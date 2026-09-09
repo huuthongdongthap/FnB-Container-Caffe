@@ -32,7 +32,7 @@ export function AccountEmpty() {
             className="text-sm"
             style={{
               color: 'var(--aura-text-secondary, #a0a8b0)',
-              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              fontFamily: 'var(--aura-font-body)',
             }}
           >
             {t('noData')}

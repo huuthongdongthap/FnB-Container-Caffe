@@ -27,12 +27,12 @@ interface MobileLoginProps {
 
 /* ── Static styles ──────────────────────────────────────────────────*/
 
-const wrap: React.CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f7f4', fontFamily: "'Space Grotesk', sans-serif", padding: 16 };
+const wrap: React.CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f7f4', fontFamily: "var(--aura-font-body)", padding: 16 };
 const card: React.CSSProperties = { width: '100%', maxWidth: 380, background: '#ffffff', borderRadius: 16, padding: '32px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.04)' };
 const logo: React.CSSProperties = { fontSize: 28, fontWeight: 700, color: '#F97316', textAlign: 'center', marginBottom: 4, letterSpacing: '-0.5px' };
 const subtitle: React.CSSProperties = { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32 };
 const label: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a2e', marginBottom: 6 };
-const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', fontSize: 16, border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none', background: '#f9fafb', color: '#1a1a2e', fontFamily: "'Space Grotesk', sans-serif", transition: 'border-color 0.15s' };
+const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', fontSize: 16, border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none', background: '#f9fafb', color: '#1a1a2e', fontFamily: "var(--aura-font-body)", transition: 'border-color 0.15s' };
 const pinRow: React.CSSProperties = { display: 'flex', gap: 10, justifyContent: 'center', margin: '8px 0 24px' };
 const errorBox: React.CSSProperties = { marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', fontSize: 13, textAlign: 'center' };
 
@@ -44,14 +44,14 @@ function pinBoxStyle(focused: boolean): React.CSSProperties {
     border: focused ? '2px solid #F97316' : '2px solid #e5e7eb', borderRadius: 12,
     background: '#f9fafb', color: '#1a1a2e', outline: 'none',
     boxShadow: focused ? '0 0 0 3px rgba(249,115,22,0.15)' : 'none',
-    fontFamily: "'Space Grotesk', sans-serif", caretColor: '#F97316',
+    fontFamily: "var(--aura-font-body)", caretColor: '#F97316',
   };
 }
 
 function submitStyle(disabled: boolean): React.CSSProperties {
   return {
     width: '100%', padding: '14px 0', fontSize: 16, fontWeight: 600, border: 'none', borderRadius: 12,
-    background: '#F97316', color: '#ffffff', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+    background: '#F97316', color: '#ffffff', cursor: 'pointer', fontFamily: "var(--aura-font-body)",
     transition: 'opacity 0.15s', marginTop: 8, opacity: disabled ? 0.7 : 1,
   };
 }

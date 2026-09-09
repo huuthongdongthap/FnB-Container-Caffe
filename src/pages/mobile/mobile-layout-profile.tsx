@@ -16,7 +16,7 @@ export default function ProfileScreen({ user, onLogout }: { user: MobileUser; on
       </div>
       <button
         onClick={onLogout}
-        style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 15, fontWeight: 600, border: '2px solid #fecaca', borderRadius: 12, background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" }}
+        style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 15, fontWeight: 600, border: '2px solid #fecaca', borderRadius: 12, background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: "var(--aura-font-body)" }}
       >
         {t('auth.logout', 'Đăng xuất / Logout')}
       </button>

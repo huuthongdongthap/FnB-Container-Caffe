@@ -49,7 +49,7 @@ export function ReviewsPagination({
         style={{
           color: 'var(--aura-text-secondary, #a0a8b0)',
           fontFamily:
-            'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            'var(--aura-font-body)',
         }}
       >
         {t('pageOf', { page, totalPages })}

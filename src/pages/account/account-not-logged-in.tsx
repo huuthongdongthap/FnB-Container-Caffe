@@ -48,7 +48,7 @@ export function AccountNotLoggedIn() {
             className="max-w-xs text-sm"
             style={{
               color: 'var(--aura-text-secondary, #a0a8b0)',
-              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              fontFamily: 'var(--aura-font-body)',
             }}
           >
             {t('notLoggedIn.body')}
@@ -60,7 +60,7 @@ export function AccountNotLoggedIn() {
             style={{
               backgroundColor: 'var(--aura-primary, #c6c6c7)',
               color: 'var(--aura-on-primary, #1a1a2e)',
-              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              fontFamily: 'var(--aura-font-body)',
             }}
           >
             {t('notLoggedIn.cta')}

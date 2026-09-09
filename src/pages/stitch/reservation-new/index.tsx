@@ -1,11 +1,8 @@
 import { useState } from 'react';
-import { StitchShell } from '../StitchBase';
-import { PageHeader } from '@/components/stitch/StitchLayout';
 import { PartySizeSelector } from './party-size-selector';
 import { DateTimePicker } from './date-time-picker';
 import { ZoneSelector } from './zone-selector';
 import { ContactInfoForm } from './contact-info-form';
-import { BottomNav } from './bottom-nav';
 import { ReservationStyles } from './reservation-new-styles';
 
 // Re-exports for backward compatibility
@@ -24,10 +21,9 @@ export default function ReservationNew() {
   };
 
   return (
-    <StitchShell>
-      <PageHeader brand="AURA CAFE" scrollEffect />
-
-      <main className="mt-20 mb-32 max-w-container-max mx-auto px-5 lg:px-16">
+    <div className="text-on-surface">
+      {/* TopAppBar + NavigationBar provided by MD3AppShell (StitchAppLayout) */}
+      <main className="mb-32 max-w-container-max mx-auto px-5 lg:px-16">
         <form onSubmit={handleSubmit} className="space-y-12">
           <section className="mb-12">
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
@@ -58,8 +54,7 @@ export default function ReservationNew() {
         </form>
       </main>
 
-      <BottomNav />
       <ReservationStyles />
-    </StitchShell>
+    </div>
   );
 }

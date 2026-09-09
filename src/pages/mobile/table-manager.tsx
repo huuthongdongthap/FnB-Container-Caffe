@@ -15,7 +15,7 @@ interface TableRow {
 
 /* ── Static styles ──────────────────────────────────────────────────*/
 
-const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: "'Space Grotesk', sans-serif", paddingBottom: 24 };
+const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: "var(--aura-font-body)", paddingBottom: 24 };
 const header: React.CSSProperties = { padding: '14px 16px', background: '#ffffff', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10 };
 const headerTitle: React.CSSProperties = { fontSize: 20, fontWeight: 700, color: '#1a1a2e', margin: 0 };
 const grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, padding: '14px 14px' };
@@ -28,8 +28,8 @@ const confirmOverlay: React.CSSProperties = { position: 'fixed', inset: 0, backg
 const confirmBox: React.CSSProperties = { background: '#fff', borderRadius: 16, padding: '24px 20px', maxWidth: 320, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' };
 const confirmText: React.CSSProperties = { fontSize: 15, color: '#1a1a2e', textAlign: 'center', margin: 0, lineHeight: 1.5 };
 const confirmBtns: React.CSSProperties = { display: 'flex', gap: 10, marginTop: 20 };
-const confirmYes: React.CSSProperties = { flex: 1, padding: '11px 0', fontSize: 14, fontWeight: 600, border: 'none', borderRadius: 10, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" };
-const confirmNo: React.CSSProperties = { flex: 1, padding: '11px 0', fontSize: 14, fontWeight: 600, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#fff', color: '#374151', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" };
+const confirmYes: React.CSSProperties = { flex: 1, padding: '11px 0', fontSize: 14, fontWeight: 600, border: 'none', borderRadius: 10, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: "var(--aura-font-body)" };
+const confirmNo: React.CSSProperties = { flex: 1, padding: '11px 0', fontSize: 14, fontWeight: 600, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#fff', color: '#374151', cursor: 'pointer', fontFamily: "var(--aura-font-body)" };
 
 /* ── Lookup maps ────────────────────────────────────────────────────*/
 
@@ -58,7 +58,7 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
   const base: React.CSSProperties = {
     flex: '1 1 0', minWidth: 56, padding: '7px 4px', fontSize: 11, fontWeight: 600,
     border: `1.5px solid ${color}`, borderRadius: 8,
-    fontFamily: "'Space Grotesk', sans-serif", cursor: 'pointer',
+    fontFamily: "var(--aura-font-body)", cursor: 'pointer',
   };
   return active ? { ...base, background: color, color: '#fff' } : { ...base, background: '#fff', color };
 }

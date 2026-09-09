@@ -47,7 +47,7 @@ export function AccountError({ error, onRetry }: AccountErrorProps) {
             className="text-sm"
             style={{
               color: 'var(--aura-text-secondary, #a0a8b0)',
-              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              fontFamily: 'var(--aura-font-body)',
             }}
           >
             {error}
@@ -59,7 +59,7 @@ export function AccountError({ error, onRetry }: AccountErrorProps) {
             style={{
               backgroundColor: 'var(--aura-primary, #c6c6c7)',
               color: 'var(--aura-on-primary, #1a1a2e)',
-              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              fontFamily: 'var(--aura-font-body)',
             }}
           >
             {t('error.retry')}

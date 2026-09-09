@@ -115,7 +115,7 @@ export function LoyaltyPage({
         style={{
           backgroundColor: '#051424',
           color: '#d5e4fa',
-          fontFamily: "'Space Grotesk', sans-serif",
+          fontFamily: "var(--aura-font-body)",
         }}
       >
         <LoyaltyHeader />

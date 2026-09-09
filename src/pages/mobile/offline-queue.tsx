@@ -23,7 +23,7 @@ interface OfflineOrderRecord {
 
 /* ── Static styles ──────────────────────────────────────────────────*/
 
-const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: "'Space Grotesk', sans-serif", paddingBottom: 24 };
+const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: "var(--aura-font-body)", paddingBottom: 24 };
 const header: React.CSSProperties = { padding: '14px 16px', background: '#ffffff', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
 const headerTitle: React.CSSProperties = { fontSize: 20, fontWeight: 700, color: '#1a1a2e', margin: 0 };
 const statusText: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#6b7280' };
@@ -31,7 +31,7 @@ const list: React.CSSProperties = { padding: '12px 14px', display: 'flex', flexD
 const listCard: React.CSSProperties = { background: '#ffffff', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: 5 };
 const endpointText: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: '#1a1a2e', wordBreak: 'break-all', marginTop: 3 };
 const timeText: React.CSSProperties = { fontSize: 11, color: '#9ca3af', marginTop: 2 };
-const btnSync: React.CSSProperties = { margin: '8px 14px 0', padding: '14px 0', fontSize: 15, fontWeight: 600, border: 'none', borderRadius: 12, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'opacity 0.15s' };
+const btnSync: React.CSSProperties = { margin: '8px 14px 0', padding: '14px 0', fontSize: 15, fontWeight: 600, border: 'none', borderRadius: 12, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: "var(--aura-font-body)", transition: 'opacity 0.15s' };
 const empty: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#9ca3af', fontSize: 14, textAlign: 'center' };
 const payloadPre: React.CSSProperties = { fontSize: 11, background: '#f9fafb', padding: '8px 10px', borderRadius: 6, marginTop: 4, overflow: 'auto', maxHeight: 80, color: '#374151' };
 
