@@ -91,7 +91,7 @@ export function StitchAccountNew({
         aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
       >
         <button
-          type="button"
+         type="button"
           className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
           aria-label={t('stitch.accountDashboard.openMenu')}
         >
@@ -103,7 +103,7 @@ export function StitchAccountNew({
         </h1>
 
         <button
-          type="button"
+         type="button"
           className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
           aria-label="Notifications"
         >
@@ -118,10 +118,10 @@ export function StitchAccountNew({
 
         {/* ─── Quick Order Button ─── */}
         <button
-          type="button"
+         type="button"
           className="w-full h-14 rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition-transform group"
           style={{
-            background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, #A0522D 100%)',
+            background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, var(--aura-chrome-mid, #A0522D) 100%)',
             boxShadow: 'inset 0 1px 0 rgba(var(--aura-glass-bg),0.2)',
           }}
           aria-label={t('stitch.accountDashboard.quickOrder')}

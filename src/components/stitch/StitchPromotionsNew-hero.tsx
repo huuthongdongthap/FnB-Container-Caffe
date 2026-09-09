@@ -63,7 +63,7 @@ export function HeroSection({ hero, countdownSeconds }: HeroSectionProps) {
               {hero.description}
             </p>
             <button
-              type="button"
+             type="button"
               className="w-full bg-[var(--aura-bronze-shimmer)] py-2 text-center font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-[0.2em] text-[var(--aura-surface-dim)] transition-all active:scale-95"
             >
               Claim Offer

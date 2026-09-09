@@ -31,7 +31,7 @@ export const REVIEWS_STYLES = `
 
   /* Chrome gradient for buttons */
   .chrome-gradient {
-    background: linear-gradient(135deg, #c6c6c7 0%, #e3e2e3 50%, var(--aura-chrome-dim) 100%);
+    background: linear-gradient(135deg, var(--aura-text-body, #c6c6c7) 0%, var(--aura-chrome-bright, #e3e2e3) 50%, var(--aura-chrome-dim) 100%);
   }
 
   /* Photo hover effects */

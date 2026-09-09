@@ -42,7 +42,7 @@ export function RewardHistory({
           {t('stitch.referral.rewardsTitle')}
         </h3>
         <button
-          type="button"
+         type="button"
           onClick={onDownloadStatement}
           className={`${BODY_FONT} text-[10px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] underline transition-colors hover:text-[var(--aura-chrome-light,#C9D6DF)]`}
           aria-label={t('stitch.referral.downloadStatementAria')}

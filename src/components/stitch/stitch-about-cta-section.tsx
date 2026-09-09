@@ -36,7 +36,7 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
           39 Nguyen Tat Thanh, Sa Dec, Dong Thap. Where industrial container style meets premium coffee experience.
         </p>
         <button
-          type="button"
+         type="button"
           onClick={onCtaClick}
           className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,var(--aura-chrome-light,#C9D6DF))]"
           style={{ backgroundColor: 'var(--aura-tertiary, var(--aura-chrome-light, #C9D6DF))' }}

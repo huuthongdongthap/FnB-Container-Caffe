@@ -61,7 +61,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
         </div>
 
         <button
-          type="button"
+         type="button"
           onClick={() => onNavClick?.('order')}
           className="bg-[var(--aura-surface-dim)] text-[var(--aura-noir-deep)] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:bg-[var(--aura-chrome-bright)] transition-all"
           style={{ fontFamily: "var(--aura-font-body)" }}

@@ -61,7 +61,7 @@ export function FilterTabs({
 
           {/* Filter by type — desktop only */}
           <button
-            type="button"
+           type="button"
             onClick={onFilterByType}
             className="hidden items-center gap-1 font-label-caps text-[10px] uppercase tracking-wider md:flex"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}

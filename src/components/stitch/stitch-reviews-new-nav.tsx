@@ -88,7 +88,7 @@ export function ReviewsNavHeader() {
 
         {/* Book a Table */}
         <button
-          type="button"
+         type="button"
           className="chrome-gradient rounded-full px-6 py-2 text-[var(--aura-noir-deep, #0A1A2E)] uppercase transition-transform active:scale-95"
           style={{
             fontFamily: "var(--aura-font-body)",

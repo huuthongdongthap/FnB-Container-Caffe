@@ -25,7 +25,7 @@ export function PaymentOption({
   onClick,
 }: PaymentOptionProps) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={cn(
         GLASS_CARD_CLASSES,
@@ -58,7 +58,7 @@ export function TopAppBar({
   const { t } = useTranslation();
   return (
     <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/60 backdrop-blur-[8px] border-b border-white/20 flex justify-between items-center px-6 h-16">
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/cart')}
         className="active:scale-95 transition-transform text-[var(--aura-chrome-bright)]"
         aria-label="Go back"
@@ -68,7 +68,7 @@ export function TopAppBar({
       <h1 className="font-['Space_Grotesk'] text-[20px] font-bold leading-tight uppercase tracking-widest text-[var(--aura-chrome-bright)]">
         {t('orderFailure.title', 'ORDER FAILED')}
       </h1>
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/account')}
         className="active:scale-95 transition-transform text-[var(--aura-chrome-bright)]"
         aria-label="Account"
@@ -123,7 +123,7 @@ export function RetryButton({
   const { t } = useTranslation();
   return (
     <section className="w-full">
-      <button
+      <button type="button"
         onClick={onRetry}
         disabled={isProcessing}
         className="w-full bg-[var(--aura-bronze-shimmer)] text-white font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase py-6 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"

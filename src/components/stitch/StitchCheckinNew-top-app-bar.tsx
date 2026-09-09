@@ -16,7 +16,7 @@ export function TopAppBar({ onMenu, onAccount }: TopAppBarProps) {
       style={{ boxShadow: '0px 0px 15px rgba(var(--aura-chrome-light),0.1)' }}
     >
       <div className="flex items-center gap-4">
-        <button
+        <button type="button"
           onClick={onMenu}
           className="text-[var(--aura-bronze-shimmer)] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
           aria-label="Menu"
@@ -27,7 +27,7 @@ export function TopAppBar({ onMenu, onAccount }: TopAppBarProps) {
           AURA CAFE
         </h1>
       </div>
-      <button
+      <button type="button"
         onClick={onAccount}
         className="text-[var(--aura-bronze-shimmer)] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
         aria-label="Account"

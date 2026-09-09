@@ -17,7 +17,7 @@ export function StitchMenuNewSearchBar({
   return (
     <div className="relative w-full md:w-80 group" role="search">
       <Search
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors group-focus-within:text-[#c6c6c7]"
+        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors group-focus-within:text-[var(--aura-text-body, #c6c6c7)]"
         aria-hidden="true"
       />
       <input
@@ -30,7 +30,7 @@ export function StitchMenuNewSearchBar({
         style={{ fontFamily: 'var(--aura-font-body)' }}
       />
       {searchQuery !== '' && (
-        <button
+        <button type="button"
           onClick={() => onSearchChange('')}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors hover:text-[var(--aura-text-body,#c6c6c7)]"
           aria-label={t('stitch.clearSearchAriaLabel')}

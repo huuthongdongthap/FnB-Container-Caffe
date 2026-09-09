@@ -65,7 +65,7 @@ export function HeroSection({
         <div className="flex flex-col items-center justify-center gap-6 md:flex-row">
           {/* Explore the Menu */}
           <button
-            type="button"
+           type="button"
             onClick={onExploreMenu}
             className="rounded-none px-12 py-3 text-[14px] uppercase leading-[1.0] tracking-widest transition-all"
             style={{
@@ -89,7 +89,7 @@ export function HeroSection({
           </button>
           {/* View Space */}
           <button
-            type="button"
+           type="button"
             onClick={onViewSpace}
             className="rounded-none px-12 py-3 text-[14px] uppercase leading-[1.0] tracking-widest transition-all"
             style={{

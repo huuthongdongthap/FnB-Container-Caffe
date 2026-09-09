@@ -88,7 +88,7 @@ export function EventCardItem({
             {event.metaLabel}
           </span>
           <button
-            type="button"
+           type="button"
             onClick={() => onBookTable?.(event.id)}
             className="rounded px-4 py-2 font-label-caps text-[10px] uppercase tracking-wider transition-all"
             style={{

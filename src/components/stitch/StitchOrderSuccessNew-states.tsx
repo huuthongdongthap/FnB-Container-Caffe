@@ -84,7 +84,7 @@ export function ErrorState({
           <p className="mt-2 text-sm text-[var(--aura-chrome-soft)]">{message}</p>
         </div>
         {onRetry && (
-          <button
+          <button type="button"
             onClick={onRetry}
             className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[var(--aura-chrome-soft)] via-[var(--aura-chrome-dim)] to-[var(--aura-chrome-dim)] px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-bright)] shadow-xl transition-all hover:brightness-110 active:scale-95"
             aria-label={t('stitch.orderSuccessRetry')}

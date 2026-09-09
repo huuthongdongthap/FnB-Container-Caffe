@@ -72,7 +72,7 @@ export function StitchTrackOrderNew({
         <OrderSummary items={items} total={total} />
 
         <div className="pt-4">
-          <button
+          <button type="button"
             onClick={onTrackMap}
             className="w-full h-16 bg-[var(--aura-bronze-shimmer)] text-white font-['Space_Grotesk'] text-[14px] font-medium tracking-[0.2em] uppercase rounded-xl flex items-center justify-center gap-3 transition-transform active:scale-95 duration-150"
             style={{ boxShadow: '0 0 15px rgba(212, 165, 116, 0.4)' }}

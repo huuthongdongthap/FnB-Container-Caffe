@@ -87,7 +87,7 @@ export function ReviewCard({
           fontSize: '16px',
           lineHeight: '1.6',
           fontWeight: 400,
-          color: review.isHighlighted ? '#d3e4ff' : 'var(--aura-chrome-soft)',
+          color: review.isHighlighted ? 'var(--aura-chrome-bright, #d3e4ff)' : 'var(--aura-chrome-soft)',
         }}
       >
         &ldquo;{review.content}&rdquo;
@@ -130,7 +130,7 @@ export function ReviewCard({
           {review.date}
         </span>
         <button
-          type="button"
+         type="button"
           onClick={handleLike}
           className={`flex items-center gap-1 transition-colors ${
             liked

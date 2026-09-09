@@ -12,7 +12,7 @@ export function SocialIconButton({
   label: string;
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className="w-10 h-10 border border-[var(--aura-chrome-bright)]/20 flex items-center justify-center hover:bg-[var(--aura-bronze-shimmer)] hover:text-white/90 transition-all"
       aria-label={label}

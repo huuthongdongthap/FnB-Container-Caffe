@@ -79,7 +79,7 @@ export function StitchAccountDashNew({
         {/* Quick Order Button */}
         <section>
           <button
-            type="button"
+           type="button"
             className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)]"
             aria-label={t('stitch.accountDashboard.quickOrder', 'QUICK ORDER')}
           >

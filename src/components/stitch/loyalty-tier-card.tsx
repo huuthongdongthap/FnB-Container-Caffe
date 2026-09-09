@@ -120,7 +120,7 @@ export function TierCard({
           </div>
         </div>
         <button
-          type="button"
+         type="button"
           onClick={onRedeemPoints}
           className="mt-[24px] w-full py-3 font-bold rounded-lg active:scale-95 transition-transform"
           style={{

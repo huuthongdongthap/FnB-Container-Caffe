@@ -83,7 +83,7 @@ export function PastArchives({
         {/* View all */}
         <div className="mt-12 text-center">
           <button
-            type="button"
+           type="button"
             onClick={onViewArchive}
             className="font-label-caps text-xs uppercase tracking-wider transition-all hover:underline"
             style={{ color: 'var(--aura-chrome-light, #efbd8a)' }}

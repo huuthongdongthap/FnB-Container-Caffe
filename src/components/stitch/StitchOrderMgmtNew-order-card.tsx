@@ -115,7 +115,7 @@ export function OrderCard({ order, onAction }: Readonly<OrderCardProps>) {
 
         {/* Actions */}
         {isCancelled ? (
-          <button
+          <button type="button"
             className="w-full rounded-lg border border-white/5 bg-white/5 py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:bg-white/10 active:scale-95"
             aria-label={tTerminal('viewLog')}
           >

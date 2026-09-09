@@ -36,7 +36,7 @@ export function OrderHeader({
     >
       <div className="flex items-center justify-between px-5 h-12">
         <button
-          type="button"
+         type="button"
           onClick={onBack}
           className="active:scale-95 transition-transform text-[var(--aura-chrome-bright,#E8EEF3)]"
           aria-label={t('stitch.ordering.back', { defaultValue: 'Go back' })}
@@ -50,11 +50,11 @@ export function OrderHeader({
           })}
         </h1>
         <button
-          type="button"
+         type="button"
           onClick={onToggleSearch}
           className={clsx(
             'active:scale-95 transition-transform',
-            showSearch ? 'text-[var(--aura-text-primary, #e8e8e8)]' : 'text-[#ffb779]',
+            showSearch ? 'text-[var(--aura-text-primary, #e8e8e8)]' : 'text-[var(--aura-chrome-bright, #ffb779)]',
           )}
           aria-label={t('stitch.ordering.toggleSearch', {
             defaultValue: showSearch ? 'Close search' : 'Open search',

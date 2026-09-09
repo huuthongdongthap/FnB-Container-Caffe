@@ -15,7 +15,7 @@ export function TopBar({ onBack }: TopBarProps) {
   return (
     <header className="w-full top-0 sticky bg-[var(--aura-surface-dim)] dark:bg-[var(--aura-surface-dim)] border-b border-[var(--aura-chrome-soft)]/10 z-50 h-16 flex items-center px-5">
       <div className="flex items-center w-full">
-        <button
+        <button type="button"
           onClick={onBack}
           className="mr-4 text-[var(--aura-bronze-shimmer)] hover:opacity-80 transition-opacity"
           aria-label="Go back"

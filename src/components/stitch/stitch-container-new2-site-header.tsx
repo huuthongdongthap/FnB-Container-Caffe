@@ -80,7 +80,7 @@ export function SiteHeader({
 
         {/* Reservation button */}
         <button
-          type="button"
+         type="button"
           onClick={onReservation}
           className="px-6 py-2 rounded-lg font-bold active:scale-95 transition-all duration-300"
           style={{

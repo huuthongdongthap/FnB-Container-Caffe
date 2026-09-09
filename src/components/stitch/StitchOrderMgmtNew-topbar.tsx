@@ -38,7 +38,7 @@ export function StitchOrderMgmtTopBar({
     >
       <div className="flex items-center gap-4">
         {/* Mobile hamburger */}
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
           onClick={onToggleSidebar}
           aria-label={tTerminal('openSidebar')}
@@ -59,13 +59,13 @@ export function StitchOrderMgmtTopBar({
 
       {/* Right actions */}
       <div className="flex items-center gap-4 md:gap-6">
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
           aria-label={tTerminal('notifications')}
         >
           <Bell size={20} />
         </button>
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
           aria-label={tTerminal('help')}
         >

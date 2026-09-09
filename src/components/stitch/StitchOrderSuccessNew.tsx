@@ -97,7 +97,7 @@ export function StitchOrderSuccessNew({
 
       {/* ═══════════ HEADER ════════════════════════════════════════════ */}
       <header className="fixed top-0 w-full z-50 bg-[color-mix(in_oklab,var(--aura-surface-dim)_80%,transparent)] backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16">
-        <button
+        <button type="button"
           onClick={onBack}
           className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
           aria-label={t('stitch.orderSuccessNewBack')}
@@ -112,7 +112,7 @@ export function StitchOrderSuccessNew({
           AURA CAFE
         </h1>
 
-        <button
+        <button type="button"
           onClick={onAccount}
           className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
           aria-label={t('stitch.orderSuccessNewAccount')}

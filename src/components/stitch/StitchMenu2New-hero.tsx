@@ -25,7 +25,7 @@ export function Hero({ activeCategory, onCategoryChange }: HeroProps) {
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.key;
             return (
-              <button
+              <button type="button"
                 key={cat.key}
                 role="tab"
                 aria-selected={isActive}

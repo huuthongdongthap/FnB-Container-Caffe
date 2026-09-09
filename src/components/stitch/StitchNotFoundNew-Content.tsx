@@ -45,7 +45,7 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
 
         {/* Call to action */}
         <div className="flex flex-col items-center gap-6">
-          <button
+          <button type="button"
             onClick={onNavigateHome}
             className="inline-flex items-center justify-center gap-3 bg-[var(--aura-bronze-shimmer)] text-[var(--aura-text-primary)] px-8 py-4 font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm transition-transform active:scale-95 hover:brightness-110 overflow-hidden relative group/btn"
           >
@@ -56,14 +56,14 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
           <div className="w-12 h-px bg-[var(--aura-chrome-soft)]/30" />
 
           <div className="flex gap-8">
-            <button
+            <button type="button"
               onClick={onSearch}
               className="text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
             </button>
-            <button
+            <button type="button"
               onClick={onHelp}
               className="text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
               aria-label="Help"

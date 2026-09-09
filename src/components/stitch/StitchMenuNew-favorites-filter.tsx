@@ -16,7 +16,7 @@ export function StitchMenuNewFavoritesFilter({
 
   return (
     <div className="mb-6 flex items-center">
-      <button
+      <button type="button"
         onClick={onToggle}
         className={`flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
           showFavoritesOnly

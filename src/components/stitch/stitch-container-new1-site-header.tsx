@@ -81,7 +81,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
 
         {/* Reservation button */}
         <button
-          type="button"
+         type="button"
           onClick={onReservation}
           className="rounded-full px-6 transition-transform hover:scale-105 active:scale-95"
           style={{

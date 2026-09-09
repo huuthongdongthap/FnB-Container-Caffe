@@ -31,10 +31,10 @@ function RevenueChart() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="rounded-full bg-white/10 px-3 py-1 text-[12px] text-[var(--aura-text-primary, #e8e8e8)]">
+          <button type="button" className="rounded-full bg-white/10 px-3 py-1 text-[12px] text-[var(--aura-text-primary, #e8e8e8)]">
             Weekly
           </button>
-          <button className="rounded-full px-3 py-1 text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5">
+          <button type="button" className="rounded-full px-3 py-1 text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5">
             Monthly
           </button>
         </div>
@@ -102,7 +102,7 @@ function StaffPanel() {
         ))}
       </div>
 
-      <button className="w-full rounded-xl bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] py-4 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-noir-void, #050D1A)] shadow-lg shadow-[rgba(201,214,223,0.3)] transition-all hover:brightness-110 active:scale-[0.97]">
+      <button type="button" className="w-full rounded-xl bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] py-4 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-noir-void, #050D1A)] shadow-lg shadow-[rgba(201,214,223,0.3)] transition-all hover:brightness-110 active:scale-[0.97]">
         CLOCK IN
       </button>
     </div>
@@ -153,7 +153,7 @@ function PromotionsPanel() {
             </div>
           </div>
         ))}
-        <button className="w-full rounded-lg border border-dashed border-white/20 py-3 text-[13px] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:bg-white/5 hover:text-[var(--aura-text-primary, #e8e8e8)]">
+        <button type="button" className="w-full rounded-lg border border-dashed border-white/20 py-3 text-[13px] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:bg-white/5 hover:text-[var(--aura-text-primary, #e8e8e8)]">
           + Create New Promotion
         </button>
       </div>

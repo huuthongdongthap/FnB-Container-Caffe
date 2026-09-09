@@ -12,14 +12,14 @@ export function Header({ onNavigate }: { onNavigate?: (path: string) => void }) 
         AURA CAFE
       </div>
       <div className="flex gap-4">
-        <button
+        <button type="button"
           onClick={() => onNavigate?.('/search')}
           className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 duration-200"
           aria-label="Search"
         >
           <Search className="w-5 h-5" />
         </button>
-        <button
+        <button type="button"
           onClick={() => onNavigate?.('/account')}
           className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 duration-200"
           aria-label="Account"

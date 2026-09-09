@@ -82,7 +82,7 @@ export function LandingNav() {
           {t('landing.about', 'About')}
         </a>
       </div>
-      <button
+      <button type="button"
         className="px-6 py-2 active:opacity-80 active:scale-95 transition-all duration-300"
         style={{
           backgroundColor: 'var(--aura-chrome-bright)',

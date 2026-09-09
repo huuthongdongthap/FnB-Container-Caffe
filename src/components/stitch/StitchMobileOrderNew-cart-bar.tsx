@@ -61,7 +61,7 @@ export function FloatingCartBar({
 
         {/* View Cart Button */}
         <button
-          type="button"
+         type="button"
           onClick={() => onViewCart?.(cart)}
           className="bg-[var(--aura-chrome-mid)] text-white px-8 py-3 rounded-full font-body text-[12px] font-semibold tracking-wider uppercase active:scale-95 transition-transform shadow-lg flex items-center gap-2"
           aria-label={t('stitch.ordering.viewCart', {

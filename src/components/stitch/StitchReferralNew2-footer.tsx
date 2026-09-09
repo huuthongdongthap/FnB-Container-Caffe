@@ -32,7 +32,7 @@ export function ReferralFooter() {
             href={link.href}
             className={`flex flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
               isActive
-                ? 'rounded-full bg-[#39475e]/40 px-4 py-1 text-[var(--aura-chrome-light, #C9D6DF)]'
+                ? 'rounded-full bg-[var(--aura-noir-steel, #39475e)]/40 px-4 py-1 text-[var(--aura-chrome-light, #C9D6DF)]'
                 : 'text-[var(--aura-text-secondary, #a0a8b0)]'
             }`}
             aria-label={label}

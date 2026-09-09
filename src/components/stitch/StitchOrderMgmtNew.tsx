@@ -88,9 +88,9 @@ export function StitchOrderMgmtNew({
           </h2>
           <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{error}</p>
           {onRefresh && (
-            <button
+            <button type="button"
               onClick={onRefresh}
-              className="mt-2 flex items-center gap-2 rounded-lg bg-[var(--aura-primary, #c6c6c7)] px-6 py-3 font-sans text-sm font-bold text-[#0c1c30] transition-all hover:brightness-110 active:scale-95"
+              className="mt-2 flex items-center gap-2 rounded-lg bg-[var(--aura-primary, #c6c6c7)] px-6 py-3 font-sans text-sm font-bold text-[var(--aura-noir-deep, #0c1c30)] transition-all hover:brightness-110 active:scale-95"
               aria-label={tTerminal('retry')}
             >
               <RefreshCw size={16} />
@@ -137,7 +137,7 @@ export function StitchOrderMgmtNew({
                 <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
                   {stat.label}
                 </span>
-                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent">
+                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #efbd8a)] to-[var(--aura-chrome-light, #d4a574)] bg-clip-text text-transparent">
                   {stat.value}
                 </span>
               </div>

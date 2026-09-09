@@ -43,7 +43,7 @@ export function StitchMenuNewHeader({ brandName }: StitchMenuNewHeaderProps) {
           </a>
         </nav>
 
-        <button
+        <button type="button"
           className="rounded-full bg-[var(--aura-chrome-bright)] px-6 py-2 text-xs font-semibold tracking-[0.1em] text-[var(--aura-noir-deep)] transition-all active:scale-95 hover:opacity-90"
           style={{ fontFamily: 'var(--aura-font-body)' }}
         >

@@ -15,7 +15,7 @@ export const POS_STYLES = `
     border-radius: 12px;
   }
   .industrial-gradient {
-    background: linear-gradient(135deg, #2a1e10 0%, var(--aura-noir-void, #050D1A) 100%);
+    background: linear-gradient(135deg, var(--aura-noir-void, #2a1e10) 0%, var(--aura-noir-void, #050D1A) 100%);
   }
   .bronze-glow:active {
     box-shadow: 0px 0px 12px rgba(242, 192, 141, 0.4);

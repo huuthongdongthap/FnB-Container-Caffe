@@ -31,7 +31,7 @@ export function DashError({ onRetry }: { onRetry?: () => void }) {
         </p>
         {onRetry && (
           <button
-            type="button"
+           type="button"
             onClick={onRetry}
             className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px] bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)] text-[var(--aura-noir-deep)]"
             style={{ fontFamily: BODY_FONT }}

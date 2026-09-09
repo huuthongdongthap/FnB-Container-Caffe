@@ -74,7 +74,7 @@ export function WeeklyStreak({
         />
       </p>
       <button
-        type="button"
+       type="button"
         onClick={onCheckIn}
         className="mt-4 w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
         style={{

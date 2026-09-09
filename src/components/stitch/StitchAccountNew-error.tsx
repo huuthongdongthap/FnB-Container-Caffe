@@ -36,7 +36,7 @@ export function AccountNewError({ onRetry }: { onRetry?: () => void }) {
         </p>
         {onRetry && (
           <button
-            type="button"
+           type="button"
             onClick={onRetry}
             className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px]"
             style={{

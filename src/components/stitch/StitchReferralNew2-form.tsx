@@ -47,17 +47,17 @@ export function ReferralCodeBlock({
             type="text"
             readOnly
             value={code}
-            className={`w-full bg-transparent px-5 py-4 ${BODY_FONT} text-lg tracking-widest text-[#efbd8a] outline-none placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/40`}
+            className={`w-full bg-transparent px-5 py-4 ${BODY_FONT} text-lg tracking-widest text-[var(--aura-chrome-light, #efbd8a)] outline-none placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/40`}
             aria-label={t('stitch.referral.referralCodeAria')}
             tabIndex={-1}
           />
           <button
-            type="button"
+           type="button"
             onClick={handleCopy}
             className={`mr-2 flex shrink-0 items-center gap-2 rounded-md px-5 py-2.5 ${BODY_FONT} text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 ${
               copied
                 ? 'bg-[var(--aura-success)]/20 text-[var(--aura-success)]'
-                : 'bg-[var(--aura-chrome-light, #C9D6DF)] text-[#0a1628]'
+                : 'bg-[var(--aura-chrome-light, #C9D6DF)] text-[var(--aura-noir-void, #0a1628)]'
             }`}
             style={copied ? {} : { boxShadow: '0 2px 12px rgba(239, 189, 138, 0.3)' }}
             aria-label={

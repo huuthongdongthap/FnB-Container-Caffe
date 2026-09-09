@@ -57,7 +57,7 @@ export function RewardCard({
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
         <button
-          type="button"
+         type="button"
           onClick={(e) => {
             e.stopPropagation();
             onClaim?.(reward.id);

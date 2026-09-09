@@ -66,7 +66,7 @@ export function StitchMenuNewMenuCard({
           >
             {item.name}
           </h3>
-          <button
+          <button type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleFavorite(item.id);
@@ -104,7 +104,7 @@ export function StitchMenuNewMenuCard({
           </p>
         )}
 
-        <button
+        <button type="button"
           onClick={() => onAddToCart(item)}
           disabled={isAdded}
           aria-label={t('stitch.addToCartAria', { name: item.name })}

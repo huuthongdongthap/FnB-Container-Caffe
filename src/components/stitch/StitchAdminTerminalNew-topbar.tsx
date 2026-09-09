@@ -25,7 +25,7 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
     >
       <div className="flex items-center gap-4 md:gap-8">
         {/* Mobile hamburger */}
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
           onClick={onOpenSidebar}
           aria-label={tTerminal('openSidebar')}
@@ -51,19 +51,19 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={tTerminal('searchPlaceholder')}
-            className="w-40 border-b border-[#44474d] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-chrome-bright, #E8EEF3)] md:w-64"
+            className="w-40 border-b border-[var(--st-outline-variant, #44474d)] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-chrome-bright, #E8EEF3)] md:w-64"
             aria-label={tTerminal('search')}
           />
         </div>
 
         {/* Icon buttons */}
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
           aria-label={tTerminal('notifications')}
         >
           <Bell size={20} />
         </button>
-        <button
+        <button type="button"
           className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
           aria-label={tTerminal('help')}
         >

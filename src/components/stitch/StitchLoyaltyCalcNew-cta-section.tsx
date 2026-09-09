@@ -6,7 +6,7 @@ export function CtaSection({ pointsPerDollar }: CtaSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       <button
-        type="button"
+       type="button"
         className="w-full bg-[var(--aura-bronze-shimmer)] py-4 font-[family-name:var(--aura-body-font)] text-sm uppercase tracking-wider text-[var(--aura-surface-dim)] shadow-lg shadow-[var(--aura-bronze-shimmer)]/20 transition-all duration-200 active:scale-95"
       >
         Quick Order

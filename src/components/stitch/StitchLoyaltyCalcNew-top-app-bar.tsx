@@ -5,7 +5,7 @@ export function TopAppBar() {
     <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[var(--aura-surface-container)] bg-[var(--aura-surface-dim)] px-5">
       <div className="flex items-center gap-4">
         <button
-          type="button"
+         type="button"
           className="text-[var(--aura-chrome-bright)] active:scale-95"
           aria-label="Menu"
         >

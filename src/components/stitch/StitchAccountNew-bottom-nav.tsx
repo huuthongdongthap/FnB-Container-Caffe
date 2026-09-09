@@ -27,7 +27,7 @@ function BottomNavItem({
 }) {
   return (
     <button
-      type="button"
+     type="button"
       className={clsx(
         'flex flex-col items-center justify-center gap-1 transition-all active:scale-90 min-w-[48px] min-h-[48px] rounded-full px-4 py-1',
         active

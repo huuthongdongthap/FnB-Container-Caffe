@@ -108,7 +108,7 @@ export function CartSidebar({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
-                    type="button"
+                   type="button"
                     onClick={() => removeFromCart(item.id)}
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm glass-card active:scale-90 transition-transform"
                     aria-label={`${t('posNew.decrementQuantity')} ${item.name}`}
@@ -119,7 +119,7 @@ export function CartSidebar({
                     {item.quantity}
                   </span>
                   <button
-                    type="button"
+                   type="button"
                     onClick={() => addToCart(item)}
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[rgba(var(--aura-chrome-light),0.1)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(var(--aura-chrome-light),0.18)] active:scale-90 transition-transform"
                     aria-label={`${t('posNew.incrementQuantity')} ${item.name}`}
@@ -153,7 +153,7 @@ export function CartSidebar({
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <button
-            type="button"
+           type="button"
             className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(var(--aura-chrome-light),0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
             onClick={() => onPayment?.('payos')}
             aria-label={t('posNew.payos')}
@@ -164,7 +164,7 @@ export function CartSidebar({
             </span>
           </button>
           <button
-            type="button"
+           type="button"
             className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(var(--aura-chrome-light),0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
             onClick={() => onPayment?.('cod')}
             aria-label={t('posNew.cod')}
@@ -176,8 +176,8 @@ export function CartSidebar({
           </button>
         </div>
         <button
-          type="button"
-          className="w-full bg-[var(--aura-primary, #f2c08d)] py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[#1a1008] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(var(--aura-chrome-light),0.15)] font-body"
+         type="button"
+          className="w-full bg-[var(--aura-primary, #f2c08d)] py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[var(--aura-noir-void, #1a1008)] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(var(--aura-chrome-light),0.15)] font-body"
           onClick={() => onCompleteOrder?.(cart, total)}
           disabled={cart.length === 0}
           aria-label={t('posNew.completeOrder')}

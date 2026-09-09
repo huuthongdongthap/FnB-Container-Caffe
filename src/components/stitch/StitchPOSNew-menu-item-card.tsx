@@ -45,7 +45,7 @@ export function MenuItemCard({
           {quantity > 0 ? (
             <div className="flex items-center gap-1 bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 10%,transparent)] rounded-lg px-1.5 py-1">
               <button
-                type="button"
+               type="button"
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-primary,var(--aura-chrome-bright,#eae1db))] hover:bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] transition-all active:scale-90"
                 aria-label={t('posNew.decrementQuantity')}
@@ -56,7 +56,7 @@ export function MenuItemCard({
                 {quantity}
               </span>
               <button
-                type="button"
+               type="button"
                 onClick={(e) => { e.stopPropagation(); onAdd(); }}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] text-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] transition-all active:scale-90"
                 aria-label={t('posNew.incrementQuantity')}
@@ -66,7 +66,7 @@ export function MenuItemCard({
             </div>
           ) : (
             <button
-              type="button"
+             type="button"
               onClick={(e) => { e.stopPropagation(); onAdd(); }}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 8%,transparent)] text-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] hover:bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] transition-all active:scale-90"
               aria-label={t('posNew.addToCart')}

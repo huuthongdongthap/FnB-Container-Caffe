@@ -55,7 +55,7 @@ export function StitchOrderFailureNew({
       <main
         className="pt-24 px-6 flex flex-col items-start gap-12 min-h-screen pb-32"
         style={{
-          background: 'radial-gradient(circle at 50% 50%, #0c1a2d 0%, var(--aura-surface-dim) 100%)',
+          background: 'radial-gradient(circle at 50% 50%, var(--aura-noir-deep, #0c1a2d) 0%, var(--aura-surface-dim) 100%)',
         }}
       >
         <ErrorHeroSection />

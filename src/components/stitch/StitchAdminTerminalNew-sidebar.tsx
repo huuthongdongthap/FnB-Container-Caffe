@@ -37,7 +37,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
       <aside
         ref={ref}
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[#44474d]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-[8px] shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--st-outline-variant, #44474d)]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-[8px] shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
         aria-label={tTerminal('sidebar')}
@@ -73,7 +73,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                       'flex items-center gap-4 px-4 py-3 text-sm transition-all duration-300 ease-in-out rounded-lg mb-0.5',
                       active
                         ? 'border-r-2 border-[var(--aura-chrome-bright, #E8EEF3)] bg-[rgba(201,214,223,0.1)] text-[var(--aura-chrome-bright, #E8EEF3)]'
-                        : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[#273a55]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
+                        : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[var(--st-surface-container-highest, #273a55)]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                     )}
                     aria-current={active ? 'page' : undefined}
                     aria-label={tNav(item.to)}
@@ -89,7 +89,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
 
         {/* Bottom section */}
         <div className="mt-auto px-6">
-          <button
+          <button type="button"
             className="mb-6 w-full rounded-lg bg-[var(--aura-chrome-mid, #6B9FB8)] py-3 font-bold text-white transition-transform active:scale-95"
             aria-label={tTerminal('generateReport')}
           >

@@ -67,7 +67,7 @@ function SearchAndFilters({
         {FILTER_TABS.map((tab) => {
           const isActive = tab.key === activeFilter;
           return (
-            <button
+            <button type="button"
               key={tab.key}
               onClick={() => onFilterChange?.(tab.key)}
               className={cn(

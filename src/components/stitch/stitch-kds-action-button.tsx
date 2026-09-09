@@ -24,7 +24,7 @@ export function ActionButton({
   className?: string;
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       disabled={disabled}
       className={cn(

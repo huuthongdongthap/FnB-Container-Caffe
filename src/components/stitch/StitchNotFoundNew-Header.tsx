@@ -7,7 +7,7 @@ interface HeaderProps {
 export function Header({ onNavigate }: HeaderProps) {
   return (
     <header className="fixed top-0 w-full backdrop-blur-md bg-[var(--aura-surface-dim)]/40 flex items-center justify-between px-5 h-20 z-40">
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/menu')}
         className="text-[var(--aura-chrome-bright)] cursor-pointer hover:opacity-80 transition-opacity"
         aria-label="Menu"

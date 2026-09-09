@@ -59,7 +59,7 @@ export function StitchHeroNewNavbar({ brandName, navVisible }: StitchHeroNewNavb
           </Link>
         </div>
 
-        <button
+        <button type="button"
           style={{
             fontFamily: SPACE_GROTESK,
             fontSize: '12px',

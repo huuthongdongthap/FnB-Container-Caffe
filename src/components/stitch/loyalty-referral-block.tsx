@@ -58,7 +58,7 @@ export function ReferralBlock({
           {code}
         </span>
         <button
-          type="button"
+         type="button"
           onClick={handleCopy}
           className="flex items-center gap-1 text-[12px] leading-none font-bold active:scale-90 transition-all"
           style={{
@@ -85,14 +85,14 @@ export function ReferralBlock({
       {/* Share buttons */}
       <div className="flex gap-2">
         <button
-          type="button"
+         type="button"
           className="flex-1 py-2 bg-white/5 border border-[var(--aura-chrome-soft)]/20 rounded flex items-center justify-center hover:bg-white/10 transition-all"
           aria-label={t('loyalty.shareCodeAria')}
         >
           <Share2 className="h-4 w-4" style={{ color: 'var(--aura-chrome-soft)' }} />
         </button>
         <button
-          type="button"
+         type="button"
           onClick={onShare}
           className="flex-[3] py-2 rounded font-bold active:scale-95 transition-transform"
           style={{

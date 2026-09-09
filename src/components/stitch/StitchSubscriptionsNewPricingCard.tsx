@@ -92,7 +92,7 @@ export function StitchSubscriptionsNewPricingCard({ tier, onSelectPlan }: Readon
         </ul>
       </div>
       <button
-        type="button"
+       type="button"
         onClick={() => onSelectPlan?.(tier.id)}
         className={`w-full py-4 font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-[0.1em] transition-all active:scale-[0.98] ${
           tier.highlighted

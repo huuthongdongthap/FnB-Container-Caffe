@@ -49,7 +49,7 @@ export function PromotionsNewsletter() {
           Promotion terms apply. Subject to availability.
         </p>
         <button
-          type="button"
+         type="button"
           className="font-[family-name:var(--aura-body-font)] text-xs text-[var(--aura-bronze-shimmer)] underline underline-offset-4 decoration-[var(--aura-bronze-shimmer)]/30 transition-all hover:decoration-[var(--aura-bronze-shimmer)]"
         >
           View Details

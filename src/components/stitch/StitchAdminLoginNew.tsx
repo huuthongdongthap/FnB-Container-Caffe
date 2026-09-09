@@ -88,14 +88,14 @@ export function StitchAdminLoginNew({
 
           <div className="flex flex-col gap-4 w-full text-center">
             <button
-              type="button"
+             type="button"
               className="font-label-caps text-label-caps text-primary/60 hover:text-primary transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.guestAriaLabel')}
             >
               {t('adminLogin.enterAsGuest')}
             </button>
             <button
-              type="button"
+             type="button"
               className="font-label-caps text-label-caps text-outline hover:text-on-surface transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.contactSupportAriaLabel')}
             >

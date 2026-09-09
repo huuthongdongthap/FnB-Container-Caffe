@@ -25,7 +25,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         {message}
       </p>
       {onRetry && (
-        <button
+        <button type="button"
           onClick={onRetry}
           className="flex items-center gap-2 rounded-lg bg-[var(--aura-chrome-bright)] px-5 py-2.5 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-noir-deep)] transition-all hover:opacity-90"
           style={{ fontFamily: "var(--aura-font-body)" }}

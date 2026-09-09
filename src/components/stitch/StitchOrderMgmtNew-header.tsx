@@ -28,7 +28,7 @@ export function StitchOrderMgmtHeader(props: Readonly<HeaderProps>) {
     <>
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <button
+        <button type="button"
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           onClick={onToggleSidebar}
           aria-label="Close sidebar"

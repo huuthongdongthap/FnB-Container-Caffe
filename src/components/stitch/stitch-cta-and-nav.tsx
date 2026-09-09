@@ -25,14 +25,14 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around rounded-t-xl border-t border-[var(--aura-chrome-soft)]/10 bg-[var(--aura-surface-container)] px-4 pb-6 pt-3 shadow-lg">
       <button
-        type="button"
+       type="button"
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-bronze-shimmer)] active:scale-90"
       >
         <span className="material-symbols-outlined mb-1">restaurant_menu</span>
         <span className="font-[family-name:var(--aura-body-font)] text-xs uppercase">Menu</span>
       </button>
       <button
-        type="button"
+       type="button"
         className="flex flex-col items-center justify-center rounded-xl bg-[var(--aura-bronze-shimmer)]/20 px-4 py-1 text-[var(--aura-bronze-shimmer)] active:scale-90"
       >
         <span
@@ -44,7 +44,7 @@ export function BottomNav() {
         <span className="font-[family-name:var(--aura-body-font)] text-xs uppercase">Reservations</span>
       </button>
       <button
-        type="button"
+       type="button"
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-bronze-shimmer)] active:scale-90"
       >
         <span className="material-symbols-outlined mb-1">person</span>

@@ -53,7 +53,7 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
           })}
         </p>
         <button
-          type="button"
+         type="button"
           onClick={onCtaClick}
           className="bg-[var(--aura-surface-dim)] hover:bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
           style={{

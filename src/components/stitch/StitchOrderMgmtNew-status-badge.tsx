@@ -44,15 +44,15 @@ export function OrderActionButton({
   onClick,
 }: Readonly<OrderActionButtonProps>) {
   return (
-    <button
+    <button type="button"
       disabled={disabled}
       onClick={onClick}
       className={cn(
         'font-sans text-[12px] font-bold uppercase tracking-[0.1em] py-3 transition-all rounded-lg',
         disabled &&
-          'cursor-not-allowed bg-[#343536] text-[var(--aura-text-secondary, #a0a8b0)]/50',
+          'cursor-not-allowed bg-[var(--aura-noir-steel, #343536)] text-[var(--aura-text-secondary, #a0a8b0)]/50',
         !disabled && primary
-          ? 'bg-[var(--aura-primary, #c6c6c7)] text-[#0c1c30] hover:brightness-110 active:scale-[0.97]'
+          ? 'bg-[var(--aura-primary, #c6c6c7)] text-[var(--aura-noir-deep, #0c1c30)] hover:brightness-110 active:scale-[0.97]'
           : '',
         !disabled &&
           !primary &&

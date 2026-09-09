@@ -81,7 +81,7 @@ export function ProductCard({
           {quantity > 0 ? (
             <div className="flex items-center gap-2 bg-[rgba(var(--aura-chrome-light),0.1)] rounded-lg px-2 py-1">
               <button
-                type="button"
+               type="button"
                 onClick={onRemove}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(var(--aura-chrome-light),0.1)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.removeItem', {
@@ -95,7 +95,7 @@ export function ProductCard({
                 {quantity}
               </span>
               <button
-                type="button"
+               type="button"
                 onClick={onAdd}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(var(--aura-chrome-light),0.15)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.addItem', {
@@ -108,7 +108,7 @@ export function ProductCard({
             </div>
           ) : (
             <button
-              type="button"
+             type="button"
               onClick={onAdd}
               className="w-10 h-10 rounded-full bg-[rgba(205,127,50,0.2)] flex items-center justify-center text-[var(--aura-chrome-mid)] shadow-lg shadow-[rgba(205,127,50,0.15)] active:scale-90 transition-transform"
               aria-label={t('stitch.ordering.addToCart', {

@@ -63,9 +63,9 @@ export function CustomerLookup({
             </span>
           </div>
           <button
-            type="button"
+           type="button"
             onClick={() => { onClearCustomer?.(); setPhone(''); }}
-            className="text-[#8a7a6a] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
+            className="text-[var(--aura-text-muted, #8a7a6a)] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
             aria-label={t('posNew.clearCustomer')}
           >
             <X className="w-4 h-4" />
@@ -108,10 +108,10 @@ export function CustomerLookup({
           onChange={(e) => setPhone(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('posNew.phonePlaceholder')}
-          className="flex-1 bg-[rgba(var(--aura-chrome-light),0.05)] border border-[rgba(var(--aura-chrome-light),0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[#5a4a3a] font-body outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] transition-colors"
+          className="flex-1 bg-[rgba(var(--aura-chrome-light),0.05)] border border-[rgba(var(--aura-chrome-light),0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[var(--aura-text-muted, #5a4a3a)] font-body outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] transition-colors"
         />
         <button
-          type="button"
+         type="button"
           onClick={handleLookup}
           disabled={!phone.trim() || lookupMutation.isPending}
           className="px-4 py-2 bg-[rgba(var(--aura-chrome-light),0.1)] border border-[rgba(var(--aura-chrome-light),0.2)] rounded-sm text-[var(--aura-primary, #f2c08d)] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"

@@ -117,8 +117,8 @@ export function StitchPOSNew({
           <AlertCircle className="w-10 h-10 text-[var(--aura-error, #FFB4AB)]" />
           <p className="text-[14px] text-[var(--aura-error, #FFB4AB)] font-body">{error}</p>
           <button
-            type="button"
-            className="px-6 py-3 bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all font-body"
+           type="button"
+            className="px-6 py-3 bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all font-body"
             onClick={() => window.location.reload()}
             aria-label={t('posNew.reboot')}
           >
@@ -152,15 +152,15 @@ export function StitchPOSNew({
 
         {/* Mobile Cart Toggle */}
         <button
-          type="button"
-          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform"
+         type="button"
+          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform"
           onClick={() => setCartOpen(!cartOpen)}
           aria-label={cartOpen ? t('posNew.closeCart') : t('posNew.openCart')}
         >
           <span className="relative">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="m1 1 4 0 2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
             {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#1a1008] text-[var(--aura-primary, #f2c08d)] text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--aura-noir-void, #1a1008)] text-[var(--aura-primary, #f2c08d)] text-[10px] font-bold flex items-center justify-center">
                 {cartItemCount}
               </span>
             )}

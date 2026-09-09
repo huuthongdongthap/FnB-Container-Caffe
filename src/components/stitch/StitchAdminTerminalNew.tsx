@@ -38,7 +38,7 @@ export function StitchAdminTerminalNew({
     <div className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] font-body text-[var(--aura-text-primary, #e8e8e8)]">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <button
+        <button type="button"
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-label={tTerminal('closeSidebar')}

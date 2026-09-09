@@ -32,7 +32,7 @@ export function Footer({ brandName }: FooterProps) {
           </a>
           <a
             href="#"
-            className="font-body text-sm font-medium text-[var(--aura-text-secondary, #A0A8B0)] transition-colors hover:text-[#b5c8e7"
+            className="font-body text-sm font-medium text-[var(--aura-text-secondary, #A0A8B0)] transition-colors hover:text-[var(--aura-chrome-bright, #b5c8e7)"
             aria-label={t('stitch.menu2.footerInstagram')}
           >
             {t('stitch.menu2.footerInstagram')}

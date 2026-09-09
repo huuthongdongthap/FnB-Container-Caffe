@@ -48,7 +48,7 @@ export function PaymentMethodSelector({
                   glassPanelBg,
                   'p-6 rounded-xl flex items-center justify-between border border-[rgba(var(--aura-chrome-light),0.1)] transition-all',
                   isSelected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
-                  isSelected && !isPayos && 'border-[#c6c6c7] bg-[rgba(var(--aura-chrome-light),0.05)]',
+                  isSelected && !isPayos && 'border-[var(--aura-text-body, #c6c6c7)] bg-[rgba(var(--aura-chrome-light),0.05)]',
                   isPayos && !isSelected && 'shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
                 )}
               >
@@ -58,7 +58,7 @@ export function PaymentMethodSelector({
                       'w-12 h-12 rounded-full flex items-center justify-center',
                       isPayos
                         ? 'bg-[color-mix(in_srgb,var(--aura-chrome-bright)_20%,transparent)] text-[var(--aura-chrome-bright)]'
-                        : 'bg-[rgba(var(--aura-chrome-light),0.2)] text-[#c6c6c7]',
+                        : 'bg-[rgba(var(--aura-chrome-light),0.2)] text-[var(--aura-text-body, #c6c6c7)]',
                     )}
                   >
                     <IconComp className="w-6 h-6" aria-hidden="true" />
@@ -85,7 +85,7 @@ export function PaymentMethodSelector({
                   <div
                     className={cn(
                       'w-2.5 h-2.5 rounded-full transition-opacity',
-                      isPayos ? 'bg-[var(--aura-chrome-bright)]' : 'bg-[#c6c6c7]',
+                      isPayos ? 'bg-[var(--aura-chrome-bright)]' : 'bg-[var(--aura-text-body, #c6c6c7)]',
                       isSelected ? 'opacity-100' : 'opacity-0',
                     )}
                   />

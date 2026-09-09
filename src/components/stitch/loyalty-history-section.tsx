@@ -25,7 +25,7 @@ export function PointsHistorySection({ history }: { history: LoyaltyHistoryEntry
           {t('loyalty.pointsHistory')}
         </h3>
         <button
-          type="button"
+         type="button"
           className="cursor-pointer hover:text-[var(--aura-chrome-bright)] transition-colors"
           style={{ color: 'var(--aura-chrome-soft)' }}
           aria-label={t('loyalty.filterHistoryAria')}

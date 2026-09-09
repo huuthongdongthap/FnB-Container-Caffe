@@ -22,8 +22,8 @@ export function POSHeader({ brandName }: { brandName: string }) {
       </div>
       <div className="flex items-center gap-5">
         <button
-          type="button"
-          className="text-[#8a7a6a] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
+         type="button"
+          className="text-[var(--aura-text-muted, #8a7a6a)] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
           aria-label={t('posNew.schedule')}
         >
           <Clock className="w-5 h-5" />

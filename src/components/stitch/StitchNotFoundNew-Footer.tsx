@@ -13,7 +13,7 @@ export function Footer({ onNavigate }: FooterProps) {
     <footer className="fixed bottom-0 w-full flex flex-col items-center gap-1 pb-5 z-40">
       <div className="flex gap-6 mb-2">
         {footerLinks.map((link) => (
-          <button
+          <button type="button"
             key={link.label}
             onClick={() => onNavigate?.(link.path)}
             className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors"

@@ -12,7 +12,7 @@ export function ReferralHeader() {
       aria-label={t('stitch.referral.headerAria')}
     >
       <button
-        type="button"
+       type="button"
         className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
         aria-label={t('stitch.referral.closeAria')}
       >

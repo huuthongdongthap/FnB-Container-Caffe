@@ -81,7 +81,7 @@ export function ProgressTracker({
             <div className="flex h-12 w-12 items-center justify-center rounded bg-[var(--aura-noir-deep, #0A1A2E)]/60 backdrop-blur-[8px]"
               style={{
                 border: '1px solid',
-                borderImageSource: 'linear-gradient(135deg, var(--aura-text-primary, #F5F5F5)FFF 0%, #A8B2BD 100%)',
+                borderImageSource: 'linear-gradient(135deg, var(--aura-text-primary, #F5F5F5)FFF 0%, var(--aura-chrome-light, #A8B2BD) 100%)',
                 borderImageSlice: 1,
               }}
             >

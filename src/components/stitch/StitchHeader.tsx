@@ -32,7 +32,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
 
   const linkStyle = (active: boolean): React.CSSProperties => ({
     fontFamily: "var(--aura-font-display)",
-    color: active ? 'var(--aura-chrome-light, #C9D6DF)' : '#c5c6cd',
+    color: active ? 'var(--aura-chrome-light, #C9D6DF)' : 'var(--aura-text-body, #c5c6cd)',
     borderColor: active ? 'var(--aura-chrome-light, #C9D6DF)' : 'transparent',
   });
 
@@ -77,13 +77,13 @@ export default function StitchHeader(_props: StitchHeaderProps) {
         <Link
           to="/table-reservation"
           className="px-4 sm:px-6 py-2 text-[10px] sm:text-xs leading-[1] tracking-[0.1em] font-semibold uppercase text-[var(--aura-noir-void, #050D1A)] no-underline hover:opacity-90 transition-opacity whitespace-nowrap"
-          style={{ backgroundColor: '#efbd8a', fontFamily: "var(--aura-font-body)" }}
+          style={{ backgroundColor: 'var(--aura-chrome-light, #efbd8a)', fontFamily: "var(--aura-font-body)" }}
         >
           {t('nav.bookNow', 'Order Now')}
         </Link>
 
         {/* Hamburger button (mobile only) */}
-        <button
+        <button type="button"
           className="md:hidden flex flex-col gap-1.5 p-2 bg-transparent border-none cursor-pointer"
           onClick={() => setMenuOpen((prev) => !prev)}
           aria-label={menuOpen ? t('nav.closeMenu', 'Close menu') : t('nav.openMenu', 'Open menu')}
@@ -108,7 +108,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
       {menuOpen && (
         <>
           {/* Backdrop for dismiss */}
-          <button
+          <button type="button"
             className="fixed inset-0 z-40 md:hidden bg-transparent border-none cursor-default"
             onClick={() => setMenuOpen(false)}
             aria-hidden
@@ -130,7 +130,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
                     className="text-[22px] leading-[1.4] font-semibold no-underline"
                     style={{
                       fontFamily: "var(--aura-font-display)",
-                      color: active ? 'var(--aura-chrome-light, #C9D6DF)' : '#c5c6cd',
+                      color: active ? 'var(--aura-chrome-light, #C9D6DF)' : 'var(--aura-text-body, #c5c6cd)',
                     }}
                   >
                     {t(item.key)}

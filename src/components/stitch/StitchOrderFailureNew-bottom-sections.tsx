@@ -35,14 +35,14 @@ export function SupportSection({
         {t('orderFailure.helpDesc', 'Our concierge team is available 24/7 to assist with your order issues.')}
       </p>
       <div className="flex flex-col gap-3">
-        <button
+        <button type="button"
           onClick={onChatSupport}
           className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-['Space_Grotesk'] text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
         >
           <MessageCircle className="w-5 h-5" />
           {t('orderFailure.chat', 'Chat with Support')}
         </button>
-        <button
+        <button type="button"
           onClick={onCallSupport}
           className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-['Space_Grotesk'] text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
         >
@@ -89,28 +89,28 @@ export function BottomNavBar({
   const { t } = useTranslation();
   return (
     <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-2 pb-4 bg-[var(--aura-surface-dim)]/60 backdrop-blur-[8px] border-t border-white/10 z-50">
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/menu')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <UtensilsCrossed className="w-6 h-6 mb-1" />
         <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.menu', 'Menu')}</span>
       </button>
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/referrals')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <UserPlus className="w-6 h-6 mb-1" />
         <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.referrals', 'Referrals')}</span>
       </button>
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/rewards')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <Award className="w-6 h-6 mb-1" />
         <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.rewards', 'Rewards')}</span>
       </button>
-      <button
+      <button type="button"
         onClick={() => onNavigate?.('/profile')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >

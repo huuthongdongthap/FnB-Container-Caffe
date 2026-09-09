@@ -27,7 +27,7 @@ export function getLoginStyles(): string {
 
     /* ─── Chrome Gradient Button Background ─────────────────────── */
     .chrome-gradient-bg {
-      background: linear-gradient(135deg, var(--aura-chrome-bright, #E8EEF3) 0%, #90A4AE 50%, #546E7A 100%);
+      background: linear-gradient(135deg, var(--aura-chrome-bright, #E8EEF3) 0%, var(--aura-text-secondary, #90A4AE) 50%, var(--aura-text-muted, #546E7A) 100%);
     }
     .chrome-gradient-bg:disabled {
       opacity: 0.6;

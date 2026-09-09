@@ -70,7 +70,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
             )}
           </p>
           <div className="flex flex-col sm:flex-row gap-6">
-            <button
+            <button type="button"
               className="px-10 py-5 transition-all duration-500 uppercase flex items-center gap-3"
               style={{
                 background: 'linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-primary) 100%)',
@@ -91,7 +91,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
               {t('landing.exploreNow', 'Khám phá ngay')}
               <ArrowRight className="w-[18px] h-[18px]" aria-hidden="true" />
             </button>
-            <button
+            <button type="button"
               className="bg-transparent border px-10 py-5 uppercase transition-all flex items-center gap-3"
               style={{
                 borderColor: 'var(--aura-chrome-dim)',

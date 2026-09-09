@@ -18,7 +18,7 @@ export function ReferralHeader() {
       {/* Left: back arrow + brand */}
       <div className="flex items-center gap-4">
         <button
-          type="button"
+         type="button"
           className="text-[var(--aura-chrome-light, #C9D6DF)] transition-transform active:scale-95"
           aria-label={t('stitch.referral.backAria')}
         >
@@ -31,16 +31,16 @@ export function ReferralHeader() {
 
       {/* Center: desktop nav links */}
       <nav className="hidden items-center gap-8 md:flex" role="navigation" aria-label={t('stitch.referral.desktopNavAria')}>
-        <a href="#menu" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]`}>
+        <a href="#menu" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-chrome-light, #efbd8a)]`}>
           {t('stitch.referral.navMenu')}
         </a>
         <a href="#referrals" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-chrome-light, #C9D6DF)]`}>
           {t('stitch.referral.navReferrals')}
         </a>
-        <a href="#rewards" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]`}>
+        <a href="#rewards" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-chrome-light, #efbd8a)]`}>
           {t('stitch.referral.navRewards')}
         </a>
-        <a href="#profile" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]`}>
+        <a href="#profile" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-chrome-light, #efbd8a)]`}>
           {t('stitch.referral.navProfile')}
         </a>
       </nav>

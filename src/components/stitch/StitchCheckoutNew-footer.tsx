@@ -52,7 +52,7 @@ export function CheckoutFooter({
             disabled={processing}
             className={cn(
               'min-w-[min(240px,60vw)] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
-              'bg-gradient-to-br from-[#E3E2E3] via-[#C6C6C7] to-[var(--aura-chrome-dim)]',
+              'bg-gradient-to-br from-[var(--aura-chrome-bright, #E3E2E3)] via-[var(--aura-text-body, #C6C6C7)] to-[var(--aura-chrome-dim)]',
               'text-[var(--aura-surface-container)]',
               processing
                 ? 'cursor-not-allowed opacity-60'

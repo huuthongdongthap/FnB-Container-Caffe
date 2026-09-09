@@ -93,7 +93,7 @@ export function StitchReviewsNew({
 
   /* ─── Full Render ──────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen overflow-x-hidden antialiased" style={{ backgroundColor: 'var(--aura-surface-container)', color: '#d3e4ff' }}>
+    <div className="min-h-screen overflow-x-hidden antialiased" style={{ backgroundColor: 'var(--aura-surface-container)', color: 'var(--aura-chrome-bright, #d3e4ff)' }}>
       <ReviewsNavHeader />
 
       <main className="mx-auto max-w-[1200px] px-6 pb-16" style={{ paddingTop: '96px' }}>
@@ -107,7 +107,7 @@ export function StitchReviewsNew({
               {t('stitch.guestExperiences', { defaultValue: 'Guest Experiences' })}
             </h1>
             <div className="flex items-center gap-4">
-              <span style={{ fontFamily: "var(--aura-font-display)", fontSize: '24px', lineHeight: '1.3', fontWeight: 500, color: '#c6c6c7' }}>
+              <span style={{ fontFamily: "var(--aura-font-display)", fontSize: '24px', lineHeight: '1.3', fontWeight: 500, color: 'var(--aura-text-body, #c6c6c7)' }}>
                 {data.aggregateRating}/5
               </span>
               <div className="flex gap-1">
@@ -125,7 +125,7 @@ export function StitchReviewsNew({
             </div>
           </div>
           <button
-            type="button"
+           type="button"
             onClick={onWriteReview}
             className="chrome-gradient group flex items-center gap-2 rounded-full px-8 py-4 text-[var(--aura-noir-deep, #0A1A2E)] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
             style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}

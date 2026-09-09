@@ -76,8 +76,8 @@ export function StitchOrderMgmtSidebar({
 
       {/* Bottom section */}
       <div className="mt-auto px-6">
-        <button
-          className="mb-6 w-full rounded-lg bg-gradient-to-br from-[var(--aura-primary, #c6c6c7)] to-[#8e9097] py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#0c1c30] transition-all hover:brightness-110 active:scale-[0.97]"
+        <button type="button"
+          className="mb-6 w-full rounded-lg bg-gradient-to-br from-[var(--aura-primary, #c6c6c7)] to-[var(--aura-text-muted, #8e9097)] py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-noir-deep, #0c1c30)] transition-all hover:brightness-110 active:scale-[0.97]"
           aria-label={tTerminal('newOrder')}
         >
           {tTerminal('newOrder')}
@@ -96,7 +96,7 @@ export function StitchOrderMgmtSidebar({
           </a>
           <a
             href="#"
-            className="flex items-center gap-4 px-6 py-3 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#ffb4ab]"
+            className="flex items-center gap-4 px-6 py-3 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-error, #ffb4ab)]"
             aria-label={tTerminal('logout')}
           >
             <LogOut size={20} />

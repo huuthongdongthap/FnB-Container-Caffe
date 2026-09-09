@@ -97,7 +97,7 @@ export function StitchCheckinNew({
             </div>
           </div>
 
-          <button
+          <button type="button"
             onClick={handleSubmit}
             disabled={isLoading || phone.replace(/\D/g, '').length < 10}
             className={cn(

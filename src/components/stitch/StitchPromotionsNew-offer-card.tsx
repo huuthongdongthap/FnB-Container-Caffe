@@ -122,7 +122,7 @@ export function FullWidthOfferCard({ offer }: { offer: PromoOffer }) {
             </div>
           )}
           <button
-            type="button"
+           type="button"
             className="border border-[var(--aura-chrome-bright)] px-8 py-3 font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-widest text-[var(--aura-chrome-bright)] transition-colors hover:bg-[var(--aura-chrome-bright)] hover:text-[var(--aura-surface-dim)]"
           >
             Details

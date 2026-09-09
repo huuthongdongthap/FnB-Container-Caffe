@@ -170,11 +170,11 @@ interface ChromeButtonProps {
 
 export function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className="relative w-full overflow-hidden py-4 text-center text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-bright)] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98] rounded-none"
       style={{
-        background: 'linear-gradient(180deg, var(--aura-chrome-light, #C9D6DF) 0%, #a1a1aa 100%)',
+        background: 'linear-gradient(180deg, var(--aura-chrome-light, #C9D6DF) 0%, var(--aura-text-muted, #a1a1aa) 100%)',
       }}
       aria-label={ariaLabel ?? label}
     >

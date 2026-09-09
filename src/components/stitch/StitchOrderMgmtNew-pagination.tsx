@@ -22,14 +22,14 @@ export function PaginationFooter() {
         {tTerminal('showingOrders').replace('{current}', '6').replace('{total}', '124')}
       </span>
       <div className="flex items-center gap-2">
-        <button
+        <button type="button"
           className={cn(GLASS_CLASSES, 'flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:bg-white/10 active:scale-95')}
           aria-label={tTerminal('prevPage')}
         >
           <ChevronLeft size={20} />
         </button>
         {[1, 2, 3].map((page) => (
-          <button
+          <button type="button"
             key={page}
             className={cn(
               'flex h-10 w-10 items-center justify-center rounded-lg font-sans text-[12px] font-bold uppercase tracking-[0.1em] transition-all',
@@ -44,13 +44,13 @@ export function PaginationFooter() {
           </button>
         ))}
         <span className="px-1 text-[var(--aura-text-secondary, #a0a8b0)]" aria-hidden="true">...</span>
-        <button
+        <button type="button"
           className={cn(GLASS_CLASSES, 'flex h-10 w-10 items-center justify-center rounded-lg font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:bg-white/10 active:scale-95')}
           aria-label={tTerminal('page').replace('{n}', '12')}
         >
           12
         </button>
-        <button
+        <button type="button"
           className={cn(GLASS_CLASSES, 'flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:bg-white/10 active:scale-95')}
           aria-label={tTerminal('nextPage')}
         >

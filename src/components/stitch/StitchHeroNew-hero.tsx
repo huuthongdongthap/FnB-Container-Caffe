@@ -64,7 +64,7 @@ export function StitchHeroNewHero() {
         </div>
 
         <div className="flex flex-col items-center justify-center gap-6 md:flex-row">
-          <button
+          <button type="button"
             style={{
               fontFamily: SPACE_GROTESK,
               fontSize: '12px',
@@ -78,7 +78,7 @@ export function StitchHeroNewHero() {
           >
             {t('hero.bookTable', 'Book Your Table')}
           </button>
-          <button
+          <button type="button"
             style={{
               fontFamily: SPACE_GROTESK,
               fontSize: '12px',

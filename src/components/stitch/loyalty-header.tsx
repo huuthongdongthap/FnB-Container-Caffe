@@ -47,7 +47,7 @@ export function LoyaltyHeader() {
       </nav>
       <div className="flex items-center gap-[12px]">
         <button
-          type="button"
+         type="button"
           className="px-[24px] py-2 border border-[var(--aura-chrome-bright)]/30 rounded-full hover:bg-[var(--aura-chrome-bright)]/10 transition-all"
           style={{
             fontFamily: "var(--aura-font-body)",

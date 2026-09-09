@@ -7,19 +7,19 @@ export function StitchSubscriptionsNewFooter() {
         </h2>
         <nav className="flex flex-wrap justify-center gap-6">
           <button
-            type="button"
+           type="button"
             className="font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-[0.1em] text-[var(--aura-bronze-shimmer)] transition-colors hover:text-[var(--aura-bronze-shimmer)]/80"
           >
             PRIVACY POLICY
           </button>
           <button
-            type="button"
+           type="button"
             className="font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-[0.1em] text-[var(--aura-bronze-shimmer)] transition-colors hover:text-[var(--aura-bronze-shimmer)]/80"
           >
             TERMS OF SERVICE
           </button>
           <button
-            type="button"
+           type="button"
             className="font-[family-name:var(--aura-body-font)] text-xs uppercase tracking-[0.1em] text-[var(--aura-bronze-shimmer)] transition-colors hover:text-[var(--aura-bronze-shimmer)]/80"
           >
             RECORDS

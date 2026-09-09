@@ -94,7 +94,7 @@ export function HeroSection({
           {/* CTA Buttons */}
           <div className="flex flex-wrap gap-4">
             <button
-              type="button"
+             type="button"
               onClick={onReservation}
               className="px-8 py-4 font-bold uppercase tracking-wider rounded-none active:scale-95 transition-all duration-500"
               style={{
@@ -119,7 +119,7 @@ export function HeroSection({
               {reservationLabel}
             </button>
             <button
-              type="button"
+             type="button"
               onClick={onViewGallery}
               className="shimmer-hover px-8 py-4 font-bold uppercase tracking-wider rounded-none hover:bg-white/5 active:scale-95 transition-all duration-500"
               style={{

@@ -51,7 +51,7 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
         <GaugeBar label={item.gaugeLabel} value={item.gaugeValue} />
 
         {/* Add to Order */}
-        <button
+        <button type="button"
           onClick={() => onAddToOrder(item)}
           disabled={isAdded}
           aria-label={

@@ -45,7 +45,7 @@ export function Header({
       aria-label={t('kds.header', 'KDS Header')}
     >
       <div className="flex items-center gap-6">
-        <button
+        <button type="button"
           className="rounded p-1 text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30 md:hidden"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? t('kds.closeSidebar', 'Close sidebar') : t('kds.openSidebar', 'Open sidebar')}
@@ -113,13 +113,13 @@ export function Header({
           </span>
         </div>
         <div className="flex gap-4">
-          <button
+          <button type="button"
             className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
             aria-label={t('kds.notifications', 'Notifications')}
           >
             <Bell className="h-5 w-5" aria-hidden="true" />
           </button>
-          <button
+          <button type="button"
             className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
             aria-label={t('kds.settings', 'Settings')}
           >

@@ -68,7 +68,7 @@ export function StitchReferralNew1({
   }
 
   return (
-    <div className="min-h-screen bg-[var(--aura-surface-container)] font-body text-[#d9e3f6]" style={{ WebkitFontSmoothing: 'antialiased' }}>
+    <div className="min-h-screen bg-[var(--aura-surface-container)] font-body text-[var(--aura-chrome-bright, #d9e3f6)]" style={{ WebkitFontSmoothing: 'antialiased' }}>
       <ReferralHeader />
 
       <main

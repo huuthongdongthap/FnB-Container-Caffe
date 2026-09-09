@@ -45,7 +45,7 @@ export function AccountNewOrderHistory({
           {t('stitch.accountDashboard.recentTransactions')}
         </h3>
         <button
-          type="button"
+         type="button"
           className="text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-light, #C9D6DF)] hover:opacity-80 transition-opacity"
           aria-label={t('stitch.accountDashboard.viewAll')}
         >

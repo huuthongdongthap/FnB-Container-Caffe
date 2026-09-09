@@ -68,7 +68,7 @@ export function NavBar({
 
         {/* CTA */}
         <button
-          type="button"
+         type="button"
           className="rounded-lg px-6 py-2.5 font-label-caps text-xs uppercase tracking-wider shadow-md transition-all duration-200 active:scale-95"
           style={{
             backgroundColor: 'var(--aura-chrome-light, #efbd8a)',
@@ -147,7 +147,7 @@ export function HeroSection({
           </p>
           <div className="flex flex-wrap gap-4">
             <button
-              type="button"
+             type="button"
               onClick={onReserveSpot}
               className="inline-flex items-center gap-2 rounded-lg px-10 py-4 font-label-caps text-xs uppercase tracking-wider transition-all hover:brightness-110"
               style={{
@@ -161,7 +161,7 @@ export function HeroSection({
               <CalendarIcon className="h-[18px] w-[18px]" />
             </button>
             <button
-              type="button"
+             type="button"
               onClick={onViewDetails}
               className="rounded-lg px-10 py-4 font-label-caps text-xs uppercase tracking-wider transition-all"
               style={{

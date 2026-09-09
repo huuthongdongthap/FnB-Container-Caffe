@@ -61,7 +61,7 @@ export function Header({ brandName }: HeaderProps) {
           </div>
 
           {/* Reservation CTA */}
-          <button
+          <button type="button"
             className="bg-[var(--aura-chrome-bright,#E5E4E2)] px-6 py-2 font-body text-[12px] font-semibold uppercase tracking-widest text-[var(--st-on-primary,#1e314a)] transition-all active:scale-95 hover:bg-white"
             aria-label={t('stitch.menu2.reservationAriaLabel')}
           >

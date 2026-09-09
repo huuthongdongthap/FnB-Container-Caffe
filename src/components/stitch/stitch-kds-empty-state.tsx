@@ -25,7 +25,7 @@ export function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
         {t('kds.emptyDescription', 'No tickets to display. New orders will appear here.')}
       </p>
       {onRefresh && (
-        <button
+        <button type="button"
           onClick={onRefresh}
           className="flex items-center gap-2 rounded-lg bg-[var(--st-surface-container-highest,#273647)] px-4 py-2 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--aura-noir-steel,#39475e)]"
           style={{ fontFamily: "var(--aura-font-body)" }}

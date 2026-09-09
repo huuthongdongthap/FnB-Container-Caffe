@@ -34,7 +34,7 @@ export function RewardHistory({
         className="rounded-xl overflow-hidden"
         style={{
           border: '1px solid transparent',
-          background: 'linear-gradient(color-mix(in srgb, var(--aura-surface-container) 50%, transparent), color-mix(in srgb, var(--aura-surface-container) 50%, transparent)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
+          background: 'linear-gradient(color-mix(in srgb, var(--aura-surface-container) 50%, transparent), color-mix(in srgb, var(--aura-surface-container) 50%, transparent)) padding-box, linear-gradient(135deg, var(--aura-chrome-bright, #E5E7EB) 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
         }}
       >
         <table className="w-full text-left border-collapse">

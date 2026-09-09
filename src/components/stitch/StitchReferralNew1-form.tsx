@@ -34,14 +34,14 @@ export function ReferralCodeBlock({
           className="rounded-lg p-6 flex justify-between items-center bg-[var(--aura-surface-container)]"
           style={{
             border: '1px solid transparent',
-            background: 'linear-gradient(var(--aura-surface-container), var(--aura-surface-container)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
+            background: 'linear-gradient(var(--aura-surface-container), var(--aura-surface-container)) padding-box, linear-gradient(135deg, var(--aura-chrome-bright, #E5E7EB) 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
           }}
         >
           <span className="font-body text-[24px] leading-[1.2] font-medium font-mono tracking-widest text-[var(--aura-chrome-bright, #E8EEF3)]">
             {code}
           </span>
           <button
-            type="button"
+           type="button"
             onClick={handleCopy}
             className="flex items-center gap-1 text-[var(--aura-chrome-bright)] active:scale-95 transition-transform"
             aria-label={copied ? t('stitch.referral.copiedAria') : t('stitch.referral.copyAria')}
@@ -51,7 +51,7 @@ export function ReferralCodeBlock({
         </div>
 
         <button
-          type="button"
+         type="button"
           onClick={handleCopy}
           className="w-full py-4 rounded-lg font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-widest text-[var(--aura-noir-void, #050D1A)] transition-all active:scale-[0.98]"
           style={{
