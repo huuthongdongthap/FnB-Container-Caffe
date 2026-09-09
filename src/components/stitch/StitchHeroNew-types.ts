@@ -10,8 +10,8 @@ export interface StitchHeroNewProps {
 export const DEFAULT_BG_IMAGE =
   '/photos/IMG_6565.webp';
 
-export const SPACE_GROTESK = "'Space Grotesk', sans-serif";
-export const LIBRE_CASLON = "'Libre Caslon Text', Georgia, serif";
+export const SPACE_GROTESK = 'var(--aura-font-body)';
+export const LIBRE_CASLON = 'var(--aura-font-display)';
 
 export const GLASS_PANEL: CSSProperties = {
   background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',

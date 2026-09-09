@@ -16,7 +16,7 @@ export const headlineMd: CSSProperties = {
 };
 
 export const timerDisplay: CSSProperties = {
-  fontFamily: "var(--aura-font-mono, 'Space Grotesk', sans-serif)",
+  fontFamily: 'var(--aura-font-mono)',
   fontSize: '40px',
   lineHeight: '1',
   letterSpacing: '-0.05em',

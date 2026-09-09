@@ -22,7 +22,7 @@ export default function PlatinumCard() {
       <div className="flex items-end justify-between mt-8 pt-6 border-t border-white/10">
         <div>
           <p className="font-label-caps text-[10px] text-[var(--aura-chrome-mid)] uppercase tracking-wider">Available Points / Điểm có sẵn</p>
-          <p className="font-display text-5xl md:text-7xl text-[var(--aura-tertiary)] leading-none mt-1" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>12,450</p>
+          <p className="font-display text-5xl md:text-7xl text-[var(--aura-tertiary)] leading-none mt-1" style={{ fontFamily: 'var(--aura-font-display)' }}>12,450</p>
           <p className="font-label-caps text-[10px] text-[var(--aura-chrome-mid)] mt-1 tracking-wider">PREMIUM REWARD POINTS</p>
         </div>
         <button className="px-6 py-3 rounded-lg bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] font-headline-sm uppercase tracking-widest text-xs font-bold hover:brightness-110 active:scale-95 transition-all">

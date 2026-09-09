@@ -83,7 +83,7 @@ export default function AdminTerminal() {
         <div className="p-8 space-y-8">
           {/* Welcome */}
           <div>
-            <h3 className="font-display text-3xl text-[var(--aura-chrome-bright)]" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>
+            <h3 className="font-display text-3xl text-[var(--aura-chrome-bright)]" style={{ fontFamily: 'var(--aura-font-display)' }}>
               Welcome back / Chào lại
             </h3>
             <p className="font-body text-body text-[var(--aura-chrome-mid)] mt-1">Here's what's happening / Dưới đây là tổng quan hôm nay.</p>
@@ -96,7 +96,7 @@ export default function AdminTerminal() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-label-caps text-label-caps text-[var(--aura-chrome-mid)] uppercase tracking-wider">{stat.label}</p>
-                    <p className="font-display text-4xl text-[var(--aura-chrome-bright)] mt-2" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>{stat.value}</p>
+                    <p className="font-display text-4xl text-[var(--aura-chrome-bright)] mt-2" style={{ fontFamily: 'var(--aura-font-display)' }}>{stat.value}</p>
                   </div>
                   <span className="text-2xl">{stat.icon}</span>
                 </div>

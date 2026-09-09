@@ -35,7 +35,7 @@ rightContent={
 {/* Hero */}
 <section className="text-center mb-10">
 <span className="inline-block px-3 py-1 rounded-full bg-[var(--aura-tertiary)]/15 text-[var(--aura-tertiary)] font-label-caps text-[10px] uppercase tracking-widest font-bold border border-[var(--aura-tertiary)]/30">Referral Program</span>
-<h1 className="font-display text-4xl md:text-5xl text-[var(--aura-chrome-bright)] italic mt-4" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>
+<h1 className="font-display text-4xl md:text-5xl text-[var(--aura-chrome-bright)] italic mt-4" style={{ fontFamily: 'var(--aura-font-display)' }}>
 Share the Craft<br />Chia sẻ nghệ thuật
 </h1>
 <p className="font-body text-body text-[var(--aura-chrome-mid)] mt-3 max-w-xl mx-auto">

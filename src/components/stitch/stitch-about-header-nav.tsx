@@ -36,7 +36,7 @@ export function HeaderNav() {
         <a
           href="/"
           className="text-xl font-bold uppercase tracking-wider"
-          style={{ color: "var(--aura-chrome-light, #f2c08d)", fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
+          style={{ color: "var(--aura-chrome-light, #f2c08d)", fontFamily: 'var(--aura-font-display)' }}
         >
           AURA CAFE
         </a>

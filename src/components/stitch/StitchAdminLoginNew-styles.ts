@@ -8,8 +8,6 @@
 
 export function getLoginStyles(): string {
   return `
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-
     /* ─── Glass Panel ───────────────────────────────────────────── */
     .glass-panel-login-new {
       background: rgba(255, 255, 255, 0.05);
@@ -76,10 +74,10 @@ export function getLoginStyles(): string {
       font-weight: 600;
     }
     .font-headline-md {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: var(--aura-font-body);
     }
     .font-label-caps {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: var(--aura-font-body);
     }
     .text-label-caps {
       font-size: 12px;
@@ -88,10 +86,10 @@ export function getLoginStyles(): string {
       font-weight: 600;
     }
     .font-body-sm {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: var(--aura-font-body);
     }
     .font-body-lg {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: var(--aura-font-body);
       font-size: 16px;
       line-height: 1.6;
       font-weight: 400;

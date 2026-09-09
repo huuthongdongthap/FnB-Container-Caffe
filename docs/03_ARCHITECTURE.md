@@ -141,9 +141,9 @@ Cache: AUTH_KV (KV namespace)
 ```
 
 **Typography:**
-- Heading: `'Cormorant Garamond', serif` (Google Fonts)
-- Body: `'Space Grotesk', sans-serif`
-- Tech/Prices: `'JetBrains Mono', monospace`
+- Display/Heading: `'Quicksand', 'Be Vietnam Pro', sans-serif` → `--aura-font-display` (Google Fonts)
+- Body: `'Be Vietnam Pro', 'Quicksand', sans-serif` → `--aura-font-body` (Google Fonts)
+- Tech/Prices: `--aura-font-mono` (system monospace fallback)
 
 ---
 

@@ -26,7 +26,7 @@ export function ZonesSection({
               className="mb-4 text-4xl md:text-5xl"
               style={{
                 color: 'var(--aura-text-primary, #e8e8e8)',
-                fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
+                fontFamily: 'var(--aura-font-display)',
               }}
             >
               {t('about.spacesTitle')}

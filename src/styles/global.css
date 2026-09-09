@@ -10,7 +10,7 @@
 .label-large   { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; letter-spacing: 0.006em; }
 .headline-small { font-size: 1.5rem;   line-height: 2rem;    font-weight: 600; letter-spacing: 0; }
 
-/* Brand tokens: EB Garamond + Space Grotesk */
+/* Brand tokens — Quicksand (body) + Be Vietnam Pro (display) */
 @import './brand-tokens.css';
 
 /* Tailwind v4 theme — maps AURA CAFE design tokens to Tailwind utility classes */

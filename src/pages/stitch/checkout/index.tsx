@@ -33,7 +33,7 @@ rightContent={
 />
 
 <main className="max-w-6xl mx-auto px-5 py-24">
-<h1 className="font-display text-3xl md:text-4xl text-[var(--aura-chrome-bright)] italic mb-8" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>
+<h1 className="font-display text-3xl md:text-4xl text-[var(--aura-chrome-bright)] italic mb-8" style={{ fontFamily: 'var(--aura-font-display)' }}>
 Complete Your Order
 </h1>
 

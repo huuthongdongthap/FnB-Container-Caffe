@@ -20,7 +20,7 @@ export function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
             className="mb-4 text-4xl md:text-5xl"
             style={{
               color: 'var(--aura-text-primary, #e8e8e8)',
-              fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display)',
             }}
           >
             {t('about.timelineTitle')}
@@ -59,7 +59,7 @@ export function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
                   </span>
                   <h4
                     className="mb-4 text-2xl font-semibold text-white"
-                    style={{ fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
+                    style={{ fontFamily: 'var(--aura-font-display)' }}
                   >
                     {phase.title}
                   </h4>

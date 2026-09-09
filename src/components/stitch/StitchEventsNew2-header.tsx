@@ -34,7 +34,7 @@ export function NavBar({
         <span
           className="text-2xl italic tracking-tighter md:text-[32px]"
           style={{
-            fontFamily: 'var(--aura-font-display-serif, "Libre Caslon Text", Georgia, serif)',
+            fontFamily: 'var(--aura-font-display-serif)',
             color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >

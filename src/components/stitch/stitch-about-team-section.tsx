@@ -17,7 +17,7 @@ export function TeamSection() {
     <section className="px-[var(--aura-container-padding,24px)] py-24 md:py-32" style={{ backgroundColor: "var(--aura-bg-surface, #0d1b2a)" }}>
       <div className="mx-auto max-w-[1280px]">
         <div className="mb-16 text-center md:mb-24">
-          <h2 className="mb-4 text-4xl md:text-5xl" style={{ color: "var(--aura-text-primary, #e8e8e8)", fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}>
+          <h2 className="mb-4 text-4xl md:text-5xl" style={{ color: "var(--aura-text-primary, #e8e8e8)", fontFamily: 'var(--aura-font-display)' }}>
             The Minds Behind the Machine
           </h2>
           <p className="mx-auto max-w-xl font-light leading-relaxed" style={{ color: "var(--aura-text-secondary, #a0a8b0)" }}>

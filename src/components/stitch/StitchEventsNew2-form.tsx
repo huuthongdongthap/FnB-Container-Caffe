@@ -121,7 +121,7 @@ export function FooterSection({
         <span
           className="text-[32px] italic tracking-tighter"
           style={{
-            fontFamily: 'var(--aura-font-display-serif, "Libre Caslon Text", Georgia, serif)',
+            fontFamily: 'var(--aura-font-display-serif)',
             color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >

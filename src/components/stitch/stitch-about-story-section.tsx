@@ -50,7 +50,7 @@ export function StorySection({
         </div>
         <h3
           className="mb-4 text-2xl text-white md:text-3xl"
-          style={{ fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
+          style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {card.title}
         </h3>
@@ -82,7 +82,7 @@ export function StorySection({
             className="mb-4 text-4xl md:text-5xl"
             style={{
               color: 'var(--aura-text-primary, #e8e8e8)',
-              fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display)',
             }}
           >
             {title}

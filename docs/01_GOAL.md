@@ -129,7 +129,7 @@ status: stable
 ### Design Constraints
 1. **Bazi v5.1:** Only Navy/Chrome/Mộc colors allowed in production pages.
 2. **Brand identity:** Aura Cafe — industrial-luxury container aesthetic.
-3. **Typography:** Cormorant Garamond (headings), Space Grotesk (body), JetBrains Mono (tech).
+3. **Typography:** Quicksand (display, `--aura-font-display`), Be Vietnam Pro (body, `--aura-font-body`), monospace via `--aura-font-mono`.
 
 ---
 

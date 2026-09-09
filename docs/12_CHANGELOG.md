@@ -4,6 +4,15 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 UX Token Migration — Font Stacks → Aura Tokens (Stitch Scope)
+
+- **refactor(stitch)** — Migrated 23 stitch/theme files + 5 pages from literal font stacks (`'Space Grotesk'`, `'Libre Caslon Text'`, `'Cormorant Garamond'`) to aura design tokens (`--aura-font-body`, `--aura-font-display`, `--aura-font-display-serif`, `--aura-font-mono`). Legacy fonts were never webfont-loaded (index.html only loads Quicksand + Be Vietnam Pro), so literals were broken fallbacks to generic system fonts — this is a rendering fix.
+- **refactor(theme)** — `src/theme/aura-tokens.ts` fontFamily now references CSS vars instead of literals.
+- **fix(stitch)** — Removed dead `@import` Google Fonts URL from `StitchAdminLoginNew-styles.ts` (Cormorant Garamond + Space Grotesk no longer referenced by any rule).
+- **fix(styles)** — Corrected stale font comment in `src/styles/global.css` (was "EB Garamond + Space Grotesk"; actual stack is Quicksand + Be Vietnam Pro).
+- **fix(stitch)** — Collapsed redundant `var(--aura-font-display-serif, var(--aura-font-display))` fallbacks to bare `var(--aura-font-display-serif)` in about-page CTA/hero sections for pattern consistency.
+- **docs** — Updated `docs/01_GOAL.md`, `docs/03_ARCHITECTURE.md` typography sections to reflect actual token stack (Quicksand display / Be Vietnam Pro body / `--aura-font-mono`).
+
 ### 🔧 pretix Event Ticketing Bridge (Pillar 07 Complete)
 
 - **feat(pretix)** — Added `worker/src/lib/pretix-client.js`: pretix REST API HTTP client with Token auth. Supports listEvents, getEvent, listItems, listOrders, getOrder, redeemCheckin, listWebhooks, createWebhook. Retry on 5xx (1 attempt), structured error handling with PretixApiError class. Graceful skip when PRETIX_API_URL unset.

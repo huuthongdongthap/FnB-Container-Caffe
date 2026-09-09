@@ -25,7 +25,7 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
 
         <h2
           className="mb-8 text-4xl text-white md:text-6xl md:leading-tight"
-          style={{ fontFamily: 'var(--aura-font-display-serif, var(--aura-font-display))' }}
+          style={{ fontFamily: 'var(--aura-font-display-serif)' }}
         >
           {t('about.visitTitle')}
         </h2>

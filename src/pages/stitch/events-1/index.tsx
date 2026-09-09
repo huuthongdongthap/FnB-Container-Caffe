@@ -46,7 +46,7 @@ export default function EventsPromotions1() {
           <div className="relative z-10 text-center px-6 max-w-3xl">
             <div className="glass-panel rounded-2xl p-8 md:p-12">
               <span className="font-label-caps text-label-caps text-[var(--aura-tertiary)] uppercase tracking-[0.2em] block mb-4">Featured / Nổi bật</span>
-              <h1 className="font-display text-4xl md:text-6xl text-[var(--aura-chrome-bright)] italic mb-4" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>
+              <h1 className="font-display text-4xl md:text-6xl text-[var(--aura-chrome-bright)] italic mb-4" style={{ fontFamily: 'var(--aura-font-display)' }}>
                 Midnight Saxophone Sessions
               </h1>
               <p className="font-body text-body text-[var(--aura-chrome-mid)] max-w-xl mx-auto">
@@ -83,7 +83,7 @@ export default function EventsPromotions1() {
                   </div>
                 </div>
                 <div className="p-5 flex flex-col flex-1">
-                  <h3 className="font-display text-xl text-[var(--aura-chrome-bright)] mb-2 italic" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>{evt.title}</h3>
+                  <h3 className="font-display text-xl text-[var(--aura-chrome-bright)] mb-2 italic" style={{ fontFamily: 'var(--aura-font-display)' }}>{evt.title}</h3>
                   <p className="font-body text-sm text-[var(--aura-chrome-mid)] mb-4 flex-1">{evt.desc}</p>
                   <div className="flex items-center justify-between mt-auto">
                     <span className="font-label-caps text-[10px] text-[var(--aura-chrome-mid)] uppercase tracking-wider">🕐 {evt.time} · {evt.venue}</span>
@@ -98,7 +98,7 @@ export default function EventsPromotions1() {
         {/* Past Events */}
         <section className="py-16 border-t border-white/5">
           <div className="max-w-7xl mx-auto px-5">
-            <h2 className="font-display text-2xl text-[var(--aura-chrome-mid)] italic mb-8" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>
+            <h2 className="font-display text-2xl text-[var(--aura-chrome-mid)] italic mb-8" style={{ fontFamily: 'var(--aura-font-display)' }}>
               Past Archives / Lưu trữ
               <span className="block h-px bg-white/10 flex-1 ml-4 mt-2" />
             </h2>
@@ -108,7 +108,7 @@ export default function EventsPromotions1() {
                   <div className="w-16 h-16 rounded-lg overflow-hidden bg-white/5 shrink-0 bg-cover" style={{ backgroundImage: `url(${evt.img})` }} role="img" aria-label={evt.title} />
                   <div>
                     <span className="font-label-caps text-[9px] text-[var(--aura-chrome-mid)] uppercase tracking-wider">{evt.month}</span>
-                    <h4 className="font-display text-body-md text-[var(--aura-chrome-bright)]" style={{ fontFamily: 'var(--font-display, "Libre Caslon Text", serif)' }}>{evt.title}</h4>
+                    <h4 className="font-display text-body-md text-[var(--aura-chrome-bright)]" style={{ fontFamily: 'var(--aura-font-display)' }}>{evt.title}</h4>
                   </div>
                 </div>
               ))}

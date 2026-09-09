@@ -34,7 +34,7 @@ export function ValuesSection({ values }: { values: ValueCard[] }) {
               </div>
               <h3
                 className="mb-4 uppercase tracking-widest text-white"
-                style={{ fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
+                style={{ fontFamily: 'var(--aura-font-display)' }}
               >
                 {value.title}
               </h3>

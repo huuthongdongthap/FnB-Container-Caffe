@@ -92,5 +92,5 @@ export const COLORS = {
 
 export const FONTS = {
   display: "var(--aura-font-display)",
-  body: "'Space Grotesk', sans-serif",
+  body: 'var(--aura-font-body)',
 } as const;
