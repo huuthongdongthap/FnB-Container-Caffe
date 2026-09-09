@@ -34,3 +34,6 @@ export type { MD3SnackbarProps } from './md3-snackbar';
 
 export { MD3LinearProgress, MD3CircularProgress } from './md3-progress-indicator';
 export type { MD3LinearProgressProps, MD3CircularProgressProps } from './md3-progress-indicator';
+
+export { MD3AppShell, useDefaultNavItems } from './md3-app-shell';
+export type { MD3AppShellProps, MD3NavItem } from './md3-app-shell';

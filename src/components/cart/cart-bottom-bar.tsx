@@ -4,15 +4,23 @@
  * Animated slide-up entrance. Matches Aura Cafe dark luxury design system.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
+import { hasM3NavBar } from '@/components/stitch/StitchAppLayout';
 
 export default function CartBottomBar() {
   const items = useCartStore((s) => s.items);
   const totalItems = useCartStore((s) => s.totalItems);
   const subtotal = useCartStore((s) => s.subtotal);
   const navigate = useNavigate();
+  const location = useLocation();
   const [visible, setVisible] = useState(false);
+  // Float above the MD3 NavigationBar on shell pages so both stay tappable
+  const onShell = hasM3NavBar(location.pathname);
+  const lift = onShell ? 'bottom-20' : 'bottom-0';
+  // When lifted over the 80px nav zone, translate-y-full strands the bar
+  // mid-screen; slide past the nav zone too so it fully exits the viewport
+  const hide = onShell ? 'translate-y-[calc(100%+5rem)]' : 'translate-y-full';
 
   const count = totalItems();
   const total = subtotal();
@@ -33,8 +41,8 @@ export default function CartBottomBar() {
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 z-[60] transition-transform duration-300 ease-out ${
-        visible ? 'translate-y-0' : 'translate-y-full'
+      className={`fixed ${lift} left-0 right-0 z-[60] transition-transform duration-300 ease-out ${
+        visible ? 'translate-y-0' : hide
       }`}
     >
       {/* Glass backdrop */}
