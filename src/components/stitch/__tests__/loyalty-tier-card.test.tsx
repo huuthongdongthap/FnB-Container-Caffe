@@ -42,6 +42,7 @@ const MOCK_DATA: LoyaltyDashboardData = {
   pointsHistory: [],
   streakDays: [],
   tierBenefits: [],
+  tierLadder: [],
 };
 
 describe('TierCard', () => {

@@ -20,5 +20,7 @@ export function mapSseEventToOrder(orderData: Record<string, unknown>): Order {
     customer_address: firstOrDefault('customer_address', orderData) || undefined,
     items: (orderData.items as OrderItem[]) || [],
     created_at: firstOrDefault('created_at', orderData),
+    points_earned: Number(orderData.points_earned ?? orderData.pointsEarned ?? 0) || undefined,
+    cashback_earned: Number(orderData.cashback_earned ?? orderData.cashbackEarned ?? 0) || undefined,
   };
 }

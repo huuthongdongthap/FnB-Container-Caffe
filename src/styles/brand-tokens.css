@@ -89,6 +89,12 @@
   --aura-accent-text: var(--aura-forest-light);
   --aura-overlay: rgba(10, 26, 46, 0.8);
 
+  /* Loyalty tier accents — Đồng/Bạc/Vàng/Bạch Kim ladder */
+  --aura-tier-bronze:   #CD7F32;   /* Đồng — warm bronze */
+  --aura-tier-silver:   #C9D6DF;   /* Bạc — mirror chrome (brand accent) */
+  --aura-tier-gold:     #E3C05B;   /* Vàng — soft gold */
+  --aura-tier-platinum: #B8D8E8;   /* Bạch Kim — icy platinum */
+
   /* Glass morphism tokens (aura-prefixed) */
   --aura-glass-bg: rgba(10, 26, 46, 0.65);
   --aura-glass-border: rgba(201, 214, 223, 0.18);

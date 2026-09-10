@@ -13,6 +13,7 @@ import {
   type LoyaltyLoadingState,
 } from '@/components/stitch/StitchLoyaltyNew';
 import { WEEK_DAYS, TIER_BENEFIT_KEYS, DEFAULT_CHECKIN, REWARD_IMAGES } from './loyalty-constants';
+import { getDefaultLoyaltyData } from '@/components/stitch/loyalty-default-data';
 import { LoyaltyHeader } from './loyalty-header';
 import type { Reward, PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';
 
@@ -102,6 +103,9 @@ export function LoyaltyPage({
     pointsHistory: mappedHistory,
     streakDays: streakDays,
     tierBenefits: tierBenefits,
+    tierLadder: store.tierLadder.length > 0
+      ? store.tierLadder
+      : getDefaultLoyaltyData(t).tierLadder,
   };
 
   return (

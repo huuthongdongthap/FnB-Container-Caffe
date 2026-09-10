@@ -27,6 +27,15 @@ export interface LoyaltyTierBenefit {
   label: string;
 }
 
+export interface LoyaltyTierLadderItem {
+  tier_name: string;
+  display_name_vi: string;
+  min_points: number;
+  point_multiplier: number;
+  cashback_rate: number;
+  is_current: boolean;
+}
+
 export interface LoyaltyDashboardData {
   tierName: string;
   memberSince: string;
@@ -41,6 +50,7 @@ export interface LoyaltyDashboardData {
   pointsHistory: LoyaltyHistoryEntry[];
   streakDays: LoyaltyStreakDay[];
   tierBenefits: LoyaltyTierBenefit[];
+  tierLadder: LoyaltyTierLadderItem[];
 }
 
 export type LoyaltyLoadingState = 'idle' | 'loading' | 'error';

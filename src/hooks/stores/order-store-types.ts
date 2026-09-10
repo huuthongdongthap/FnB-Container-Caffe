@@ -20,6 +20,8 @@ export interface Order {
   shipping_fee?: number;
   notes?: string;
   table_id?: string;
+  points_earned?: number;
+  cashback_earned?: number;
 }
 
 export interface CreateOrderPayload {

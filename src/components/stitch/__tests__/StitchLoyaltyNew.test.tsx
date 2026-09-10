@@ -78,6 +78,7 @@ const MOCK_DATA: LoyaltyDashboardData = {
     { label: 'T', checked: true },
   ],
   tierBenefits: [{ label: 'Free coffee' }],
+  tierLadder: [],
 };
 
 describe('StitchLoyaltyNew', () => {

@@ -581,7 +581,12 @@
     "defaultReward3Alt": "Bánh",
     "defaultHistory1": "Đặt hàng #ORD-001",
     "defaultHistory2": "Đặt hàng #ORD-002",
-    "defaultHistory3": "Đặt hàng #ORD-003"
+    "defaultHistory3": "Đặt hàng #ORD-003",
+    "tierLadderTitle": "Hệ thống cấp bậc thành viên",
+    "currentTier": "Cấp bậc hiện tại",
+    "tierFromPoints": "Từ {{points}} điểm",
+    "pointMultiplier": "Hệ số điểm",
+    "cashbackRate": "Hoàn tiền"
   },
   "referral": {
     "cashbackReceived": "Tiền cashback đã nhận",

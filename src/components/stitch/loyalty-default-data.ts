@@ -54,5 +54,11 @@ export function getDefaultLoyaltyData(t: TFunction): LoyaltyDashboardData {
       { label: t('loyalty.benefit3', 'Invite-only tasting events') },
       { label: t('loyalty.benefit4', '15% Discount on retail gear') },
     ],
+    tierLadder: [
+      { tier_name: 'bronze', display_name_vi: 'Đồng', min_points: 0, point_multiplier: 1.0, cashback_rate: 0.03, is_current: true },
+      { tier_name: 'silver', display_name_vi: 'Bạc', min_points: 50, point_multiplier: 1.1, cashback_rate: 0.05, is_current: false },
+      { tier_name: 'gold', display_name_vi: 'Vàng', min_points: 200, point_multiplier: 1.3, cashback_rate: 0.07, is_current: false },
+      { tier_name: 'platinum', display_name_vi: 'Bạch Kim', min_points: 500, point_multiplier: 1.5, cashback_rate: 0.10, is_current: false },
+    ],
   };
 }

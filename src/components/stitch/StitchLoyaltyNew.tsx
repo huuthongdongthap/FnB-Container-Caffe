@@ -17,6 +17,7 @@ export type {
   LoyaltyHistoryEntry,
   LoyaltyStreakDay,
   LoyaltyTierBenefit,
+  LoyaltyTierLadderItem,
   LoyaltyDashboardData,
   LoyaltyLoadingState,
   StitchLoyaltyNewProps,
@@ -34,6 +35,7 @@ import { PointsHistorySection } from './loyalty-history-section';
 import { WeeklyStreak } from './loyalty-weekly-streak';
 import { ReferralBlock } from './loyalty-referral-block';
 import { TierBenefits } from './loyalty-tier-benefits';
+import { TierLadder } from './loyalty-tier-ladder';
 import { LoyaltyFooter } from './loyalty-footer';
 
 /* ─── Hooks ───────────────────────────────────────────────────────── */
@@ -111,6 +113,7 @@ export function StitchLoyaltyNew({
         {/* Left Column: Hero & Rewards */}
         <div className="col-span-12 lg:col-span-8 flex flex-col gap-[48px]">
           <TierCard data={data} onRedeemPoints={onRedeemPoints} />
+          <TierLadder tiers={data.tierLadder} />
           <RewardsGrid rewards={data.rewards} onClaimReward={onClaimReward} />
           <PointsHistorySection history={data.pointsHistory} />
         </div>

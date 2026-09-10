@@ -1,6 +1,6 @@
 /* ── Loyalty store helper functions ── */
 
-import { LOYALTY_KEY, type Reward, type PointsHistoryEntry, type StoredLoyalty } from './loyalty-store-types';
+import { LOYALTY_KEY, type Reward, type PointsHistoryEntry, type StoredLoyalty, type LoyaltyTierLadderItem } from './loyalty-store-types';
 
 export function loadInitialLoyalty(): StoredLoyalty | null {
   try {
@@ -49,4 +49,17 @@ export function parseLoyaltySummary(data: Record<string, unknown>): { tier: stri
     3
   );
   return { tier, points, cashbackRate };
+}
+
+export function parseTierLadder(data: Record<string, unknown>[], currentTier: string): LoyaltyTierLadderItem[] {
+  return data
+    .map((tier) => ({
+      tier_name: String(tier.tier_name || ''),
+      display_name_vi: String(tier.display_name_vi || tier.tier_name || ''),
+      min_points: Number(tier.min_points ?? 0),
+      point_multiplier: Number(tier.point_multiplier ?? 1),
+      cashback_rate: Number(tier.cashback_rate ?? 0),
+      is_current: String(tier.tier_name || '') === currentTier,
+    }))
+    .sort((a, b) => a.min_points - b.min_points);
 }

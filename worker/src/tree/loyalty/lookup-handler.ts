@@ -10,9 +10,10 @@ const DEFAULT_TIER = 'bronze';
 const TIER_VI_MAP: Record<string, string> = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
 
 export async function handleLookup(c: Context<{ Bindings: Env }>) {
-  const phone = (c.req.query('phone') || '').trim();
-  if (!phone) {
-    return c.json({ ok: false, error: 'Thiếu số điện thoại' }, 400);
+  // Normalize to digits so "0901 234 567" and "0901234567" match the same row
+  const phone = (c.req.query('phone') || '').replace(/\D/g, '');
+  if (phone.length < 9 || phone.length > 12) {
+    return c.json({ ok: false, error: 'Số điện thoại không hợp lệ' }, 400);
   }
 
   const db = c.env.AURA_DB;

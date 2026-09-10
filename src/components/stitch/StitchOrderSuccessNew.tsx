@@ -132,6 +132,8 @@ export function StitchOrderSuccessNew({
           items={order.items}
           total={order.total}
           formatFn={fmt}
+          pointsEarned={order.pointsEarned}
+          cashbackEarned={order.cashbackEarned}
         />
 
         {/* Track Order CTA */}

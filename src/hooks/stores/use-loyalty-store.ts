@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
-import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary } from './loyalty-store-helpers';
+import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary, parseTierLadder } from './loyalty-store-helpers';
 
-import type { Reward, PointsHistoryEntry } from './loyalty-store-types';
-export type { Reward, PointsHistoryEntry } from './loyalty-store-types';
+import type { Reward, PointsHistoryEntry, LoyaltyTierLadderItem } from './loyalty-store-types';
+export type { Reward, PointsHistoryEntry, LoyaltyTierLadderItem } from './loyalty-store-types';
 
 /* ═══════════════════════════════════════════════════════════════════
    Loyalty store — Zustand with manual localStorage persistence.
@@ -15,6 +15,7 @@ interface LoyaltyState {
   tier: string;
   points: number;
   cashbackRate: number;
+  tierLadder: LoyaltyTierLadderItem[];
   rewards: Reward[];
   history: PointsHistoryEntry[];
   loading: boolean;
@@ -33,6 +34,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   tier: initial?.tier ?? 'bronze',
   points: initial?.points ?? 0,
   cashbackRate: initial?.cashbackRate ?? 3,
+  tierLadder: [],
   rewards: [],
   history: [],
   loading: false,
@@ -60,12 +62,21 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         rewards = parseRewards(rawRewards);
       } catch { /* rewards are optional */ }
 
+      let tierLadder: LoyaltyTierLadderItem[] = [];
+      try {
+        const tiersBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/tiers');
+        const tiersData = tiersBody.data || tiersBody;
+        const rawTiers = Array.isArray(tiersData) ? tiersData : [];
+        tierLadder = parseTierLadder(rawTiers, parseLoyaltySummary(data).tier);
+      } catch { /* tier ladder is optional */ }
+
       const { tier: tierVal, points: pointsVal, cashbackRate: cashbackRateVal } = parseLoyaltySummary(data);
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
       set({
         tier: tierVal,
         points: pointsVal,
         cashbackRate: cashbackRateVal,
+        tierLadder,
         rewards,
         history,
         loading: false,

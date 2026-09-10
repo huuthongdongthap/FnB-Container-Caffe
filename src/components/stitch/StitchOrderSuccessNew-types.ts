@@ -25,6 +25,9 @@ export interface OrderSuccessNewData {
   locationImageUrl?: string;
   customerName?: string;
   table?: string;
+  /* Loyalty earnings — credited asynchronously when order status advances */
+  pointsEarned?: number;
+  cashbackEarned?: number;
 }
 
 /* ─── Component Props ────────────────────────────────────────────────────── */

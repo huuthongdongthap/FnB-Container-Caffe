@@ -54,6 +54,8 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     status?: string;
     total?: number;
     payment_method?: string;
+    points_earned?: number;
+    cashback_earned?: number;
   } | null>(null);
 
   // Load cached pending order from localStorage
@@ -67,6 +69,8 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
           status: String(parsed.status ?? ''),
           total: Number(parsed.total ?? 0),
           payment_method: String(parsed.payment_method ?? ''),
+          points_earned: Number(parsed.points_earned ?? 0) || undefined,
+          cashback_earned: Number(parsed.cashback_earned ?? 0) || undefined,
         });
         localStorage.removeItem('pendingOrder');
       }
@@ -146,6 +150,8 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
       locationName: 'AURA CAFE',
       customerName: currentOrder?.customer_name || '',
       table: currentOrder?.table_id,
+      pointsEarned: source.points_earned,
+      cashbackEarned: source.cashback_earned,
     };
   }, [currentOrder, pendingOrder]);
 

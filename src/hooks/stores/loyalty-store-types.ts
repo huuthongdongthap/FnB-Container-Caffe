@@ -23,3 +23,12 @@ export interface StoredLoyalty {
   points: number;
   cashbackRate: number;
 }
+
+export interface LoyaltyTierLadderItem {
+  tier_name: string;
+  display_name_vi: string;
+  min_points: number;
+  point_multiplier: number;
+  cashback_rate: number;
+  is_current: boolean;
+}

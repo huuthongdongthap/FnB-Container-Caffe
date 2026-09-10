@@ -120,6 +120,9 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       `).bind(paymentId, orderId, validatedMethod, parseInt(String(data.total)), 'pending').run();
     }
 
+    // Auto-create loyalty profile: email identity takes precedence, phone-only
+    // checkout falls back to phone-keyed lookup so walk-in guests still earn tiers.
+    // Follows phone-auth-handler pattern: synthetic email {phone}@loyalty.aura.
     if (data.customer_email) {
       await db.prepare(`
         INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
@@ -129,6 +132,28 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       `).bind(
         generateId('CUST_'), data.customer_email, data.customer_name, data.customer_phone
       ).run();
+    } else if (data.customer_phone) {
+      const digits = String(data.customer_phone).replace(/\D/g, '');
+      if (digits.length >= 9 && digits.length <= 12) {
+        const existing = await db.prepare(
+          'SELECT id FROM customers WHERE phone = ?'
+        ).bind(digits).first<{ id: string }>();
+
+        if (!existing) {
+          const custId = generateId('CUST_');
+          const now = new Date().toISOString();
+          await db.batch([
+            db.prepare(
+              `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)`
+            ).bind(custId, `${digits}@loyalty.aura`, data.customer_name, digits, now, now),
+            db.prepare(
+              `INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
+               VALUES (?, ?, 0, 0, 0, ?, ?)`
+            ).bind(generateId('wal_'), custId, now, now),
+          ]);
+        }
+      }
     }
 
     // ERPNext sync (fire-and-forget -- never block order creation)

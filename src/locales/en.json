@@ -597,7 +597,12 @@
     "defaultReward3Alt": "Pastry",
     "defaultHistory1": "Order #ORD-001",
     "defaultHistory2": "Order #ORD-002",
-    "defaultHistory3": "Order #ORD-003"
+    "defaultHistory3": "Order #ORD-003",
+    "tierLadderTitle": "Membership Tier System",
+    "currentTier": "Current Tier",
+    "tierFromPoints": "From {{points}} points",
+    "pointMultiplier": "Point Multiplier",
+    "cashbackRate": "Cashback"
   },
   "contact": {
     "breadcrumbHome": "Home",

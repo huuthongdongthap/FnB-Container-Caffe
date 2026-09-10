@@ -12,7 +12,7 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const { results } = await db.prepare(
-      'SELECT id, status, total, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at FROM orders WHERE id = ?'
+      'SELECT id, status, total, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
     ).bind(id).all<Record<string, unknown>>();
 
     if (!results || results.length === 0) {
@@ -24,7 +24,9 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
       items: JSON.parse(results[0].items as string),
       total: parseInt(results[0].total as string),
       shipping_fee: parseInt(String(results[0].shipping_fee || 0)),
-      discount: parseInt(String(results[0].discount || 0))
+      discount: parseInt(String(results[0].discount || 0)),
+      points_earned: Number(results[0].points_earned ?? 0),
+      cashback_earned: Number(results[0].cashback_earned ?? 0)
     };
 
     const { results: paymentResults } = await db.prepare(

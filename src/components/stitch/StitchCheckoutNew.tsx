@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingBag, CircleUser, User, Wallet } from 'lucide-react';
+import { ShoppingBag, CircleUser, User, Wallet, Award, CreditCard } from 'lucide-react';
 
 import { CheckoutNewSkeleton } from './StitchCheckoutNew-skeleton';
 import { EmptyCartState } from './StitchCheckoutNew-empty-state';
@@ -10,12 +10,21 @@ import { OrderSummaryPanel } from './StitchCheckoutNew-order-summary';
 import { CheckoutFooter } from './StitchCheckoutNew-footer';
 
 import { cn } from '@/lib/cn';
+import { apiFetch } from '@/lib/api-client';
 import type {
   StitchCheckoutNewProps,
   CheckoutNewFormData,
   PaymentMethod,
   OrderType,
 } from './StitchCheckoutNew-types';
+
+interface LoyaltyLookupResult {
+  tier: string;
+  tier_vi: string;
+  balance: number;
+  loyalty_points: number;
+  member_since: string;
+}
 
 // Re-export types for backward compatibility
 export type {
@@ -47,6 +56,43 @@ export function StitchCheckoutNew({
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Loyalty lookup: debounce 400ms on phone change, fetch tier + wallet balance
+  const lookupLoyalty = useCallback(async (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 12) {
+      setLoyalty(null);
+      return;
+    }
+    setIsLookingUp(true);
+    try {
+      const res = await apiFetch<{ ok: boolean; member?: LoyaltyLookupResult }>(
+        `/api/loyalty/lookup?phone=${encodeURIComponent(digits)}`
+      );
+      setLoyalty(res?.ok && res.member ? res.member : null);
+    } catch {
+      setLoyalty(null);
+    } finally {
+      setIsLookingUp(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    lookupTimerRef.current = setTimeout(() => lookupLoyalty(form.phone), 400);
+    return () => {
+      if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    };
+  }, [form.phone, lookupLoyalty]);
+
+  useEffect(() => {
+    return () => {
+      if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    };
+  }, []);
 
   if (!summary) return <CheckoutNewSkeleton />;
   if (summary.items.length === 0) return <EmptyCartState />;
@@ -176,6 +222,36 @@ export function StitchCheckoutNew({
                     <span>✨</span>
                     <span>Tự động tích điểm & hoàn tiền vào Ví Aura (1.0x - 1.5x)</span>
                   </p>
+
+                  {/* Loyalty tier badge + wallet balance chip (debounced lookup) */}
+                  {isLookingUp && (
+                    <p className="mt-1 text-xs text-[var(--aura-chrome-mid)] animate-pulse" data-testid="loyalty-lookup-loading">
+                      Đang tra cứu thành viên...
+                    </p>
+                  )}
+                  {!isLookingUp && loyalty && (
+                    <div
+                      className="mt-2 flex flex-wrap items-center gap-2"
+                      data-testid="loyalty-member-badge"
+                    >
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold',
+                          'border-[rgba(var(--aura-chrome-light),0.4)] bg-[rgba(var(--aura-chrome-light),0.12)] text-[var(--aura-chrome-bright)]'
+                        )}
+                      >
+                        <Award className="w-3.5 h-3.5" aria-hidden="true" />
+                        {loyalty.tier_vi} · {loyalty.loyalty_points.toLocaleString('vi-VN')} điểm
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold border-white/[0.12] bg-white/[0.04] text-[var(--aura-chrome-soft)]"
+                        data-testid="loyalty-wallet-balance"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" aria-hidden="true" />
+                        Ví Aura: {loyalty.balance.toLocaleString('vi-VN')}₫
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {orderType === 'delivery' && (

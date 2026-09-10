@@ -35,7 +35,7 @@ export function usePromotions() {
         usageCount: item.usageCount ?? item.usage_count ?? 0,
         usageLimit: item.usageLimit ?? item.usage_limit ?? 0,
         icon: item.icon || 'Sparkles',
-        isFeatured: item.isFeatured ?? (item.code === 'AURA20'),
+        isFeatured: item.isFeatured ?? false,
       }));
     },
   });
@@ -58,7 +58,7 @@ export function usePromotionByCode(code: string) {
         usageCount: item.usageCount ?? item.usage_count ?? 0,
         usageLimit: item.usageLimit ?? item.usage_limit ?? 0,
         icon: item.icon || 'Sparkles',
-        isFeatured: item.isFeatured ?? (item.code === 'AURA20'),
+        isFeatured: item.isFeatured ?? false,
       };
     },
     enabled: !!code,

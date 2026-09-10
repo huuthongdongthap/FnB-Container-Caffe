@@ -5,7 +5,7 @@ import { PromotionCard } from '@/components/promotions/promotion-card';
 describe('PromotionCard', () => {
   const activePromo = {
     id: '1',
-    code: 'AURA20',
+    code: 'SAVE20',
     percent: 20,
     maxDiscount: 50000,
     minOrder: 50000,
@@ -36,7 +36,7 @@ describe('PromotionCard', () => {
 
   it('renders voucher code', () => {
     render(<PromotionCard {...activePromo} />);
-    expect(screen.getByText('AURA20')).toBeInTheDocument();
+    expect(screen.getByText('SAVE20')).toBeInTheDocument();
   });
 
   it('shows validity dates', () => {
@@ -67,7 +67,7 @@ describe('PromotionCard', () => {
     fireEvent.click(copyBtn);
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('AURA20');
+      expect(writeText).toHaveBeenCalledWith('SAVE20');
     });
   });
 

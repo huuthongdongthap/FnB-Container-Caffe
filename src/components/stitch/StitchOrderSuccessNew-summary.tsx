@@ -8,7 +8,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { Check } from 'lucide-react';
+import { Check, Sparkles, Wallet } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { OrderSuccessNewItem } from './StitchOrderSuccessNew-types';
 import { PROGRESS_PERCENT, STATUS_STEPS } from './StitchOrderSuccessNew-types';
@@ -21,6 +21,8 @@ interface OrderSummaryCardProps {
   items: OrderSuccessNewItem[];
   total: number;
   formatFn: (amount: number) => string;
+  pointsEarned?: number;
+  cashbackEarned?: number;
 }
 
 export function OrderSummaryCard({
@@ -28,6 +30,8 @@ export function OrderSummaryCard({
   items,
   total,
   formatFn,
+  pointsEarned,
+  cashbackEarned,
 }: OrderSummaryCardProps) {
   const { t } = useTranslation();
 
@@ -91,6 +95,27 @@ export function OrderSummaryCard({
 
       {/* Divider between items and progress */}
       <div className="w-full h-px bg-white/5 my-1" />
+
+      {/* Loyalty earnings — points + cashback credited for this order */}
+      {(pointsEarned ?? 0) > 0 || (cashbackEarned ?? 0) > 0 ? (
+        <div
+          className="flex flex-wrap gap-2"
+          data-testid="loyalty-earnings"
+        >
+          {(pointsEarned ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[rgba(var(--aura-chrome-light),0.4)] bg-[rgba(var(--aura-chrome-light),0.12)] text-[11px] font-semibold text-[var(--aura-chrome-bright)]">
+              <Sparkles size={12} aria-hidden="true" />
+              +{pointsEarned?.toLocaleString('vi-VN')} {t('stitch.loyaltyPointsEarned', { defaultValue: 'điểm' })}
+            </span>
+          )}
+          {(cashbackEarned ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/[0.12] bg-white/[0.04] text-[11px] font-semibold text-[var(--aura-chrome-soft)]">
+              <Wallet size={12} aria-hidden="true" />
+              +{formatFn(cashbackEarned ?? 0)} {t('stitch.loyaltyCashbackEarned', { defaultValue: 'Ví Aura' })}
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {/* Progress tracker (3 steps: Received -> Preparing -> Ready) */}
       <div className="flex flex-col gap-4 pt-2">
