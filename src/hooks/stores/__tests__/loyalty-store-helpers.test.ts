@@ -10,10 +10,11 @@ describe('parseTierLadder', () => {
     ];
     const result = parseTierLadder(rows as Record<string, unknown>[], 'bronze');
     expect(result.length).toBe(2);
-    expect(result[0].tier_name).toBe('bronze');
-    expect(result[0].display_name_vi).toBe('Đồng');
-    expect(result[0].is_current).toBe(true);
-    expect(result[1].is_current).toBe(false);
+    const bronze = result.find((t) => t.tier_name === 'bronze') as LoyaltyTierLadderItem;
+    const silver = result.find((t) => t.tier_name === 'silver') as LoyaltyTierLadderItem;
+    expect(bronze.display_name_vi).toBe('Đồng');
+    expect(bronze.is_current).toBe(true);
+    expect(silver.is_current).toBe(false);
   });
 
   it('sorts tiers by min_points ascending', () => {
@@ -24,17 +25,18 @@ describe('parseTierLadder', () => {
     ];
     const result = parseTierLadder(rows as Record<string, unknown>[], 'gold');
     expect(result.map((t) => t.tier_name)).toEqual(['bronze', 'gold', 'platinum']);
-    expect(result[1].is_current).toBe(true);
+    expect(result.find((t) => t.tier_name === 'gold')?.is_current).toBe(true);
   });
 
   it('coerces missing fields to safe defaults', () => {
     const rows = [{ tier_name: 'bronze' }];
     const result = parseTierLadder(rows as Record<string, unknown>[], 'bronze');
-    expect(result[0].display_name_vi).toBe('bronze');
-    expect(result[0].min_points).toBe(0);
-    expect(result[0].point_multiplier).toBe(1);
-    expect(result[0].cashback_rate).toBe(0);
-    expect(result[0].is_current).toBe(true);
+    const bronze = result[0];
+    expect(bronze?.display_name_vi).toBe('bronze');
+    expect(bronze?.min_points).toBe(0);
+    expect(bronze?.point_multiplier).toBe(1);
+    expect(bronze?.cashback_rate).toBe(0);
+    expect(bronze?.is_current).toBe(true);
   });
 
   it('returns empty array for empty input', () => {

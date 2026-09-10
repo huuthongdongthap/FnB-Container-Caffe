@@ -20,6 +20,7 @@ export interface Order {
   shipping_fee?: number;
   notes?: string;
   table_id?: string;
+  order_type?: 'dine_in' | 'takeaway' | 'delivery';
   points_earned?: number;
   cashback_earned?: number;
 }
@@ -38,6 +39,7 @@ export interface CreateOrderPayload {
   discount?: number;
   tip?: number;
   table_id?: string;
+  order_type?: 'dine_in' | 'takeaway' | 'delivery';
 }
 
 export interface OrderState {

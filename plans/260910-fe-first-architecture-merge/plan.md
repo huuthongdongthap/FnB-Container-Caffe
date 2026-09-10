@@ -23,7 +23,7 @@ Ship go-live features first (Wave A), migrate to feature-sliced structure increm
 |------|-------|-------|--------|
 | A | 0 | Deprecate Grand Opening (AURA20/AURA10 is_active=0, kill banner/countdown) | ✅ |
 | A | 1 | Loyalty 4-tier FE wiring (Đồng 1.0x/3% → Bạch Kim 1.5x/10%) + phone→profile auto-create | ✅ |
-| A | 2 | Delivery/Takeaway/Dine-in checkout completion | ⚪ |
+| A | 2 | Delivery/Takeaway/Dine-in checkout completion | ✅ |
 | A | 3 | `/track-order` real-time + Telegram bar notification | ⚪ |
 | A | 4 | Aura Wallet payment option at checkout | ⚪ |
 | A | 5 | PWA polish (SW exists; verify offline fallback + install prompt) | ⚪ |
@@ -38,7 +38,8 @@ Wave C (monorepo `apps/` + `packages/ui` + Edge SSR): **DEFERRED** — revisit w
 
 - [phase-00-deprecate-grand-opening.md](./phase-00-deprecate-grand-opening.md)
 - [phase-01-loyalty-4tier-fe.md](./phase-01-loyalty-4tier-fe.md)
-- files for phases 02–09 pending approval of this overview
+- [phase-02-delivery-takeaway-dinein-checkout.md](./phase-02-delivery-takeaway-dinein-checkout.md)
+- files for phases 03–09 pending approval of this overview
 
 ## Dependencies
 

@@ -61,9 +61,26 @@ export const createOrderSchema = z.object({
   table_id: z.string().optional(),
   /** Customer id (from POS lookup). Optional — guest orders leave it unset. */
   customer_id: z.string().optional(),
-  order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional().default('dine_in'),
+  /** No default: omitted order_type skips per-type validation (legacy QR flows);
+   *  create-order falls back to 'dine_in' at insert time. */
+  order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
   tip_amount: z.number().nonnegative().optional().default(0),
   service_fee: z.number().nonnegative().optional().default(0),
+}).superRefine((data, ctx) => {
+  if (data.order_type === 'delivery' && !(data.customer_address ?? '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['customer_address'],
+      message: 'Địa chỉ giao hàng là bắt buộc với đơn giao tận nơi',
+    });
+  }
+  if (data.order_type === 'dine_in' && !(data.table_id ?? '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['table_id'],
+      message: 'Số bàn là bắt buộc với đơn tại quán',
+    });
+  }
 });
 
 // ── Register ──

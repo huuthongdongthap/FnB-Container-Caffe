@@ -98,6 +98,12 @@ export function StitchCheckoutNew({
   if (summary.items.length === 0) return <EmptyCartState />;
 
   const displayError = error || submitError;
+
+  // VN mobile numbers: exactly 10 digits starting with 0
+  const isPhoneValid = /^0\d{9}$/.test(form.phone.replace(/\s/g, ''));
+  const isAddressMissing = orderType === 'delivery' && !form.address.trim();
+  const isTableMissing = orderType === 'dine_in' && !form.tableNumber?.trim();
+  const canSubmit = isPhoneValid && !isAddressMissing && !isTableMissing;
   const processing = isProcessing || isSubmitting;
 
   const updateField = <K extends keyof CheckoutNewFormData>(
@@ -108,6 +114,16 @@ export function StitchCheckoutNew({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+    if (!canSubmit) {
+      setSubmitError(
+        !isPhoneValid
+          ? t('stitch.phoneInvalid', 'Số điện thoại không hợp lệ (VD: 0901234567)')
+          : isAddressMissing
+            ? t('stitch.addressRequired', 'Vui lòng nhập địa chỉ giao hàng')
+            : t('stitch.tableRequired', 'Vui lòng nhập số bàn'),
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onPlaceOrder({ ...form, paymentMethod, orderType });
@@ -222,6 +238,11 @@ export function StitchCheckoutNew({
                     <span>✨</span>
                     <span>Tự động tích điểm & hoàn tiền vào Ví Aura (1.0x - 1.5x)</span>
                   </p>
+                  {form.phone && !isPhoneValid && (
+                    <p className="mt-1 text-xs text-red-400" data-testid="phone-error">
+                      {t('stitch.phoneInvalid', 'Số điện thoại không hợp lệ (VD: 0901234567)')}
+                    </p>
+                  )}
 
                   {/* Loyalty tier badge + wallet balance chip (debounced lookup) */}
                   {isLookingUp && (
@@ -257,22 +278,32 @@ export function StitchCheckoutNew({
                 {orderType === 'delivery' && (
                   <div className="md:col-span-2">
                     <Field
-                      label={locale?.startsWith('vi') ? 'Địa Chỉ Giao Hàng (Sa Đéc)' : t('stitch.deliveryAddress', 'Delivery Address')}
+                      label={locale?.startsWith('vi') ? 'Địa Chỉ Giao Hàng (Sa Đéc) *' : t('stitch.deliveryAddress', 'Delivery Address *')}
                       placeholder="Số nhà, tên đường, Phường 1 / Phường 2 / Tân Quy Đông..."
                       value={form.address}
                       onChange={(v) => updateField('address', v)}
                     />
+                    {isAddressMissing && (
+                      <p className="mt-1 text-xs text-red-400" data-testid="address-error">
+                        {t('stitch.addressRequired', 'Vui lòng nhập địa chỉ giao hàng')}
+                      </p>
+                    )}
                   </div>
                 )}
 
                 {orderType === 'dine_in' && (
                   <div className="md:col-span-2">
                     <Field
-                      label="Số Bàn (Bàn 1 đến 12)"
+                      label="Số Bàn (Bàn 1 đến 12) *"
                       placeholder="Ví dụ: Bàn 5"
                       value={form.tableNumber || ''}
                       onChange={(v) => updateField('tableNumber', v)}
                     />
+                    {isTableMissing && (
+                      <p className="mt-1 text-xs text-red-400" data-testid="table-error">
+                        {t('stitch.tableRequired', 'Vui lòng nhập số bàn')}
+                      </p>
+                    )}
                   </div>
                 )}
 

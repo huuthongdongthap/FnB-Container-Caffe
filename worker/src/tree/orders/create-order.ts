@@ -260,7 +260,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       customer_address: data.customer_address || null, payment_method: validatedMethod,
       shipping_fee: parseInt(String(data.shipping_fee || 0)), discount: parseInt(String(data.discount || 0)),
       notes: data.notes || null, delivery_time: data.delivery_time || 'now',
-      table_id: resolvedTableId,
+      table_id: resolvedTableId, order_type: data.order_type || 'dine_in',
       created_at: new Date().toISOString()
     },
     message: 'Order created successfully'

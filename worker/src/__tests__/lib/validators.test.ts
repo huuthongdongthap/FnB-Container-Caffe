@@ -134,6 +134,29 @@ describe('createOrderSchema', () => {
     const data = createOrderSchema.parse({ ...validOrder, customer_email: 'a@b.com', notes: 'Please hurry', shipping_fee: 10000 });
     expect(data.customer_email).toBe('a@b.com');
   });
+
+  it('requires customer_address for delivery orders', () => {
+    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'delivery' })).toThrow(/customer_address/);
+    const ok = createOrderSchema.parse({ ...validOrder, order_type: 'delivery', customer_address: '39 Nguyễn Tất Thành' });
+    expect(ok.order_type).toBe('delivery');
+  });
+
+  it('requires table_id for dine_in orders', () => {
+    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'dine_in' })).toThrow(/table_id/);
+    const ok = createOrderSchema.parse({ ...validOrder, order_type: 'dine_in', table_id: '5' });
+    expect(ok.order_type).toBe('dine_in');
+  });
+
+  it('omitted order_type skips per-type validation (legacy QR flow)', () => {
+    const data = createOrderSchema.parse(validOrder);
+    expect(data.order_type).toBeUndefined();
+    expect(data.customer_address).toBeUndefined();
+  });
+
+  it('takeaway requires neither address nor table', () => {
+    const data = createOrderSchema.parse({ ...validOrder, order_type: 'takeaway' });
+    expect(data.order_type).toBe('takeaway');
+  });
 });
 
 describe('reservationSchema', () => {

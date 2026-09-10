@@ -85,6 +85,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
       'items',         // array
       'total',         // number
   'table_id', // string | null (table reference)
+      'order_type',    // 'dine_in' | 'takeaway' | 'delivery' (defaults 'dine_in')
       'customer',      // object { full_name, phone, address }
       'customer_name', // string
       'customer_phone',// string
