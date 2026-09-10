@@ -1,7 +1,7 @@
 # Deployment
 
 ## Platform: Cloudflare Workers
-## URL: https://aura-space-worker.agencyos-openclaw.workers.dev
+## URL: https://aura-space-worker.sadec-marketing-hub.workers.dev
 ## Worker Name: aura-space-worker
 ## Version ID: e29565e6-a338-463b-b56e-e5bb3bda1e10
 ## Deployed: 2026-06-06
