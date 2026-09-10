@@ -172,7 +172,7 @@ Cache: AUTH_KV (KV namespace)
 - `GET /api/menu/:id` — Single product
 
 #### Orders (`/api/orders`)
-- `POST /api/orders` — Create (rate limit: 5/IP/10min)
+- `POST /api/orders` — Create (rate limit: 5/IP/10min). Optional `order_type` (`dine_in`|`takeaway`|`delivery`): `delivery` requires `customer_address`, `dine_in` requires `table_id`; omitted `order_type` skips per-type validation (legacy QR flow, defaults `dine_in` at insert)
 - `GET /api/orders/latest` — Timestamp of most recent
 - `GET /api/orders/:id` — Get order detail
 - `PATCH /api/orders/:id` — Update status (admin only)
