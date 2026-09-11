@@ -78,7 +78,7 @@ describe('telegram', () => {
       const body = JSON.parse(options.body as string);
       expect(body.chat_id).toBe('chat-456');
       expect(body.parse_mode).toBe('HTML');
-      expect(body.text).toContain('DON MBI');
+      expect(body.text).toContain('ĐƠN MỚI');
       expect(body.text).toContain('AURA CAFE');
       expect(body.text).toContain('Nguyen Van A');
       expect(body.text).toContain('0909123456');

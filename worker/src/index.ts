@@ -55,6 +55,7 @@ import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { kdsStreamRouter } from './routes/kds-stream';
+import { orderStreamRouter } from './routes/order-stream';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
 import { subscriptionsRouter } from './routes/subscriptions';
@@ -190,8 +191,8 @@ app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
 app.route('/api/kds/orders', kdsStreamRouter);
 
-// ── SSE Stream (deprecated — replaced by DO WebSocket) ──
-// app.route('/api/orders', orderStreamRouter);
+// ── SSE Stream — per-order status updates (client EventSource, order-store subscribeToOrder) ──
+app.route('/api/orders', orderStreamRouter);
 
 // ── Realtime WebSocket (DO-backed, public) ──
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));

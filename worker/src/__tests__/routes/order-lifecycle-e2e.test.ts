@@ -100,7 +100,7 @@ describe('Order lifecycle E2E', () => {
         table_id: null, order_type: 'dine_in', tip_amount: 0, service_fee: 0,
         created_at: new Date().toISOString(),
       }] },
-      { match: (s) => s.includes('SELECT id, status FROM orders'), firstRow: { id: 'ORD-TEST-001', status: 'pending' } },
+      { match: (s) => s.includes('SELECT id, status, items, total'), firstRow: { id: 'ORD-TEST-001', status: 'pending' } },
       { match: (s) => s.startsWith('UPDATE orders SET'), rows: [] },
       { match: (s) => s.includes('SELECT id FROM customers'), rows: [] },
       { match: (s) => s.includes('SELECT id FROM referrals'), rows: [] },
@@ -144,7 +144,7 @@ describe('Order lifecycle E2E', () => {
     expect(patched.success).toBe(true);
 
     const db2 = makeScriptedDB([
-      { match: (s) => s.includes('SELECT id, status FROM orders'), firstRow: { id: 'ORD-TEST-001', status: 'confirmed' } },
+      { match: (s) => s.includes('SELECT id, status, items, total'), firstRow: { id: 'ORD-TEST-001', status: 'confirmed' } },
     ]);
     const env2 = makeEnv(db2);
     const badRes = await app.fetch(

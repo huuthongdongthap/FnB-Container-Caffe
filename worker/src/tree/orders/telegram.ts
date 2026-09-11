@@ -21,7 +21,7 @@ export async function notifyTelegram(env: Record<string, unknown>, order: Record
       ? '🛵 GIAO HÀNG (DELIVERY)'
       : (order.order_type === 'takeaway' ? '🛍️ MANG ĐI (TAKEAWAY)' : (order.table_id ? `☕ TẠI BÀN (${order.table_id})` : '☕ TẠI QUÁN'));
 
-    const text = `🟎 <b>DON MBI — AURA CAFE</b>\n` +
+    const text = `🆕 <b>ĐƠN MỚI — AURA CAFE</b>\n` +
       `📌 <b>${orderTypeLabel}</b>\n${
       '━'.repeat(22)}\n` +
       `📋 ${esc(order.id as string)}\n` +

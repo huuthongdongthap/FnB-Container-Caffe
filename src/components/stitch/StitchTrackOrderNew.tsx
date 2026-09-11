@@ -49,6 +49,7 @@ export function StitchTrackOrderNew({
   estimatedMinutes = defaultProps.estimatedMinutes,
   items = defaultProps.items,
   total = defaultProps.total,
+  status,
   onTrackMap,
   onBack,
   onNavigate,
@@ -67,7 +68,7 @@ export function StitchTrackOrderNew({
       <main className="max-w-[1200px] mx-auto px-5 pt-8 space-y-8 min-h-screen pb-32">
         <OrderHero orderId={orderId} estimatedMinutes={estimatedMinutes} />
 
-        <OrderTimeline />
+        <OrderTimeline status={status} />
 
         <OrderSummary items={items} total={total} />
 

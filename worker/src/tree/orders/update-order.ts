@@ -17,8 +17,9 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
     const body = await parseJSON(request);
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
 
+    // Fetch full row — needed for DO broadcast payload below
     const { results } = await db.prepare(
-      'SELECT id, status FROM orders WHERE id = ?'
+      'SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?'
     ).bind(id).all<Record<string, unknown>>();
 
     if (!results || results.length === 0) {
@@ -60,6 +61,34 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
         status: body.status,
         timestamp: new Date().toISOString()
       }), { expirationTtl: 60 }).catch(() => {});
+    }
+
+    // ── DO Broadcast (KDS + realtime clients) ──────────────────────
+    // Mirror create-order.ts: publish post-update state so KDS dashboards
+    // and any DO WebSocket subscribers see status changes live.
+    if (body.status !== undefined && (env as Record<string, unknown>).ORDER_BROADCASTER) {
+      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
+      const stub = ns.get(ns.idFromName(id));
+      const row = results[0];
+      const items = typeof row.items === 'string' ? JSON.parse(row.items as string) : (row.items ?? []);
+      ;(async () => {
+        try {
+          await (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
+            orderId: id,
+            status: body.status as string,
+            payment_status: String(row.payment_status ?? 'unpaid'),
+            items,
+            total: Number(row.total ?? 0),
+            customer_name: String(row.customer_name ?? ''),
+            customer_phone: String(row.customer_phone ?? ''),
+            table_id: row.table_id ? String(row.table_id) : null,
+            createdAt: row.created_at ? new Date(row.created_at as string).getTime() : Date.now(),
+            updatedAt: Date.now(),
+          });
+        } catch (e) {
+          log.warn('DO broadcast error (non-blocking):', { message: (e as Error).message, orderId: id });
+        }
+      })();
     }
 
     if (body.status === 'cancelled') {

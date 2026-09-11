@@ -1,12 +1,30 @@
 /**
- * OrderTimeline — vertical progress timeline with 4 steps
+ * OrderTimeline — vertical progress timeline driven by live order status
  */
 
 import { useTranslation } from 'react-i18next';
 import { TimelineStep } from './StitchTrackOrderNew-timeline-step';
 
-export function OrderTimeline() {
+export interface OrderTimelineProps {
+  /** Live order status; undefined renders the static demo timeline */
+  status?: string;
+}
+
+/** Canonical status order for the timeline; anything before the current status is completed */
+const STATUS_FLOW = ['confirmed', 'preparing', 'ready', 'served', 'delivered'] as const;
+
+const STATUS_LABEL_KEYS: Record<(typeof STATUS_FLOW)[number], string> = {
+  confirmed: 'trackOrder.stepConfirmed',
+  preparing: 'trackOrder.stepPreparing',
+  ready: 'trackOrder.stepReady',
+  served: 'trackOrder.stepServed',
+  delivered: 'trackOrder.stepDelivered',
+};
+
+export function OrderTimeline({ status }: OrderTimelineProps) {
   const { t } = useTranslation();
+
+  const currentIndex = status ? STATUS_FLOW.indexOf(status as (typeof STATUS_FLOW)[number]) : -1;
 
   return (
     <section className="py-4 relative">
@@ -17,32 +35,20 @@ export function OrderTimeline() {
       />
 
       <div className="space-y-12">
-        <TimelineStep
-          label={t('trackOrder.stepConfirmed', 'Confirmed')}
-          time="10:42 AM"
-          isActive={false}
-          isCompleted={true}
-          isLast={false}
-        />
-        <TimelineStep
-          label={t('trackOrder.stepPreparing', 'Preparing')}
-          time={t('trackOrder.inProgress', 'IN PROGRESS')}
-          isActive={true}
-          isCompleted={false}
-          isLast={false}
-        />
-        <TimelineStep
-          label={t('trackOrder.stepOutForDelivery', 'Out for Delivery')}
-          isActive={false}
-          isCompleted={false}
-          isLast={false}
-        />
-        <TimelineStep
-          label={t('trackOrder.stepDelivered', 'Delivered')}
-          isActive={false}
-          isCompleted={false}
-          isLast={true}
-        />
+        {STATUS_FLOW.map((step, index) => {
+          const isCompleted = index < currentIndex;
+          const isActive = index === currentIndex;
+          return (
+            <TimelineStep
+              key={step}
+              label={t(STATUS_LABEL_KEYS[step], STATUS_LABEL_KEYS[step])}
+              time={isActive ? t('trackOrder.inProgress', 'IN PROGRESS') : undefined}
+              isActive={isActive}
+              isCompleted={isCompleted}
+              isLast={index === STATUS_FLOW.length - 1}
+            />
+          );
+        })}
       </div>
     </section>
   );

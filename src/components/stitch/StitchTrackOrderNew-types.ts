@@ -15,6 +15,8 @@ export interface StitchTrackOrderNewProps {
   estimatedMinutes?: number;
   items?: TrackOrderItem[];
   total?: number;
+  /** Live order status (pending → confirmed → preparing → ready → served/delivered). Drives the timeline when provided. */
+  status?: string;
   onTrackMap?: () => void;
   onBack?: () => void;
   onNavigate?: (path: string) => void;
