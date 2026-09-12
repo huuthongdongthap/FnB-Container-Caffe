@@ -10,6 +10,7 @@ npx wrangler d1 execute AURA_DB --file=db/migrations/<file>.sql --remote
 Rules:
 - Apply files in name order, once each. There is no applied-migrations tracking table.
 - New tables use `CREATE TABLE IF NOT EXISTS` (re-run safe). `ALTER TABLE ADD COLUMN` is one-shot (SQLite has no IF NOT EXISTS variant).
+- Down-migrations live beside their up-file as `<same-stem>.down.sql`. They are a rollback tool — never applied as part of normal forward flow.
 - All new DDL goes in `worker/db/migrations/` (date-numbered). `worker/migrations/` (004–014) is legacy — do not add files there.
 
 ## Canonical vs duplicate definitions
@@ -23,6 +24,7 @@ Some tables are defined in more than one place. When they conflict, the canonica
 | payments | `schema.sql` + `migrations/006_refund_columns.sql` | `db/migrations/20260818_02_payments_table.sql` (narrower column set) |
 | checkins | `db/migrations/20260824_01_checkins_table.sql` | — |
 | users | `db/migrations/20260824_04_users_recreate.sql` (renames empty legacy table to `users_legacy`, then canonical DDL) | `db/migrations/20260824_02_users_table.sql` (fails on DBs that still carry the legacy table) |
+| customer_identities / consents / customer_events / visits | `db/migrations/20260913_01_customer_identity_consent_events_visits.sql` (+ `.down.sql` rollback) | — |
 
 ## Ordering hazard
 

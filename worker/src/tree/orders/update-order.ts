@@ -139,6 +139,40 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
 if (['served', 'completed'].includes(body.status as string)) {
 
+      // Customer-domain visit capture (additive — never blocks completion):
+      // one visit row + VisitRecorded event per completed order.
+      try {
+        const order = await db.prepare(
+          'SELECT total, order_type, table_id, customer_email, customer_phone FROM orders WHERE id = ?'
+        ).bind(id).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null }>();
+
+        if (order) {
+          const normalizedPhone = String(order.customer_phone || '').replace(/\D/g, '');
+          const visitCustomer = await db.prepare(
+            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+          ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
+
+          if (visitCustomer) {
+            const { recordVisit } = await import('../customer');
+            // dine_in + table_id = QR-table order; dine_in without = walk-in.
+            const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
+              order.order_type === 'delivery' ? 'online_delivery'
+              : order.order_type === 'takeaway' ? 'online_pickup'
+              : order.table_id ? 'qr_table'
+              : 'in_store';
+            const visitResult = await recordVisit({
+              db, customerId: visitCustomer.id, orderId: id,
+              spent: order.total, channel: visitChannel
+            });
+            if (visitResult.created) {
+              log.info('Visit recorded', { customer_id: visitCustomer.id, order_id: id, channel: visitChannel });
+            }
+          }
+        }
+      } catch (visitErr) {
+        log.warn('Visit capture error (non-blocking):', { message: (visitErr as Error).message, orderId: id });
+      }
+
       try {
         const order = await db.prepare(
           'SELECT total, customer_email, customer_phone FROM orders WHERE id = ?'

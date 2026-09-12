@@ -90,6 +90,28 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
           )
         );
       }
+
+      // Customer-domain capture (additive — never blocks signup):
+      // phone identity + explicit signup consent for CRM.
+      c.executionCtx?.waitUntil?.(
+        (async () => {
+          try {
+            const { identifyCustomer, recordConsent } = await import('../customer');
+            const identity = await identifyCustomer({
+              db, customerId: id, phone, zalo: zalo || undefined,
+              source: 'signup'
+            });
+            if (identity) {
+              await recordConsent({
+                db, customerId: id,
+                purpose: 'crm', granted: true, source: 'signup'
+              });
+            }
+          } catch (custErr) {
+            log.error('Customer capture error (non-blocking):', { message: (custErr as Error).message });
+          }
+        })()
+      );
     }
 
     const token = await generateJWT(

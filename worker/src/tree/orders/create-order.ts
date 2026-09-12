@@ -123,6 +123,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     // Auto-create loyalty profile: email identity takes precedence, phone-only
     // checkout falls back to phone-keyed lookup so walk-in guests still earn tiers.
     // Follows phone-auth-handler pattern: synthetic email {phone}@loyalty.aura.
+    let customerIdForCapture: string | null = data.customer_id || null;
     if (data.customer_email) {
       await db.prepare(`
         INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
@@ -132,6 +133,10 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       `).bind(
         generateId('CUST_'), data.customer_email, data.customer_name, data.customer_phone
       ).run();
+      const linkedCust = await db.prepare(
+        'SELECT id FROM customers WHERE email = ?'
+      ).bind(data.customer_email).first<{ id: string }>();
+      if (linkedCust) customerIdForCapture = linkedCust.id;
     } else if (data.customer_phone) {
       const digits = String(data.customer_phone).replace(/\D/g, '');
       if (digits.length >= 9 && digits.length <= 12) {
@@ -152,8 +157,35 @@ export async function createOrder(request: Request, env: Record<string, unknown>
                VALUES (?, ?, 0, 0, 0, ?, ?)`
             ).bind(generateId('wal_'), custId, now, now),
           ]);
+          customerIdForCapture = custId;
+        } else {
+          customerIdForCapture = existing.id;
         }
       }
+    }
+
+    // Customer-domain capture (additive, consent-gated — never blocks checkout):
+    // identity row + CustomerIdentified/OrderLinked events on the zero-based DB.
+    if (customerIdForCapture && ctx?.waitUntil) {
+      const captureCustId = customerIdForCapture;
+      ctx.waitUntil((async () => {
+        try {
+          const { identifyCustomer, linkOrder } = await import('../customer');
+          const identity = await identifyCustomer({
+            db, customerId: captureCustId,
+            phone: data.customer_phone, email: data.customer_email,
+            source: 'checkout'
+          });
+          if (identity) {
+            await linkOrder({
+              db, customerId: captureCustId, orderId,
+              total: parseInt(String(data.total)), orderType: data.order_type
+            });
+          }
+        } catch (custErr) {
+          log.warn('Customer capture error (non-blocking):', { message: (custErr as Error).message, orderId });
+        }
+      })());
     }
 
     // ERPNext sync (fire-and-forget -- never block order creation)
