@@ -14,7 +14,12 @@
     "isolatedModules": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@aura/domain-customer": ["./packages/domain/customer/index.ts"],
+      "@aura/domain-customer/*": ["./packages/domain/customer/*"],
+      "@aura/domain-crm": ["./packages/domain/crm/index.ts"],
+      "@aura/domain-crm/*": ["./packages/domain/crm/*"],
+      "worker/*": ["./worker/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

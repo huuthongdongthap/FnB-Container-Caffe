@@ -3,6 +3,11 @@
   "version": "2.1.1",
   "description": "AURA CAFE — Quán cà phê container industrial-luxury tại Sa Đéc",
   "type": "module",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "lint": "eslint worker/src/ --ext .ts",
     "lint:fix": "eslint worker/src/ --ext .ts --fix",

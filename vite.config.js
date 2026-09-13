@@ -27,6 +27,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__rootDir, 'src'),
+      '@aura/domain-customer': resolve(__rootDir, 'packages/domain/customer/index.ts'),
+      '@aura/domain-crm': resolve(__rootDir, 'packages/domain/crm/index.ts'),
     },
   },
   build: {
