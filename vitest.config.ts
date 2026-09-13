@@ -13,6 +13,7 @@ export default defineConfig({
       '@/lib': fileURLToPath(new URL('./worker/src/lib', import.meta.url)),
       '@aura/domain-customer': fileURLToPath(new URL('./packages/domain/customer/index.ts', import.meta.url)),
       '@aura/domain-crm': fileURLToPath(new URL('./packages/domain/crm/index.ts', import.meta.url)),
+      '@aura/domain-order': fileURLToPath(new URL('./packages/domain/order/index.ts', import.meta.url)),
       'worker/src/middleware/logger': fileURLToPath(new URL('./worker/src/middleware/logger.ts', import.meta.url)),
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],

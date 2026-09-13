@@ -29,6 +29,7 @@ export default defineConfig({
       '@': resolve(__rootDir, 'src'),
       '@aura/domain-customer': resolve(__rootDir, 'packages/domain/customer/index.ts'),
       '@aura/domain-crm': resolve(__rootDir, 'packages/domain/crm/index.ts'),
+      '@aura/domain-order': resolve(__rootDir, 'packages/domain/order/index.ts'),
     },
   },
   build: {
