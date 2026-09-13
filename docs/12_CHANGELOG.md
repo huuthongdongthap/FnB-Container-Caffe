@@ -4,6 +4,24 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M1 Customer Domain — Identity, Consent, Visits, Order-Link Capture
+
+- **feat(domain/customer)** — Added `worker/src/tree/customer/`: identify-customer, record-consent, record-visit, link-order + helpers. Zero-based customer DB per v4 §6 — AURA earns customer relationships transaction-by-transaction; no Viva Star migration.
+- **feat(domain)** — D1 migration `0005_customer_identity_consent_events_visits` (+down): customers identity/consent columns, customer_events, customer_visits tables.
+- **feat(orders)** — create-order/update-order capture customer identity events on golden-loop spine (CustomerCreated / CustomerIdentified / ConsentGiven).
+- **test** — 299-line customer-domain suite (worker).
+- See: `plans/2026-09-13-m1-customer-domain/`
+
+### 🔧 M1 i18n Glossary Consolidation (D9)
+
+- **fix(i18n)** — vi `nav.referral` + `footer.referral`: "Giới thiệu bạn" → "Giới thiệu bạn bè" (converged with `loyalty.referEarn`, glossary G10 ratified).
+- **fix(i18n)** — Added vi `stitch.accountDashboard.errorDescription` — Account Dashboard error state now renders translated copy instead of en fallback.
+- **docs** — `.ai/context/glossary.vi-en.yaml` ratified (referral convergence note).
+- **test** — `src/__tests__/locales-glossary.test.ts` regression guard: referral labels + errorDescription key + JSON validity — locale drift now fails CI.
+- **fix(worker)** — `phone-auth-handler.ts` safeWaitUntil: Hono executionCtx getter throws under `router.request()` in tests → background call sites wrapped, prod behavior unchanged.
+- **fix(test)** — promotion-card usage-count assertion exact-matched `/^10\/100 luot dung$/` (was colliding with "Con 110 ngay" expiry label under /10/ regex).
+- 359 files / 3269 tests green; tsc exit 0; review PASS.
+
 ### 🔧 UX Token Migration — Font Stacks → Aura Tokens (Stitch Scope)
 
 - **refactor(stitch)** — Migrated 23 stitch/theme files + 5 pages from literal font stacks (`'Space Grotesk'`, `'Libre Caslon Text'`, `'Cormorant Garamond'`) to aura design tokens (`--aura-font-body`, `--aura-font-display`, `--aura-font-display-serif`, `--aura-font-mono`). Legacy fonts were never webfont-loaded (index.html only loads Quicksand + Be Vietnam Pro), so literals were broken fallbacks to generic system fonts — this is a rendering fix.
