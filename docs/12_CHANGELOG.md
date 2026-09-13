@@ -4,6 +4,15 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M2 Shim Caller Migration — Order / Payment / Kitchen
+
+- **refactor(M2)** — Migrated every caller off shim route paths onto direct `@aura/domain-order` / `@aura/domain-payment` / `@aura/domain-kitchen` imports: `index.ts`, `orders-hono.ts`, `cron-admin.ts`, `webhooks.ts`, `tests/*`, `worker/src/__tests__/*` (17 test files).
+- **refactor(M2)** — Deleted all shims: 6 route shims (`payments.ts`, `payments/momo-create.ts`, `payments-nowpayments.ts`, `kds-mobile.ts`, `kds-stream.ts`, `kitchen-stations.ts`), `routes/orders.ts` domain shim, and the entire `worker/src/tree/orders/` directory (14 files). Canonical copies live in `packages/domain/*` (drift-verified zero before deletion).
+- **fix(domain/order)** — 12 broken dynamic imports in `create-order.ts` / `update-order.ts` / `loyalty-trigger.ts` had tree-relative `await import()` paths that never resolved from the domain location — repointed to `worker/src/...` alias paths.
+- **test** — Repointed dead `vi.mock` paths (telegram ×2, loyalty-trigger ×1) to domain package locations so mocks keep firing after tree deletion.
+- **test** — Full suite green: 360 files / 3274 tests. tsc delta −1 vs baseline (1240→1239), all within known legacy TS2307/TS6059 band.
+- Commit: `fcce027`. Money-table safety: zero DDL, no contract change.
+
 ### 🔧 M1 Monorepo Domain Extraction — Payment + Kitchen (Batch 6)
 
 - **feat(domain/payment)** — Extracted PayOS create-link, MoMo create, NowPayments IPN to `packages/domain/payment/` (commands/ + barrel). Old routes (`worker/src/routes/payments.ts`, `payments/momo-create.ts`, `payments-nowpayments.ts`) become re-export shims — old paths stay live until M2 migrates callers.
