@@ -4,6 +4,13 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🌐 AURA M1 — vi.json English-phrase translation (Batch 5)
+
+- **i18n** - translate 7 English UI phrases in `src/locales/vi.json` to Vietnamese (identical-key count 77 → 70): about.card1Title/card2Title/grandOpeningAlt, adminMetrics.title, kds.header, landing.footerTagline, referral.copyCode
+- **test** - update 2 functional tests that asserted the old English copy (`Metrics`, `StitchAbout`) to follow the new vi values; glossary test locks unchanged
+- **i18n** - 69 proper-noun/code/version/template keys kept English per brand rule (AURA CAFE, Aura Black, addresses, phone placeholders, COD/MoMo/PayOS, GROW/LAUNCH/SCALE, AURA Terminal v2.4, `{{badge}}`, campaigns.trigger*En active display map)
+- **test** - full suite 360 files / 3274 tests green
+
 ### 🏗️ AURA M1 — Monorepo Scaffold + CRM Domain (Batch 4)
 
 - **feat** - npm-workspaces root scaffold (`packages/*`, `apps/*`)

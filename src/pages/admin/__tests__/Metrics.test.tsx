@@ -42,7 +42,7 @@ describe('MetricsDashboard', () => {
   it('renders page title', () => {
     createTestAuthState('test-jwt', { id: '1', name: 'Admin', email: 'admin@aura.vn', role: 'owner' });
     renderWithProviders(<MetricsDashboardPage />);
-    expect(screen.getByText('Metrics Dashboard')).toBeTruthy();
+    expect(screen.getByText('Bảng chỉ số')).toBeTruthy();
   });
 
   it('renders range selector with 3 tabs', () => {

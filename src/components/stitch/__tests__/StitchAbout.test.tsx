@@ -39,8 +39,8 @@ describe('StitchAbout', () => {
 
   it('renders story cards section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Container Concept')).toBeInTheDocument();
-    expect(screen.getByText('QR Ordering')).toBeInTheDocument();
+    expect(screen.getByText('Kiểu container')).toBeInTheDocument();
+    expect(screen.getByText('Đặt món qua QR')).toBeInTheDocument();
     expect(screen.getByText('Trải Nghiệm Gần Gũi')).toBeInTheDocument();
   });
 

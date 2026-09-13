@@ -600,7 +600,7 @@
     "emptyTitle": "Chưa có hoạt động giới thiệu",
     "emptyDescription": "Chia sẻ mã của bạn để bắt đầu nhận thưởng.",
     "copied": "Đã sao chép!",
-    "copyCode": "Copy Code",
+    "copyCode": "Sao chép mã",
     "friendsEmpty": "Chưa có người giới thiệu. Chia sẻ mã của bạn để bắt đầu.",
     "rewardsEmpty": "Chưa có phần thưởng. Bắt đầu giới thiệu bạn bè để nhận quà."
   },
@@ -1039,7 +1039,7 @@
     "confirmCancel": "Xác nhận hủy"
   },
   "adminMetrics": {
-    "title": "Metrics Dashboard"
+    "title": "Bảng chỉ số"
   },
   "kds": {
     "title": "KDS",
@@ -1073,7 +1073,7 @@
     "capacity": "công suất",
     "allClear": "Tất cả đã xong!",
     "emptyDescription": "Không có phiếu nào. Đơn mới sẽ hiển thị tại đây.",
-    "header": "KDS Header",
+    "header": "Đầu bảng KDS",
     "closeSidebar": "Đóng thanh bên",
     "openSidebar": "Mở thanh bên",
     "station": "TRẠM",
@@ -1309,9 +1309,9 @@
     "heroSubtitle": "Quán Cà Phê Container Bản Địa — 5 không gian gần gũi tại Sa Đéc",
     "storyTitle": "Câu chuyện của chúng tôi",
     "storyLead": "AURA CAFE ra đời từ ý tưởng biến 5 container tái chế thành quán café mộc mạc, gần gũi cho người địa phương Sa Đéc.",
-    "card1Title": "Container Concept",
+    "card1Title": "Kiểu container",
     "card1Desc": "5 không gian container: Quầy Pha Chế, Sân Thượng, Góc Yên Tĩnh, Khu Sofa, Phòng Riêng. Mỗi nơi một cảm xúc bản địa.",
-    "card2Title": "QR Ordering",
+    "card2Title": "Đặt món qua QR",
     "card2Desc": "Gọi món bằng QR code — không cần app, không cần chờ đợi. Quét mã, chọn món, thanh toán tiện lợi.",
     "card3Title": "Trải Nghiệm Gần Gũi",
     "card3Desc": "Cà phê ngon giá bình dân, không gian mát mẻ, phục vụ nhiệt tình — quán của dân Sa Đéc.",
@@ -1348,7 +1348,7 @@
     "spacesDesc": "Năm khu vực, năm cá tính riêng — mỗi góc nhỏ tại AURA CAFE đều mang một trải nghiệm độc đáo. / Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.",
     "visitTitle": "Ghé thăm AURA CAFE",
     "exploreNow": "Khám phá ngay / Explore Now",
-    "grandOpeningAlt": "AURA CAFE grand opening at 39 Nguyễn Tất Thành"
+    "grandOpeningAlt": "AURA CAFE khai trương tại 39 Nguyễn Tất Thành"
   },
   "tracking": {
     "ariaLabel": "Trạng thái đơn hàng",
@@ -1433,7 +1433,7 @@
     "locationHours": "Mở cửa: 07:00 - 23:00 mỗi ngày",
     "locationPhone": "+84 277 123 456",
     "locationMapAlt": "Bản đồ vị trí AURA CAFE tại Sa Đéc, Đồng Tháp",
-    "footerTagline": "Architectural Container Coffee Experience",
+    "footerTagline": "Trải nghiệm cà phê kiến trúc container",
     "footerContact": "Liên Hệ",
     "footerContactAria": "Liên hệ AURA CAFE",
     "footerPrivacy": "Chính Sách Bảo Mật",
