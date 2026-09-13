@@ -21,6 +21,10 @@
       "@aura/domain-crm/*": ["./packages/domain/crm/*"],
       "@aura/domain-order": ["./packages/domain/order/index.ts"],
       "@aura/domain-order/*": ["./packages/domain/order/*"],
+      "@aura/domain-payment": ["./packages/domain/payment/index.ts"],
+      "@aura/domain-payment/*": ["./packages/domain/payment/*"],
+      "@aura/domain-kitchen": ["./packages/domain/kitchen/index.ts"],
+      "@aura/domain-kitchen/*": ["./packages/domain/kitchen/*"],
       "worker/*": ["./worker/*"]
     }
   },
