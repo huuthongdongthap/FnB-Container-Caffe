@@ -4,6 +4,12 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M1 D1 Hygiene — Orphan-Table Retirement + D7 Spec Reconciliation
+
+- **feat(db)** — Migration `20260913_02_retire_orphan_tables` (+down): dropped 9 verified-empty orphan tables from prod D1 — `users_legacy`, `checkin_log`, `odoo_*` (6 tables), `erpnext_invoices`. 0 data rows, zero code consumers (verified via live sqlite_master + row counts + repo-wide grep pre-drop). DDL preserved verbatim in down-migration; live data untouched (orders 89, payments 14, users 6, customers 20).
+- **fix(db)** — Rewrote `20260824_04_users_recreate`: `ALTER TABLE users RENAME TO users_legacy` → `DROP TABLE IF EXISTS users_legacy`. The old rename resurrected `users_legacy` on fresh bootstraps by renaming the canonical `users` table away (review finding H1).
+- **docs(specs)** — D7 closed as RESOLVED-NOT-NEEDED: migrations 006/013 were recreate+rename (no `_new` duplicates ever existed in prod); subscription family never provisioned. Corrected: migration-matrix (MERGE rows closed), phase-map M1 items 2/4/5 marked done/closed, DOMAIN_MAP §1/§5, CURRENT_STATE P4, migrations README remote-only list + retired section.
+
 ### 🔧 M1 Customer Domain — Identity, Consent, Visits, Order-Link Capture
 
 - **feat(domain/customer)** — Added `worker/src/tree/customer/`: identify-customer, record-consent, record-visit, link-order + helpers. Zero-based customer DB per v4 §6 — AURA earns customer relationships transaction-by-transaction; no Viva Star migration.
