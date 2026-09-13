@@ -28,6 +28,6 @@ export async function creditLoyaltyIfEligible(
     return;
   }
 
-  const { processOrderLoyalty } = await import('../../routes/loyalty');
+  const { processOrderLoyalty } = await import('worker/src/routes/loyalty');
   await processOrderLoyalty(orderId, env);
 }

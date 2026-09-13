@@ -95,7 +95,7 @@ let createOrder: any, getOrder: any, updateOrder: any, getAdminOrders: any, getS
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  const mod = await import('../worker/src/routes/orders.ts');
+  const mod = await import('@aura/domain-order');
   createOrder = mod.createOrder;
   getOrder = mod.getOrder;
   updateOrder = mod.updateOrder;

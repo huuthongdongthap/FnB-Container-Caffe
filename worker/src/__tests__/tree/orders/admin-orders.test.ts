@@ -52,7 +52,7 @@ function makeAdminReq(params: Record<string, string> = {}): Request {
 }
 
 /* ── imports under test ── */
-import { getAdminOrders } from '../../../tree/orders/admin-orders';
+import { getAdminOrders } from '@aura/domain-order';
 
 describe('admin-orders', () => {
   beforeEach(() => {

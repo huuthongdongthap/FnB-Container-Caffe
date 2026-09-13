@@ -14,7 +14,7 @@ import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
 import { notifyStaffOnNewOrder } from '../tree/push/triggers';
 import { syncOrderToERPNext } from '../tree/erpnext/sync';
 import { verifyJWT } from './auth';
-import { buildOrderTail } from '../tree/orders/shared-listing';
+import { buildOrderTail } from '@aura/domain-order';
 
 /** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
 function makeOrderId(): string {

@@ -38,7 +38,7 @@ describe('Payments MoMo smoke', () => {
 
   it('creates MoMo payment link — happy path', async() => {
     const { Hono } = await import('hono');
-    const { momoCreate } = await import('../../routes/payments/momo-create');
+    const { momoCreate } = await import('@aura/domain-payment');
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

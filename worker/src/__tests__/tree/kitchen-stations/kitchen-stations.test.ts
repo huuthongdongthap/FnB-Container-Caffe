@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { kitchenStationsRouter } from '../../../routes/kitchen-stations';
+import { kitchenStationsRouter } from '@aura/domain-kitchen';
 import { requireStaff } from '../../../middleware/staff-auth';
 import { generateJWT } from '../../../lib/jwt';
 import type { D1Database } from '@cloudflare/workers-types';

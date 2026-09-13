@@ -94,8 +94,8 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
     if (body.status === 'cancelled') {
   // Restore inventory (idempotent — no-op if no reserves exist)
   try {
-    const { restoreInventoryForOrder } = await import('../../routes/inventory/order-deduction');
-    await restoreInventoryForOrder(env as import('../../types/env').Env, id);
+    const { restoreInventoryForOrder } = await import('worker/src/routes/inventory/order-deduction');
+    await restoreInventoryForOrder(env as import('worker/src/types/env').Env, id);
   } catch (invErr) {
     log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
   }
@@ -105,7 +105,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       ).bind(id).first<{ id: string }>();
       if (refRow) {
         try {
-          const { reverseReferralCashback } = await import('../../routes/referrals');
+          const { reverseReferralCashback } = await import('worker/src/routes/referrals');
           await reverseReferralCashback(db, refRow.id);
         } catch (revErr) {
           log.error('Reverse cashback error (non-blocking):', { message: (revErr as Error).message });
@@ -131,7 +131,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
     	// Loyalty credit — single call, idempotent (skips if earn already exists)
 	try {
-		const { creditLoyaltyIfEligible } = await import('./loyalty-trigger');
+		const { creditLoyaltyIfEligible } = await import('../policies/loyalty-trigger');
 		await creditLoyaltyIfEligible(db, env, id);
 	} catch (loyaltyErr) {
 		log.error('Loyalty credit error (non-blocking):', { message: (loyaltyErr as Error).message, orderId: id });
@@ -153,7 +153,7 @@ if (['served', 'completed'].includes(body.status as string)) {
           ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
 
           if (visitCustomer) {
-            const { recordVisit } = await import('../customer');
+            const { recordVisit } = await import('worker/src/tree/customer');
             // dine_in + table_id = QR-table order; dine_in without = walk-in.
             const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
               order.order_type === 'delivery' ? 'online_delivery'
@@ -184,7 +184,7 @@ if (['served', 'completed'].includes(body.status as string)) {
           ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
 
           if (customer) {
-            const { processReferralCashbackOnFirstOrder } = await import('../../routes/referrals');
+            const { processReferralCashbackOnFirstOrder } = await import('worker/src/routes/referrals');
             const result = await processReferralCashbackOnFirstOrder(
               db, customer.id, id, order.total
             );
@@ -217,8 +217,8 @@ if (['served', 'completed'].includes(body.status as string)) {
               return;
             }
 
-            const { createErpnextClientWithKv } = await import('../../clients/erpnext-client');
-            const { ErpnextAccountingClient } = await import('../../clients/erpnext-accounting-client');
+            const { createErpnextClientWithKv } = await import('worker/src/clients/erpnext-client');
+            const { ErpnextAccountingClient } = await import('worker/src/clients/erpnext-accounting-client');
 
             const erpnextClient = await createErpnextClientWithKv(env as unknown as ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace });
             if (!erpnextClient) {

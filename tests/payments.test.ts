@@ -126,7 +126,7 @@ beforeEach(() => {
 });
 
 async function mountRouter() {
-  const mod = await import('../worker/src/routes/payments');
+  const mod = await import('@aura/domain-payment');
   paymentRouter = mod.paymentRouter;
 }
 

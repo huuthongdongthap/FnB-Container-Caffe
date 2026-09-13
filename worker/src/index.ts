@@ -17,7 +17,7 @@ import { getMenu, getMenuItem } from './routes/menu';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
   getLatestOrderTimestamp, splitOrders
-} from './routes/orders';
+} from '@aura/domain-order';
 import {
   loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
   bootstrapOwner, resetPassword, changePassword
@@ -28,7 +28,7 @@ import { tenantMiddleware } from './middleware/tenant';
 import { registerWithVerification } from './routes/auth-register';
 import { getAuthSession } from './routes/auth-session';
 import { verifyEmail } from './routes/auth-verify';
-import { paymentRouter } from './routes/payments';
+import { paymentRouter } from '@aura/domain-payment';
 import { createHARouter } from './routes/homeassistant';
 import { createTIRoutes } from './routes/integrations/tastyigniter';
 import { createFrigateRoutes } from './routes/integrations/frigate';
@@ -42,7 +42,7 @@ import { contactRouter } from './routes/contact';
 import { tablesRouter, qrRouter } from './routes/tables';
 import { tableSessionsRouter } from './routes/table-sessions';
 import { menuModifiersRouter } from './routes/menu-modifiers';
-import { kitchenStationsRouter } from './routes/kitchen-stations';
+import { kitchenStationsRouter } from '@aura/domain-kitchen';
 import { floorPlanRouter } from './routes/floor-plan';
 import { clientErrorsRouter } from './routes/client-errors';
 import { staffTipsRouter } from './routes/staff-tips';
@@ -54,7 +54,7 @@ import { customersRouter } from './routes/customers';
 import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
-import { kdsStreamRouter } from './routes/kds-stream';
+import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { orderStreamRouter } from './routes/order-stream';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
@@ -66,7 +66,7 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
-import { nowPaymentsIPN } from './routes/payments-nowpayments';
+import { nowPaymentsIPN } from '@aura/domain-payment';
 import { getInvoiceReceipt } from './routes/subscription-receipt';
 // ── SaaS (Phase 4–5) ──
 import { getPricing } from './routes/saas-pricing';
@@ -119,7 +119,7 @@ import {
 import { requireStaff } from './middleware/staff-auth';
 
 // ── Staff Mobile Routes (KDS, Tables, Orders) ──
-import { getKdsMobile, updateKdsStatus } from './routes/kds-mobile';
+import { getKdsMobile, updateKdsStatus } from '@aura/domain-kitchen';
 import { getTablesMobile, updateTableStatus } from './routes/tables-mobile';
 import { getOrdersMobile, createOrderMobile, getOrderDetail } from './routes/orders-mobile';
 

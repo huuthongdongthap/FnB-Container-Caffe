@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const loyaltySpy = vi.fn().mockResolvedValue(undefined);
-vi.mock('../../src/tree/orders/loyalty-trigger', () => ({
+vi.mock('../../../../packages/domain/order/policies/loyalty-trigger', () => ({
   creditLoyaltyIfEligible: loyaltySpy,
 }));
 
@@ -38,7 +38,7 @@ describe('loyalty single-call guard', () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const src = (await import('fs')).readFileSync(
-      resolve(__dirname, '../../tree/orders/update-order.ts'),
+      resolve(__dirname, '../../../../packages/domain/order/commands/update-order.ts'),
       'utf8'
     );
 

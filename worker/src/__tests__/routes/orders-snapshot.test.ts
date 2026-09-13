@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createOrder } from '../../routes/orders';
+import { createOrder } from '@aura/domain-order';
 import { createMockEnv, createMockDB } from '../test-utils';
 
 function snapshotMockDB() {

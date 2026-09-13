@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canTransition, isTerminal, ORDER_TRANSITIONS, TERMINAL_STATES } from '../../../tree/orders/order-state-machine';
+import { canTransition, isTerminal, ORDER_TRANSITIONS, TERMINAL_STATES } from '@aura/domain-order';
 
 describe('canTransition', () => {
   it('allows valid transitions through the lifecycle', () => {

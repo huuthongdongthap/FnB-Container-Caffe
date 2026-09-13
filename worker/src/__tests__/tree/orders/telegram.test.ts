@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 /* ── imports under test ── */
-import { notifyTelegram } from '../../../tree/orders/telegram';
+import { notifyTelegram } from '@aura/domain-order';
 
 describe('telegram', () => {
   describe('notifyTelegram', () => {

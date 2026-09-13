@@ -170,7 +170,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       const captureCustId = customerIdForCapture;
       ctx.waitUntil((async () => {
         try {
-          const { identifyCustomer, linkOrder } = await import('../customer');
+          const { identifyCustomer, linkOrder } = await import('worker/src/tree/customer');
           const identity = await identifyCustomer({
             db, customerId: captureCustId,
             phone: data.customer_phone, email: data.customer_email,
@@ -233,7 +233,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     }
 
     // Notify kitchen staff via push (non-blocking)
-    const { sendPushToStaff } = await import('../push/notifier.js');
+    const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
     // @ts-ignore -- PushEnv needs AURA_DB binding
     const pushPromise = sendPushToStaff(env, {
       title: 'Đơn hàng mới 🍳',
@@ -255,7 +255,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     // Post-order: non-blocking inventory deduction (log-only on failure)
     try {
-      await deductInventoryForOrder(env as unknown as import('../../types/env').Env, orderId, data.items as Array<{ product_id: string; quantity: number; name?: string }>);
+      await deductInventoryForOrder(env as unknown as import('worker/src/types/env').Env, orderId, data.items as Array<{ product_id: string; quantity: number; name?: string }>);
     } catch (e) {
       log.warn('Inventory deduction failed for order', {
         orderId,
@@ -264,8 +264,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     }
 
     if (data.customer_email) {
-      const { sendEmail } = await import('../../lib/email.js');
-      const { renderOrderConfirm } = await import('../../templates/order-confirm.js');
+      const { sendEmail } = await import('worker/src/lib/email.js');
+      const { renderOrderConfirm } = await import('worker/src/templates/order-confirm.js');
       const paymentLabels: Record<string, string> = { cod: 'COD', payos: 'PayOS' };
       const emailPromise = sendEmail(env, {
         to: data.customer_email,

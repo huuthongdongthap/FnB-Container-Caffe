@@ -11,7 +11,7 @@ import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
 import { createAlertDispatcher } from '../lib/alert-dispatcher';
-import { notifyTelegram } from '../tree/orders/telegram';
+import { notifyTelegram } from '@aura/domain-order';
 import { sendZNS } from './zalo';
 import { sendCashbackExpiryWarnings } from './cron';
 

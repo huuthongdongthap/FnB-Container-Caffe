@@ -39,7 +39,7 @@ function makeDB(chains: Record<string, unknown>[] = [makeChain()]) {
 }
 
 /* ── imports under test (after vi.mock, before makeEnv because they run at import time) ── */
-import { getOrder } from '../../../tree/orders/get-order';
+import { getOrder } from '@aura/domain-order';
 
 describe('get-order', () => {
   beforeEach(() => {

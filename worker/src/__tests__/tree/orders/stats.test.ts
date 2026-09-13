@@ -44,7 +44,7 @@ function makeEnv(db: import('@cloudflare/workers-types').D1Database) {
 }
 
 /* ── imports under test ── */
-import { getStats } from '../../../tree/orders/stats';
+import { getStats } from '@aura/domain-order';
 
 describe('stats', () => {
   beforeEach(() => {

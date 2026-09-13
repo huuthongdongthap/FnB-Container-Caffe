@@ -9,7 +9,7 @@ import { TEST_JWT_SECRET, createMockKV, createMockDB } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 
 async function createTestRouter() {
-  const mod = await import('../../routes/payments');
+  const mod = await import('@aura/domain-payment');
   const honoMod = await import('hono');
   const Hono = honoMod.Hono;
   const app = new Hono();

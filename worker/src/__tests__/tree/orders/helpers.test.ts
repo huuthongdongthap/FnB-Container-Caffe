@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateId, parseJSON } from '../../../tree/orders/helpers.js';
+import { generateId, parseJSON } from '@aura/domain-order';
 
 describe('generateId', () => {
   it('returns string starting with ID_ (default prefix)', () => {

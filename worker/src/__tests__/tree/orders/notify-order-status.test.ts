@@ -16,7 +16,7 @@ vi.mock('../../../middleware/logger', () => ({
 }));
 
 /* ── mock ZNS sender ── */
-vi.mock('../../../tree/zalo/zns-sender', () => ({
+vi.mock('worker/src/tree/zalo/zns-sender', () => ({
   sendZNS: vi.fn(async() => ({ success: true, messageId: 'zns_123' }))
 }));
 
@@ -56,7 +56,7 @@ function makeEnv(db: import('@cloudflare/workers-types').D1Database, overrides: 
 }
 
 /* ── imports under test ── */
-import { notifyOrderStatus } from '../../../tree/orders/notify-order-status';
+import { notifyOrderStatus } from '@aura/domain-order';
 
 describe('notify-order-status', () => {
   beforeEach(() => {

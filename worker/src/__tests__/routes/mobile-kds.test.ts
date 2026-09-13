@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getKdsMobile,
   updateKdsStatus,
-} from '../../routes/kds-mobile';
+} from '@aura/domain-kitchen';
 import { TEST_JWT_SECRET } from '../test-utils';
 
 // ── Mock D1 ─────────────────────────────────────────────────────────

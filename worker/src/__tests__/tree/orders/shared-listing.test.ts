@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildOrderFilterClause, buildOrderTail } from '../../../tree/orders/shared-listing';
+import { buildOrderFilterClause, buildOrderTail } from '@aura/domain-order';
 
 describe('buildOrderFilterClause', () => {
   it('returns empty clause and params with no filters', () => {

@@ -9,11 +9,11 @@ import { describe, it, expect, vi } from 'vitest';
 // Mocks — vitest hoists vi.mock() to the top automatically.
 // ---------------------------------------------------------------------------
 
-vi.mock('../../../tree/orders/telegram', () => ({
+vi.mock('../../../../../packages/domain/order/notifications/telegram', () => ({
   notifyTelegram: vi.fn(async() => {})
 }));
 
-vi.mock('../../../tree/push/notifier', () => ({
+vi.mock('worker/src/tree/push/notifier', () => ({
   sendPushToStaff: vi.fn(async() => ({ sent: 0, failed: 0 }))
 }));
 
@@ -49,7 +49,7 @@ vi.mock('../../../lib/metrics-collector', () => ({
 // ---------------------------------------------------------------------------
 
 import { jsonResponse, errorResponse } from '../../../middleware/cors';
-import { createOrder } from '../../../tree/orders/create-order.js';
+import { createOrder } from '@aura/domain-order';
 import { createMockEnv, createMockDB, createMockKV } from '../../test-utils';
 
 // ---------------------------------------------------------------------------

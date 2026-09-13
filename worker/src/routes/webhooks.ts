@@ -5,7 +5,7 @@
  */
 
 import { Hono } from 'hono';
-import { notifyTelegram } from './orders';
+import { notifyTelegram } from '@aura/domain-order';
 import { payosWebhookSchema } from '../lib/validators';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';

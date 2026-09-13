@@ -17,11 +17,11 @@ vi.mock('../../../middleware/logger', () => ({
 }));
 
 /* ── mock telegram / push / email (used by create-order via splitOrders import chain) ── */
-vi.mock('../../../tree/orders/telegram', () => ({
+vi.mock('../../../../../packages/domain/order/notifications/telegram', () => ({
   notifyTelegram: vi.fn(async() => {})
 }));
 
-vi.mock('../../../tree/push/notifier', () => ({
+vi.mock('worker/src/tree/push/notifier', () => ({
   sendPushToStaff: vi.fn(async() => ({ sent: 0, failed: 0 }))
 }));
 
@@ -69,7 +69,7 @@ function makeEnv(db: import('@cloudflare/workers-types').D1Database) {
 }
 
 /* ── imports under test ── */
-import { splitOrders } from '../../../tree/orders/split-orders';
+import { splitOrders } from '@aura/domain-order';
 
 describe('split-orders', () => {
   beforeEach(() => {

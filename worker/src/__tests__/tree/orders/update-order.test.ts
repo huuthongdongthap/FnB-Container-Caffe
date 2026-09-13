@@ -66,7 +66,7 @@ function makeKV() {
 }
 
 /* ── imports under test ── */
-import { updateOrder } from '../../../tree/orders/update-order';
+import { updateOrder } from '@aura/domain-order';
 
 describe('update-order', () => {
   beforeEach(() => {

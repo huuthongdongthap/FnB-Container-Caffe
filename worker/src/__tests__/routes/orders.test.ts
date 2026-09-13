@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { notifyTelegram, createOrder, getOrder, updateOrder, getAdminOrders, getStats, getLatestOrderTimestamp } from '../../routes/orders';
+import { notifyTelegram, createOrder, getOrder, updateOrder, getAdminOrders, getStats, getLatestOrderTimestamp } from '@aura/domain-order';
 import { createMockEnv, createMockDB } from '../test-utils';
 
 function orderMockDB() {
