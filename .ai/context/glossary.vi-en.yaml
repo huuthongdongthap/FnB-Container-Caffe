@@ -1,0 +1,167 @@
+# AURA glossary — vi-VN canonical / en-US secondary (spec §15)
+# Source of truth for user-facing terminology. No ad-hoc translation,
+# no mixed vi/en UI, no duplicate terms. Keys drive i18n consolidation.
+# Status: ratified 2026-09-13 (owner G10); locales consolidation in progress.
+
+_version: 1.0
+_date: 2026-09-11
+
+order:
+  vi: "Đơn hàng"
+  en: "Order"
+  note: use everywhere for order; replaces per-page variants
+
+reservation:
+  vi: "Đặt bàn"
+  en: "Reservation"
+  note: current locales already agree (nav.reservations = admin.reservations = Đặt bàn)
+
+menu:
+  vi: "Thực đơn"
+  en: "Menu"
+  note: canonical for /menu; "TV Menu" stays a product name (TV Menu)
+
+membership:
+  vi: "Thành viên"
+  en: "Membership"
+  note: person-status sense; loyalty tier sense below
+
+loyalty:
+  vi: "Tích điểm"
+  en: "Loyalty"
+  note: earning/points sense. NEVER also "Thành viên" — current locales use both; consolidate to Tích điểm
+
+loyalty_tier:
+  vi: "Hạng thành viên"
+  en: "Loyalty tier"
+  note: 4-tier ladder (Đồng/Bạc/Vàng/Kim cương — confirm names in Phase 1)
+
+cashback:
+  vi: "Hoàn tiền"
+  en: "Cashback"
+
+reward:
+  vi: "Phần thưởng"
+  en: "Reward"
+
+referral:
+  vi: "Giới thiệu bạn bè"
+  en: "Referral"
+  note: nav.referral + footer.referral aligned to "Giới thiệu bạn bè" 2026-09-13 (M1 Batch 2)
+
+promotion:
+  vi: "Ưu đãi"
+  en: "Promotion"
+
+voucher:
+  vi: "Voucher"
+  en: "Voucher"
+  note: loanword kept per current usage; confirm in Phase 1
+
+campaign:
+  vi: "Chiến dịch"
+  en: "Campaign"
+
+checkout:
+  vi: "Thanh toán"
+  en: "Checkout"
+  note: action sense; payment-method sense below
+
+payment:
+  vi: "Thanh toán"
+  en: "Payment"
+  note: same vi word for action+method is fine; disambiguate by context key (payment.method vs checkout.title)
+
+cart:
+  vi: "Giỏ hàng"
+  en: "Cart"
+
+kitchen:
+  vi: "Bếp"
+  en: "Kitchen"
+
+kds:
+  vi: "Màn hình bếp"
+  en: "KDS"
+  note: "Màn hình bếp" in vi UI; keep KDS as internal/system name only
+
+table:
+  vi: "Bàn"
+  en: "Table"
+
+space:
+  vi: "Không gian"
+  en: "Space"
+
+staff:
+  vi: "Nhân viên"
+  en: "Staff"
+
+manager:
+  vi: "Quản lý"
+  en: "Manager"
+
+owner:
+  vi: "Chủ sở hữu"
+  en: "Owner"
+
+customer:
+  vi: "Khách hàng"
+  en: "Customer"
+
+review:
+  vi: "Đánh giá"
+  en: "Review"
+
+checkin:
+  vi: "Check-in"
+  en: "Check-in"
+  note: loanword kept per current usage; confirm in Phase 1
+
+event:
+  vi: "Sự kiện"
+  en: "Event"
+
+order_type:
+  dine_in:
+    vi: "Tại bàn"
+    en: "Dine-in"
+  takeaway:
+    vi: "Mang đi"
+    en: "Takeaway"
+  delivery:
+    vi: "Giao hàng"
+    en: "Delivery"
+
+order_status:
+  vi: "Trạng thái đơn hàng"
+  en: "Order status"
+
+track_order:
+  vi: "Tra cứu đơn hàng"
+  en: "Track order"
+  note: current nav.trackOrder = "Tra cứu" alone; expand for clarity in Phase 1
+
+subscription:
+  vi: "Gói đăng ký"
+  en: "Subscription"
+
+account:
+  vi: "Tài khoản"
+  en: "Account"
+
+home:
+  vi: "Trang chủ"
+  en: "Home"
+
+contact:
+  vi: "Liên hệ"
+  en: "Contact"
+
+gallery:
+  vi: "Thư viện ảnh"
+  en: "Gallery"
+
+about:
+  vi: "Về chúng tôi"
+  en: "About us"

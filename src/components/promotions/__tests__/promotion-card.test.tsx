@@ -78,8 +78,9 @@ describe('PromotionCard', () => {
 
   it('displays usage count when present', () => {
     render(<PromotionCard {...activePromo} />);
-    // Usage shows as "10/100 luot dung"
-    expect(screen.getByText(/10/)).toBeInTheDocument();
+    // Usage shows as "10/100 luot dung". Exact match avoids colliding with
+    // the expiry label (e.g. "Con 110 ngay") which can also contain "10".
+    expect(screen.getByText(/^10\/100 luot dung$/)).toBeInTheDocument();
     expect(screen.getByText(/100/)).toBeInTheDocument();
   });
 

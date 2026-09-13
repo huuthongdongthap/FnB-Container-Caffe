@@ -14,6 +14,16 @@ import { getActiveCampaign } from './campaign';
 const log = createLogger({ route: 'loyalty' });
 const DEFAULT_TIER = 'bronze';
 
+// Hono's executionCtx getter throws when no ExecutionContext exists (e.g.
+// router.request() in tests). Never let background capture break signup.
+function safeWaitUntil(c: Context<{ Bindings: Env }>, p: Promise<unknown>): void {
+  try {
+    c.executionCtx?.waitUntil?.(p);
+  } catch {
+    p.catch(e => log.error('Background task dropped (no ExecutionContext):', { message: (e as Error).message }));
+  }
+}
+
 export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
   try {
     if (!(await throttle(c, 'pa', 10, 300))) {
@@ -84,7 +94,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
       if (validated.referral_code) {
         const { applyReferralForNewCustomer } = await import('../../routes/referrals');
-        c.executionCtx?.waitUntil?.(
+        safeWaitUntil(c,
           applyReferralForNewCustomer(db, id, validated.referral_code).catch(e =>
             log.error('Referral apply error:', { message: (e as Error).message })
           )
@@ -93,7 +103,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
       // Customer-domain capture (additive — never blocks signup):
       // phone identity + explicit signup consent for CRM.
-      c.executionCtx?.waitUntil?.(
+      safeWaitUntil(c,
         (async () => {
           try {
             const { identifyCustomer, recordConsent } = await import('../customer');
