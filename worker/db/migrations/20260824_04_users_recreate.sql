@@ -1,14 +1,19 @@
 -- 20260824_04_users_recreate.sql
--- The remote database carries an empty legacy `users` table
+-- The remote database carried an empty legacy `users` table
 -- (id, phone, full_name, tier, total_points — a customer-loyalty shape) that
 -- is absent from every SQL file in this repo and does not match the shape
 -- staff-tips.ts joins on (u.id = orders.updated_by, u.name).
 --
--- The table was confirmed empty (SELECT COUNT(*) = 0) before this migration
--- was authored; renaming preserves it for forensics without blocking the
--- canonical DDL from 20260824_02_users_table.sql.
+-- Originally this migration renamed that table to users_legacy for
+-- forensics. The legacy table was retired 2026-09-13 (dropped via
+-- 20260913_02_retire_orphan_tables.sql after owner approval — it stayed
+-- empty). A rename is now wrong: on a fresh bootstrap (schema.sql already
+-- creates the canonical `users`), it would rename the canonical table away
+-- and resurrect `users_legacy`. DROP IF EXISTS keeps this migration
+-- idempotent everywhere: no-op on fresh databases, no-op on prod
+-- (already applied historically).
 
-ALTER TABLE users RENAME TO users_legacy;
+DROP TABLE IF EXISTS users_legacy;
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

@@ -26,6 +26,15 @@ Some tables are defined in more than one place. When they conflict, the canonica
 | users | `db/migrations/20260824_04_users_recreate.sql` (renames empty legacy table to `users_legacy`, then canonical DDL) | `db/migrations/20260824_02_users_table.sql` (fails on DBs that still carry the legacy table) |
 | customer_identities / consents / customer_events / visits | `db/migrations/20260913_01_customer_identity_consent_events_visits.sql` (+ `.down.sql` rollback) | — |
 
+## Retired tables (2026-09-13)
+
+`db/migrations/20260913_02_retire_orphan_tables.sql` drops 9 orphan tables
+(0 data rows, zero code consumers, verified against live D1 before drop):
+`users_legacy`, `checkin_log`, `odoo_invoices`, `odoo_mappings`,
+`odoo_customer_consent`, `odoo_product_sync`, `odoo_sync_failures`,
+`odoo_sync_logs`, `erpnext_invoices`. Their DDL is preserved verbatim in
+the `.down.sql` rollback. Never recreate them except via that rollback.
+
 ## Ordering hazard
 
 `migrations/006_refund_columns.sql` recreates `payments` and SELECTs refund columns from the pre-migration table — only valid if those columns already exist (added by prior manual applies). On a fresh database, run `schema.sql` first, then treat 006 as a no-op.
@@ -34,11 +43,14 @@ Some tables are defined in more than one place. When they conflict, the canonica
 
 The production D1 contains tables with no CREATE TABLE in any repo file:
 `_cf_KV`, `bonus_campaigns`, `signup_bonus_log`, `loyalty_audit_log`,
-`checkin_log`, `erpnext_invoices`, `erpnext_product_sync`, `odoo_*`
-(5 tables), `campaign_logs`, `campaign_configs`, `users_legacy`,
-`sessions`, `order_payments`.
+`erpnext_product_sync`, `campaign_logs`, `campaign_configs`, `sessions`,
+`order_payments`.
 Before recreating or altering any of these, dump their schema from remote
 (`pragma_table_info`) — the repo cannot rebuild them.
+
+(`checkin_log`, `erpnext_invoices`, the 5 `odoo_*` tables, and `users_legacy`
+were also remote-only — they were retired 2026-09-13; DDL preserved in
+`20260913_02_retire_orphan_tables.down.sql`.)
 
 ## Fresh-environment bootstrap
 
