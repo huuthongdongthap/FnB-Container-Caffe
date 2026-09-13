@@ -1,7 +1,8 @@
 # M1 Batch 4 — Monorepo Scaffold + CRM Domain + Customer Move (D6, D11)
 
-**Status: READY FOR APPROVAL** — 2026-09-13 · M1 §2 item 1 + item 3
-Phase-01 (scaffold + customer move) · Phase-02 (CRM domain)
+**Status: COMPLETE** — 2026-09-13 · M1 §2 item 1 + item 3
+Phase-01 (scaffold + customer move) ✓ · Phase-02 (CRM domain) ✓
+Verified: 360 files / 3274 tests green · committed
 
 ## Authority
 

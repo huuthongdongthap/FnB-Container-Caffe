@@ -1,6 +1,6 @@
 # M1 Batch 4 Phase 1 — Monorepo Scaffold + Move customer → packages/domain/customer
 
-Priority: P0 · Status: pending · 2026-09-13
+Priority: P0 · Status: COMPLETE · 2026-09-13
 
 ## Context
 

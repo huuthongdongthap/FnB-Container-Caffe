@@ -4,6 +4,16 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🏗️ AURA M1 — Monorepo Scaffold + CRM Domain (Batch 4)
+
+- **feat** - npm-workspaces root scaffold (`packages/*`, `apps/*`)
+- **feat** - Customer domain moved to `packages/domain/customer` (@aura/domain-customer)
+- **feat** - Re-export shim at `worker/src/tree/customer/index.ts` — old bundle stays deployable
+- **feat** - CRM domain `packages/domain/crm` (@aura/domain-crm): `lookupProfile` (unified profile: identity + customer + consents + visits + orders), `toCrmView` (staff/owner surface shape)
+- **feat** - Placeholder apps: `apps/space`, `apps/ops`, `apps/hq`
+- **feat** - TS path aliases `@aura/domain-customer`, `@aura/domain-crm` in root + worker tsconfig, vite, vitest
+- **test** - 5 CRM tests; full suite 360 files / 3274 tests green
+
 ### 🔧 Odoo Integration — Phase 1: E-Invoicing
 
 - **feat** - OdooClient base class: JSON-RPC 2.0, auth caching, retry with exponential backoff

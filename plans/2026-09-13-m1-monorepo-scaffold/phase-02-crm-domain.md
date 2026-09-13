@@ -1,6 +1,6 @@
 # M1 Batch 4 Phase 2 — CRM Domain Module (packages/domain/crm)
 
-Priority: P1 · Status: pending · 2026-09-13 · blocked-by: phase 1
+Priority: P1 · Status: COMPLETE · 2026-09-13 · blocked-by: phase 1 (done)
 
 ## Context
 
@@ -44,14 +44,17 @@ Priority: P1 · Status: pending · 2026-09-13 · blocked-by: phase 1
 
 ## Todo
 
-- [ ] Create `packages/domain/crm/{package.json,tsconfig.json}`
-- [ ] Implement `lookup-profile.ts` + `crm-profile.ts` + `index.ts`
-- [ ] Add `__tests__/lookup-profile.test.ts` (or similar) with ≥3 cases
-- [ ] Wire `@aura/domain-crm` alias in root + worker tsconfig
+- [x] Create `packages/domain/crm/{package.json,tsconfig.json}`
+- [x] Implement `lookup-profile.ts` + `crm-profile.ts` + `index.ts`
+- [x] Add `__tests__/lookup-profile.test.ts` with 5 cases (empty
+      no-match, merged lookup, consent reduction, toCrmView shape,
+      phone fallback)
+- [x] Wire `@aura/domain-crm` alias in root + worker tsconfig +
+      vitest.config.ts + vite.config.js
 - [ ] Optional: migrate 1–2 callers in tree/loyalty to use the new
-      module (only if trivial)
-- [ ] Full suite + tsc green
-- [ ] Review + commit
+      module — deferred, recorded as M2 follow-up
+- [x] Full suite + tsc green (360 files / 3274 tests)
+- [x] Review + commit
 
 ## Success criteria
 
