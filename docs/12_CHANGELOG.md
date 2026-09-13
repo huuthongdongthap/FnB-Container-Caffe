@@ -4,6 +4,15 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M1 Monorepo Domain Extraction — Payment + Kitchen (Batch 6)
+
+- **feat(domain/payment)** — Extracted PayOS create-link, MoMo create, NowPayments IPN to `packages/domain/payment/` (commands/ + barrel). Old routes (`worker/src/routes/payments.ts`, `payments/momo-create.ts`, `payments-nowpayments.ts`) become re-export shims — old paths stay live until M2 migrates callers.
+- **feat(domain/kitchen)** — Extracted KDS mobile handlers, KDS SSE stream, kitchen-stations router to `packages/domain/kitchen/`. Old routes (`kds-mobile.ts`, `kds-stream.ts`, `kitchen-stations.ts`) become re-export shims.
+- **build** — Wired `@aura/domain-payment` + `@aura/domain-kitchen` aliases across root tsconfig, worker tsconfig, vite, vitest. Added `worker/src` alias to vite/vitest (needed when shims are runtime-consumed by `worker/src/index.ts`, unlike test-only order shim).
+- **test** — Full suite green: 360 files / 3274 tests (payment 16, kitchen 14 included).
+- Commits: `c1db222` (order), `9027d21` (payment + kitchen).
+- Money-table safety: zero DDL, pure code-move — `payments`/`subscription_invoices` schemas untouched.
+
 ### 🔧 M1 D1 Hygiene — Orphan-Table Retirement + D7 Spec Reconciliation
 
 - **feat(db)** — Migration `20260913_02_retire_orphan_tables` (+down): dropped 9 verified-empty orphan tables from prod D1 — `users_legacy`, `checkin_log`, `odoo_*` (6 tables), `erpnext_invoices`. 0 data rows, zero code consumers (verified via live sqlite_master + row counts + repo-wide grep pre-drop). DDL preserved verbatim in down-migration; live data untouched (orders 89, payments 14, users 6, customers 20).
