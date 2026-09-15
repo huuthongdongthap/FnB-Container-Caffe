@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 async function mountRouter() {
-  const mod = await import('../worker/src/routes/shifts');
+  const mod = await import('@aura/domain-shift');
   shiftsRouter = mod.shiftsRouter;
 }
 

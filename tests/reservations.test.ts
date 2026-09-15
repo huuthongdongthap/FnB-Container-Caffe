@@ -98,7 +98,7 @@ let env: ReturnType<typeof createEnv>;
 beforeEach(async () => {
   vi.clearAllMocks();
   env = createEnv();
-  const mod = await import('../worker/src/routes/reservations.ts');
+  const mod = await import('@aura/domain-reservation');
   router = mod.reservationsRouter;
 });
 

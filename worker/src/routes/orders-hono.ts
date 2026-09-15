@@ -10,7 +10,7 @@ import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
 import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../middleware/rate-limit';
-import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
+import { deductInventoryForOrder } from '@aura/domain-inventory';
 import { notifyStaffOnNewOrder } from '../tree/push/triggers';
 import { syncOrderToERPNext } from '../tree/erpnext/sync';
 import { verifyJWT } from './auth';

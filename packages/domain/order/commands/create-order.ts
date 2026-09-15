@@ -9,7 +9,7 @@ import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validator
 import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
 import { generateId, parseJSON } from '../model/helpers';
 import { notifyTelegram } from '../notifications/telegram';
-import { deductInventoryForOrder } from 'worker/src/routes/inventory/order-deduction';
+import { deductInventoryForOrder } from '@aura/domain-inventory';
 import { syncOrderToERPNext } from 'worker/src/tree/erpnext/sync.js';
 
 const log = createLogger({ route: 'orders' });

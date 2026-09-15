@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getMenu, getMenuItem } from '../../routes/menu';
+import { getMenu, getMenuItem } from '@aura/domain-catalog';
 import { createMockEnv, createMockDB } from '../test-utils';
 
 const SAMPLE_MENU = [

@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+// Preload @hono/zod-openapi so its extendZodWithOpenApi side-effect patches the root
+// zod instance before any test-schema module imports zod. Without this, common.ts and
+// catalog schemas capture an unpatched zod namespace and `.openapi()` is undefined.
+import '@hono/zod-openapi';
+
 // Initialize i18n for tests so t() returns translation values, not keys
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';

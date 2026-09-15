@@ -15,16 +15,26 @@
     "allowJs": true,
     "outDir": "./dist",
     "paths": {
+      "@aura/domain-catalog": ["../packages/domain/catalog/index.ts"],
+      "@aura/domain-catalog/*": ["../packages/domain/catalog/*"],
       "@aura/domain-customer": ["../packages/domain/customer/index.ts"],
       "@aura/domain-customer/*": ["../packages/domain/customer/*"],
       "@aura/domain-crm": ["../packages/domain/crm/index.ts"],
       "@aura/domain-crm/*": ["../packages/domain/crm/*"],
       "@aura/domain-order": ["../packages/domain/order/index.ts"],
       "@aura/domain-order/*": ["../packages/domain/order/*"],
+      "@aura/domain-table": ["../packages/domain/table/index.ts"],
+      "@aura/domain-table/*": ["../packages/domain/table/*"],
       "@aura/domain-payment": ["../packages/domain/payment/index.ts"],
       "@aura/domain-payment/*": ["../packages/domain/payment/*"],
       "@aura/domain-kitchen": ["../packages/domain/kitchen/index.ts"],
-      "@aura/domain-kitchen/*": ["../packages/domain/kitchen/*"]
+      "@aura/domain-kitchen/*": ["../packages/domain/kitchen/*"],
+      "@aura/domain-staff": ["../packages/domain/staff/index.ts"],
+      "@aura/domain-staff/*": ["../packages/domain/staff/*"],
+      "@aura/domain-shift": ["../packages/domain/shift/index.ts"],
+      "@aura/domain-shift/*": ["../packages/domain/shift/*"],
+      "@aura/domain-inventory": ["../packages/domain/inventory/index.ts"],
+      "@aura/domain-inventory/*": ["../packages/domain/inventory/*"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -88,7 +88,7 @@ beforeEach(async () => {
     role: 'owner',
   }, TEST_JWT_SECRET);
   env = createEnv();
-  const mod = await import('../worker/src/routes/categories.ts');
+  const mod = await import('@aura/domain-catalog');
   router = mod.categoriesRouter;
 });
 

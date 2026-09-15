@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '../../routes/tables';
+import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '@aura/domain-table';
 import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../../tree/qr/signer';
 import { createMockEnv, createMockContext, mockRequestWithRole } from '../test-utils';
 

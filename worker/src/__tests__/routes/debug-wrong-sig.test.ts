@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { tablesRouter } from '../../routes/tables';
+import { tablesRouter } from '@aura/domain-table';
 import { createMockEnv, createMockContext } from '../test-utils';
 
 const VALID_SECRET = 'qr-signing-secret-2026';

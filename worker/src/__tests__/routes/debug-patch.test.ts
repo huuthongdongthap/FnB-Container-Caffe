@@ -1,5 +1,5 @@
 import { it } from 'vitest';
-import { tablesRouter } from '../../routes/tables';
+import { tablesRouter } from '@aura/domain-table';
 
 it('list all registered routes', async () => {
   const anyRouter = tablesRouter as any;

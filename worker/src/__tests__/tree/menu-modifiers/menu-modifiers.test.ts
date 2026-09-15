@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { menuModifiersRouter } from '../../../routes/menu-modifiers';
+import { menuModifiersRouter } from '@aura/domain-catalog';
 import { requireAuth } from '../../../middleware/auth';
 import { generateJWT } from '../../../lib/jwt';
 import type { D1Database } from '@cloudflare/workers-types';

@@ -5,7 +5,7 @@ import {
   registerStaffDevice,
   revokeStaffDevice,
   listStaffDevices,
-} from '../../routes/staff-auth';
+} from '@aura/domain-staff';
 import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import { generateId } from '../../tree/auth/helpers';

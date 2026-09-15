@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STAFF_ROLES, ROLE_LABELS, ROLE_PERMISSIONS, hasPermission, visibleRolesFor } from '../../lib/staff-roles';
+import { STAFF_ROLES, ROLE_LABELS, ROLE_PERMISSIONS, hasPermission, visibleRolesFor } from '@aura/domain-staff';
 
 describe('STAFF_ROLES', () => {
   it('lists exactly 4 roles', () => {

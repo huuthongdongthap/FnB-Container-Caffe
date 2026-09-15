@@ -38,7 +38,7 @@ let getMenuItem: any;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  const mod = await import('../worker/src/routes/menu.ts');
+  const mod = await import('@aura/domain-catalog');
   getMenu = mod.getMenu;
   getMenuItem = mod.getMenuItem;
 });

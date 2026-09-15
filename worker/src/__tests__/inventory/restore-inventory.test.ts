@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { restoreInventoryForOrder } from '../../routes/inventory/order-deduction';
+import { restoreInventoryForOrder } from '@aura/domain-inventory';
 import { createMockDB, createMockEnv } from '../test-utils';
 
 describe('restoreInventoryForOrder', () => {

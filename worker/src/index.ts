@@ -13,7 +13,7 @@ import { openApiApp } from './lib/openapi';
 
 
 // Route modules — pre-existing TS
-import { getMenu, getMenuItem } from './routes/menu';
+import { getMenu, getMenuItem } from '@aura/domain-catalog';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
   getLatestOrderTimestamp, splitOrders
@@ -33,23 +33,22 @@ import { createHARouter } from './routes/homeassistant';
 import { createTIRoutes } from './routes/integrations/tastyigniter';
 import { createFrigateRoutes } from './routes/integrations/frigate';
 import { webhookRouter } from './routes/webhooks';
-import { reservationsRouter } from './routes/reservations';
+import { reservationsRouter } from '@aura/domain-reservation';
 import { loyaltyRouter } from './routes/loyalty';
 import { referralRouter } from './routes/referrals';
 import { contactRouter } from './routes/contact';
 
 // ── Converted route modules (was .js, now .ts) ──
-import { tablesRouter, qrRouter } from './routes/tables';
+import { tablesRouter, qrRouter } from '@aura/domain-table';
 import { tableSessionsRouter } from './routes/table-sessions';
-import { menuModifiersRouter } from './routes/menu-modifiers';
+import { menuModifiersRouter } from '@aura/domain-catalog';
 import { kitchenStationsRouter } from '@aura/domain-kitchen';
 import { floorPlanRouter } from './routes/floor-plan';
 import { clientErrorsRouter } from './routes/client-errors';
-import { staffTipsRouter } from './routes/staff-tips';
+import { staffTipsRouter } from '@aura/domain-staff';
 import { adminQRRouter } from './routes/admin-qr';
 import { reviewsRouter } from './routes/reviews';
-import { categoriesRouter } from './routes/categories';
-import { productsRouter } from './routes/products';
+import { categoriesRouter, productsRouter } from '@aura/domain-catalog';
 import { customersRouter } from './routes/customers';
 import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
@@ -57,7 +56,7 @@ import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { orderStreamRouter } from './routes/order-stream';
 import { promotionsRouter } from './routes/promotions';
-import { shiftsRouter } from './routes/shifts';
+import { shiftsRouter } from '@aura/domain-shift';
 import { subscriptionsRouter } from './routes/subscriptions';
 import { adminLoyaltyRouter } from './routes/admin-loyalty';
 import { birthdayRouter } from './routes/birthday';
@@ -106,7 +105,7 @@ import { chatRouter } from './routes/chat';
 import { analyticsRouter } from './routes/analytics-hono';
 import { refundRouter } from './routes/refunds';
 import { registerVitalsRoute } from './routes/vitals';
-import { inventoryCRUD, inventorySnapshots, inventoryTransactions } from './routes/inventory';
+import { inventoryCRUD, inventorySnapshots, inventoryTransactions } from '@aura/domain-inventory';
 
 // ── Staff Mobile Auth ──
 import {
@@ -115,7 +114,7 @@ import {
   registerStaffDevice,
   revokeStaffDevice,
   listStaffDevices,
-} from './routes/staff-auth';
+} from '@aura/domain-staff';
 import { requireStaff } from './middleware/staff-auth';
 
 // ── Staff Mobile Routes (KDS, Tables, Orders) ──

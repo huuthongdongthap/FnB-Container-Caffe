@@ -108,7 +108,7 @@ beforeEach(() => {
 });
 
 async function mountRouter() {
-  const mod = await import('../worker/src/routes/tables');
+  const mod = await import('@aura/domain-table');
   tablesRouter = mod.tablesRouter;
 }
 

@@ -9,7 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { bulkGenerateSlugs } from '../tree/qr/generator';
 import { signQRUrl } from '../tree/qr/signer';
 import type { Env } from '../types/env';
-import type { CafeTable, QrCodeRow } from './tables';
+import type { CafeTable, QrCodeRow } from '@aura/domain-table';
 
 export const adminQRRouter = new Hono<{ Bindings: Env }>();
 

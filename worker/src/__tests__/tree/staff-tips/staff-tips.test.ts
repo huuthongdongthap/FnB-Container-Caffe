@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { staffTipsRouter } from '../../../routes/staff-tips';
+import { staffTipsRouter } from '@aura/domain-staff';
 import { requireAuth } from '../../../middleware/auth';
 import { generateJWT } from '../../../lib/jwt';
 import type { D1Database } from '@cloudflare/workers-types';

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockDB, createMockEnv } from '../test-utils';
 import { Hono } from 'hono';
-import { categoriesRouter } from '../../routes/categories';
+import { categoriesRouter } from '@aura/domain-catalog';
 
 function makeDB(): ReturnType<typeof createMockDB> {
   return createMockDB();

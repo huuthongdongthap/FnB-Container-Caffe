@@ -1,8 +1,8 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 
-import { CategoryRoutes } from '../schemas/categories';
-import { ProductRoutes } from '../schemas/products';
+import { CategoryRoutes } from '@aura/domain-catalog';
+import { ProductRoutes } from '@aura/domain-catalog';
 import { OrderRoutes } from '../schemas/orders';
 import { TableRoutes } from '../schemas/tables';
 import { AuthRoutes } from '../schemas/auth';

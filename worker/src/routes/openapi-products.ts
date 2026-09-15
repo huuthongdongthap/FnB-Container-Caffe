@@ -2,7 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import { ProductRoutes } from '../schemas/products';
+import { ProductRoutes } from '@aura/domain-catalog';
 
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 

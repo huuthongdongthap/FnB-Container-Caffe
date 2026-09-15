@@ -5,7 +5,7 @@
  */
 
 import QRCode from 'qrcode';
-import type { CafeTable } from '../../routes/tables';
+import type { CafeTable } from '@aura/domain-table';
 import type { Env } from '../../types/env';
 
 /**

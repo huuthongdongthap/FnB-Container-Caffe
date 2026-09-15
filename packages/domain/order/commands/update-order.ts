@@ -94,8 +94,8 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
     if (body.status === 'cancelled') {
   // Restore inventory (idempotent — no-op if no reserves exist)
   try {
-    const { restoreInventoryForOrder } = await import('worker/src/routes/inventory/order-deduction');
-    await restoreInventoryForOrder(env as import('worker/src/types/env').Env, id);
+    const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+    await restoreInventoryForOrder(env as any, id);
   } catch (invErr) {
     log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
   }
