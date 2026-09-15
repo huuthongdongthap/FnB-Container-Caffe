@@ -12,6 +12,7 @@
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { requireStaff } from 'worker/src/middleware/staff-auth';
+import { buildIndexFromDbRows, filterItemsForStation } from '../src/policies/station-policy';
 
 export interface KitchenStation {
   id: string;
@@ -143,8 +144,9 @@ kitchenStationsRouter.delete('/categories/:categoryId/:stationId', async (c) => 
   return c.json({ success: true });
 });
 
-// ── Station KDS view ────────────────────────────────────────────────
+// ── Station KDS view ────────────────────────────────────────────────────────
 // Returns active orders routed to the given station, with per-item status.
+// Each item appears in exactly one station view (no duplication).
 
 kitchenStationsRouter.get('/:id/tickets', async (c) => {
   const db = c.env.AURA_DB;
@@ -152,50 +154,43 @@ kitchenStationsRouter.get('/:id/tickets', async (c) => {
   const station = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(stationId).first<{ id: string }>();
   if (!station) return c.json({ success: false, error: 'Station not found' }, 404);
 
-  // Orders routed to this station: those whose dominant category maps here,
-  // or that have an explicit order_item_stations row for this station.
-  const { results } = await db.prepare(
-    `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at,
-            t.table_number AS table_name
-     FROM orders o
-     LEFT JOIN tables t ON t.id = o.table_id
-     WHERE o.status IN ('pending', 'preparing', 'ready')
-       AND (
-         o.id IN (SELECT order_item_id FROM order_item_stations WHERE station_id = ?)
-         OR o.id IN (
-           SELECT o2.id FROM orders o2
-           WHERE o2.status IN ('pending', 'preparing', 'ready')
-             AND EXISTS (
-               SELECT 1 FROM category_stations cs
-               WHERE cs.station_id = ? AND cs.category_id IN (
-                 -- dominant category resolution happens in app layer; here we
-                 -- fall back to any category tag embedded in the items blob.
-                 SELECT json_extract(value, '$.category_id')
-                 FROM json_each(o2.items)
-               )
-             )
-         )
-       )
-     ORDER BY o.created_at ASC`
-  ).bind(stationId, stationId).all<Record<string, unknown>>();
+  // Load category → station mappings and build the routing index.
+  const { results: mappings } = await db.prepare(
+    'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+  ).all<Record<string, unknown>>();
+  const categoryIndex = buildIndexFromDbRows(mappings);
 
-  const tickets = results.map((r) => {
-    let items: Array<Record<string, unknown>> = [];
-    try { items = JSON.parse((r.items as string) || '[]'); } catch { items = []; }
-    return {
-      id: r.id,
-      table_id: r.table_id,
-      table_name: r.table_name,
-      status: r.status,
-      created_at: r.created_at,
-      items: items.map((i) => ({
+  // Fetch all active orders.
+  const { results: activeOrders } = await db.prepare(
+    'SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, t.table_number AS table_name FROM orders o LEFT JOIN tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?) ORDER BY o.created_at ASC'
+  ).bind('pending', 'preparing', 'ready').all<Record<string, unknown>>();
+
+  // Check which orders have an explicit item assignment for this station.
+  const { results: assignedItems } = await db.prepare(
+    'SELECT order_item_id FROM order_item_stations WHERE station_id = ?'
+  ).bind(stationId).all<{ order_item_id: string }>();
+  const assignedOrderIds = new Set(assignedItems.map((r) => r.order_item_id));
+
+  // Build station-filtered tickets using the pure policy.
+  const tickets: Array<Record<string, unknown>> = [];
+  for (const order of activeOrders) {
+    const itemsForStation = filterItemsForStation(order.items as string, stationId, categoryIndex);
+    const hasAssignedItems = assignedOrderIds.has(order.id);
+    if (itemsForStation.length === 0 && !hasAssignedItems) continue;
+    tickets.push({
+      id: order.id,
+      table_id: order.table_id,
+      table_name: order.table_name,
+      status: order.status,
+      created_at: order.created_at,
+      items: itemsForStation.map((i: Record<string, unknown>) => ({
         name: i.name,
         qty: i.qty || i.quantity || 1,
         price: i.price || 0,
         category_id: i.category_id || null,
       })),
-    };
-  });
+    });
+  }
   return c.json({ success: true, data: tickets });
 });
 

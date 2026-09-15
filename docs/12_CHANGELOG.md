@@ -4,6 +4,44 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M3 Phase 05 — Canonical KDS Consolidation & Owner Dashboard v1
+
+- **feat(domain/kitchen)** — Added pure `station-policy.ts` (`buildCategoryStationIndex`, `buildIndexFromDbRows`, `parseOrderItems`, `routeItemToStation`, `groupItemsByStation`, `filterItemsForStation`) with zero Hono/worker imports for direct vitest unit testing. Barrel-exported from `packages/domain/kitchen/index.ts`.
+- **feat(kitchen-stations)** — Replaced the `GET /:id/tickets` KDS subquery (which could surface an order across multiple station views) with a policy-driven loop: fetch all active orders once, then `filterItemsForStation` keeps only the items matching the requested station. Each item now appears in exactly one station view.
+- **feat(reports)** — Added `GET /api/reconciliation` daily reconciliation endpoint that LEFT JOINs `shifts` with `shift_reconciliations`, sums cash payments from `orders`, cash payouts from `expenses`, and aggregates per payment method. Returns per-shift rows (`opening_float`, `cash_payments`, `cash_payouts`, `expected_cash`, `actual_cash`, `variance`, `status`, `denominated`) plus `payment_methods`, `category_breakdown`, and totals (`revenue`, `cash_expected`, `cash_actual`, `cash_variance`, `digital_payments`, `order_count`).
+- **test** — `station-policy.test.ts` (14 tests: parse/index/route/group/filter), `reconciliation.test.ts` (4 tests: 200 shape, digital payments, shift fields, totals). Full suite green: 362 files / 3297 tests passing. tsc delta +16 (1317→1333), all within legacy TS2307/TS2339/TS2345 band, 0 new error classes.
+- **docs** — Updated `docs/12_CHANGELOG.md`, `.ai/specs/phase-map.md`, and `plans/2026-09-14-m3-cafe-independent-operation/journal.md`. **M3 milestone complete.**
+
+### 🔧 M2 Staff & Shift Exemplar (D10) — Extract + Migrate + Delete
+
+- **feat(domain/staff)** — Extracted staff domain into `packages/domain/staff/` (auth/crypto, auth/pin, model/staff-types, policies/roles, routes/staff-auth, routes/staff-tips, barrel index). Implemented edge Web Crypto PBKDF2 PIN authentication (`crypto.subtle`, 100,000 iterations, 8-byte salt, zero Node.js `crypto` dependencies). Extracted bilingual RBAC policy engine (`STAFF_ROLES`, `ROLE_LABELS` in `vi`/`en`, `ROLE_PERMISSIONS`, `hasPermission`, `visibleRolesFor`). Extracted staff tips attribution reporting (`/report`, `/summary`, `/orders`) and device management.
+- **feat(domain/shift)** — Extracted shift domain into `packages/domain/shift/` (model/shift-types, routes/shifts, barrel index). Extracted attendance tracking endpoints (`POST /clock-in`, `POST /clock-out`, `GET /`) enforcing single active shift per staff member per calendar day and worked hours computation.
+- **refactor(M2)** — Migrated all callers directly to `@aura/domain-staff` and `@aura/domain-shift`: `worker/src/index.ts`, `worker/src/middleware/staff-auth.ts`, `worker/src/__tests__/lib/staff-roles.test.ts`, `worker/src/__tests__/routes/staff-auth-mobile.test.ts`, `tests/shifts.test.ts`.
+- **refactor(M2)** — Deleted legacy worker files without temporary shims: `worker/src/routes/staff-auth.ts`, `worker/src/routes/staff-tips.ts`, `worker/src/routes/shifts.ts`, `worker/src/lib/staff-roles.ts`.
+- **build** — Wired `@aura/domain-staff` + `@aura/domain-shift` paths in `worker/tsconfig.json`, root `tsconfig.json`, and `vitest.config.ts`.
+- **test** — Full suite green: 358 test files / 3270 tests passing. tsc delta within established M1/M2 band (1317 errors, all TS2307/TS6059/TS2305/TS2554, 0 new error classes).
+- See: `plans/2026-09-14-m2-staff-shift-exemplar/`. M2 Milestone complete.
+
+### 🔧 M2 Tables Exemplar (D10) — Extract + Migrate + Delete
+
+- **feat(domain/table)** — Extracted `tablesRouter` (GET list + by-id, PATCH occupy/release/status) and `qrRouter` (GET /:slug → PNG, signature-gated) into `packages/domain/table/` (commands/ + policies/ + barrel). Status policy extracted as `policies/status.ts` with `TABLE_STATUS_TRANSITIONS` + `canTransitionTo` (v1 permissive — all 4 statuses legal targets).
+- **refactor(M2)** — Migrated every caller off `worker/src/routes/tables.ts` onto direct `@aura/domain-table` imports: `worker/src/index.ts`, `worker/src/routes/admin-qr.ts`, `worker/src/tree/qr/generator.ts`, `worker/src/__tests__/routes/{tables,debug-wrong-sig,debug-patch}.test.ts`, `tests/tables.test.ts` (6 files).
+- **refactor(M2)** — Deleted `worker/src/routes/tables.ts` shim and its `.bak` artifact. Canonical copies live in `packages/domain/table/`.
+- **build** — Wired `@aura/domain-table` + `@aura/domain-table/*` aliases in `worker/tsconfig.json`, root `tsconfig.json`, `vitest.config.ts`.
+- **test** — Full suite green: 360 files / 3274 tests. tsc delta all new errors match the established M1/M2 band (TS2307 + TS6059 + relocated TS2305/TS2554 `openapi`/`2-3 args`) — identical to what catalog/order/payment/kitchen already ship with. 0 new error classes introduced.
+- Scope: `worker/src/routes/tables.ts` only. Status-enum conflict avoided (out-of-scope: `schemas/tables.ts`, `openapi-tables.ts`, `tables-mobile.ts`, `table-sessions.ts`, `tree/qr/generator.ts`, `tree/qr/signer.ts`). Money-table safety: zero DDL, SQL strings byte-identical, HTTP shape unchanged.
+- See: `plans/2026-09-14-m2-tables-exemplar/`.
+
+### 🔧 M2 Catalog Domain Exemplar (D10) — Extract + Migrate + Delete
+
+- **feat(domain/catalog)** — Extracted products / menu / categories / menu-modifiers routes + schemas into `packages/domain/catalog/` (commands/ queries/ model/ schemas/ barrel). Pricing + availability policies split into `policies/pricing.ts` + `policies/availability.ts` per D10 spec. Old route files become re-export shims (kept live during migration window).
+- **refactor(M2)** — Migrated every caller off shim paths onto direct `@aura/domain-catalog` imports: `worker/src/index.ts`, `worker/src/lib/openapi.ts`, `openapi-categories.ts`, `openapi-products.ts`, `worker/src/__tests__/tree/menu-modifiers/`, `worker/src/__tests__/routes/{categories,menu}.test.ts`, `tests/{products,menu,categories}.test.ts` (9 files total). 3 call sites were dynamic imports repointed to the barrel.
+- **refactor(M2)** — Deleted all shims: 4 route shims (`products.ts`, `categories.ts`, `menu.ts`, `menu-modifiers.ts`) + 2 schema shims (`schemas/products.ts`, `schemas/categories.ts`). Canonical copies live in `packages/domain/catalog/`.
+- **build** — Wired `@aura/domain-catalog` + `@aura/domain-catalog/*` aliases in `worker/tsconfig.json`, root `tsconfig.json`, `vitest.config.ts`.
+- **fix(test)** — Added `import '@hono/zod-openapi'` preload to `src/test-setup.ts` so the root zod instance gets patched before test-schema modules load. Without this, dual-zod (root `node_modules/zod` vs `worker/node_modules/zod`, two separate module instances) causes `z.coerce.number().openapi is not a function` across 42 catalog tests — the patch side-effect from `@hono/zod-openapi` was mutating only the worker copy.
+- **test** — Full suite green: 360 files / 3274 tests. tsc delta +24 (552→576), all new errors match the established M1 band (TS2307 `worker/src/...` unresolvable from package, TS6059 `not under rootDir`, relocated TS2305/TS2554 `openapi`/`2-3 args`) — identical error classes already present for `packages/domain/{order,payment,kitchen}` in baseline.
+- See: `plans/2026-09-14-m2-catalog-exemplar/`. Money-table safety: zero DDL, no contract change, menu payload shape identical.
+
 ### 🔧 M2 Shim Caller Migration — Order / Payment / Kitchen
 
 - **refactor(M2)** — Migrated every caller off shim route paths onto direct `@aura/domain-order` / `@aura/domain-payment` / `@aura/domain-kitchen` imports: `index.ts`, `orders-hono.ts`, `cron-admin.ts`, `webhooks.ts`, `tests/*`, `worker/src/__tests__/*` (17 test files).
