@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: Medium (P2)
-- **Current Status**: Pending Review
+- **Current Status**: Completed (commit `117608a`)
 - **Description**: Phân định rõ ràng ranh giới giữa Transport Schemas (OpenAPI HTTP contracts trong `worker/src/schemas/`) và Domain Validation Schemas (Pure Zod trong `packages/domain/*/schemas`), ngăn chặn rule drift và đảm bảo Single Source of Truth.
 
 ## Key Insights
@@ -56,11 +56,11 @@
 5. Chạy `npx tsc --noEmit` xác nhận type contract khớp 100%.
 
 ## Todo List
-- [ ] Audit enums giữa `worker/src/schemas/common.ts` và domain packages
-- [ ] Đảm bảo domain enums là Source of Truth
-- [ ] Xác nhận không có circular dependency giữa `worker/src/schemas` và `packages/domain`
-- [ ] Chạy test suite route validation
-- [ ] Kiểm tra Swagger/OpenAPI docs generation
+- [x] Audit enums giữa `worker/src/schemas/common.ts` và domain packages
+- [x] Đảm bảo domain enums là Source of Truth
+- [x] Xác nhận không có circular dependency giữa `worker/src/schemas` và `packages/domain`
+- [x] Chạy test suite route validation
+- [x] Kiểm tra Swagger/OpenAPI docs generation
 
 ## Success Criteria
 - Mọi trạng thái đơn hàng (order status), thanh toán (payment status) chỉ được định nghĩa một lần duy nhất tại domain package.
