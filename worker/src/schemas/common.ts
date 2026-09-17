@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { openapi } from '@hono/zod-openapi';
+import { z } from '@hono/zod-openapi';
 
 /**
  * Common OpenAPI schemas for all routes

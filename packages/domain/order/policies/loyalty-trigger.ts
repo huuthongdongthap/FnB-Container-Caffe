@@ -13,8 +13,7 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
-import { loadPolicy } from 'packages/domain/crm/commands/loyalty-policy';
-import { applyAccrual } from 'packages/domain/crm/commands/accrual';
+import { loadPolicy, applyAccrual } from '@aura/domain-crm';
 
 const log = createLogger({ route: 'orders' });
 

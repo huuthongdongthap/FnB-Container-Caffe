@@ -13,8 +13,7 @@ import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { z } from 'zod';
-import { loadPolicy } from 'packages/domain/crm/commands/loyalty-policy';
-import { reverseAccrual } from 'packages/domain/crm/commands/refund-reversal';
+import { loadPolicy, reverseAccrual } from '@aura/domain-crm';
 
 const log = createLogger({ route: 'refund' });
 export const refundRouter = new Hono<{ Bindings: Env }>();

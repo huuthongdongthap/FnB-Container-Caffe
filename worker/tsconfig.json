@@ -34,7 +34,9 @@
       "@aura/domain-shift": ["../packages/domain/shift/index.ts"],
       "@aura/domain-shift/*": ["../packages/domain/shift/*"],
       "@aura/domain-inventory": ["../packages/domain/inventory/index.ts"],
-      "@aura/domain-inventory/*": ["../packages/domain/inventory/*"]
+      "@aura/domain-inventory/*": ["../packages/domain/inventory/*"],
+      "worker/*": ["./*"],
+      "worker/src/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts"],
