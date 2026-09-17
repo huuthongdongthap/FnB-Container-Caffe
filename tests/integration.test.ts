@@ -404,11 +404,16 @@ describe('Source Code Pattern Verification', () => {
     expect(znsSender).toContain("startsWith('YOUR_')");
   });
 
-  test('cron.ts exports all required functions', () => {
-    const cron = fs.readFileSync(path.join(srcDir, 'routes/cron.ts'), 'utf8');
-    expect(cron).toContain('export async function checkOverdueOrders');
-    expect(cron).toContain('export async function sendCashbackExpiryWarnings');
-    expect(cron).toContain('export async function processErpnextRetryQueue');
-    expect(cron).toContain('export async function processErpnextProductSync');
+  test('cron-handlers exports all required functions', () => {
+    const cronHandlersDir = path.join(srcDir, 'routes/cron-handlers');
+    const orderChecks = fs.readFileSync(path.join(cronHandlersDir, 'order-checks.ts'), 'utf8');
+    expect(orderChecks).toContain('export async function checkOverdueOrders');
+
+    const cashbackWarnings = fs.readFileSync(path.join(cronHandlersDir, 'cashback-warnings.ts'), 'utf8');
+    expect(cashbackWarnings).toContain('export async function sendCashbackExpiryWarnings');
+
+    const erpnextSync = fs.readFileSync(path.join(cronHandlersDir, 'erpnext-sync.ts'), 'utf8');
+    expect(erpnextSync).toContain('export async function processErpnextRetryQueue');
+    expect(erpnextSync).toContain('export async function processErpnextProductSync');
   });
 });
