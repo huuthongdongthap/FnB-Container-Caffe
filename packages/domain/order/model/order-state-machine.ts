@@ -8,15 +8,18 @@
  * cancelled) have no outgoing transitions — any attempted move is rejected.
  */
 
-export type OrderStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'preparing'
-  | 'ready'
-  | 'served'
-  | 'delivered'
-  | 'completed'
-  | 'cancelled';
+export const ORDER_STATUSES = [
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'served',
+  'delivered',
+  'completed',
+  'cancelled',
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /** from -> allowed next states. Terminal states map to an empty array. */
 export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {

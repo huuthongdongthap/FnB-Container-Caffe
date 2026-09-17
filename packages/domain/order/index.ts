@@ -1,6 +1,6 @@
 // @aura/domain-order — Order bounded context
 // model
-export { ORDER_TRANSITIONS, TERMINAL_STATES, canTransition, isTerminal, isFinal } from './model/order-state-machine';
+export { ORDER_STATUSES, ORDER_TRANSITIONS, TERMINAL_STATES, canTransition, isTerminal, isFinal } from './model/order-state-machine';
 export type { OrderStatus, TransitionResult } from './model/order-state-machine';
 export { generateId, parseJSON } from './model/helpers';
 // commands

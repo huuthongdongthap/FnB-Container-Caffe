@@ -132,6 +132,7 @@ export const OrderStatusEnum = z.enum([
   'preparing',
   'ready',
   'served',
+  'delivered',
   'completed',
   'cancelled',
   'refunded',
