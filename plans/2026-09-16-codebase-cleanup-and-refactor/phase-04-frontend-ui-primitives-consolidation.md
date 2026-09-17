@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: Medium (P2)
-- **Current Status**: Pending Review
+- **Current Status**: Completed (commit `891deb0`)
 - **Description**: Hợp nhất thư viện UI components theo chuẩn Material Design 3 (MD3). Chuẩn hoá export từ `src/components/ui/` sang `src/components/md3/` và loại bỏ code dư thừa/inconsistent giữa hai thư mục UI primitives.
 
 ## Key Insights
@@ -57,11 +57,11 @@
 5. Chạy `npm run build` để kiểm tra compile và bundle output của Vite.
 
 ## Todo List
-- [ ] Khảo sát đối chiếu giữa `src/components/ui/` và `src/components/md3/`
-- [ ] Export MD3 primitives tại `src/components/ui/index.ts`
-- [ ] Đảm bảo CSS variables MD3 hoạt động đồng bộ
-- [ ] Chạy test suite của UI components
-- [ ] Xác nhận `npm run build` hoàn thành không có lỗi
+- [x] Khảo sát đối chiếu giữa `src/components/ui/` và `src/components/md3/`
+- [x] Export MD3 primitives tại `src/components/ui/index.ts`
+- [x] Đảm bảo CSS variables MD3 hoạt động đồng bộ
+- [x] Chạy test suite của UI components
+- [x] Xác nhận `npm run build` hoàn thành không có lỗi
 
 ## Success Criteria
 - MD3 components trở thành nguồn tham chiếu chuẩn cho toàn bộ giao diện mới.

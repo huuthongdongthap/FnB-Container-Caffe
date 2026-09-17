@@ -9,11 +9,11 @@
 
 | Phase | Title | Scope | Status |
 |---|---|---|---|
-| [Phase 01](phase-01-filesystem-hygiene.md) | Filesystem & Backup Hygiene | Xoá `.bak`, `_dist_backup`, dọn dẹp worktrees cũ | ⏳ Pending Review |
-| [Phase 02](phase-02-customer-domain-and-tree-cleanup.md) | Customer Domain & Tree Consolidation | Sửa leaky imports `order -> worker/src/tree`, xoá 5 file trùng lặp tại `worker/src/tree/customer/` | ⏳ Pending Review |
-| [Phase 03](phase-03-schema-and-contract-consolidation.md) | Schema & Contract Single Source of Truth | Đồng nhất Zod schemas giữa `worker/src/schemas` và `packages/domain/*/schemas` | ⏳ Pending Review |
-| [Phase 04](phase-04-frontend-ui-primitives-consolidation.md) | UI Primitives & MD3 Token Consolidation | Hợp nhất `src/components/md3/` & `src/components/ui/`, chuẩn hoá design tokens | ⏳ Pending Review |
-| [Phase 05](phase-05-verification-and-test-suite-safety.md) | End-to-End Verification & Build Audit | Chạy 3.374 unit tests, `tsc --noEmit`, và `vite build` | ⏳ Pending Review |
+| [Phase 01](phase-01-filesystem-hygiene.md) | Filesystem & Backup Hygiene | Xoá `.bak`, `_dist_backup`, dọn dẹp worktrees cũ | ✅ Completed |
+| [Phase 02](phase-02-customer-domain-and-tree-cleanup.md) | Customer Domain & Tree Consolidation | Sửa leaky imports `order -> worker/src/tree`, xoá 5 file trùng lặp tại `worker/src/tree/customer/` | ✅ Completed |
+| [Phase 03](phase-03-schema-and-contract-consolidation.md) | Schema & Contract Single Source of Truth | Đồng nhất Zod schemas giữa `worker/src/schemas` và `packages/domain/*/schemas` | ✅ Completed |
+| [Phase 04](phase-04-frontend-ui-primitives-consolidation.md) | UI Primitives & MD3 Token Consolidation | Hợp nhất `src/components/md3/` & `src/components/ui/`, chuẩn hoá design tokens | ✅ Completed |
+| [Phase 05](phase-05-verification-and-test-suite-safety.md) | End-to-End Verification & Build Audit | Chạy 3.374 unit tests, `tsc --noEmit`, và `vite build` | ✅ Completed |
 
 ## Key Dependencies & Execution Order
 ```
