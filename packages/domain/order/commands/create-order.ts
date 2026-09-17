@@ -170,7 +170,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       const captureCustId = customerIdForCapture;
       ctx.waitUntil((async () => {
         try {
-          const { identifyCustomer, linkOrder } = await import('worker/src/tree/customer');
+          const { identifyCustomer, linkOrder } = await import('@aura/domain-customer');
           const identity = await identifyCustomer({
             db, customerId: captureCustId,
             phone: data.customer_phone, email: data.customer_email,

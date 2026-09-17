@@ -6,9 +6,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { campaignConfigSchema, zodErrorResponse } from '../lib/validators';
-
-type CampaignTrigger = 'welcome' | 'birthday' | 'winback' | 'post_visit' | 'cashback_expiry';
-type CampaignChannel = 'sms' | 'email' | 'zalo';
+import type { CampaignTrigger, CampaignChannel, CampaignConfig } from '@aura/domain-crm';
 
 const ALL_TRIGGERS: CampaignTrigger[] = [
   'welcome',
@@ -262,4 +260,3 @@ campaignsRouter.delete('/:trigger', async(c) => {
 });
 
 export { ALL_TRIGGERS, ALL_CHANNELS, TRIGGER_META };
-export type { CampaignTrigger, CampaignChannel, CampaignConfig };

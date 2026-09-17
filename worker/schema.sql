@@ -618,3 +618,27 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+
+-- =====================================================
+-- CAMPAIGN ENGINE — logs + per-trigger configs
+-- =====================================================
+CREATE TABLE IF NOT EXISTS campaign_configs (
+  trigger TEXT PRIMARY KEY,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  channels TEXT NOT NULL DEFAULT '["sms"]',  -- JSON array of channel slugs
+  timing TEXT,  -- optional schedule hint (cron-ish or hours)
+  updated_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS campaign_logs (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  trigger TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status TEXT NOT NULL DEFAULT 'sent',  -- sent, failed, skipped
+  error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_customer ON campaign_logs(customer_id, trigger);
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_sent ON campaign_logs(sent_at);

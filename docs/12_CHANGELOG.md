@@ -4,6 +4,105 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 M5 CRM / Growth — Campaign Engine (Phase 05)
+
+- **feat(domain/crm)** — Added 4 new command files in `packages/domain/crm/commands/campaign/`:
+  - `types.ts` — shared `CampaignTrigger`, `CampaignChannel`, `CampaignCustomer`, `CampaignMessage`, `CampaignResult`, `CampaignLogRow`, `CampaignConfig`.
+  - `templates.ts` — pure `renderTemplate(trigger, params?)` → `{ subject, sms, html }`. Bilingual (VN + EN) for all 5 triggers. Exhaustive switch throws on unknown trigger. `safeName` defaults to `'bạn'`, `formatCurrency` uses vi-VN locale.
+  - `dedup.ts` — `deduplicate(db, customerId, trigger, sinceDays)` → boolean (true = skip send). `logSend(db, result)` — INSERT into `campaign_logs` with generated ID.
+  - `detect.ts` — 5 trigger detectors: `detectWelcomeCandidates` (24h new), `detectBirthdayCandidates` (month match, once/year), `detectWinbackCandidates` (30d inactive), `detectPostVisitCandidates` (24-48h after completed order), `detectCashbackExpiry` (7 days before expires). Plus `markExpiryNotified(db, ids[])` batch UPDATE.
+- **refactor(tree/campaigns)** — `cron-handler.ts` migrated from local `./campaign-engine`, `./templates`, `./triggers/*` to `@aura/domain-crm` barrel exports. Channel senders (sms/email/zalo) remain in `worker/src/tree/campaigns/channels/` (integration layer).
+- **refactor(routes)** — `routes/campaigns.ts` now imports `CampaignTrigger`, `CampaignChannel`, `CampaignConfig` types from `@aura/domain-crm` instead of local re-declaration.
+- **feat(schema)** — Added `campaign_configs` + `campaign_logs` tables to `worker/schema.sql` with indexes on `(customer_id, trigger)` and `sent_at`.
+- **test** — `tests/crm-campaign.test.ts` (17 tests: template rendering × 5, dedup × 3, logSend × 2, detectors × 7). Full suite green: 369 files / 3374 tests.
+
+### 🔧 M5 CRM / Growth — Referral (Phase 04)
+
+- **feat(domain/crm)** — Added `referral-policy.ts` + `referral.ts` in `packages/domain/crm/commands/`:
+  - `referral-policy.ts` — pure `resolveReferralPolicy(kv?)` → `ReferralPolicy`. Defaults: `{ bonusType: 'cashback', pointsReferrer: 100, pointsReferee: 50, cashbackReferrerVnd: 10000, cashbackRefereeVnd: 5000, minOrderVnd: 20000 }`. KV overlay (`referral:policy`) merges partial over defaults. Invalid JSON → fallback to defaults.
+  - `referral.ts` — `getOrCreateReferralCode(db, customerId)` (6-char uppercase, unique), `getReferralCode(db, customerId)`, `redeemReferral(db, code, refereeId)` (validates code + self-referral + duplicate pending → creates pending `ReferralRow`), `rewardReferralOnFirstOrder(db, refereeId, orderId, amount, policy?)` (points mode: customers + loyalty_point_logs; cashback mode: batch cashback_wallets + cashback_transactions + loyalty_audit_log), `reverseReferralCashback(db, referralId)` (batch debit wallet + reversal audit), `getReferralStatus(db, customerId)` (code + counts + cashback earned). Idempotent: one reward per (referrer, referee) via `referral.status` check.
+- **feat(routes)** — Added 2 endpoints on `crmRouter` in `worker/src/routes/crm.ts`:
+  - `GET /api/crm/customers/:id/referral` — get/create referral code + status. Auth: owner, staff, or self.
+  - `POST /api/crm/customers/:id/referral/redeem` — body `{ code }`. Auth: self only. Returns `{ success, data: ReferralResult }` or 400 with `reason`.
+- **refactor(domain/crm)** — `place-order.ts` now triggers `rewardReferralOnFirstOrder` after loyalty accrual (non-blocking). Uses KV-tunable policy.
+- **refactor(tree/loyalty)** — `phone-auth-handler.ts` migrated from legacy `routes/referrals.applyReferralForNewCustomer` to `redeemReferral` from `@aura/domain-crm`.
+- **test** — `tests/crm-referral.test.ts` (18 tests: resolveReferralPolicy × 4, redeemReferral × 4, rewardReferralOnFirstOrder × 4, reverseReferralCashback × 2, getReferralStatus × 2, getOrCreateReferralCode × 2). Full suite green: 368 files / 3357 tests.
+
+### 🔧 M5 CRM / Growth — Segments (Phase 03)
+
+- **feat(domain/crm)** — Added `segments.ts` in `packages/domain/crm/commands/`:
+  - `DEFAULT_SEGMENTS` — 5 declarative definitions: `new_first_week`, `regular`, `regular_high_value`, `lapsing_30d`, `dormant_60d`. Each has `key`, `labelVi`, `labelEn`, `description`, optional `highValueThresholdVnd`.
+  - `loadSegmentDefinitions(kv?)` — KV override (`crm:segments`) replaces defaults entirely (no merge). Shape guard validates entries; bad JSON/missing key → defaults.
+  - `scanCustomers(db)` — LEFT JOIN orders + GROUP BY customer → `{ id, name, phone, tier, lifetime_points, last_order_at }`.
+  - `buildSegment(db, key, kv?, opts?, now?)` — evaluates predicate per customer, returns `{ key, labelVi, labelEn, description, count, customers[] }`. `limit=0` returns all matches.
+  - `listSegments(db, kv?, now?)` — all definitions with counts (no member list).
+  - `classify(row, policy, now)` — wraps `computeFrequencyBand` with dormant fallback for null `last_order_at`.
+- **feat(routes)** — Added 2 endpoints on `crmRouter` in `worker/src/routes/crm.ts`:
+  - `GET /segments` — list all segment definitions with counts. Auth: `requireAuth(['owner', 'staff'])`.
+  - `GET /segments/:key/customers?limit&offset` — paginated member list. Auth: same. `limit=0` returns all.
+- **test** — `tests/crm-segments.test.ts` (19 tests: classification × 8, pagination × 4, KV override × 5, listSegments × 2). Full suite green: 367 files / 3339 tests.
+
+### 🔧 M5 CRM / Growth — Customer Intelligence (Phase 02)
+
+- **feat(domain/crm)** — Added 3 new commands in `packages/domain/crm/commands/`:
+  - `frequency-band.ts` — pure `computeFrequencyBand(summary, policy, now?)` → `'new' | 'regular' | 'lapsing' | 'dormant' | 'resurrected'`. KV-tunable via `crm:band_policy` (defaults: new 30d, regular 60d, dormant 120d, resurrect window 30d). `resolveBandPolicy(kv)` merges override over defaults.
+  - `preferences.ts` — pure `extractPreferences(orders[])` → `{ favouriteCategories, favouriteItems, avgOrderCents, preferredChannel, orderCount, totalSpentCents }`. Defensive `parseOrderItems` skips malformed JSON. Categories + items capped at top 5 by frequency.
+  - `customer-360.ts` — `getCustomer360(db, customerId, kv?, opts?)` composes account + tier + band + preferences + recent events (default 5) into unified owner/staff read model. Partial-but-typed fallbacks: read failure in any lens returns empty data, not an exception. Parallel D1 reads. Tier display normalizes legacy `'member'` → `'bronze'`.
+- **feat(routes)** — Added `GET /api/crm/customers/:id/360` on `crmRouter`. Auth: `requireAuth(['owner', 'staff'])`. Query: `?eventLimit=`. Returns `{ success, data: Customer360 }`.
+- **test** — `tests/crm-intelligence.test.ts` (14 tests: banding boundaries × 6, preference parsing × 5, 360 composition × 3). Full suite green: 366 files / 3320 tests.
+
+### 🔧 M5 CRM / Growth — Loyalty Domain (Phase 01)
+
+- **feat(domain/crm)** — Added 4 pure, Hono-free commands in `packages/domain/crm/commands/`:
+  - `loyalty-policy.ts` — `loadPolicy(db, kv?)` reads `loyalty_tiers` + active `bonus_campaigns` + KV overrides. Returns `{ tiers, defaultRate, campaignMultiplier }`.
+  - `compute-tier.ts` — pure `computeTier(lifetimePoints, currentTierName, policy)` → `{ tierName, lifetimePoints, nextTier, pointsToNext }`. Uses `loyalty_tiers.min_points` thresholds (Bronze 0 / Silver 50 / Gold 200 / Platinum 500). No D1 dependency.
+  - `accrual.ts` — `applyAccrual(db, policy, { customerId, orderId, orderTotalVnd })` writes `loyalty_point_logs`, updates `customers.loyalty_points` + `lifetime_points`, recalculates tier, emits tier_upgrade/downgrade to `loyalty_audit_log`. Idempotent: skips when `loyalty_point_logs` already has `reason='order'` for the order.
+  - `refund-reversal.ts` — `reverseAccrual(db, policy, { customerId, orderId, refundAmountVnd })` writes negative `points_change`, decrements both points columns, recalculates tier if dropped below threshold.
+- **refactor(domain/crm)** — `get-customer-account.ts` now uses `computeTier` instead of inline nextTier query. Behavior byte-identical.
+- **refactor(domain/order)** — `loyalty-trigger.ts` delegates to `applyAccrual` directly. Idempotency guard on `cashback_transactions WHERE order_id AND type='earn'`. Min order threshold 20,000 VND.
+- **refactor(routes)** — `worker/src/routes/refunds.ts` migrated to `loadPolicy` + `reverseAccrual`. `worker/src/routes/loyalty.ts` re-exports the 3 domain commands.
+- **cleanup** — Deleted legacy `worker/src/tree/loyalty/process-order.ts` (278 lines) and 3 obsolete test files that referenced it.
+- **Invariants preserved**: tier thresholds 0/50/200/500 `min_points` (NOT `min_spent_vnd`), 1pt/10k VND × tier multiplier, cashback rates 3/5/7/10%, multipliers 1.0/1.1/1.3/1.5, earn cap 50k/tx, wallet cap 50% of bill, proportional refund reversal.
+- **test** — Full suite green: 365 files / 3306 tests. Legacy `process-order.ts` zero imports remain.
+
+### 🔧 M4 AURA Online — Pickup / Delivery Fulfillment (Option D)
+
+- **feat(domain/crm)** — Added `getFulfillment(db, orderId, viewerCustomerId?, kv?)` and `listPickupPoints(kv?)` in `packages/domain/crm/commands/get-fulfillment.ts`. Pure function, Hono-free. Computes ETA from prep baseline (8 min) + 3 min per pending order ahead in queue. Terminal states (`served`, `picked_up`, `cancelled`, `rejected`) return `etaAt: null`, `etaMinutes: 0`, no pickup point. Customer-scoped: a customer may only read their own fulfillment; staff/owner see any. Pickup point resolved from `fulfillment:pickup_point` KV config with static `DEFAULT_PICKUP_POINT` fallback (malformed JSON also falls back). Exported via barrel.
+- **feat(routes)** — Added two endpoints on `crmRouter` in `worker/src/routes/crm.ts`:
+  - `GET /fulfillment/locations` — public pickup-point list (no auth; customer needs location before ordering).
+  - `GET /orders/:id/fulfillment` — auth: `requireAuth(['customer', 'staff', 'owner'])`. Returns `{ orderId, status, channel, etaAt, etaMinutes, pickupPoint, queueDepth }`. 404 for unknown order, 403 for customer reading another's order, 500 for D1 failure.
+- **test** — `tests/crm-fulfillment.test.ts` (11 tests: default pickup point, KV-configured pickup point, public access, pending pickup with ETA + queue depth + pickup point, terminal order null ETA + no pickup point, unknown order 404, customer cross-read 403, staff override, delivery channel no pickup point, 401 no auth, malformed JSON fallback). Full suite green: 367 files / 3345 tests.
+
+### 🔧 M4 AURA Online — Online Order (Option C)
+
+- **feat(domain/crm)** — Added `placeOrder(db, input)` in `packages/domain/crm/commands/place-order.ts`. Pure function, Hono-free. Reads each item's price from `menu_items` server-side (customer cannot inject price). Validates channel (`pickup`|`delivery`), item existence, availability, quantity. Inserts into `orders` with `status: 'pending'`. Exported via barrel alongside `VALID_CHANNELS`.
+- **feat(routes)** — Added `POST /orders` on `crmRouter` in `worker/src/routes/crm.ts`. Auth: `requireAuth(['customer', 'staff', 'owner'])`. Customer role uses own `id`; staff/owner must pass `customerId` + `customerPhone`. Validates body (channel, items, customerPhone). Returns 201 with `{ orderId, status, channel, totalCents, items }`; 400 for invalid input; 401/403 for auth.
+- **test** — `tests/crm-online-order.test.ts` (11 tests: customer pickup order, staff on-behalf delivery, unavailable item rejection, unknown item rejection, empty items, invalid channel, missing customerPhone, invalid quantity, 401 no auth, 403 disallowed role, per-item note preservation). Full CRM/M4 suite green: 37 tests.
+
+### 🔧 M4 AURA Online — Public Digital Menu (Option B)
+
+- **feat(domain/catalog)** — Added `getCustomerMenu(db, opts)` in `packages/domain/catalog/commands/get-customer-menu.ts`. Queries `menu_items`, groups by `category`, strips internal fields (`cost`, `sku`, `supplier`), exposes `priceCents`, `imageUrl`, `tags`, `available`. Honors availability policy via `toAvailabilityFilter`. Non-blocking — returns empty categories on failure.
+- **feat(routes)** — Added `GET /menu` on `crmRouter` (public, no auth). Query params: `?category=&include_unavailable=true`. Customer-facing menu for online ordering surface.
+- **test** — `tests/crm-customer-menu.test.ts` (7 tests: category aggregation, default availability filter, include_unavailable, category query, field stripping, D1 failure fallback, public access). Full CRM suite green: 26 tests.
+
+### 🔧 M4 AURA Online — Customer Self-Service Account (Option A)
+
+- **feat(domain/crm)** — Added `getCustomerAccount(db, customerId, opts)` in `packages/domain/crm/commands/get-customer-account.ts`. Parallel D1 reads across `customers`, `orders`, `consents`, `loyalty_tiers`. Returns `{ customerId, name, phone, email, tier, points, lifetimePoints, nextTier, recentOrders, consents }`. Partial-but-typed fallbacks so read failures never break the customer journey. Exported via barrel.
+- **feat(domain/crm)** — Added `updateConsent(db, update)` in `packages/domain/crm/commands/update-consent.ts`. Append-only INSERT (never UPDATE) — each change writes a new row to `consents`, latest row per `(customer_id, purpose)` is current state. Validates purpose against `['marketing','order','analytics','referral','loyalty']`, returns `{ ok: true, consent } | { ok: false, error, code }`. Tracks `actorId`, `actorRole`, `source`, `policyVersion`.
+- **feat(routes)** — Added M4 endpoints in `worker/src/routes/crm.ts`:
+  - `GET /account/me` — returns authenticated customer's account view (role: customer | staff | owner).
+  - `PATCH /account/consent` — body `{ purpose, granted, policyVersion?, customerId? }`. Customer can only update own; staff/owner can update any (pass `customerId`). Returns 400 for invalid purpose / missing fields, 401 without auth.
+  - `GET /consent-purposes` — public list of valid purposes for UI dropdowns.
+- **test** — `tests/crm-account.test.ts` (10 tests: account aggregation with tier calc, empty account for unknown customer, 401 without auth, 403 disallowed role, consent grant, consent revoke (staff-on-customer), 400 invalid purpose, 400 missing fields, 401 no auth on PATCH, public consent-purposes list).
+- **docs** — Updated `.ai/specs/phase-map.md` (M4 IN PROGRESS — Option A Customer Account).
+
+### 🔧 M1 Customer Events Read-Model (Option A) — CRM Timeline API
+
+- **feat(domain/crm)** — Added pure `aggregateEvents(db, customerId, options)` in `packages/domain/crm/commands/aggregate-events.ts`. Parallel D1 reads across `customer_identities`, `consents`, `visits`, `orders`, `loyalty_point_logs`. Returns `{ customerId, events, total }` sorted descending by timestamp. Failures swallowed (non-blocking — read failure never breaks staff/owner surface). Exported via barrel.
+- **feat(routes)** — Added `worker/src/routes/crm.ts` with Hono router: `GET /customers/:id/events` (timeline feed, `?limit` query) and `GET /customers/:id/profile` (recent activity summary). Both protected by `requireAuth(['owner', 'staff'])`. Mounted at `/api/crm` in `worker/src/index.ts`.
+- **test** — `tests/crm-events.test.ts` (9 tests: empty state, identity aggregation, descending sort, limit trim, payload JSON parse, consent revoke type, mixed-source aggregation, 401 without auth, 401 invalid token). Full suite green: 363 files / 3306 tests passing.
+- **docs** — Updated `.ai/specs/phase-map.md` (M1 IN PROGRESS, CRM lookup step marked done).
+
 ### 🔧 M3 Phase 05 — Canonical KDS Consolidation & Owner Dashboard v1
 
 - **feat(domain/kitchen)** — Added pure `station-policy.ts` (`buildCategoryStationIndex`, `buildIndexFromDbRows`, `parseOrderItems`, `routeItemToStation`, `groupItemsByStation`, `filterItemsForStation`) with zero Hono/worker imports for direct vitest unit testing. Barrel-exported from `packages/domain/kitchen/index.ts`.

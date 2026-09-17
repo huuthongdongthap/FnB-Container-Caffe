@@ -153,7 +153,7 @@ if (['served', 'completed'].includes(body.status as string)) {
           ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
 
           if (visitCustomer) {
-            const { recordVisit } = await import('worker/src/tree/customer');
+            const { recordVisit } = await import('@aura/domain-customer');
             // dine_in + table_id = QR-table order; dine_in without = walk-in.
             const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
               order.order_type === 'delivery' ? 'online_delivery'

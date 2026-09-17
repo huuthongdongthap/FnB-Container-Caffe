@@ -19,6 +19,10 @@ export { menuModifiersRouter } from './commands/menu-modifiers';
 // Queries (plain handlers)
 export { getMenu, getMenuItem } from './queries/menu';
 
+// M4 Online — customer-facing menu view
+export { getCustomerMenu } from './commands/get-customer-menu';
+export type { CustomerMenu, CustomerMenuItem, CustomerMenuCategory, CustomerMenuOptions } from './commands/get-customer-menu';
+
 // Policies
 export { happyHourDiscountFor } from './policies/pricing';
 export { parseAvailabilityFilter, toAvailabilityFlag } from './policies/availability';

@@ -3,13 +3,17 @@
  * Routes each trigger through dedup, send, and log
  */
 import { createLogger } from '../../utils/logger';
-import { deduplicate, logSend } from './campaign-engine';
-import { renderTemplate } from './templates';
-import { detectWelcomeCandidates } from './triggers/welcome';
-import { detectBirthdayCandidates } from './triggers/birthday';
-import { detectWinbackCandidates } from './triggers/winback';
-import { detectPostVisitCandidates } from './triggers/post-visit';
-import { detectCashbackExpiry, markExpiryNotified } from './triggers/cashback-expiry';
+import {
+  deduplicate,
+  logSend,
+  renderTemplate,
+  detectWelcomeCandidates,
+  detectBirthdayCandidates,
+  detectWinbackCandidates,
+  detectPostVisitCandidates,
+  detectCashbackExpiry,
+  markExpiryNotified,
+} from '@aura/domain-crm';
 import { sendCampaignSms } from './channels/sms';
 import { sendCampaignEmail } from './channels/email';
 import { sendCampaignZalo } from './channels/zalo';

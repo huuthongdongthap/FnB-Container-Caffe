@@ -160,4 +160,6 @@ loyaltyRouter.get('/tiers', async(c) => {
 });
 
 // Re-exports for backward compat with orders.ts, refunds.ts, and tests
-export { processOrderLoyalty, deductPointsForRefund } from '../tree/loyalty/process-order';
+export { loadPolicy } from 'packages/domain/crm/commands/loyalty-policy';
+export { applyAccrual } from 'packages/domain/crm/commands/accrual';
+export { reverseAccrual } from 'packages/domain/crm/commands/refund-reversal';

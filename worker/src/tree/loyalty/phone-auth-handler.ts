@@ -93,11 +93,18 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       }
 
       if (validated.referral_code) {
-        const { applyReferralForNewCustomer } = await import('../../routes/referrals');
         safeWaitUntil(c,
-          applyReferralForNewCustomer(db, id, validated.referral_code).catch(e =>
-            log.error('Referral apply error:', { message: (e as Error).message })
-          )
+          (async () => {
+            try {
+              const { redeemReferral } = await import('@aura/domain-crm');
+              const result = await redeemReferral(db, validated.referral_code, id);
+              if (!result.success) {
+                log.warn('Referral redeem failed on signup:', { reason: result.reason, customerId: id });
+              }
+            } catch (e) {
+              log.error('Referral redeem error:', { message: (e as Error).message });
+            }
+          })()
         );
       }
 

@@ -13,8 +13,8 @@ import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { z } from 'zod';
-import { deductPointsForRefund } from '../tree/loyalty/process-order';
-import type { Env } from '../types/env';
+import { loadPolicy } from 'packages/domain/crm/commands/loyalty-policy';
+import { reverseAccrual } from 'packages/domain/crm/commands/refund-reversal';
 
 const log = createLogger({ route: 'refund' });
 export const refundRouter = new Hono<{ Bindings: Env }>();
@@ -157,14 +157,21 @@ refundRouter.post('/refund', requireAuth(['owner', 'staff']), audit('refund_crea
     const now = new Date().toISOString();
     const refundStatus = amount >= payment.amount ? 'refunded' : 'partial';
 
-    // ── Deduct loyalty points (proportional for partial refunds) — non-blocking ──
+    // ── Reverse loyalty accrual (proportional for partial refunds) — non-blocking ──
     try {
       const orderRow = await db.prepare(
         'SELECT customer_id FROM orders WHERE id = ?'
       ).bind(payment.order_id).first<{ customer_id: string | null }>();
 
       if (orderRow?.customer_id) {
-        await deductPointsForRefund(db, parseInt(orderRow.customer_id, 10), payment.order_id, amount);
+        const policy = await loadPolicy(db).catch(() => null);
+        if (policy) {
+          await reverseAccrual(db, policy, {
+            orderId: payment.order_id,
+            customerId: orderRow.customer_id,
+            refundAmountVnd: amount,
+          });
+        }
       }
     } catch (loyaltyErr) {
       log.error('Failed to reverse loyalty on refund:', { message: (loyaltyErr as Error).message, paymentId });

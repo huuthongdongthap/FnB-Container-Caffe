@@ -65,6 +65,7 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
+import { crmRouter } from './routes/crm';
 import { nowPaymentsIPN } from '@aura/domain-payment';
 import { getInvoiceReceipt } from './routes/subscription-receipt';
 // ── SaaS (Phase 4–5) ──
@@ -253,6 +254,7 @@ app.route('/api/qr', qrRouter);
 app.route('/api/admin/qr', adminQRRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
+app.route('/api/crm', crmRouter);
 app.route('/api/pos/customer', posCustomerRouter);
 app.route('/api/promotions', promotionsRouter);
 app.route('/api/signage', signageRouter);
