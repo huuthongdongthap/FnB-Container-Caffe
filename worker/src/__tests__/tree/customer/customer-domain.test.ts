@@ -6,11 +6,16 @@ vi.mock('../../../middleware/logger', () => ({
   createLogger: () => ({ debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, child: () => ({}) })
 }));
 
-import { identifyCustomer } from '../../../tree/customer/identify-customer';
-import { recordConsent, hasActiveConsent } from '../../../tree/customer/record-consent';
-import { recordVisit } from '../../../tree/customer/record-visit';
-import { linkOrder } from '../../../tree/customer/link-order';
-import { classifyIdentifier, normalizePhone, isPlausibleVnPhone } from '../../../tree/customer/helpers';
+import {
+  identifyCustomer,
+  recordConsent,
+  hasActiveConsent,
+  recordVisit,
+  linkOrder,
+  classifyIdentifier,
+  normalizePhone,
+  isPlausibleVnPhone,
+} from '@aura/domain-customer';
 
 // ── Mock D1 (captures SQL + binds) ────────────────────────────────────────────
 type Row = Record<string, unknown>;
