@@ -46,7 +46,7 @@ export const ErrorResponseSchema = z.object({
   error: z.object({
     code: z.string().openapi({ example: 'VALIDATION_ERROR' }),
     message: z.string().openapi({ example: 'Invalid input data' }),
-    details: z.record(z.unknown()).optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
   }),
   meta: z.object({
     timestamp: z.string().datetime().openapi({ example: '2026-08-26T10:00:00Z' }),

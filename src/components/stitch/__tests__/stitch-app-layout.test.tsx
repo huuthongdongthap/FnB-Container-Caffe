@@ -18,8 +18,8 @@ vi.mock('react-i18next', () => ({
 
 import StitchAppLayout from '../StitchAppLayout';
 
-describe('StitchAppLayout', () => {
-  it('renders children', () => {
+describe('StitchAppLayout (legacy wrapper → CustomerShell)', () => {
+  it('renders children via CustomerShell', () => {
     renderWithProviders(
       <StitchAppLayout>
         <div>Page content</div>

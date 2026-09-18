@@ -1,0 +1,168 @@
+/* ═══════════════════════════════════════════════════════════════════
+   AURA Industrial Luxury · M3 System Token Mapping
+   Navy (#0A1128) + Chrome/Silver + Bronze (#D4AF37) + Noir Void + Pearl
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── AURA Industrial Luxury Palette ── */
+  --aura-navy-900: #0A1128;      /* Primary surface / AppBar */
+  --aura-navy-800: #0D1B3A;      /* Card surface */
+  --aura-navy-700: #142A4A;      /* Elevated surface */
+  --aura-navy-600: #1E3A5F;      /* Hover surface */
+  --aura-navy-500: #2A4A7A;      /* Border */
+  --aura-navy-400: #3A6B80;      /* Muted text */
+  --aura-navy-300: #5A8BB0;      /* Disabled */
+
+  --aura-chrome-50:  #F5F7F8;    /* Lightest chrome */
+  --aura-chrome-100: #E8ECEF;    /* Light chrome */
+  --aura-chrome-200: #C9D6DF;    /* Chrome primary */
+  --aura-chrome-300: #A8B8C4;    /* Chrome muted */
+  --aura-chrome-400: #8898A4;    /* Chrome border */
+  --aura-chrome-500: #6B9FB8;    /* Chrome brand (primary) */
+  --aura-chrome-600: #5A8FB0;    /* Chrome hover */
+  --aura-chrome-700: #4A7FA8;    /* Chrome active */
+
+  --aura-bronze-500: #D4AF37;    /* Bronze accent (CTA highlight) */
+  --aura-bronze-400: #E8C547;    /* Bronze hover */
+  --aura-bronze-600: #B8952F;    /* Bronze active */
+
+  --aura-noir-void:  #050814;    /* OpsShell background — near-black */
+  --aura-noir-900:   #0A1128;    /* Same as navy-900 */
+  --aura-noir-800:   #0D1B3A;
+
+  --aura-pearl-50:   #FAFAF8;    /* AdminShell background */
+  --aura-pearl-100:  #F5F5F0;    /* AdminShell surface */
+  --aura-pearl-200:  #E8E8DD;    /* AdminShell border */
+
+  /* ── M3 System Color Roles (Light / Customer Default) ── */
+  --md-sys-color-primary: var(--aura-chrome-500);
+  --md-sys-color-on-primary: var(--aura-navy-900);
+  --md-sys-color-primary-container: var(--aura-chrome-100);
+  --md-sys-color-on-primary-container: var(--aura-navy-900);
+
+  --md-sys-color-secondary: var(--aura-navy-700);
+  --md-sys-color-on-secondary: var(--aura-chrome-50);
+  --md-sys-color-secondary-container: var(--aura-chrome-200);
+  --md-sys-color-on-secondary-container: var(--aura-navy-900);
+
+  --md-sys-color-tertiary: var(--aura-bronze-500);
+  --md-sys-color-on-tertiary: var(--aura-navy-900);
+  --md-sys-color-tertiary-container: var(--aura-bronze-400);
+  --md-sys-color-on-tertiary-container: var(--aura-navy-900);
+
+  --md-sys-color-error: #EF5350;
+  --md-sys-color-on-error: #FFFFFF;
+  --md-sys-color-error-container: #7F1D1D;
+  --md-sys-color-on-error-container: #FECACA;
+
+  --md-sys-color-background: var(--aura-pearl-50);
+  --md-sys-color-on-background: var(--aura-navy-900);
+  --md-sys-color-surface: #FFFFFF;
+  --md-sys-color-on-surface: var(--aura-navy-900);
+  --md-sys-color-surface-variant: var(--aura-chrome-100);
+  --md-sys-color-on-surface-variant: var(--aura-navy-500);
+
+  --md-sys-color-outline: var(--aura-chrome-400);
+  --md-sys-color-outline-variant: var(--aura-navy-500);
+
+  --md-sys-color-inverse-surface: var(--aura-noir-void);
+  --md-sys-color-inverse-on-surface: var(--aura-chrome-50);
+  --md-sys-color-inverse-primary: var(--aura-chrome-300);
+
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+
+  /* ── Elevation Shadows (Glass/Industrial) ── */
+  --md-sys-elevation-level0: none;
+  --md-sys-elevation-level1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.15);
+  --md-sys-elevation-level2: 0 2px 4px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.15);
+  --md-sys-elevation-level3: 0 4px 8px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15);
+
+  /* ── Shape Tokens ── */
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 24px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* ── Motion ── */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-decelerated: cubic-bezier(0, 0, 0.2, 1);
+  --md-sys-motion-easing-accelerated: cubic-bezier(0.4, 0, 1, 1);
+  --md-sys-motion-duration-short1: 50ms;
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-short3: 150ms;
+  --md-sys-motion-duration-short4: 200ms;
+  --md-sys-motion-duration-medium1: 250ms;
+  --md-sys-motion-duration-medium2: 300ms;
+  --md-sys-motion-duration-medium3: 350ms;
+  --md-sys-motion-duration-medium4: 400ms;
+  --md-sys-motion-duration-long1: 450ms;
+  --md-sys-motion-duration-long2: 500ms;
+  --md-sys-motion-duration-long3: 550ms;
+  --md-sys-motion-duration-long4: 600ms;
+}
+
+/* ── OpsShell Dark Override (KDS / TV / POS) ── */
+[data-shell="ops"] {
+  --md-sys-color-background: var(--aura-noir-void);
+  --md-sys-color-surface: var(--aura-noir-void);
+  --md-sys-color-on-surface: var(--aura-chrome-300);
+  --md-sys-color-on-surface-variant: var(--aura-chrome-400);
+  --md-sys-color-primary: var(--aura-chrome-300);
+  --md-sys-color-on-primary: var(--aura-noir-void);
+  --md-sys-color-primary-container: var(--aura-navy-800);
+  --md-sys-color-on-primary-container: var(--aura-chrome-50);
+  --md-sys-color-secondary: var(--aura-navy-700);
+  --md-sys-color-on-secondary: var(--aura-chrome-50);
+  --md-sys-color-secondary-container: var(--aura-navy-600);
+  --md-sys-color-on-secondary-container: var(--aura-chrome-200);
+  --md-sys-color-tertiary: var(--aura-bronze-400);
+  --md-sys-color-on-tertiary: var(--aura-noir-void);
+  --md-sys-color-tertiary-container: var(--aura-bronze-600);
+  --md-sys-color-on-tertiary-container: var(--aura-noir-void);
+  --md-sys-color-error: #FF8A80;
+  --md-sys-color-on-error: #000000;
+  --md-sys-color-error-container: #7F1D1D;
+  --md-sys-color-on-error-container: #FFCDD2;
+  --md-sys-color-outline: var(--aura-chrome-500);
+  --md-sys-color-outline-variant: var(--aura-navy-600);
+  --md-sys-color-surface-variant: var(--aura-navy-800);
+  --md-sys-color-on-surface-variant: var(--aura-chrome-400);
+  --md-sys-color-inverse-surface: var(--aura-pearl-100);
+  --md-sys-color-inverse-on-surface: var(--aura-noir-void);
+  --md-sys-color-inverse-primary: var(--aura-chrome-500);
+}
+
+/* ── AdminShell Light Override ── */
+[data-shell="admin"] {
+  --md-sys-color-background: var(--aura-pearl-100);
+  --md-sys-color-surface: #FFFFFF;
+  --md-sys-color-on-surface: var(--aura-navy-900);
+  --md-sys-color-on-surface-variant: var(--aura-navy-700);
+  --md-sys-color-primary: var(--aura-chrome-500);
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: var(--aura-chrome-100);
+  --md-sys-color-on-primary-container: var(--aura-navy-900);
+  --md-sys-color-secondary: var(--aura-navy-700);
+  --md-sys-color-on-secondary: var(--aura-chrome-50);
+  --md-sys-color-secondary-container: var(--aura-chrome-200);
+  --md-sys-color-on-secondary-container: var(--aura-navy-900);
+  --md-sys-color-tertiary: var(--aura-bronze-500);
+  --md-sys-color-on-tertiary: var(--aura-navy-900);
+  --md-sys-color-tertiary-container: var(--aura-bronze-400);
+  --md-sys-color-on-tertiary-container: var(--aura-navy-900);
+  --md-sys-color-error: #EF5350;
+  --md-sys-color-on-error: #FFFFFF;
+  --md-sys-color-error-container: #7F1D1D;
+  --md-sys-color-on-error-container: #FECACA;
+  --md-sys-color-outline: var(--aura-chrome-400);
+  --md-sys-color-outline-variant: var(--aura-navy-500);
+  --md-sys-color-surface-variant: var(--aura-chrome-100);
+  --md-sys-color-on-surface-variant: var(--aura-navy-500);
+  --md-sys-color-inverse-surface: var(--aura-navy-900);
+  --md-sys-color-inverse-on-surface: var(--aura-pearl-50);
+  --md-sys-color-inverse-primary: var(--aura-chrome-300);
+}

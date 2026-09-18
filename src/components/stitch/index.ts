@@ -8,6 +8,11 @@ export { default as StitchFooter } from './StitchFooter';
 export type { StitchFooterProps } from './StitchFooter';
 
 export { default as StitchAppLayout } from './StitchAppLayout';
+export { default as CustomerShell } from './CustomerShell';
+export { default as OpsShell } from './OpsShell';
+export { default as AdminShell } from './AdminShell';
+export { getShellConfig, hasM3NavBar } from './shell-config';
+export type { ShellRouteConfig } from './shell-config';
 
 export { default as StitchAbout } from './StitchAbout';
 export type { StitchAboutProps, AboutPageData, Zone, TimelinePhase, StoryCard, ValueCard } from './StitchAbout';

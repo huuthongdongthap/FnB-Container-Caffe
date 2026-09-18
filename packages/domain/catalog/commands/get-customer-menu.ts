@@ -39,6 +39,7 @@ export interface CustomerMenu {
 export interface CustomerMenuOptions {
   includeUnavailable?: boolean;
   category?: string;
+  locale?: string;
 }
 
 export async function getCustomerMenu(
@@ -46,6 +47,8 @@ export async function getCustomerMenu(
   opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenu> {
   const includeUnavailable = opts.includeUnavailable ?? false;
+  // Locale defaults to vi-VN, fallback is deterministic vi-VN
+  const _locale = opts.locale === 'en-US' ? 'en-US' : 'vi-VN';
 
   try {
     let query = `SELECT id, name, description, price, category, image_url, tags, available
@@ -61,7 +64,7 @@ export async function getCustomerMenu(
       params.push(opts.category);
     }
 
-    query += ' ORDER BY category, name';
+    query += ' ORDER BY category ASC, name ASC';
 
     const { results } = await db
       .prepare(query)
@@ -95,13 +98,58 @@ export async function getCustomerMenu(
       categoryMap.set(item.category, list);
     }
 
-    const categories: CustomerMenuCategory[] = Array.from(categoryMap.entries()).map(
-      ([name, catItems]) => ({ name, items: catItems }),
-    );
+    const categories: CustomerMenuCategory[] = Array.from(categoryMap.entries())
+      .map(([name, catItems]) => ({ name, items: catItems }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 
     return { categories, totalItems: items.length };
   } catch (err) {
     log.error('customer_menu_read_failed', { error: String(err) });
     return { categories: [], totalItems: 0 };
+  }
+}
+
+export async function getCustomerMenuItem(
+  db: D1Database,
+  id: string,
+): Promise<CustomerMenuItem | null> {
+  try {
+    const { results } = await db
+      .prepare(
+        'SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?'
+      )
+      .bind(id)
+      .all<{
+        id: string;
+        name: string;
+        description: string | null;
+        price: number | string;
+        category: string;
+        image_url: string | null;
+        tags: string | null;
+        available: number | boolean;
+      }>();
+
+    if (!results || results.length === 0) {
+      return null;
+    }
+
+    const raw = results[0];
+    if (!raw) {
+      return null;
+    }
+    return {
+      id: raw.id,
+      name: raw.name,
+      description: raw.description,
+      priceCents: typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price,
+      category: raw.category,
+      imageUrl: raw.image_url,
+      tags: raw.tags ? JSON.parse(raw.tags) : [],
+      available: toAvailabilityFlag(raw.available),
+    };
+  } catch (err) {
+    log.error('customer_menu_item_read_failed', { id, error: String(err) });
+    return null;
   }
 }

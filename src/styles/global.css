@@ -12,6 +12,9 @@
 
 /* Brand tokens — Quicksand (body) + Be Vietnam Pro (display) */
 @import './brand-tokens.css';
+@import './aura-tokens.css';
+@import './typography.css';
+@import './density.css';
 
 /* Tailwind v4 theme — maps AURA CAFE design tokens to Tailwind utility classes */
 @theme {

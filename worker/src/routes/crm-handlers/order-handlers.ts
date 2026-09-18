@@ -7,22 +7,8 @@ import {
   getFulfillment,
   listPickupPoints,
 } from '@aura/domain-crm';
-import { getCustomerMenu } from '@aura/domain-catalog';
 
 export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
-  /**
-   * GET /api/crm/menu
-   * Public customer-facing menu for online ordering. Strips internal fields
-   * (cost/sku/supplier). Query: ?category=&include_unavailable=true
-   */
-  router.get('/menu', async (c) => {
-    const db = c.env.AURA_DB;
-    const category = c.req.query('category');
-    const includeUnavailable = c.req.query('include_unavailable') === 'true';
-
-    const menu = await getCustomerMenu(db, { category, includeUnavailable });
-    return c.json({ success: true, data: menu });
-  });
 
   /**
    * POST /api/crm/orders

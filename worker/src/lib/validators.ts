@@ -652,12 +652,12 @@ export const customerUpdateSchema = z.object({
 });
 
 // ── Shared Zod error response helpers ──────────────────────────────
-export function zodErrorResponse(c: import('hono').Context, error: z.ZodError) {
-  return c.json({ success: false, error: error.issues[0].message }, 400);
+export function zodErrorResponse(c: { json: (data: unknown, status?: any) => Response }, error: z.ZodError) {
+  return c.json({ success: false, error: error.issues[0]?.message ?? 'Validation error' }, 400);
 }
 
 export function zodErrorResponseRaw(error: z.ZodError) {
-  return new Response(JSON.stringify({ success: false, error: error.issues[0].message }), {
+  return new Response(JSON.stringify({ success: false, error: error.issues[0]?.message ?? 'Validation error' }), {
     status: 400,
     headers: { 'Content-Type': 'application/json' },
   });

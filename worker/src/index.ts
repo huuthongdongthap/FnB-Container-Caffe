@@ -13,7 +13,7 @@ import { openApiApp } from './lib/openapi';
 
 
 // Route modules — pre-existing TS
-import { getMenu, getMenuItem } from '@aura/domain-catalog';
+import { getCustomerMenu, getCustomerMenuItem } from '@aura/domain-catalog';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
   getLatestOrderTimestamp, splitOrders
@@ -49,6 +49,7 @@ import { staffTipsRouter } from '@aura/domain-staff';
 import { adminQRRouter } from './routes/admin-qr';
 import { reviewsRouter } from './routes/reviews';
 import { categoriesRouter, productsRouter } from '@aura/domain-catalog';
+import { catalogRouter } from './routes/openapi-catalog';
 import { customersRouter } from './routes/customers';
 import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
@@ -161,9 +162,31 @@ app.use('*', requestMetrics());
 // ── Global error handler ──
 app.onError(errorHandler);
 
-// ── Menu ──
-app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
-app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
+// ── Menu (M4-B canonical customer projection) ──
+app.get('/api/menu', async (c) => {
+  const db = c.env.AURA_DB;
+  const category = c.req.query('category');
+  const includeUnavailable = c.req.query('include_unavailable') === 'true';
+  const locale = c.req.query('locale') || 'vi-VN';
+
+  const menu = await getCustomerMenu(db, { category, includeUnavailable, locale });
+  return c.json({
+    success: true,
+    data: menu,
+    meta: { locale: locale === 'en-US' ? 'en-US' : 'vi-VN' },
+  });
+});
+
+app.get('/api/menu/:id', async (c) => {
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
+  const item = await getCustomerMenuItem(db, id);
+
+  if (!item) {
+    return c.json({ success: false, error: 'Menu item not found' }, 404);
+  }
+  return c.json({ success: true, data: item });
+});
 
 // ── Orders (checkout flow) ──
 const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
@@ -242,6 +265,7 @@ app.route('/api/push', pushRouter);
 app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
 app.route('/api/products', productsRouter);
+app.route('/api/catalog', catalogRouter);
 app.route('/api/tables', tablesRouter);
 app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']));
 app.route('/api/table-sessions', tableSessionsRouter);

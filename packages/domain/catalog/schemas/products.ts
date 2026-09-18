@@ -68,9 +68,9 @@ export const ProductCreateSchema = z.object({
   })).optional(),
   preparationTimeMinutes: z.number().int().positive().default(5),
   calories: z.number().int().nonnegative().optional(),
-  nutritionInfo: z.record(z.unknown()).optional(),
+  nutritionInfo: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductCreate');
 
 export const ProductUpdateSchema = z.object({
@@ -89,9 +89,9 @@ export const ProductUpdateSchema = z.object({
   })).optional(),
   preparationTimeMinutes: z.number().int().positive().optional(),
   calories: z.number().int().nonnegative().optional(),
-  nutritionInfo: z.record(z.unknown()).optional(),
+  nutritionInfo: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductUpdate');
 
 export const ProductResponseSchema = z.object({
@@ -112,9 +112,9 @@ export const ProductResponseSchema = z.object({
   })),
   preparationTimeMinutes: z.number().int().positive(),
   calories: z.number().int().nonnegative().nullable(),
-  nutritionInfo: z.record(z.unknown()).nullable(),
+  nutritionInfo: z.record(z.string(), z.unknown()).nullable(),
   tags: z.array(z.string()),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
 }).openapi('Product');

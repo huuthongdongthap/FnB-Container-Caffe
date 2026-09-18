@@ -54,6 +54,11 @@ export function useDefaultNavItems(): MD3NavItem[] {
       icon: <CalendarIcon />,
     },
     {
+      value: '/promotions',
+      label: t('nav.promotions', 'Ưu đãi'),
+      icon: <PromotionsIcon />,
+    },
+    {
       value: '/account',
       label: t('nav.account', 'Tài khoản'),
       icon: <UserIcon />,
@@ -62,11 +67,12 @@ export function useDefaultNavItems(): MD3NavItem[] {
 }
 
 /* ─── Icons (lucide, tree-shaken) ─────────────────────────── */
-import { Home, Coffee, CalendarCheck, User } from 'lucide-react';
+import { Home, Coffee, CalendarCheck, TicketPercent, User } from 'lucide-react';
 
 const HomeIcon = () => <Home aria-hidden="true" />;
 const MenuIcon = () => <Coffee aria-hidden="true" />;
 const CalendarIcon = () => <CalendarCheck aria-hidden="true" />;
+const PromotionsIcon = () => <TicketPercent aria-hidden="true" />;
 const UserIcon = () => <User aria-hidden="true" />;
 
 /* ─── Logo — AURA CAFE ────────────────────────────────────── */

@@ -15,10 +15,7 @@ const LoyaltyPage = React.lazy(() => import('@/pages/loyalty'));
 const ReferralPage = React.lazy(() => import('@/pages/referral'));
 const EventsPage = React.lazy(() => import('@/pages/events'));
 const AccountPage = React.lazy(() => import('@/pages/account'));
-const KDSPage = React.lazy(() => import('@/pages/KDS'));
-const TVMenuPage = React.lazy(() => import('@/pages/TVMenu'));
 const TableCheckinPage = React.lazy(() => import('@/pages/TableCheckin'));
-const LocaleOrderPage = React.lazy(() => import('@/pages/[locale]/order'));
 const PricingPage = React.lazy(() => import('@/pages/[locale]/pricing'));
 const BrandGuideline = React.lazy(() => import('@/pages/BrandGuideline'));
 const TableOrder = React.lazy(() => import('@/pages/TableOrder'));
@@ -41,36 +38,49 @@ const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/custome
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 
 export const publicRoutes = [
+  // Tab 1: Trang chủ
   <Route key="/" path="/" element={guarded(<HomePage />)} />,
+  <Route key="/container" path="/container" element={guarded(<ContainerPage />)} />,
+
+  // Tab 2: Thực đơn
   <Route key="/menu" path="/menu" element={guarded(<MenuPage />)} />,
-  <Route key="/checkout" path="/checkout" element={guarded(<CheckoutPage />)} />,
-  <Route key="/order-success" path="/order-success" element={guarded(<OrderSuccessPage />)} />,
-  <Route key="/order-failure" path="/order-failure" element={guarded(<OrderFailureNew />)} />,
-  <Route key="/loyalty" path="/loyalty" element={guarded(<LoyaltyPage />)} />,
-  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
-  <Route key="/referral" path="/referral" element={guarded(<ReferralPage />)} />,
+  <Route key="/menu/:id" path="/menu/:id" element={guarded(<MenuPage />)} />,
+
+  // Tab 3: Đặt bàn
+  <Route key="/table-reservation" path="/table-reservation" element={guarded(<ReservationNew />)} />,
+
+  // Tab 4: Ưu đãi
   <Route key="/promotions" path="/promotions" element={guarded(<PromotionsNew />)} />,
   <Route key="/events" path="/events" element={guarded(<EventsPage />)} />,
-  <Route key="/track-order" path="/track-order" element={guarded(<TrackOrderNew />)} />,
-  <Route key="/kds" path="/kds" element={guarded(<KDSPage />)} />,
-  <Route key="/table-reservation" path="/table-reservation" element={guarded(<ReservationNew />)} />,
-  <Route key="/tv-menu" path="/tv-menu" element={guarded(<TVMenuPage />)} />,
+
+  // Tab 5: Cá nhân
   <Route key="/account" path="/account" element={guarded(<AccountPage />)} />,
+  <Route key="/loyalty" path="/loyalty" element={guarded(<LoyaltyPage />)} />,
+  <Route key="/referral" path="/referral" element={guarded(<ReferralPage />)} />,
+  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsNew />)} />,
+
+  // Các trang chức năng không có tab (checkout, order, checkin...)
+  <Route key="/checkout" path="/checkout" element={guarded(<CheckoutPage />)} />,
+  <Route key="/order" path="/order" element={guarded(<TableOrder />)} />,
   <Route key="/checkin" path="/checkin" element={guarded(<CheckinNew />)} />,
+  <Route key="/track-order" path="/track-order" element={guarded(<TrackOrderNew />)} />,
+  <Route key="/order-success" path="/order-success" element={guarded(<OrderSuccessPage />)} />,
+  <Route key="/order-failure" path="/order-failure" element={guarded(<OrderFailureNew />)} />,
+
+  // Legacy / other pages
   <Route key="/table-checkin" path="/table-checkin" element={guarded(<TableCheckinPage />)} />,
   <Route key="/about" path="/about" element={guarded(<OurStory />)} />,
   <Route key="/reviews" path="/reviews" element={guarded(<CustomerAccountDashboard />)} />,
-  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsNew />)} />,
   <Route key="/contact" path="/contact" element={guarded(<ContactNew />)} />,
   <Route key="/brand" path="/brand" element={guarded(<BrandGuideline />)} />,
-  <Route key="/order" path="/order" element={guarded(<TableOrder />)} />,
-  <Route key="/container" path="/container" element={guarded(<ContainerPage />)} />,
-  ...['vi', 'en'].flatMap((loc) => [
-    <Route key={`/${loc}/order`} path={`/${loc}/order`} element={guarded(<LocaleOrderPage />)} />,
-  ]),
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
+  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
+  <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/saas/dashboard" path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />,
   <Route key="/saas/onboard/tenant" path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />,
   <Route key="/saas/onboard" path="/saas/onboard" element={guarded(<OnboardingWizard />)} />,
   <Route key="/stitch-gallery-screen-showcase" path="/stitch-gallery-screen-showcase" element={guarded(<StitchScreenGallery />)} />,
+  ...['vi', 'en'].flatMap((loc) => [
+    <Route key={`/${loc}/order`} path={`/${loc}/order`} element={guarded(<TableOrder />)} />,
+  ]),
 ];

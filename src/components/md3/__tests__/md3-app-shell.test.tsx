@@ -26,7 +26,7 @@ function renderShell(props: Partial<Parameters<typeof MD3AppShell>[0]> = {}) {
 
 /* ── default nav items hook ──────────────────────────────── */
 describe('useDefaultNavItems', () => {
-  it('returns 4 customer-core items with routes and labels', () => {
+  it('returns 5 customer-core items with routes and labels', () => {
     let items: MD3NavItem[] = [];
     function Probe() {
       items = useDefaultNavItems();
@@ -37,11 +37,12 @@ describe('useDefaultNavItems', () => {
         <Probe />
       </MemoryRouter>,
     );
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(5);
     expect(items.map((i) => i.value)).toEqual([
       '/',
       '/menu',
       '/table-reservation',
+      '/promotions',
       '/account',
     ]);
   });

@@ -83,15 +83,16 @@ export async function getMenuItem(request: Request, env: Record<string, unknown>
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const { results } = await db.prepare('SELECT * FROM menu_items WHERE id = ?').bind(id).all<MenuItem>();
 
-    if (!results || results.length === 0) {
+    const rawItem = results?.[0];
+    if (!rawItem) {
       return errorResponse('Menu item not found', 404);
     }
 
     const item = {
-      ...results[0],
-      tags: results[0].tags ? JSON.parse(results[0].tags as string) : [],
-      price: parseInt(results[0].price as unknown as string),
-      available: toAvailabilityFlag(results[0].available)
+      ...rawItem,
+      tags: rawItem.tags ? JSON.parse(rawItem.tags as string) : [],
+      price: parseInt(rawItem.price as unknown as string),
+      available: toAvailabilityFlag(rawItem.available)
     };
 
     return jsonResponse({ success: true, item });

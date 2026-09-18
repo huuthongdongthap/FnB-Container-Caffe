@@ -20,7 +20,7 @@ export { menuModifiersRouter } from './commands/menu-modifiers';
 export { getMenu, getMenuItem } from './queries/menu';
 
 // M4 Online — customer-facing menu view
-export { getCustomerMenu } from './commands/get-customer-menu';
+export { getCustomerMenu, getCustomerMenuItem } from './commands/get-customer-menu';
 export type { CustomerMenu, CustomerMenuItem, CustomerMenuCategory, CustomerMenuOptions } from './commands/get-customer-menu';
 
 // Policies
@@ -30,3 +30,4 @@ export { parseAvailabilityFilter, toAvailabilityFlag } from './policies/availabi
 // OpenAPI contracts
 export * from './schemas/products';
 export * from './schemas/categories';
+export * from './schemas/menu';

@@ -22,7 +22,10 @@ function base64UrlEncode(str: string): string {
 function base64UrlEncodeBinary(uint8Array: Uint8Array): string {
   let binaryString = '';
   for (let i = 0; i < uint8Array.length; i++) {
-    binaryString += String.fromCharCode(uint8Array[i]);
+    const byte = uint8Array[i];
+    if (byte !== undefined) {
+      binaryString += String.fromCharCode(byte);
+    }
   }
   return btoa(binaryString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
@@ -94,6 +97,9 @@ export async function verifyJWT(
     }
 
     const [headerBase64, payloadBase64, signatureBase64] = parts;
+    if (!headerBase64 || !payloadBase64 || !signatureBase64) {
+      return null;
+    }
     const signatureInput = `${headerBase64}.${payloadBase64}`;
 
     const key = await crypto.subtle.importKey(
@@ -133,7 +139,7 @@ export function getAuthToken(request: Request): string | null {
   const cookie = request.headers.get('Cookie');
   if (cookie) {
     const match = cookie.match(/(?:^|;\s*)access_token=([^\s;]+)/);
-    if (match) {
+    if (match && match[1]) {
       return match[1];
     }
   }
@@ -170,9 +176,19 @@ export async function verifyPassword(password: string, stored: string): Promise<
     return false;
   }
   if (stored.startsWith('pbkdf2$')) {
-    const [, iterStr, saltHex, hashHex] = stored.split('$');
+    const parts = stored.split('$');
+    const iterStr = parts[1];
+    const saltHex = parts[2];
+    const hashHex = parts[3];
+    if (!iterStr || !saltHex || !hashHex) {
+      return false;
+    }
     const iter = parseInt(iterStr, 10);
-    const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(h => parseInt(h, 16)));
+    const saltMatch = saltHex.match(/.{2}/g);
+    if (!saltMatch) {
+      return false;
+    }
+    const salt = new Uint8Array(saltMatch.map(h => parseInt(h, 16)));
     const enc = new TextEncoder();
     const keyMat = await crypto.subtle.importKey(
       'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']

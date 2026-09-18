@@ -101,3 +101,28 @@ export async function apiFetch<T = unknown>(
 
   return await res.json();
 }
+
+/* ── Catalog API methods ───────────────────────── */
+
+export const apiClient = {
+  getCustomerMenu: async (opts?: { includeUnavailable?: boolean; category?: string; locale?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (opts?.includeUnavailable) searchParams.set('include_unavailable', 'true');
+    if (opts?.category) searchParams.set('category', opts.category);
+    if (opts?.locale) searchParams.set('locale', opts.locale);
+
+    const qs = searchParams.toString();
+    const res = await apiFetch<{ success: boolean; data: import('@aura/domain-catalog').CustomerMenu; meta: { locale: string } }>(
+      `/api/menu${qs ? `?${qs}` : ''}`
+    );
+    return res.data;
+  },
+
+  getMenuItem: async (id: string) => {
+    const res = await apiFetch<{ success: boolean; data: import('@aura/domain-catalog').CustomerMenuItem }>(
+      `/api/menu/${id}`
+    );
+    return res.data;
+  },
+};
+

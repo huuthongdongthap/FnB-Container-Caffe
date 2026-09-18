@@ -6,22 +6,19 @@
  */
 
 import { Hono } from 'hono';
-import type { Context } from 'hono';
 import { createCategorySchema, updateCategorySchema } from 'worker/src/lib/validators';
-import { requireAuth } from 'worker/src/middleware/auth';
-import { audit } from 'worker/src/middleware/audit-log';
 import type { Env } from 'worker/src/types/env';
 import type { Category } from '../model/catalog-types';
 
 export const categoriesRouter = new Hono<{ Bindings: Env }>();
 
-categoriesRouter.get('/', async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const { results } = await db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC').all<Category>();
   return c.json({ success: true, data: results });
 });
 
-categoriesRouter.get('/:id', async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.get('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(c.req.param('id')).first<Category>();
   if (!row) {
@@ -30,12 +27,12 @@ categoriesRouter.get('/:id', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.post('/', requireAuth(['owner']), audit('category_create'), async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = createCategorySchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return c.json({ success: false, error: parsed.error.issues[0]?.message ?? 'Validation error' }, 400);
   }
   const data = parsed.data;
   const id = `cat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -46,13 +43,13 @@ categoriesRouter.post('/', requireAuth(['owner']), audit('category_create'), asy
   return c.json({ success: true, data: row }, 201);
 });
 
-categoriesRouter.put('/:id', requireAuth(['owner']), audit('category_update'), async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.put('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
   const parsed = updateCategorySchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return c.json({ success: false, error: parsed.error.issues[0]?.message ?? 'Validation error' }, 400);
   }
   const data = parsed.data;
   const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<Category>();
@@ -66,7 +63,7 @@ categoriesRouter.put('/:id', requireAuth(['owner']), audit('category_update'), a
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.delete('/:id', requireAuth(['owner']), audit('category_delete'), async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.delete('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<Category>();

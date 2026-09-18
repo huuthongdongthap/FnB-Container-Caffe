@@ -3,6 +3,7 @@ import { Scalar } from '@scalar/hono-api-reference';
 
 import { CategoryRoutes } from '@aura/domain-catalog';
 import { ProductRoutes } from '@aura/domain-catalog';
+import { MenuRoutes } from '@aura/domain-catalog';
 import { OrderRoutes } from '../schemas/orders';
 import { TableRoutes } from '../schemas/tables';
 import { AuthRoutes } from '../schemas/auth';
@@ -95,6 +96,7 @@ const isRouteDef = (r: unknown): r is { method: string; path: string } =>
 const routes = [
   ...Object.values(CategoryRoutes).filter(isRouteDef),
   ...Object.values(ProductRoutes).filter(isRouteDef),
+  ...Object.values(MenuRoutes).filter(isRouteDef),
   ...Object.values(OrderRoutes).filter(isRouteDef),
   ...Object.values(TableRoutes).filter(isRouteDef),
   ...Object.values(TableRoutes.zones).filter(isRouteDef),

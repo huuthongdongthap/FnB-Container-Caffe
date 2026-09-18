@@ -5,7 +5,8 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import OfflineBanner from '@/components/pwa/offline-banner';
 import OrderQueueIndicator from '@/components/pwa/OrderQueueIndicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
-import { StitchAppLayout } from '@/components/stitch';
+import CustomerShell from '@/components/stitch/CustomerShell';
+import OpsShell from '@/components/stitch/OpsShell';
 import CartBottomBar from '@/components/cart/cart-bottom-bar';
 import { ToastProvider } from '@/components/ui/toast';
 import { publicRoutes } from '@/routes/public-routes';
@@ -14,6 +15,9 @@ import { mobileRoutes } from '@/routes/mobile-routes';
 import { adminRoutes } from '@/routes/admin-routes';
 
 const NotFoundNew = React.lazy(() => import('@/pages/stitch/not-found'));
+const KDSPage = React.lazy(() => import('@/pages/KDS'));
+const TVMenuPage = React.lazy(() => import('@/pages/TVMenu'));
+const TableOrder = React.lazy(() => import('@/pages/TableOrder'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,18 +40,33 @@ function AppContent() {
       <ToastProvider>
         <AppBanner />
         <OrderQueueIndicator />
-        <StitchAppLayout>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}>
+        <BrowserRouter>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--md-sys-color-on-surface-variant)]">Loading...</div>}>
             <Routes>
-              {...publicRoutes}
-              {...stitchRoutes}
-              {...mobileRoutes}
-              {...adminRoutes}
+              {/* ── OPS SHELL ── */}
+              <Route element={<OpsShell />}>
+                <Route path="/kds" element={<KDSPage />} />
+                <Route path="/tv-menu" element={<TVMenuPage />} />
+                <Route path="/pos/table/:tableId" element={<TableOrder />} />
+              </Route>
+
+              {/* ── ADMIN ROUTES ── */}
+              {adminRoutes}
+
+              {/* ── MOBILE ROUTES ── */}
+              {mobileRoutes}
+
+              {/* ── CUSTOMER SHELL ── */}
+              <Route element={<CustomerShell />}>
+                {publicRoutes}
+                {stitchRoutes}
+              </Route>
+
               <Route path="*" element={<NotFoundNew />} />
             </Routes>
           </React.Suspense>
-        </StitchAppLayout>
-        <CartBottomBar />
+          <CartBottomBar />
+        </BrowserRouter>
       </ToastProvider>
     </AuthProvider>
   );
@@ -56,9 +75,7 @@ function AppContent() {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <AppContent />
     </QueryClientProvider>
   );
 }

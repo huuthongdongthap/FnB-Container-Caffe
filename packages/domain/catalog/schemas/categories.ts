@@ -34,7 +34,7 @@ export const CategoryCreateSchema = z.object({
   displayOrder: z.number().int().nonnegative().default(0),
   isActive: z.boolean().default(true),
   imageUrl: z.string().url().optional().openapi({ example: 'https://cdn.aura.cafe/categories/ca-phe.webp' }),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CategoryCreate');
 
 export const CategoryUpdateSchema = z.object({
@@ -45,10 +45,10 @@ export const CategoryUpdateSchema = z.object({
   displayOrder: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
   imageUrl: z.string().url().nullable().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CategoryUpdate');
 
-export const CategoryResponseSchema = z.object({
+export const CategoryResponseSchema: z.ZodType<any> = z.object({
   id: z.string().uuid(),
   slug: SlugSchema,
   type: CategoryTypeEnum,
@@ -57,10 +57,10 @@ export const CategoryResponseSchema = z.object({
   displayOrder: z.number().int().nonnegative(),
   isActive: z.boolean(),
   imageUrl: z.string().url().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-  children: z.array(z.lazy(() => CategoryResponseSchema)).optional(),
+  children: z.array(z.lazy((): z.ZodType<any> => CategoryResponseSchema)).optional(),
 }).openapi('Category');
 
 export const CategoryListResponseSchema = z.object({
