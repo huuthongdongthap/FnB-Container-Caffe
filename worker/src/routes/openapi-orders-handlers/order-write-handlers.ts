@@ -3,9 +3,23 @@ import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
+import { calculateOrderSnapshot, canTransition, canActorTransition, toActorRole } from '@aura/domain-order';
+
+const STAFF_ROLES = ['owner', 'manager', 'staff'];
+
+function resolveCustomerId(c: Context<{ Bindings: Env }>, bodyCustomerId: string | null | undefined): string | null {
+  const user = c.get('user');
+  if (user && STAFF_ROLES.includes(user.role)) {
+    return bodyCustomerId || null; // staff can specify customer_id or create anonymous
+  }
+  if (user?.role === 'customer') {
+    return user.id; // customer can only create orders for themselves
+  }
+  return bodyCustomerId || null; // fallback for unauthenticated (shouldn't reach here due to requireAuth)
+}
 
 export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
-  // POST /api/orders - Create new order
+  // POST /api/orders - Create new order (OpenAPI contract: client sends intent only, server evaluates prices)
   app.openapi(OrderRoutes.create, async (c: Context<{ Bindings: Env }>) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
@@ -15,55 +29,71 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const id = crypto.randomUUID();
     const orderNumber = `ORD-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 
-    // Calculate totals
-    const items = body.items;
-    const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-    const discountAmount = 0; // TODO: apply promotions
-    const taxAmount = Math.round(subtotal * 0.1); // 10% VAT
-    const totalAmount = subtotal - discountAmount + taxAmount;
+    // Server-authoritative price evaluation via domain policy
+    // Client sends intent (menuItemId, quantity, modifier choice IDs) - NO prices
+    const snapshotInput = {
+      items: body.items.map((item) => ({
+        productId: item.menuItemId,
+        quantity: item.quantity,
+        modifiers: item.modifiers || [],
+      })),
+      orderType: body.channel,
+      shippingFee: 0,
+      discount: 0,
+      serviceFee: 0,
+      tipAmount: 0,
+      now: new Date(),
+    };
 
-    // Insert order
+    const snapshot = await calculateOrderSnapshot(c.env, snapshotInput);
+
+    // Resolve customer_id with ownership enforcement
+    const customerId = resolveCustomerId(c, body.customer?.id || null);
+
+    // Insert order with server-evaluated totals
     await db.prepare(
-      `INSERT INTO orders (id, order_number, table_id, location_id, customer_id, customer_name, customer_phone, customer_email, customer_loyalty_tier, customer_loyalty_points_earned, customer_locale, items, subtotal, discount_amount, tax_amount, total_amount, status, payment_status, notes, source, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO orders (id, order_number, table_id, location_id, customer_id, customer_name, customer_phone, customer_email, customer_loyalty_tier, customer_loyalty_points_earned, customer_locale, items, subtotal, discount_amount, tax_amount, total_amount, status, payment_status, notes, source, channel, happy_hour_applied, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id,
       orderNumber,
       body.tableId || null,
       body.locationId,
-      body.customer?.id || null,
+      customerId,
       body.customer?.name || null,
       body.customer?.phone || null,
       body.customer?.email || null,
       body.customer?.loyaltyTier || null,
       body.customer?.loyaltyPointsEarned || 0,
       body.customer?.locale || 'vi',
-      JSON.stringify(items),
-      subtotal,
-      discountAmount,
-      taxAmount,
-      totalAmount,
+      JSON.stringify(snapshot.itemsJson),
+      snapshot.subtotal,
+      snapshot.discount,
+      snapshot.serviceFee, // using service_fee column for tax
+      snapshot.total,
       'pending',
       'unpaid',
       body.notes || null,
       body.source || 'pos',
+      body.channel || 'dine_in',
+      snapshot.items.some(i => i.price !== undefined && i.price < i.unitPriceCents) ? 1 : 0, // happy_hour_applied flag
       now,
       now
     ).run();
 
-    // Insert order items
-    for (const item of items) {
+    // Insert order items with server-evaluated prices
+    for (const item of snapshot.items) {
       await db.prepare(
         `INSERT INTO order_items (id, order_id, product_id, variant_id, quantity, unit_price, total_price, modifiers, notes, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         crypto.randomUUID(),
         id,
-        item.productId,
-        item.variantId || null,
+        item.menuItemId,
+        null, // variant_id - not used in new schema
         item.quantity,
-        item.unitPrice,
-        item.totalPrice,
+        item.unitPriceCents,
+        item.subtotalCents,
         JSON.stringify(item.modifiers || []),
         item.notes || null,
         item.status || 'pending',
@@ -85,7 +115,8 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
        WHERE o.id = ?`
     ).bind(id).first();
 
-    return c.json({ success: true, data: created }, 201);
+    const { items: orderItems, payments } = await fetchOrderItemsAndPayments(db, id);
+    return c.json({ success: true, data: formatOrder(created, orderItems, payments) }, 201);
   });
 
   // PATCH /api/orders/:id - Update order
@@ -96,8 +127,13 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<{ status: string; customer_id?: string | null }>();
     if (!existing) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+
+    // Ownership scope: a customer token may only mutate its own order.
+    if (!STAFF_ROLES.includes(user.role) && existing.customer_id !== user.id) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
 
@@ -105,6 +141,16 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const params: (string | number | null)[] = [];
 
     if (body.status !== undefined) {
+      // Dual gate: structural legality (400) is decided before role authority (403).
+      const structural = canTransition(existing.status, body.status);
+      if (!structural.ok) {
+        return c.json({ success: false, error: structural.error }, 400);
+      }
+      const authCheck = canActorTransition(toActorRole(user.role), existing.status, body.status);
+      if (!authCheck.ok) {
+        return c.json({ success: false, error: authCheck.error }, 403);
+      }
+
       updates.push('status = ?');
       params.push(body.status);
       if (body.status === 'served') {
@@ -162,9 +208,24 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<{ status: string }>();
+    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<{ status: string; customer_id?: string | null }>();
     if (!existing) {
       return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+
+    // Ownership scope
+    if (!STAFF_ROLES.includes(user.role) && existing.customer_id !== user.id) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+
+    // Dual gate: structural legality then role authorization
+    const structural = canTransition(existing.status, 'cancelled');
+    if (!structural.ok) {
+      return c.json({ success: false, error: structural.error }, 400);
+    }
+    const authCheck = canActorTransition(toActorRole(user.role), existing.status, 'cancelled');
+    if (!authCheck.ok) {
+      return c.json({ success: false, error: authCheck.error }, 403);
     }
 
     if (['served', 'completed'].includes(existing.status)) {
@@ -193,14 +254,10 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
        WHERE o.id = ?`
     ).bind(id).first();
 
+    const { items: orderItems, payments } = await fetchOrderItemsAndPayments(db, id);
     return c.json({
       success: true,
-      data: {
-        ...updated,
-        table: updated?.table_id ? { id: updated.table_id, name: updated.table_name } : null,
-        status: 'cancelled',
-        cancelledAt: now,
-      },
+      data: formatOrder(updated, orderItems, payments),
     });
   });
 }

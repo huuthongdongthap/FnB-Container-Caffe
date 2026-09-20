@@ -24,7 +24,8 @@ export { getCustomerMenu, getCustomerMenuItem } from './commands/get-customer-me
 export type { CustomerMenu, CustomerMenuItem, CustomerMenuCategory, CustomerMenuOptions } from './commands/get-customer-menu';
 
 // Policies
-export { happyHourDiscountFor } from './policies/pricing';
+export { happyHourDiscountFor, resolveItemPrice } from './policies/pricing';
+export type { Channel, ChannelDeltaConfig, ResolveItemPriceInput } from './policies/pricing';
 export { parseAvailabilityFilter, toAvailabilityFlag } from './policies/availability';
 
 // OpenAPI contracts

@@ -16,6 +16,10 @@ export type { MobileUser, Tab } from './mobile-layout-types';
 
 /* ── Main App Shell ───────────────────────────────────────────────────*/
 
+/**
+ * @deprecated Use canonical OpsShell and dedicated routes instead.
+ * Retained for backward compatibility with existing mobileRoutes tab navigation.
+ */
 export default function MobileAppShell() {
   const { token, user, logout } = useMobileAuth();
   const [currentTab, setCurrentTab] = useState<Tab>('orders');

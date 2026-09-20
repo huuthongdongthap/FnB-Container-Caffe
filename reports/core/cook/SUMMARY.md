@@ -1,47 +1,51 @@
-# /cook Recipe Execution Summary — Plan M4-B
+# /cook Execution Summary
 
-- **Recipe ID:** `core:cook`
-- **Target Plan:** `plans/2026-09-18-m4b-final-audit-verdict/`
-- **Executed Date:** 2026-09-18
-- **Status:** SUCCESS (All 4 Phases Complete)
-
----
-
-## 1. Pipeline Execution
-
+## Invocation
 ```
-SEQUENTIAL:
-  ├── recipe-load        → plans/2026-09-18-m4b-final-audit-verdict/plan.md (4 phases)
-  ├── phase-01-execute   → Core API & Domain Security (Audits #01 - #06) [DONE]
-  ├── phase-02-execute   → Contract, Test & UI Isolation (Audits #07 - #12) [DONE]
-  ├── phase-03-execute   → System Health & State (Audits #13 - #18) [DONE]
-  ├── phase-04-execute   → Final Acceptance Matrix & M4-C Readiness [DONE]
-  └── on_complete        → Compiled SUMMARY.md + Verification Logs
+/cook next
 ```
 
----
+## Resolved Next Step
+M4-C Discovery complete → Phase plan written → Implementation ready.
 
-## 2. Phase Artifacts Generated
+## Context Loaded
+- `.ai/state/current.md` — M4-B GREEN, 371 files / 3,395 tests
+- `.ai/state/progress.md` — 5 M4-B phases complete, audit #01–#18 GREEN (only #15 YELLOW: legacy lint)
+- `.ai/state/decisions.md` — D-01 → D-07 recorded
+- `docs/Claude Code CLI — Project Handoff & M4-C Execution Spec.md` — 853 lines, 22 sections
+- `plans/2026-09-18-m4b-final-audit-verdict/` — M4-B verdict artifacts
 
-1. `plans/2026-09-18-m4b-final-audit-verdict/phase-01-core-api-and-security.md` (Audits #01 - #06: Canonical API, Domain Boundary, Customer DTO, Product Visibility, Price, Availability)
-2. `plans/2026-09-18-m4b-final-audit-verdict/phase-02-contracts-tests-and-shells.md` (Audits #07 - #12: Localization, OpenAPI, Test Coverage, E2E Journey, UI/API Source of Truth, Three-Shell Isolation)
-3. `plans/2026-09-18-m4b-final-audit-verdict/phase-03-system-health-and-state.md` (Audits #13 - #18: Design System, Legacy Safety, Build/Lint, Runtime Health, Git Hygiene, Project State)
-4. `plans/2026-09-18-m4b-final-audit-verdict/phase-04-final-verdict-and-m4c.md` (Acceptance Matrix, Non-Blocking Gaps Y-01/02/03, M4-C Foundation Reuse Contract)
-5. `plans/2026-09-18-m4b-final-audit-verdict/m4b-final-audit-report.md` (Formal 11-section Audit Report per §24)
+## Source Inspection (Read-Only)
+| File | Finding |
+|------|---------|
+| `packages/domain/catalog/policies/pricing.ts` | Only `happyHourDiscountFor()` exists — 34 LOC, no channel resolution |
+| `packages/domain/catalog/model/catalog-types.ts` | `Product` has single `price`, no channel columns |
+| `packages/domain/order/model/order-state-machine.ts` | 8 statuses, `canTransition()` complete, terminal guards OK |
+| `packages/domain/order/commands/create-order.ts` | **Reads `data.total` from client payload** — price tampering surface |
+| `packages/domain/crm/commands/place-order.ts` | Server-evaluates `unitPriceCents` from `menu_items` ✅ (canonical pattern) |
+| `worker/src/lib/validators.ts` | `order_type` enum + per-type field validation present |
+| `worker/schema.sql` | `menu_items.price` single column; `orders` has `subtotal`, `shipping_fee`, `discount`, `service_fee`, `tip_amount`, `location_id` |
+| `worker/db/migrations/*` | No `channel_price` / `price_list` tables exist |
 
----
+## Y-03 Channel Pricing — Root Cause
+- No `channel_prices` table; happy hour applies uniformly; modifiers channel-agnostic.
+- **Resolution:** Extend `pricing.ts` with pure `resolveItemPrice()` + channel delta config map. **No D1 migration required.**
 
-## 3. Automated Verification Checks
+## Artifacts Created
+```
+plans/2026-09-18-m4c-order-pipeline-cart/
+├── plan.md
+├── phase-01-pricing-engine-and-channel.md
+├── phase-02-price-snapshot-and-cart.md
+├── phase-03-order-state-machine-guards.md
+├── phase-04-customer-security-and-api-contract.md
+├── phase-05-acceptance-tests-and-state.md
+└── m4c-discovery-report.md
+reports/core/cook/SUMMARY.md
+```
 
-- **TypeScript (`npx tsc --noEmit`):** 0 errors (`EXIT=0`)
-- **Unit & Integration Tests (`npx vitest run`):** 371 test files, 3,395 tests PASS (`EXIT=0`)
-- **M4-B Contract & Security Tests:** 1 file, 15 tests PASS (`EXIT=0`)
-- **M4-B Targeted ESLint (`worker/src/lib/openapi.ts`, `packages/domain/catalog/*`, `src/pages/menu.tsx`, etc.):** 0 errors
-- **Project State Sync:** `.ai/state/{current,progress,decisions,blockers}.md` updated
+## Critical Finding (Blocking for M4-C Phase 02)
+`packages/domain/order/commands/create-order.ts:99` inserts `parseInt(String(data.total))` directly from the request payload. The client currently controls the stored order total. M4-C Phase 02 MUST replace this with server-evaluated pricing before any customer-facing order endpoint is exposed.
 
----
-
-## 4. Final Verdict
-
-**`M4-B VERIFIED WITH NON-BLOCKING GAPS`**
-- Ready for M4-C commencement.
+## Next Task
+Execute Phase 01: `resolveItemPrice()` in `packages/domain/catalog/policies/pricing.ts` + `pricing.test.ts`.

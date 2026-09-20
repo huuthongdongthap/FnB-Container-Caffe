@@ -19,15 +19,18 @@ import {
  * Order schemas
  */
 
+/**
+ * Line item snapshot, mirroring `EvaluatedOrderItem` from the order snapshot policy.
+ * Every money field here is server-evaluated at order creation time; client-supplied
+ * prices are never echoed back.
+ */
 export const OrderItemSchema = z.object({
-  productId: z.string().uuid(),
-  productName: z.string(),
-  productSlug: z.string(),
-  variantId: z.string().uuid().nullable(),
-  variantName: z.string().nullable(),
+  id: z.string().uuid().optional(),
+  menuItemId: z.string().uuid(),
+  name: z.string(),
   quantity: z.number().int().positive(),
-  unitPrice: MoneySchema,
-  totalPrice: MoneySchema,
+  unitPriceCents: MoneySchema,
+  subtotalCents: MoneySchema,
   modifiers: z.array(z.object({
     modifierId: z.string().uuid(),
     modifierName: z.string(),
@@ -35,8 +38,8 @@ export const OrderItemSchema = z.object({
     optionName: z.string(),
     priceAdjustment: z.number().int(),
   })).optional(),
-  notes: z.string().max(500).optional(),
-  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled']).default('pending'),
+  notes: z.string().max(500).nullable().optional(),
+  status: OrderStatusEnum.default('pending'),
 }).openapi('OrderItem');
 
 export const OrderPaymentSchema = z.object({
@@ -60,11 +63,33 @@ export const OrderCustomerSchema = z.object({
   locale: LocaleEnum.default('vi'),
 }).openapi('OrderCustomer');
 
+/**
+ * Sales channel the order was priced against. Mirrors `Channel` from
+ * `@aura/domain-catalog` pricing policy.
+ */
+export const OrderChannelEnum = z.enum(['dine_in', 'takeaway', 'delivery']).openapi({
+  example: 'dine_in',
+  description: 'Sales channel used for server-side price evaluation',
+});
+
+/**
+ * Client-supplied line item — intent only. Prices are intentionally absent:
+ * the server evaluates the canonical price per channel, modifier and active
+ * happy-hour window, then snapshots the result into the order.
+ */
+export const OrderItemInputSchema = z.object({
+  menuItemId: z.string().min(1).openapi({ example: 'prod_cafe_den' }),
+  quantity: z.number().int().positive().openapi({ example: 2 }),
+  modifiers: z.array(z.string()).optional().openapi({ description: 'Selected modifier choice IDs' }),
+  notes: z.string().max(500).optional(),
+}).openapi('OrderItemInput');
+
 export const OrderCreateSchema = z.object({
   tableId: z.string().uuid().optional(),
   locationId: z.string().uuid(),
   customer: OrderCustomerSchema.optional(),
-  items: z.array(OrderItemSchema).min(1),
+  items: z.array(OrderItemInputSchema).min(1),
+  channel: OrderChannelEnum.default('dine_in'),
   notes: z.string().max(1000).optional(),
   paymentMethod: PaymentMethodEnum.optional(),
   idempotencyKey: z.string().uuid().optional(),
@@ -85,6 +110,10 @@ export const OrderResponseSchema = z.object({
   locationId: z.string().uuid(),
   customer: OrderCustomerSchema,
   items: z.array(OrderItemSchema),
+  channel: OrderChannelEnum.default('dine_in'),
+  happyHourApplied: z.boolean().default(false).openapi({
+    description: 'True when at least one line item was priced inside an active happy-hour window',
+  }),
   subtotal: MoneySchema,
   discountAmount: MoneySchema.default(0),
   taxAmount: MoneySchema.default(0),
@@ -101,6 +130,46 @@ export const OrderResponseSchema = z.object({
   updatedAt: DateTimeSchema,
 }).openapi('Order');
 
+/**
+ * Customer-safe order line item. Positive projection: only fields a guest is
+ * allowed to see are declared, so internal evaluation detail (channel deltas,
+ * margin inputs, procurement references) can never leak through a stray spread.
+ */
+export const CustomerOrderItemSchema = z.object({
+  name: z.string().openapi({ example: 'Cà phê đen đá' }),
+  quantity: z.number().int().positive().openapi({ example: 2 }),
+  unitPriceCents: MoneySchema.openapi({ example: 25000 }),
+  subtotalCents: MoneySchema.openapi({ example: 50000 }),
+  modifiers: z.array(z.object({
+    name: z.string(),
+    priceAdjustment: z.number().int(),
+  })).optional(),
+  notes: z.string().nullable().optional(),
+  status: OrderStatusEnum,
+}).openapi('CustomerOrderItem');
+
+/**
+ * Customer-safe order projection used by guest-facing surfaces. Deliberately
+ * omits staff/audit fields (source, payments, actor identity) and exposes the
+ * server-evaluated totals only — never a client-supplied price.
+ */
+export const CustomerOrderResponseSchema = z.object({
+  id: z.string().uuid(),
+  orderNumber: z.string().openapi({ example: 'ORD-20260826-001' }),
+  table: ReferenceSchema.nullable().optional(),
+  items: z.array(CustomerOrderItemSchema),
+  channel: OrderChannelEnum.default('dine_in'),
+  subtotal: MoneySchema,
+  discountAmount: MoneySchema.default(0),
+  taxAmount: MoneySchema.default(0),
+  totalAmount: MoneySchema,
+  status: OrderStatusEnum,
+  paymentStatus: PaymentStatusEnum,
+  notes: z.string().nullable().optional(),
+  createdAt: DateTimeSchema,
+  updatedAt: DateTimeSchema,
+}).openapi('CustomerOrder');
+
 export const OrderListResponseSchema = z.object({
   orders: z.array(OrderResponseSchema),
   meta: PaginationMetaSchema,
@@ -116,11 +185,15 @@ export const OrderSummarySchema = z.object({
 
 // Export types
 export type OrderItem = z.infer<typeof OrderItemSchema>;
+export type OrderItemInput = z.infer<typeof OrderItemInputSchema>;
 export type OrderPayment = z.infer<typeof OrderPaymentSchema>;
 export type OrderCustomer = z.infer<typeof OrderCustomerSchema>;
 export type OrderCreate = z.infer<typeof OrderCreateSchema>;
 export type OrderUpdate = z.infer<typeof OrderUpdateSchema>;
+export type OrderChannel = z.infer<typeof OrderChannelEnum>;
 export type OrderResponse = z.infer<typeof OrderResponseSchema>;
+export type CustomerOrderItem = z.infer<typeof CustomerOrderItemSchema>;
+export type CustomerOrderResponse = z.infer<typeof CustomerOrderResponseSchema>;
 export type OrderListResponse = z.infer<typeof OrderListResponseSchema>;
 export type OrderSummary = z.infer<typeof OrderSummarySchema>;
 
@@ -173,10 +246,13 @@ export const OrderRoutes = {
     method: 'patch',
     path: '/api/orders/{id}',
     summary: 'Update order (status, notes, customer)',
+    description: 'Applies updates to an existing order. Status transitions are dual-gated: checked first against the lifecycle state machine (400 if illegal), then against the calling actor role (403 if unauthorized).',
     tags: ['Orders'],
     request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: OrderUpdateSchema } } } },
     responses: {
       200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
+      400: { description: 'Validation error or invalid status transition', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      403: { description: 'Role unauthorized for this transition', content: { 'application/json': { schema: ErrorResponseSchema } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },

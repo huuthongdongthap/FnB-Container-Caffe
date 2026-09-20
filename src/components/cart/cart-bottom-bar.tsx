@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
-import { hasM3NavBar } from '@/components/stitch/StitchAppLayout';
+import { hasM3NavBar } from '@/components/stitch/shell-config';
 
 export default function CartBottomBar() {
   const items = useCartStore((s) => s.items);

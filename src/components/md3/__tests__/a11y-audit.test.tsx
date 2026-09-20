@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CSS_PATH = resolve(__dirname, '../../../styles/brand-tokens.css');
+const CSS_PATH = resolve(__dirname, '../../../styles/aura-tokens.css');
 const GLOBAL_CSS_PATH = resolve(__dirname, '../../../styles/global.css');
 
 type Rgb = [number, number, number];
@@ -66,7 +66,7 @@ function compositeRgba(rgba: string, bgRgb: Rgb): Rgb | null {
 function parseCssVars(cssText: string): Map<string, string> {
   const vars = new Map<string, string>();
   const rootMatch = cssText.match(/:root\s*\{([\s\S]*?)\n\s*\}/);
-  if (!rootMatch) throw new Error(':root block not found in brand-tokens.css');
+  if (!rootMatch) throw new Error(':root block not found in aura-tokens.css');
   const rootBlock = rootMatch[1]!;
 
   const propRe = /--([\w-]+)\s*:\s*([^;]+);/g;

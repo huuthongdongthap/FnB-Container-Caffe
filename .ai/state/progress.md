@@ -1,6 +1,33 @@
-# Progress — M4-B Digital Menu
+# Progress — M4-C Order Pipeline & Server-Authoritative Cart Engine
 
 ## Completed Phases
+- [x] Phase 1: Pricing Engine & Channel Pricing — `resolveItemPrice()` in `@aura/domain-catalog` (channel deltas, modifier deltas, happy-hour windows). Resolves Y-03.
+- [x] Phase 2: Order Price Snapshot & Immutable Lines — `calculateOrderSnapshot()` in `@aura/domain-order`; wired into `createOrder` so client prices/totals are discarded.
+- [x] Phase 3: State Machine & Transition Guards — `canActorTransition()` + `toActorRole()` layered over `canTransition()`.
+- [x] Phase 4: Customer Security & OpenAPI Contract — `OrderRoutes` registered; intent-only `OrderCreateSchema`; customer-safe positive projections; ownership scoping closes the `GET /api/orders/:id` IDOR hole.
+- [x] Phase 5: Acceptance Tests & State Sync — IDOR + price-tampering + transition-validity acceptance suites; 375 files / 3,464 tests PASS; `tsc --noEmit` 0 errors.
+
+## Verification Results
+| Audit | Area | Status | Evidence |
+|-------|------|--------|----------|
+| #01 | Server-Authoritative Price | GREEN | `calculateOrderSnapshot()` discards client `price`/`subtotal`/`totalAmount`/`discountAmount` |
+| #02 | Intent-Only Contract | GREEN | `OrderCreateSchema` admits no price-bearing key at line or order level; tamper test asserts stripping |
+| #03 | Ownership Scoping (IDOR) | GREEN | `resolveCustomerScope()` in read handlers; customer token reaches only its own `customer_id` |
+| #04 | Fail-Closed Semantics | GREEN | Non-staff actor with no resolvable owner → `AND 1=0`; foreign order → 404, not 403 |
+| #05 | Dual-Gate Transition Auth | GREEN | 400 (structural illegality) decided before 403 (role authority) in `update` + `cancel` |
+| #06 | Customer-Safe Projection | GREEN | `formatCustomerOrder()` allowlist; omits `customer_id`, staff fields, supplier info |
+| #07 | OpenAPI 3.1 | GREEN | `OrderRoutes` registered in `worker/src/lib/openapi.ts`; schemas match runtime |
+| #08 | Route Auth Gate | GREEN | `requireAuth(['owner','manager','staff','customer'])` — guests reach their own routes |
+| #09 | Test Coverage | GREEN | 3 new acceptance blocks; 375 files / 3,464 tests PASS |
+| #10 | Build/Typecheck | GREEN | `npx tsc --noEmit` = 0 errors |
+| #11 | Runtime | GREEN | Hono in-process `app.fetch()` with mocked D1 |
+| #12 | State | GREEN | `.ai/state/*` updated |
+
+## M4-B Foundation (Verified — DO NOT MODIFY)
+- Canonical `GET /api/menu` + `GET /api/menu/:id`, `@aura/domain-catalog` customer-safe DTO, `MenuRoutes` registered.
+- 18/18 M4-B audits GREEN at time of completion. Historical detail retained in the milestone archive; M4-B baseline was 371 files / 3,395 tests.
+
+## Verification Results — M4-B Digital Menu (historical)
 - [x] Phase 1: Contract & Test Specification (15 tests in m4b-digital-menu-contract.test.ts)
 - [x] Phase 2: Domain Projection & Locale Support (getCustomerMenu, getCustomerMenuItem with vi-VN default)
 - [x] Phase 3: API Endpoint Implementation (canonical GET /api/menu, GET /api/menu/:id in worker/src/index.ts)
@@ -30,4 +57,5 @@
 | #18 | State | GREEN | .ai/state/ updated |
 
 ## Remaining
-- M4-C readiness: pending final decision gate
+- M4-C complete. No open blockers.
+- `formatCustomerOrder()` is defined and unit-tested but not yet wired to a customer-facing route — candidate for M4-D.

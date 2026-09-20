@@ -2,7 +2,38 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
-import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
+import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
+
+const STAFF_ROLES = ['owner', 'manager', 'staff'];
+
+/**
+ * Ownership scope for guest sessions. A customer token may only ever reach rows
+ * whose customer_id matches its own subject; staff roles see everything.
+ * `allowAll: false` with no owner means "match nothing" (fail closed).
+ */
+function resolveCustomerScope(c: Context<{ Bindings: Env }>): { allowAll: boolean; owner: string | null } {
+  const user = c.get('user');
+  if (user && STAFF_ROLES.includes(user.role)) {
+    return { allowAll: true, owner: null };
+  }
+  const owner = user?.role === 'customer' ? user.id : null;
+  return { allowAll: false, owner };
+}
+
+/**
+ * Guest-facing payloads go through the allowlist projection so staff and
+ * procurement columns never leave the worker. Staff keep the full row.
+ */
+function projectForActor<T, U>(
+  scope: { allowAll: boolean },
+  order: T,
+  items: T[],
+  full: (_o: T, _i: T[], _p: T[]) => U,
+  guest: (_o: T, _i: T[]) => U,
+  payments: T[],
+): U {
+  return scope.allowAll ? full(order, items, payments) : guest(order, items);
+}
 
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/orders - List orders with pagination and filtering
@@ -10,9 +41,22 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', tableId, locationId, status, paymentStatus, dateFrom, dateTo, customerId } = query;
+    const scope = resolveCustomerScope(c);
 
     let whereClause = 'WHERE 1=1';
     const params: (string | number)[] = [];
+
+    if (scope.allowAll) {
+      if (customerId) {
+        whereClause += ' AND o.customer_id = ?';
+        params.push(customerId);
+      }
+    } else if (scope.owner) {
+      whereClause += ' AND o.customer_id = ?';
+      params.push(scope.owner);
+    } else {
+      whereClause += ' AND 1=0';
+    }
 
     if (tableId) {
       whereClause += ' AND o.table_id = ?';
@@ -64,7 +108,7 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // For each order, fetch items and payments
     const orders = await Promise.all(rows.results.map(async (_order) => {
       const { items, payments } = await fetchOrderItemsAndPayments(db, _order.id as string);
-      return formatOrder(_order, items, payments);
+      return projectForActor(scope, _order, items, formatOrder, formatCustomerOrder, payments);
     }));
 
     return c.json({
@@ -77,13 +121,26 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }>) => {
     const db = c.env.AURA_DB;
     const { id } = c.req.valid('param');
+    const scope = resolveCustomerScope(c);
+
+    let whereClause = 'WHERE o.id = ?';
+    const params: (string | number)[] = [id];
+
+    if (scope.allowAll) {
+      // staff can see any order
+    } else if (scope.owner) {
+      whereClause += ' AND o.customer_id = ?';
+      params.push(scope.owner);
+    } else {
+      whereClause += ' AND 1=0';
+    }
 
     const order = await db.prepare(
       `SELECT o.*, t.name as table_name
        FROM orders o
        LEFT JOIN tables t ON o.table_id = t.id
-       WHERE o.id = ?`
-    ).bind(id).first();
+       ${whereClause}`
+    ).bind(...params).first();
 
     if (!order) {
       return c.json({ success: false, error: 'Order not found' }, 404);
@@ -93,7 +150,7 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     return c.json({
       success: true,
-      data: formatOrder(order, items, payments),
+      data: projectForActor(scope, order, items, formatOrder, formatCustomerOrder, payments),
     });
   });
 

@@ -12,22 +12,17 @@ export const SCREENS: Screen[] = [
   { name: 'Container Cafe v2', slug: 'LuxuryContainerCafe2', route: '/stitch/container-cafe-2', source: 'aura_cafe_luxury_container_cafe_2', icon: '🌙', status: 'routed' },
   // Story / About
   { name: 'Our Story', slug: 'OurStory', route: '/stitch/story', source: 'aura_cafe_our_story', icon: '📖', status: 'routed' },
-  // Menu
-  { name: 'Digital Menu v1', slug: 'DigitalMenu', route: '/stitch/menu', source: 'aura_cafe_digital_menu', icon: '📋', status: 'routed' },
-  { name: 'Digital Menu v2', slug: 'DigitalMenu2', route: '/stitch/menu-2', source: 'aura_cafe_digital_menu_2', icon: '📄', status: 'routed' },
+  // Menu (canonical: src/pages/menu.tsx — M4-B customer menu)
+  { name: 'Digital Menu (Canonical)', slug: 'DigitalMenu', route: '/menu', source: 'canonical/menu', icon: '📋', status: 'routed' },
   { name: 'Digital Menu v3', slug: 'DigitalMenu3', route: null, source: 'aura_cafe_digital_menu_1', icon: '📑', status: 'skipped' },
-  // Ordering
-  { name: 'Mobile Ordering', slug: 'MobileOrdering', route: '/stitch/mobile-ordering', source: 'aura_cafe_mobile_ordering', icon: '📱', status: 'routed' },
+  // Ordering (canonical: src/pages/menu.tsx)
   // Events
   { name: 'Events v1', slug: 'EventsPromotions1', route: '/stitch/events-1', source: 'aura_cafe_events_promotions_1', icon: '🎫', status: 'routed' },
   { name: 'Events v2', slug: 'EventsPromotions2', route: '/stitch/events-2', source: 'aura_cafe_events_promotions_2', icon: '🎟️', status: 'routed' },
-  // Checkout / POS
-  { name: 'Premium Checkout', slug: 'PremiumCheckout', route: '/stitch/premium-checkout', source: 'aura_cafe_premium_checkout', icon: '💳', status: 'routed' },
-  { name: 'POS Terminal', slug: 'PosTerminal', route: null, source: 'aura_cafe_pos_terminal', icon: '🖥️', status: 'partial' },
-  // KDS / Order Mgmt
-  { name: 'Kitchen Display', slug: 'KitchenDisplaySystem', route: '/stitch/kds', source: 'aura_cafe_kitchen_display_system', icon: '🍳', status: 'routed' },
+  // Checkout / POS (canonical: src/pages/checkout.tsx, src/pages/admin/POS.tsx)
+  // KDS / Order Mgmt (canonical: src/pages/KDS.tsx, src/pages/order-success.tsx)
+  { name: 'Kitchen Display (Canonical)', slug: 'KitchenDisplaySystem', route: '/kds', source: 'canonical/KDS', icon: '🍳', status: 'routed' },
   { name: 'Order Management', slug: 'OrderManagementTerminal', route: '/stitch/order-management', source: 'aura_cafe_order_management_terminal', icon: '📦', status: 'routed' },
-  { name: 'Order Success', slug: 'OrderSuccessConfirmation', route: '/stitch/order-success', source: 'aura_cafe_order_success_confirmation', icon: '✅', status: 'routed' },
   // Order failure
   { name: 'Order Failure', slug: 'OrderFailureNew', route: '/order-failure', source: 'new-screens/order-failure', icon: '❌', status: 'routed' },
   // Account
@@ -37,10 +32,9 @@ export const SCREENS: Screen[] = [
   { name: 'Referral v1', slug: 'ReferralRewards1', route: '/stitch/referral-1', source: 'aura_cafe_referral_rewards_1', icon: '🤝', status: 'routed' },
   { name: 'Referral v2', slug: 'ReferralRewards2', route: '/stitch/referral-2', source: 'aura_cafe_referral_rewards_2', icon: '🎁', status: 'routed' },
   { name: 'Customer Reviews', slug: 'CustomerReviews', route: '/stitch/reviews', source: 'aura_cafe_customer_reviews', icon: '💬', status: 'routed' },
-  // Admin
+  // Admin (canonical: src/pages/admin/ wrapped by AdminShell)
   { name: 'Admin v1', slug: 'Admin', route: '/stitch/admin', source: 'aura_cafe_admin', icon: '⚙️', status: 'routed' },
   { name: 'Admin Login', slug: 'AdminLogin', route: '/stitch/admin-login', source: 'aura_cafe_admin_login', icon: '🔐', status: 'routed' },
-  { name: 'Admin Terminal', slug: 'AdminTerminal', route: '/stitch/admin-terminal', source: 'aura_cafe_admin_terminal', icon: '🖧️', status: 'routed' },
   // Promo/Tracking/Checkin (new-screens)
   { name: 'Promotions', slug: 'PromotionsNew', route: '/promotions', source: 'new-screens/promotions', icon: '🔥', status: 'routed' },
   { name: 'Order Tracking', slug: 'TrackOrderNew', route: '/track-order', source: 'new-screens/order-tracking', icon: '📍', status: 'routed' },
@@ -59,7 +53,7 @@ export const SCREENS: Screen[] = [
   { name: 'Landing v2 (Digital Reserve)', slug: 'StitchLandingV2', route: '/stitch/landing-v2', source: 'stitch-export-aura_cafe_digital_reserve_landing', icon: '✨', status: 'routed' },
   { name: 'Loyalty Rewards', slug: 'StitchLoyalty', route: '/stitch/loyalty', source: 'stitch-export-inspired-by-luxury-gold-dark', icon: '🏆', status: 'routed' },
   { name: 'Digital Menu (New)', slug: 'StitchMenuV2', route: '/stitch/menu-v2', source: 'stitch-export-lighting_concept-page10', icon: '📋', status: 'routed' },
-  { name: 'Order Success', slug: 'StitchOrderSuccess', route: '/stitch/order-success', source: 'stitch-export-inspired-by-luxury-gold-dark', icon: '✅', status: 'routed' },
+  { name: 'Order Success (Canonical)', slug: 'StitchOrderSuccess', route: '/order-success', source: 'canonical/order-success', icon: '✅', status: 'routed' },
   { name: 'Referral Rewards', slug: 'StitchReferral', route: '/stitch/referral', source: 'stitch-export-inspired-by-luxury-gold-dark', icon: '🎁', status: 'routed' },
   { name: 'Customer Reviews', slug: 'StitchReviews', route: '/stitch/reviews', source: 'stitch-export-inspired-by-luxury-gold-dark', icon: '💬', status: 'routed' },
   // Not yet wired

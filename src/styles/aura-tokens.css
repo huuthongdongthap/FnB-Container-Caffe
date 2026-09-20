@@ -34,21 +34,55 @@
   --aura-pearl-100:  #F5F5F0;    /* AdminShell surface */
   --aura-pearl-200:  #E8E8DD;    /* AdminShell border */
 
-  /* ── M3 System Color Roles (Light / Customer Default) ── */
-  --md-sys-color-primary: var(--aura-chrome-500);
-  --md-sys-color-on-primary: var(--aura-navy-900);
-  --md-sys-color-primary-container: var(--aura-chrome-100);
-  --md-sys-color-on-primary-container: var(--aura-navy-900);
+  /* OpsShell / AdminShell surfaces (dark → light) */
+  --aura-noir-700:   #16213E;
+  --aura-noir-deep:  #0A0F1E;    /* OpsShell deep layer */
+  --aura-noir-mid:   #16213E;    /* OpsShell mid layer */
+  --aura-noir-bright: #1E2A47;   /* OpsShell raised layer */
+  --aura-noir-steel: #334155;    /* OpsShell steel line */
+  --aura-noir-mist:  var(--aura-noir-steel);
 
-  --md-sys-color-secondary: var(--aura-navy-700);
-  --md-sys-color-on-secondary: var(--aura-chrome-50);
-  --md-sys-color-secondary-container: var(--aura-chrome-200);
-  --md-sys-color-on-secondary-container: var(--aura-navy-900);
+  --aura-chrome-bright: #8FA3B8;  /* Chrome bright accent */
+  --aura-chrome-light:  #B8C5D0;  /* Chrome light accent */
+  --aura-chrome-dark:   #4A6B85;  /* Chrome dark accent */
 
-  --md-sys-color-tertiary: var(--aura-bronze-500);
-  --md-sys-color-on-tertiary: var(--aura-navy-900);
-  --md-sys-color-tertiary-container: var(--aura-bronze-400);
-  --md-sys-color-on-tertiary-container: var(--aura-navy-900);
+  /* Forest — success / biology accents */
+  --aura-forest-deep:    #1A2D1F;
+  --aura-forest-primary: #2D5A3D;   /* M3 primary (dark theme) */
+  --aura-forest-light:   #4A7C59;
+  --aura-forest-pale:    #A8C5A0;
+
+  /* Text roles */
+  --aura-text-primary: #F5F5F5;
+  --aura-text-body:    #C5C8CC;
+  --aura-text-muted:   #8A8E96;
+
+  /* Borders */
+  --aura-border-subtle:  rgba(255, 255, 255, 0.08);
+  --aura-border-default: rgba(255, 255, 255, 0.16);
+  --aura-border-strong:  rgba(255, 255, 255, 0.32);
+
+  /* Semantic states */
+  --aura-success: #81C784;
+  --aura-error:   #ffb4ab;
+  --aura-warning: #6B9FB8;   /* Chrome — vẫn Kim, không dùng amber/Hỏa */
+  --aura-info:    #64B5F6;
+
+  /* ── M3 System Color Roles (dark-first semantic layer) ── */
+  --md-sys-color-primary: var(--aura-forest-light);
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: var(--aura-forest-deep);
+  --md-sys-color-on-primary-container: var(--aura-forest-pale);
+
+  --md-sys-color-secondary: var(--aura-chrome-500);
+  --md-sys-color-on-secondary: var(--aura-noir-deep);
+  --md-sys-color-secondary-container: var(--aura-chrome-dark);
+  --md-sys-color-on-secondary-container: var(--aura-chrome-bright);
+
+  --md-sys-color-tertiary: var(--aura-chrome-light);
+  --md-sys-color-on-tertiary: var(--aura-noir-deep);
+  --md-sys-color-tertiary-container: var(--aura-chrome-500);
+  --md-sys-color-on-tertiary-container: var(--aura-noir-void);
 
   --md-sys-color-error: #EF5350;
   --md-sys-color-on-error: #FFFFFF;
@@ -57,10 +91,10 @@
 
   --md-sys-color-background: var(--aura-pearl-50);
   --md-sys-color-on-background: var(--aura-navy-900);
-  --md-sys-color-surface: #FFFFFF;
-  --md-sys-color-on-surface: var(--aura-navy-900);
+  --md-sys-color-surface: var(--aura-noir-deep);
+  --md-sys-color-on-surface: var(--aura-text-primary);
   --md-sys-color-surface-variant: var(--aura-chrome-100);
-  --md-sys-color-on-surface-variant: var(--aura-navy-500);
+  --md-sys-color-on-surface-variant: var(--aura-text-body);
 
   --md-sys-color-outline: var(--aura-chrome-400);
   --md-sys-color-outline-variant: var(--aura-navy-500);
@@ -103,6 +137,91 @@
   --md-sys-motion-duration-long2: 500ms;
   --md-sys-motion-duration-long3: 550ms;
   --md-sys-motion-duration-long4: 600ms;
+
+  /* ── Surface hierarchy (dark-first semantic layer) ── */
+  --md-sys-color-surface-dim:               var(--aura-noir-void);
+  --md-sys-color-surface-bright:            var(--aura-noir-bright);
+  --md-sys-color-surface-container-lowest:  var(--aura-noir-void);
+  --md-sys-color-surface-container-low:     var(--aura-noir-deep);
+  --md-sys-color-surface-container:         var(--aura-noir-mid);
+  --md-sys-color-surface-container-high:    var(--aura-noir-bright);
+  --md-sys-color-surface-container-highest: var(--aura-noir-steel);
+
+  --md-sys-color-primary-fixed:             var(--aura-forest-light);
+  --md-sys-color-primary-fixed-dim:         var(--aura-forest-primary);
+  --md-sys-color-secondary-fixed:           var(--aura-chrome-500);
+  --md-sys-color-secondary-fixed-dim:       var(--aura-chrome-dark);
+
+  /* ── Typescale ── */
+  --md-sys-typescale-display-font:          var(--aura-font-display);
+  --md-sys-typescale-display-size:          2.25rem;
+  --md-sys-typescale-display-line-height:   2.75rem;
+  --md-sys-typescale-display-weight:        700;
+  --md-sys-typescale-display-tracking:      -0.015em;
+
+  --md-sys-typescale-headline-font:         var(--aura-font-display);
+  --md-sys-typescale-headline-size:         1.75rem;
+  --md-sys-typescale-headline-line-height:  2.25rem;
+  --md-sys-typescale-headline-weight:       700;
+  --md-sys-typescale-headline-tracking:     0em;
+
+  --md-sys-typescale-title-font:            var(--aura-font-display);
+  --md-sys-typescale-title-size:            1.25rem;
+  --md-sys-typescale-title-line-height:     1.75rem;
+  --md-sys-typescale-title-weight:          600;
+  --md-sys-typescale-title-tracking:        0.005em;
+
+  --md-sys-typescale-body-font:             var(--aura-font-body);
+  --md-sys-typescale-body-size:             1rem;
+  --md-sys-typescale-body-line-height:      1.625rem;
+  --md-sys-typescale-body-weight:           400;
+  --md-sys-typescale-body-tracking:         0.015em;
+
+  --md-sys-typescale-label-font:            var(--aura-font-body);
+  --md-sys-typescale-label-size:            0.875rem;
+  --md-sys-typescale-label-line-height:     1.25rem;
+  --md-sys-typescale-label-weight:          500;
+  --md-sys-typescale-label-tracking:        0.005em;
+
+  /* ── Elevation (numeric alias layer) ── */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0px 1px 3px 1px rgba(0,0,0,0.15), 0px 1px 2px rgba(0,0,0,0.3);
+  --md-sys-elevation-2: 0px 2px 6px 2px rgba(0,0,0,0.15), 0px 1px 2px rgba(0,0,0,0.3);
+  --md-sys-elevation-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
+  --md-sys-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
+  --md-sys-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
+
+  --md-sys-motion-easing-emphasized:          cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* ── Stitch MD3 bridge ── */
+  --st-surface-container-lowest:  var(--aura-noir-void);
+  --st-surface-container-low:     var(--aura-noir-mid);
+  --st-surface-container:         var(--aura-noir-deep);
+  --st-surface-container-high:    var(--aura-noir-steel);
+  --st-surface-container-highest: #2a3548;
+  --st-outline-variant: #44474d;
+  --st-surface-tint:    var(--aura-chrome-bright);
+  --st-on-background:   var(--aura-chrome-bright);
+
+  /* ── Glows & Effects ── */
+  --aura-glow-chrome:        0 0 30px rgba(201,214,223,0.25);
+  --aura-glow-chrome-strong: 0 0 60px rgba(232,238,243,0.4);
+  --aura-glow-navy:          0 0 40px rgba(10,26,46,0.6);
+  --aura-glow-gold:          var(--aura-glow-chrome);
+  --aura-glow-gold-strong:   var(--aura-glow-chrome-strong);
+  --aura-glow-silver:        var(--aura-glow-chrome);
+  --aura-glow-silver-strong: var(--aura-glow-chrome-strong);
+  --glow-gold:               0 4px 20px rgba(107, 159, 184, 0.15);
+
+  --aura-duration-slow: 600ms;
+
+  /* ── Glass morphism ── */
+  --glass-bg:       rgba(10, 26, 46, 0.65);
+  --glass-border:   rgba(201, 214, 223, 0.18);
+  --glass-bg-light: rgba(255, 255, 255, 0.06);
+  --glass-blur:     8px;
 }
 
 /* ── OpsShell Dark Override (KDS / TV / POS) ── */
@@ -165,4 +284,34 @@
   --md-sys-color-inverse-surface: var(--aura-navy-900);
   --md-sys-color-inverse-on-surface: var(--aura-pearl-50);
   --md-sys-color-inverse-primary: var(--aura-chrome-300);
+}
+
+/* ════════════════ 11. DARK THEME OVERRIDES ════════════════ */
+[data-theme="dark"] {
+  --bg-primary:    var(--aura-noir-void);
+  --bg-surface:    var(--aura-noir-deep);
+  --gold-master:   var(--aura-chrome-light);
+  --gold-electric: var(--aura-chrome-bright);
+  --gold-matte:    var(--aura-chrome-dark);
+  --amber-neon:    var(--aura-chrome-mid);
+  --text-body:     var(--aura-text-body);
+  --text-white:    var(--aura-text-primary);
+  --gradient-gold: var(--aura-grad-chrome);
+  --glow-gold:     var(--aura-glow-chrome);
+  --border-gold:   1px solid var(--aura-border-chrome);
+  --aura-bg-page: var(--aura-noir-void);
+  --aura-bg-surface: var(--aura-noir-deep);
+  --aura-bg-card: var(--aura-noir-deep);
+  --bg:      var(--aura-noir-void);
+  --section: var(--aura-noir-deep);
+  --card:    var(--aura-noir-deep);
+  --gold:    var(--aura-chrome-light);
+  --gold-e:  var(--aura-chrome-bright);
+  --matte:   var(--aura-chrome-dark);
+  --amber:   var(--aura-chrome-mid);
+  --silver:  var(--aura-chrome-light);
+  --silver-e:var(--aura-chrome-bright);
+  --navy:    var(--aura-noir-void);
+  --white:   var(--aura-text-primary);
+  --txt:     var(--aura-text-body);
 }

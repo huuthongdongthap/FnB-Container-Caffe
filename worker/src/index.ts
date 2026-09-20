@@ -207,7 +207,10 @@ app.post('/api/orders', orderRateLimit, (c) => createOrder(c.req.raw, c.env, c.e
 app.post('/api/orders/split', (c) => splitOrders(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
-app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
+app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => {
+  const user = c.get('user');
+  return updateOrder(c.req.raw, c.env, c.req.param('id'), user?.role);
+});
 
 // ── Orders KDS ──
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));

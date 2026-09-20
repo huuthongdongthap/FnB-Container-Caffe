@@ -8,6 +8,7 @@ import { createLogger } from 'worker/src/middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
 import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
 import { generateId, parseJSON } from '../model/helpers';
+import { calculateOrderSnapshot } from '../policies/order-snapshot';
 import { notifyTelegram } from '../notifications/telegram';
 import { deductInventoryForOrder } from '@aura/domain-inventory';
 import { syncOrderToERPNext } from 'worker/src/tree/erpnext/sync.js';
@@ -35,7 +36,21 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const orderId = generateId('ORD_');
-    const itemsJson = JSON.stringify(data.items);
+
+    // ── Server-authoritative price snapshot (Phase 02) ──────────────
+    // Discards client-supplied totals/prices; evaluates from DB + policies.
+    const snapshot = await calculateOrderSnapshot(db, {
+      items: data.items,
+      order_type: data.order_type || 'dine_in',
+      shipping_fee: data.shipping_fee,
+      discount: data.discount,
+      service_fee: data.service_fee,
+      tip_amount: data.tip_amount,
+    });
+    if (snapshot.rejected) {
+      return errorResponse(snapshot.rejected.message, 400);
+    }
+    const itemsJson = snapshot.itemsJson;
 
     // If table_id (table_number from QR) provided, resolve to actual table UUID
 
@@ -51,8 +66,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
             orderId,
             status: 'pending',
             payment_status: 'unpaid',
-            items: data.items,
-            total: parseInt(String(data.total)),
+            items: snapshot.items,
+            total: snapshot.total,
             customer_name: data.customer_name,
             customer_phone: data.customer_phone,
             table_id: null,
@@ -96,17 +111,17 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       orderId, itemsJson,
-      parseInt(String(data.total)), 'pending',
+      snapshot.total, 'pending',
       data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null,
       validatedMethod, 'unpaid',
-      parseInt(String(data.shipping_fee || 0)),
-      parseInt(String(data.discount || 0)),
+      snapshot.shipping_fee,
+      snapshot.discount,
       data.notes || null, data.delivery_time || 'now',
       resolvedTableId,
       data.order_type || 'dine_in',
-      parseInt(String(data.tip_amount || 0)),
-      parseInt(String(data.service_fee || 0)),
+      snapshot.tip_amount,
+      snapshot.service_fee,
       data.customer_id || null
     ).run();
 
@@ -117,7 +132,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       await db.prepare(`
         INSERT INTO payments (id, order_id, method, amount, status)
         VALUES (?, ?, ?, ?, ?)
-      `).bind(paymentId, orderId, validatedMethod, parseInt(String(data.total)), 'pending').run();
+      `).bind(paymentId, orderId, validatedMethod, snapshot.total, 'pending').run();
     }
 
     // Auto-create loyalty profile: email identity takes precedence, phone-only
@@ -179,7 +194,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
           if (identity) {
             await linkOrder({
               db, customerId: captureCustId, orderId,
-              total: parseInt(String(data.total)), orderType: data.order_type
+              total: snapshot.total, orderType: data.order_type
             });
           }
         } catch (custErr) {
@@ -204,8 +219,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
               customer_phone: data.customer_phone,
               customer_id: undefined,
               table_id: resolvedTableId,
-              items: data.items,
-              total: parseInt(String(data.total)),
+              items: snapshot.items,
+              total: snapshot.total,
               payment_method: validatedMethod,
               notes: data.notes
             }
@@ -220,7 +235,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     if (validatedMethod === 'cod') {
       const telegramPromise = notifyTelegram(env, {
-        id: orderId, items: data.items, total: data.total,
+        id: orderId, items: snapshot.items, total: snapshot.total,
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address, payment_method: validatedMethod,
         notes: data.notes
@@ -237,7 +252,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     // @ts-ignore -- PushEnv needs AURA_DB binding
     const pushPromise = sendPushToStaff(env, {
       title: 'Đơn hàng mới 🍳',
-      body: `Bàn ${data.table_id || 'Mang đi'} — ${data.items.length} món`,
+      body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
       data: { url: '/kds', orderId }
     }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
     if (ctx?.waitUntil) {
@@ -248,14 +263,14 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     if (ctx?.waitUntil) {
       const mc = createMetricsCollector(db);
-      ctx.waitUntil(mc.recordMetric('order_created', parseInt(String(data.total)), {
+      ctx.waitUntil(mc.recordMetric('order_created', snapshot.total, {
         payment_method: validatedMethod, is_anonymous: !data.customer_email
       }));
     }
 
     // Post-order: non-blocking inventory deduction (log-only on failure)
     try {
-      await deductInventoryForOrder(env as unknown as import('worker/src/types/env').Env, orderId, data.items as Array<{ product_id: string; quantity: number; name?: string }>);
+      await deductInventoryForOrder(env as unknown as import('worker/src/types/env').Env, orderId, snapshot.items.map(i => ({ product_id: i.menuItemId, quantity: i.quantity, name: i.name })));
     } catch (e) {
       log.warn('Inventory deduction failed for order', {
         orderId,
@@ -272,8 +287,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
         subject: `Xác nhận đơn hàng #${orderId} — AURA CAFE`,
         html: renderOrderConfirm({
           id: orderId,
-          items: data.items.map(i => ({ name: i.name, qty: i.qty || i.quantity || 1, price: i.price || 0 })),
-          total: Number(data.total),
+          items: snapshot.items.map(i => ({ name: i.name, qty: i.quantity, price: i.unitPriceCents })),
+          total: snapshot.total,
           payment_method: paymentLabels[validatedMethod] || validatedMethod
         })
       }).catch(e => log.error('Email order confirm error:', { message: (e as Error).message }));
@@ -286,11 +301,11 @@ export async function createOrder(request: Request, env: Record<string, unknown>
   const idemBody = {
     success: true, data: {
       id: orderId, status: 'pending', payment_status: 'unpaid',
-      items: data.items, total: parseInt(String(data.total)),
+      items: snapshot.items, total: snapshot.total,
       customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
       customer_name: data.customer_name, customer_phone: data.customer_phone,
       customer_address: data.customer_address || null, payment_method: validatedMethod,
-      shipping_fee: parseInt(String(data.shipping_fee || 0)), discount: parseInt(String(data.discount || 0)),
+      shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
       notes: data.notes || null, delivery_time: data.delivery_time || 'now',
       table_id: resolvedTableId, order_type: data.order_type || 'dine_in',
       created_at: new Date().toISOString()

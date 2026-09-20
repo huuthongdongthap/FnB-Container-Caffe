@@ -4,6 +4,16 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🛒 M4-C Order Pipeline — Server-Authoritative Cart Engine
+
+- **feat(domain/order)** — `calculateOrderSnapshot()` evaluates prices server-side from client intent only (`menuItemId`, `quantity`, modifier choice IDs, `channel`). Client-supplied `price`, `subtotal`, `totalAmount`, `discountAmount` are discarded; unavailable items are rejected.
+- **feat(domain/order)** — Layered transition guards: structural `canTransition(from, to)` for state-machine legality, then `canActorTransition(toActorRole(role), from, to)` for role authority. Actor roles bridge through `toActorRole()` against the customer/staff/kitchen/rider/manager/admin matrix.
+- **feat(api/orders)** — OpenAPI 3.1 `OrderRoutes` registered in `worker/src/lib/openapi.ts`. `OrderCreateSchema` is intent-only; `CustomerOrderResponseSchema`/`CustomerOrderItemSchema` are positive zod allowlists, so internal kitchen notes, supplier fields and staff identifiers cannot reach a customer payload.
+- **fix(api/orders)** — Closed an IDOR hole on `GET /api/orders/:id`: the read performed a bare `WHERE o.id = ?` with no ownership predicate, so any authenticated actor could read any order by id. All order reads now scope through `resolveCustomerScope()` — staff roles see everything, a `customer` token reaches only rows whose `customer_id` matches its own subject, and a non-staff actor with no resolvable owner matches nothing (`AND 1=0`, fail closed). Foreign orders surface as 404, not 403, so ids stay unenumerable.
+- **fix(api/orders)** — `PATCH /api/orders/:id` and `POST /api/orders/:id/cancel` previously authenticated but did not authorize. Both now enforce the same ownership scope and the dual-gate ordering (400 for illegal transitions, 403 for insufficient role), matching the canonical `updateOrder` command.
+- **fix(api/orders)** — The route-level `requireAuth` gate excluded `customer`, which made every order route staff-only and left the ownership scoping unreachable. Guest sessions can now authenticate with their own token.
+- **test** — Acceptance suites in `worker/src/__tests__/routes/openapi-orders.test.ts`: IDOR prevention (customer listing is scoped to its own row; `formatCustomerOrder` omits `customer_id`/`customerId`), price-tampering rejection at both line and order level, and machine-readable transition-validity checks across all `OrderStatusEnum` values. Full suite green: 375 files / 3,464 tests passing, `tsc --noEmit` 0 errors.
+
 ### 🔧 M5 CRM / Growth — Campaign Engine (Phase 05)
 
 - **feat(domain/crm)** — Added 4 new command files in `packages/domain/crm/commands/campaign/`:
