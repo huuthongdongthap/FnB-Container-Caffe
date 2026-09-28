@@ -33,6 +33,8 @@
       "@aura/domain-staff/*": ["./packages/domain/staff/*"],
       "@aura/domain-shift": ["./packages/domain/shift/index.ts"],
       "@aura/domain-shift/*": ["./packages/domain/shift/*"],
+      "@aura/domain-reservation": ["./packages/domain/reservation/index.ts"],
+      "@aura/domain-reservation/*": ["./packages/domain/reservation/*"],
       "worker/*": ["./worker/*"]
     }
   },
