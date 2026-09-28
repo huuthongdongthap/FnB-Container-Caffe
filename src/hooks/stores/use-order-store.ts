@@ -5,10 +5,28 @@ import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
 import { TERMINAL_STATUSES, POLL_INTERVAL } from './order-store-constants';
 import { mapSseEventToOrder } from './order-store-utils';
-import type { Order, CreateOrderPayload, OrderState } from './order-store-types';
-export type { OrderItem, Order, CreateOrderPayload, OrderState } from './order-store-types';
+import type { CustomerOrder, CreateOrderPayload, OrderState } from './order-store-types';
+export type {
+  OrderItem,
+  Order,
+  CreateOrderPayload,
+  OrderState,
+  CustomerOrder,
+  CustomerOrderItem,
+  OrderStatus,
+  PaymentStatus,
+  OrderChannel,
+} from './order-store-types';
 export { TERMINAL_STATUSES, POLL_INTERVAL } from './order-store-constants';
 export { firstOrDefault, mapSseEventToOrder } from './order-store-utils';
+export {
+  toCustomerOrderViewModel,
+  toCustomerOrderItemViewModel,
+} from './order-store-mappers';
+export type {
+  CustomerOrderViewModel,
+  CustomerOrderItemViewModel,
+} from './order-store-mappers';
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   currentOrder: null, orderHistory: [], loading: false, error: null,
@@ -22,7 +40,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
     try {
       const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
-      const order: Order = body.data;
+      const order: CustomerOrder = body.data;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
     } catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' }); return null; }
@@ -31,7 +49,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   fetchOrder: async (id) => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<any>(`/api/orders/${id}`);
+      // Canonical OpenAPI detail endpoint — server projects a customer-safe
+      // allowlist payload; IDOR scoping is enforced server-side by resolveCustomerScope().
+      const body = await apiFetch<{ data: CustomerOrder }>(`/api/orders/${id}`);
       set({ currentOrder: body.data, loading: false, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
@@ -84,11 +104,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   flushQueuedOrders: async () => {
     const pending = await offlineDb.getPendingOrders();
     if (pending.length === 0) { set({ queuedOffline: false }); return null; }
-    let lastOrder: Order | null = null;
+    let lastOrder: CustomerOrder | null = null;
     for (const payload of pending as CreateOrderPayload[]) {
       try {
         const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
-        lastOrder = body.data as Order; set({ currentOrder: lastOrder, error: null });
+        lastOrder = body.data as CustomerOrder; set({ currentOrder: lastOrder, error: null });
       } catch { set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false }); break; }
     }
     try { if (lastOrder) await offlineDb.clearOrders(); set({ queuedOffline: false, loading: false }); } catch { /* retry next reconnect */ }

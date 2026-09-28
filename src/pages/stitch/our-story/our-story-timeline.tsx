@@ -6,11 +6,11 @@ export function TimelineSection() {
       <div className="max-w-[1280px] mx-auto px-5 md:px-16">
         <div className="text-center mb-24">
           <h2 className="font-display text-3xl md:text-4xl text-[var(--aura-chrome-bright)] mb-4">
-            Evolutionary Cycle
+            Hành Trình Kiến Tạo
           </h2>
-          <p className="text-[var(--aura-chrome-mid)] font-body text-xs font-semibold tracking-[0.3em] uppercase">
-            From Prototype to Perfection
-          </p>
+          <div className="text-[var(--aura-chrome-mid)] font-body text-xs font-semibold tracking-[0.3em] uppercase">
+            Từ Bản Vẽ Ý Tưởng Đến Điểm Hẹn Độc Bản Tại Sa Đéc
+          </div>
         </div>
 
         <div className="relative max-w-4xl mx-auto">
@@ -32,9 +32,9 @@ export function TimelineSection() {
                 <h4 className="text-white text-xl md:text-2xl font-semibold mb-4 font-display">
                   {item.title}
                 </h4>
-                <p className="text-[var(--aura-chrome-mid)] text-sm font-body">
+                <div className="text-[var(--aura-chrome-mid)] text-sm font-body">
                   {item.desc}
-                </p>
+                </div>
               </div>
 
               {/* Image Card */}

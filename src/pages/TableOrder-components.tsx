@@ -62,8 +62,8 @@ export function GuestInfoForm({
     <div
       className="fixed left-0 right-0 z-40 px-5 pt-3 pb-3"
       style={{
-        top: '3rem',
-        background: 'rgba(10,26,46,0.7)',
+        top: '4.5rem',
+        background: 'color-mix(in srgb, var(--aura-noir-deep) 85%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         borderBottom: '0.5px solid rgba(229,228,226,0.15)',

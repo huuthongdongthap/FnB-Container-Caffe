@@ -24,7 +24,7 @@ describe('StitchLandingNew', () => {
     renderWithProviders(<StitchLandingNew />);
     expect(screen.getAllByText('AURA CAFE').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Khám phá ngay')).toBeTruthy();
-    expect(screen.getByText('Thực đơn')).toBeTruthy();
+    expect(screen.getAllByText('Thực đơn').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders feature cards (Menu, Reserve, Delivery)', () => {
@@ -36,19 +36,19 @@ describe('StitchLandingNew', () => {
 
   it('renders gallery section', () => {
     renderWithProviders(<StitchLandingNew />);
-    expect(screen.getByText('Kiến Trúc Độc Bản')).toBeTruthy();
+    expect(screen.getByText(/3 Khu Không Gian|Kiến Trúc Độc Bản/)).toBeTruthy();
   });
 
   it('renders location section with address', () => {
     renderWithProviders(<StitchLandingNew />);
     expect(screen.getByText(/Ghé thăm chúng tôi tại Sa Đéc/)).toBeTruthy();
-    expect(screen.getByText('Mở cửa: 07:00 - 23:00 mỗi ngày')).toBeTruthy();
+    expect(screen.getByText(/06:00 - 23:00 mỗi ngày/)).toBeTruthy();
   });
 
-  it('renders footer with contact and privacy links', () => {
+  it('renders footer with contact and navigation links', () => {
     renderWithProviders(<StitchLandingNew />);
-    expect(screen.getByText('Contact Us')).toBeTruthy();
-    expect(screen.getByText('Privacy Policy')).toBeTruthy();
+    expect(screen.getAllByText('Liên hệ').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Câu chuyện AURA')).toBeTruthy();
   });
 
   it('has glass panel elements for parallax', () => {

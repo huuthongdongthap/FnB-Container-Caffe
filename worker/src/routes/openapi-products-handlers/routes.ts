@@ -7,7 +7,7 @@ import { registerProductMutationHandlers } from './mutation-handlers';
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiProductsRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
+openApiProductsRouter.use('/api/products/*', requireAuth(['owner', 'manager', 'staff']));
 
 registerProductReadHandlers(openApiProductsRouter);
 registerProductMutationHandlers(openApiProductsRouter);

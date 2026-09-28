@@ -22,7 +22,7 @@ export function TopBar({ onBack }: TopBarProps) {
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="font-['Space_Grotesk'] text-[20px] font-bold leading-tight uppercase tracking-tight text-[var(--aura-bronze-shimmer)]">
+        <h1 className="font-body text-[20px] font-bold leading-tight uppercase tracking-tight text-[var(--aura-bronze-shimmer)]">
           {t('trackOrder.title', 'ORDER STATUS')}
         </h1>
       </div>

@@ -56,7 +56,7 @@ export default function LoyaltyCalcNew() {
     <StitchShell>
       <PageHeader brand="AURA CAFE" scrollEffect />
 
-      <main className="pt-24 pb-32 px-5 max-w-md mx-auto">
+      <div role="region" aria-label="Loyalty Calculator" className="pt-24 pb-32 px-5 max-w-md mx-auto">
         <section className="mb-8">
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-[var(--aura-tertiary)] mb-2">
             Loyalty Calculator
@@ -79,7 +79,7 @@ export default function LoyaltyCalcNew() {
         <BenefitsList benefits={BENEFITS} />
 
         <CtaSection />
-      </main>
+      </div>
 
       <BottomNav />
     </StitchShell>

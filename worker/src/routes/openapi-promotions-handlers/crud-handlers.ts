@@ -6,7 +6,7 @@ import { PromotionRoutes } from '../../schemas/promotions';
 export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions - List promotions
   app.openapi(PromotionRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -65,7 +65,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/promotions/{id} - Get promotion by ID
   app.openapi(PromotionRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
@@ -97,7 +97,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/promotions - Create promotion
   app.openapi(PromotionRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -158,7 +158,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PATCH /api/promotions/{id} - Update promotion
   app.openapi(PromotionRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -245,7 +245,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // DELETE /api/promotions/{id} - Delete promotion
   app.openapi(PromotionRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
 

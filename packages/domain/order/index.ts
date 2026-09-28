@@ -18,13 +18,13 @@ export { getLatestOrderTimestamp } from './queries/latest-timestamp';
 export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';
+export type { ActorRole } from './policies/transition-authorization';
 export type {
   RawOrderItemInput,
   EvaluatedOrderItem,
   OrderSnapshotInput,
   OrderSnapshotRejection,
   OrderSnapshotResult,
-  ActorRole,
 } from './policies/order-snapshot';
 // notifications
 export { notifyOrderStatus } from './notifications/notify-order-status';

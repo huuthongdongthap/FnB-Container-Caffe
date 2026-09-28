@@ -1,44 +1,85 @@
-export function ContactInfoForm() {
+import { UserCheck } from 'lucide-react';
+
+interface ContactInfoFormProps {
+  fullName: string;
+  onFullNameChange: (value: string) => void;
+  phone: string;
+  onPhoneChange: (value: string) => void;
+  note: string;
+  onNoteChange: (value: string) => void;
+}
+
+export function ContactInfoForm({
+  fullName,
+  onFullNameChange,
+  phone,
+  onPhoneChange,
+  note,
+  onNoteChange,
+}: ContactInfoFormProps) {
   return (
-    <section className="max-w-2xl">
-      <label className="block font-label-sm text-label-sm uppercase mb-6 text-secondary">Contact Information</label>
-      <div className="space-y-6">
-        <div className="relative">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10" htmlFor="fullname">
-            Full Name
+    <section className="max-w-3xl">
+      <div className="flex items-center gap-2 mb-4">
+        <UserCheck className="w-4 h-4 text-[#4A7C59]" />
+        <label className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)]">
+          5. THÔNG TIN NGƯỜI ĐẶT BÀN
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+        <div>
+          <label
+            className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1.5"
+            htmlFor="fullname"
+          >
+            HỌ VÀ TÊN *
           </label>
           <input
             id="fullname"
-            className="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-[var(--aura-tertiary)] focus:ring-1 focus:ring-[var(--aura-tertiary)] outline-none transition-all placeholder:text-outline/50"
-            placeholder="John Doe"
+            required
+            value={fullName}
+            onChange={(e) => onFullNameChange(e.target.value)}
+            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all"
+            placeholder="Ví dụ: Nguyễn Văn An"
             type="text"
           />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="relative">
-            <label className="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10" htmlFor="phone">
-              Phone
-            </label>
-            <input
-              id="phone"
-              className="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-[var(--aura-tertiary)] focus:ring-1 focus:ring-[var(--aura-tertiary)] outline-none transition-all placeholder:text-outline/50"
-              placeholder="+1 (555) 000-0000"
-              type="tel"
-            />
-          </div>
-          <div className="relative">
-            <label className="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              className="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-[var(--aura-tertiary)] focus:ring-1 focus:ring-[var(--aura-tertiary)] outline-none transition-all placeholder:text-outline/50"
-              placeholder="john@example.com"
-              type="email"
-            />
-          </div>
+
+        <div>
+          <label
+            className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1.5"
+            htmlFor="phone"
+          >
+            SỐ ĐIỆN THOẠI *
+          </label>
+          <input
+            id="phone"
+            required
+            value={phone}
+            onChange={(e) => onPhoneChange(e.target.value)}
+            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all"
+            placeholder="Ví dụ: 0946 013 633"
+            type="tel"
+          />
         </div>
+      </div>
+
+      <div>
+        <label
+          className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1.5"
+          htmlFor="note"
+        >
+          YÊU CẦU ĐẶC BIỆT (TÙY CHỌN)
+        </label>
+        <textarea
+          id="note"
+          value={note}
+          onChange={(e) => onNoteChange(e.target.value)}
+          className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all resize-none h-20"
+          placeholder="Ví dụ: Cần bàn gần ổ cắm điện làm việc, mang bánh kem sinh nhật, góc view đẹp chụp ảnh..."
+        />
       </div>
     </section>
   );
 }
+

@@ -52,7 +52,7 @@ src/pages/
 | `checkout.tsx` | `/checkout` | CustomerShell | **KEEP** | Canonical Checkout Flow |
 | `TableOrder.tsx` | `/order`, `/pos/table/:id` | Customer/Ops | **MIGRATE** | Split into Customer Order vs Ops TableOrder |
 | `TableCheckin.tsx` | `/table-checkin` | CustomerShell | **MERGE** | Merge into `/checkin` (`stitch/checkin-new`) |
-| `account.tsx` | `/account` | CustomerShell | **KEEP** | Canonical Account |
+| `account.tsx` | `/account` | CustomerShell | **KEEP** | Canonical Account — actual file is `account/index.tsx` (no `account.tsx`) |
 | `loyalty.tsx` | `/loyalty` | CustomerShell | **KEEP** | Canonical Loyalty |
 | `referral.tsx` | `/referral` | CustomerShell | **KEEP** | Canonical Referral |
 | `events.tsx` | `/events` | CustomerShell | **KEEP** | Canonical Events |
@@ -163,16 +163,17 @@ The largest and most heterogeneous directory. Represents 3 distinct generations:
 
 ### 5C. Dead Stitch Prototypes (Zero Route Consumers — Safe Deletion Candidates)
 
-| Directory / Files | Classification | Evidence | Safe to Delete? |
+| Directory / Files | Classification | Evidence | Status / Action |
 |---|---|---|---|
-| `src/pages/stitch/events-1/` | **DELETE** | Route uses `events-promotions-1`; this folder is unrouted | Phase 6 |
-| `src/pages/stitch/events-2/` | **DELETE** | Route uses `events-promotions-2`; this folder is unrouted | Phase 6 |
-| `src/pages/stitch/events/` (6 sub-files) | **DELETE** | Superseded by `events-promotions-1/2` and root `events.tsx` | Phase 6 |
-| `src/pages/stitch/checkout/` (standalone) | **DELETE** | Route uses `premium-checkout` or root `checkout.tsx` | Phase 6 |
-| `src/pages/stitch/referral/` (standalone) | **DELETE** | Route uses `referral-rewards-1/2` | Phase 6 |
-| `src/pages/stitch/StitchBase.tsx` | **DELETE** | Unused base component | Phase 6 |
-| ~30 orphaned sub-component files in dead folders | **DELETE** | Only imported within their own unrouted folders | Phase 6 |
-
+| `src/pages/stitch/loyalty/` | **DELETED** | Static prototype superseded by canonical `src/pages/loyalty.tsx`; 0 imports, 0 routes | Deleted in Phase 4 |
+| `src/pages/stitch/mobile/` | **DELETED** | Static mock superseded by router-owned `src/routes/mobile-route-hosts.tsx` and `src/pages/mobile/*`; 0 imports, 0 routes | Deleted in Phase 4 |
+| `src/pages/stitch/StitchBase.tsx` | **KEEP** | Actively imported by 10+ components (`StitchShell`, `StitchNav`); essential layout primitive | Retained (KEEP) |
+| `src/pages/stitch/events-1/` | **DELETED** | Was unrouted prototype; absent from filesystem | Deleted in Phase 4/5 |
+| `src/pages/stitch/events-2/` | **DELETED** | Was unrouted prototype; absent from filesystem | Deleted in Phase 4/5 |
+| `src/pages/stitch/events/` (6 sub-files) | **DELETED** | Superseded by `events-promotions-1/2` and root `events.tsx`; absent from filesystem | Deleted in Phase 4/5 |
+| `src/pages/stitch/checkout/` (standalone) | **DELETED** | Route uses `premium-checkout` or root `checkout.tsx`; absent from filesystem | Deleted in Phase 4/5 |
+| `src/pages/stitch/referral/` (standalone) | **DELETED** | Route uses `referral-rewards-1/2`; absent from filesystem | Deleted in Phase 4/5 |
+| ~30 orphaned sub-component files in dead folders | **DELETED** | Only imported within their own unrouted folders; absent from filesystem | Deleted in Phase 4/5 |
 ---
 
 ## 6. Staff Mobile Directory (`src/pages/mobile/` — 10 Files)

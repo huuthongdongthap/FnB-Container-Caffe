@@ -16,7 +16,7 @@ export function PaymentMethodSelector({
 
   return (
     <section>
-      <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
+      <h2 className="font-display text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
         <span className="w-8 h-8 inline-flex items-center justify-center" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
             <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
@@ -64,7 +64,7 @@ export function PaymentMethodSelector({
                     <IconComp className="w-6 h-6" aria-hidden="true" />
                   </div>
                   <div>
-                    <div className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-bright, #E8EEF3)]">
+                    <div className="font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-bright, #E8EEF3)]">
                       {option.label}
                     </div>
                     <div className="text-xs text-[var(--aura-chrome-soft)]">

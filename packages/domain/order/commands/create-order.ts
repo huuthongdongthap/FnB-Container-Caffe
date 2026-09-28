@@ -21,7 +21,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
   if (idemKey && env.AUTH_KV) {
     const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
     const cached = await kv.get(`order:idempotency:${idemKey}`, 'json');
-    if (cached) return new Response(JSON.stringify(cached), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (cached) return new Response(JSON.stringify(cached), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' } });
   }
 
   try {
@@ -100,6 +100,16 @@ export async function createOrder(request: Request, env: Record<string, unknown>
           'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
         ).bind(tableRow.id).run();
       }
+    }
+
+    // Dine-in invariant: an explicitly dine-in order must resolve to a real table.
+    // The validator requires table_id for order_type='dine_in', but a bogus table
+    // number would silently resolve to NULL here — reject instead of inserting an
+    // unassigned dine-in row that breaks KDS/table-map grouping downstream.
+    // Omitted order_type keeps legacy QR-flow behavior (falls back to dine_in at
+    // insert without the hard guard).
+    if (data.order_type === 'dine_in' && !resolvedTableId) {
+      return errorResponse('dine_in orders require a valid table_id (table_number from QR)', 400);
     }
 
     await db.prepare(`
@@ -219,7 +229,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
               customer_phone: data.customer_phone,
               customer_id: undefined,
               table_id: resolvedTableId,
-              items: snapshot.items,
+              items: snapshot.items as unknown as Record<string, unknown>[],
               total: snapshot.total,
               payment_method: validatedMethod,
               notes: data.notes

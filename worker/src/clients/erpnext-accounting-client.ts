@@ -104,7 +104,7 @@ export class ErpnextAccountingClient {
         items = [];
       }
 
-      const invoiceValues = mapOrderToInvoice(order, items, customer);
+      const invoiceValues = mapOrderToInvoice(order as unknown as import('../erpnext/mapper').OrderRecord, items, customer);
 
       const response = await this.client.create('Sales Invoice', invoiceValues as unknown as Record<string, unknown>);
       const invoiceName = (response.data as Record<string, unknown>)?.name as string | undefined;
@@ -260,7 +260,7 @@ export class ErpnextAccountingClient {
       phone: order.customer_phone,
       email: order.customer_email,
       address: order.customer_address,
-      id: order.customer_id
+      id: order.customer_id ? String(order.customer_id) : undefined
     });
 
     const response = await this.client.create('Customer', customerValues as unknown as Record<string, unknown>);

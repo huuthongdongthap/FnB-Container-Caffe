@@ -118,10 +118,17 @@ export function HeroSection() {
       <div className="relative z-20 mx-auto max-w-4xl px-4 text-center">
         {/* Logo */}
         <div className="mb-8 flex justify-center">
-          <div className="relative">
-            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-chrome-light/20 to-chrome-dark/20 p-3">
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0A1A2E] text-4xl font-bold text-chrome-bright" style={{ fontFamily: 'var(--aura-font-display)' }}>
-                A
+          <div className="relative group">
+            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-chrome-light/25 to-chrome-dark/25 p-2 shadow-[0_0_30px_rgba(201,214,223,0.2)]">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0A1A2E] overflow-hidden p-1">
+                <img
+                  src="/images/aura-emblem.png"
+                  alt="AURA CAFE Logo"
+                  className="h-full w-full object-cover filter drop-shadow-[0_0_12px_rgba(201,214,223,0.4)]"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
+                  }}
+                />
               </div>
             </div>
           </div>

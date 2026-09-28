@@ -74,13 +74,13 @@ const CUSTOM_ITEMS: MenuItemData[] = [
 describe('StitchMenuNew', () => {
   it('renders with default items', () => {
     renderWithProviders(<StitchMenuNew />);
-    expect(screen.getByText('Midnight Espresso')).toBeTruthy();
+    expect(screen.getByText('Cà phê máy / phin truyền thống')).toBeTruthy();
   });
 
   it('renders with custom items', () => {
     renderWithProviders(<StitchMenuNew items={CUSTOM_ITEMS} />);
     expect(screen.getByText('Test Latte')).toBeTruthy();
-    expect(screen.queryByText('Midnight Espresso')).toBeNull();
+    expect(screen.queryByText('Cà phê máy / phin truyền thống')).toBeNull();
   });
 
   it('renders search input', () => {

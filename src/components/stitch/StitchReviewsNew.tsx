@@ -96,7 +96,7 @@ export function StitchReviewsNew({
     <div className="min-h-screen overflow-x-hidden antialiased" style={{ backgroundColor: 'var(--aura-surface-container)', color: 'var(--aura-chrome-bright, #d3e4ff)' }}>
       <ReviewsNavHeader />
 
-      <main className="mx-auto max-w-[1200px] px-6 pb-16" style={{ paddingTop: '96px' }}>
+      <div role="feed" aria-label="Customer Reviews Feed" className="comment-feed mx-auto max-w-[1200px] px-6 pb-16" style={{ paddingTop: '96px' }}>
         {/* ── Aggregate Rating Header + Write Review CTA ────────── */}
         <section className="flex flex-col items-end justify-between gap-4 mb-16 md:flex-row md:items-center">
           <div>
@@ -178,7 +178,7 @@ export function StitchReviewsNew({
           </span>
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--aura-noir-void)] border-t-transparent" />
         </div>
-      </main>
+      </div>
 
       <ReviewsFooter />
       <style>{REVIEWS_STYLES}</style>

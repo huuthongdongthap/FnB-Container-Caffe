@@ -43,7 +43,7 @@ describe('StitchPromotionsNew', () => {
 
   it('renders claim offer button', () => {
     renderWithProviders(<StitchPromotionsNew />);
-    expect(screen.getByText('Claim Offer')).toBeTruthy();
+    expect(screen.getByText('Nhận Ưu Đãi')).toBeTruthy();
   });
 
   it('renders bottom navigation', () => {

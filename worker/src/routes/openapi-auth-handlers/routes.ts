@@ -10,7 +10,7 @@ export const authRoutes = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to protected routes only
 const publicPaths = ['/register', '/login', '/verify-email', '/reset-password', '/bootstrap-owner'];
-authRoutes.use('*', async (c, next) => {
+authRoutes.use('/api/auth/*', async (c, next) => {
   const path = c.req.path;
   if (publicPaths.some(p => path.endsWith(p))) {
     return next();

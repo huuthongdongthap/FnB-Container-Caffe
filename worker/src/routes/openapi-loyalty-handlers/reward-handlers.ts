@@ -6,7 +6,7 @@ import { LoyaltyRoutes } from '../../schemas/loyalty';
 export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/rewards - List available rewards
   app.openapi(LoyaltyRoutes.rewards.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -54,7 +54,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/loyalty/rewards/{id} - Get reward by ID
   app.openapi(LoyaltyRoutes.rewards.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
@@ -81,7 +81,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/loyalty/rewards - Create reward
   app.openapi(LoyaltyRoutes.rewards.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -134,7 +134,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PATCH /api/loyalty/rewards/{id} - Update reward
   app.openapi(LoyaltyRoutes.rewards.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -195,7 +195,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/loyalty/rewards/{id}/redeem - Redeem reward
   app.openapi(LoyaltyRoutes.rewards.redeem, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');

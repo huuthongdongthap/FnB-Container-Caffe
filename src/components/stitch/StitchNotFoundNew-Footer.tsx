@@ -16,13 +16,13 @@ export function Footer({ onNavigate }: FooterProps) {
           <button type="button"
             key={link.label}
             onClick={() => onNavigate?.(link.path)}
-            className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors"
+            className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors"
           >
             {link.label}
           </button>
         ))}
       </div>
-      <p className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.2em] text-[var(--aura-bronze-shimmer)]">
+      <p className="font-body text-[12px] font-semibold tracking-[0.2em] text-[var(--aura-bronze-shimmer)]">
         &copy; 2024 AURA CAFE. INDUSTRIAL LUXURY.
       </p>
     </footer>

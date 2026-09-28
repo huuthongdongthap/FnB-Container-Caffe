@@ -6,7 +6,7 @@ import { InventoryRoutes } from '../../schemas/inventory';
 export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/ingredients - List ingredients
   app.openapi(InventoryRoutes.ingredients.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -47,7 +47,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // GET /api/inventory/ingredients/{id} - Get ingredient by ID
   app.openapi(InventoryRoutes.ingredients.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(id).first();
@@ -61,7 +61,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // POST /api/inventory/ingredients - Create ingredient
   app.openapi(InventoryRoutes.ingredients.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -103,7 +103,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // PATCH /api/inventory/ingredients/{id} - Update ingredient
   app.openapi(InventoryRoutes.ingredients.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -156,7 +156,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // DELETE /api/inventory/ingredients/{id} - Delete ingredient
   app.openapi(InventoryRoutes.ingredients.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const now = new Date().toISOString();

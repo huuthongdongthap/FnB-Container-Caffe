@@ -51,15 +51,15 @@ describe('StitchAbout', () => {
     expect(screen.getByText('PHASE 03: 2024')).toBeInTheDocument();
     expect(screen.getByText('PHASE 04: 2025')).toBeInTheDocument();
     expect(screen.getByText('PHASE 05: 2026')).toBeInTheDocument();
-    expect(screen.getByText('Khởi nguồn / The Vision')).toBeInTheDocument();
-    expect(screen.getByText('Hoàn thiện / Full Experience')).toBeInTheDocument();
+    expect(screen.getByText(/Khởi nguồn/i)).toBeInTheDocument();
+    expect(screen.getByText(/hoàn thiện/i)).toBeInTheDocument();
   });
 
   it('renders values section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Cà phê ngon giá bình dân / Good Coffee Fair Price')).toBeInTheDocument();
-    expect(screen.getByText('Không gian mộc mạc / Rustic Space')).toBeInTheDocument();
-    expect(screen.getByText('Công nghệ tiện lợi / Handy Tech')).toBeInTheDocument();
+    expect(screen.getByText('Cà phê ngon chuẩn vị')).toBeInTheDocument();
+    expect(screen.getByText('Không gian mộc mạc')).toBeInTheDocument();
+    expect(screen.getByText('Công nghệ tiện lợi')).toBeInTheDocument();
   });
 
   it('renders zones section', () => {
@@ -67,20 +67,20 @@ describe('StitchAbout', () => {
     expect(screen.getByText('Quầy Pha Chế')).toBeInTheDocument();
     expect(screen.getByText('Sân Thượng')).toBeInTheDocument();
     expect(screen.getByText('Góc Yên Tĩnh')).toBeInTheDocument();
-    expect(screen.getByText('Khu Sofa')).toBeInTheDocument();
-    expect(screen.getByText('Phòng Riêng')).toBeInTheDocument();
+    expect(screen.getByText('Ghế Mây & Nệm')).toBeInTheDocument();
+    expect(screen.getByText('Phòng Container')).toBeInTheDocument();
   });
 
   it('renders CTA section', () => {
     render(<StitchAbout />);
     expect(screen.getByText('Ghé thăm AURA CAFE')).toBeInTheDocument();
-    expect(screen.getByText('Khám phá ngay / Explore Now')).toBeInTheDocument();
+    expect(screen.getByText(/Khám phá ngay/i)).toBeInTheDocument();
   });
 
   it('calls onCtaClick when CTA button is clicked', () => {
     const onCtaClick = vi.fn();
     render(<StitchAbout onCtaClick={onCtaClick} />);
-    screen.getByText('Khám phá ngay / Explore Now').click();
+    screen.getByText(/Khám phá ngay/i).click();
     expect(onCtaClick).toHaveBeenCalledOnce();
   });
 

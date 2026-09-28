@@ -25,7 +25,7 @@ export default function ReferralRewards2() {
     <StitchShell>
       <TopNav />
 
-      <main className="pt-24 pb-32 px-5 max-w-6xl mx-auto">
+      <div role="region" aria-label="Giới Thiệu Bạn Bè" className="pt-24 pb-32 px-5 max-w-6xl mx-auto">
         <ReferralHero />
 
         {/* ── Bento Grid: Code + Progress ───────────────────────────── */}
@@ -46,7 +46,7 @@ export default function ReferralRewards2() {
           </div>
           <div className="hidden lg:block" />
         </div>
-      </main>
+      </div>
 
       <MobileBottomNav />
     </StitchShell>

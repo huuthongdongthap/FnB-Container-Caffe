@@ -1,22 +1,13 @@
 import { forwardRef, type HTMLAttributes } from 'react';
-import { MD3Chip, type MD3ChipProps } from '@/components/md3/md3-chip';
+import { cn } from '@/lib/cn';
 
 /**
- * BadgeAdapter — backward-compatible wrapper around MD3Chip.
+ * BadgeAdapter — backward-compatible Badge rendering with Material Design 3 tokens.
  * Preserves legacy Badge API: variant (default|success|warning|destructive|info|outline).
  */
-export interface BadgeAdapterProps extends HTMLAttributes<HTMLButtonElement> {
+export interface BadgeAdapterProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'outline';
 }
-
-const variantMap: Record<NonNullable<BadgeAdapterProps['variant']>, MD3ChipProps['variant']> = {
-  default: 'suggestion',
-  success: 'assist',
-  warning: 'filter',
-  destructive: 'filter',
-  info: 'assist',
-  outline: 'filter',
-};
 
 const variantClasses: Record<NonNullable<BadgeAdapterProps['variant']>, string> = {
   default: 'bg-md-surface-container-low text-md-on-surface border border-md-outline-variant',
@@ -27,20 +18,20 @@ const variantClasses: Record<NonNullable<BadgeAdapterProps['variant']>, string> 
   outline: 'border border-current bg-transparent',
 };
 
-export const Badge = forwardRef<HTMLButtonElement, BadgeAdapterProps>(
+export const Badge = forwardRef<HTMLSpanElement, BadgeAdapterProps>(
   function Badge({ className, variant = 'default', children, ...rest }, ref) {
-    const md3Variant = variantMap[variant];
-
     return (
-      <MD3Chip
+      <span
         ref={ref}
-        variant={md3Variant}
-        elevated={variant === 'outline'}
-        className={`${variantClasses[variant] ?? ''} ${className}`}
+        className={cn(
+          'inline-flex items-center rounded-md-full px-2.5 py-0.5 text-xs font-medium font-utility',
+          variantClasses[variant],
+          className,
+        )}
         {...rest}
       >
         {children}
-      </MD3Chip>
+      </span>
     );
   },
 );

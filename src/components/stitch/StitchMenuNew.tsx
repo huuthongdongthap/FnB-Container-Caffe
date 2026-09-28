@@ -21,6 +21,7 @@ export function StitchMenuNew({
   onAddToCart,
   onCartClick,
   cartItemCount = 0,
+  children,
 }: Readonly<StitchMenuNewProps>) {
   const { t } = useTranslation();
   const state = useStitchMenuNew(items);
@@ -38,23 +39,23 @@ export function StitchMenuNew({
       <style id={GLASS_PANEL_STYLE_ID}>{GLASS_PANEL_CSS}</style>
 
       {/* TopAppBar + NavigationBar provided by MD3AppShell (StitchAppLayout) */}
-      <main className="min-h-screen pb-8">
+      <main className="min-h-screen pt-28 pb-40">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h1
-                className="text-[48px] leading-[1.1] font-semibold tracking-[-0.02em] text-[var(--aura-chrome-bright)] mb-2"
+                className="text-[36px] sm:text-[44px] leading-[1.1] font-bold tracking-[-0.02em] text-[var(--aura-chrome-bright)] mb-2"
                 style={{ fontFamily: 'var(--aura-font-display)' }}
               >
-                {t('stitch.theDigitalReserve', { defaultValue: 'The Digital Reserve' })}
+                {t('stitch.theDigitalReserve', { defaultValue: 'Thực Đơn AURA CAFE' })}
               </h1>
               <p
-                className="max-w-lg text-base leading-[1.6] text-[var(--aura-chrome-soft)]"
+                className="max-w-lg text-sm sm:text-base leading-[1.6] text-[var(--aura-chrome-soft)]"
                 style={{ fontFamily: 'var(--aura-font-body)' }}
               >
                 {t('stitch.menuDescription', {
                   defaultValue:
-                    'Industrial precision meets high-end hospitality. Explore our curated selection of signature roasts and artisanal blends.',
+                    'Cà phê container độc bản và không gian thư giãn giữa lòng Sa Đéc. Thưởng thức các dòng cà phê rang mộc, trà sữa, trà trái cây và đá xay thanh mát.',
                 })}
               </p>
             </div>
@@ -98,6 +99,8 @@ export function StitchMenuNew({
               ))}
             </div>
           )}
+
+          {children}
         </div>
       </main>
 

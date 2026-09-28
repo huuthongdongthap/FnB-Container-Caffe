@@ -104,8 +104,8 @@ export default function KitchenDisplay() {
       <div style={header}>
         <h1 style={title}>KDS / Bếp</h1>
         <div style={countRow}>
-          <span style={{ ...countBadge, background: '#fef3c7', color: '#92400e' }}>{pendingCount} chờ</span>
-          <span style={{ ...countBadge, background: '#dbeafe', color: '#1e40af' }}>{preparingCount} làm</span>
+          <span style={{ ...countBadge, background: 'rgba(245, 158, 11, 0.2)', color: '#FCD34D' }}>{pendingCount} chờ</span>
+          <span style={{ ...countBadge, background: 'rgba(59, 130, 246, 0.2)', color: '#93C5FD' }}>{preparingCount} làm</span>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export default function KitchenDisplay() {
       </div>
 
       {error && (
-        <div style={{ margin: '10px 14px 0', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', fontSize: 13 }}>
+        <div style={{ margin: '10px 14px 0', padding: '10px 14px', background: 'rgba(239, 83, 80, 0.15)', border: '1px solid rgba(239, 83, 80, 0.4)', borderRadius: 10, color: '#FFB4AB', fontSize: 13 }}>
           {error}
           <button onClick={fetchOrders} style={retryBtn}>Thử lại / Retry</button>
         </div>

@@ -3,6 +3,48 @@
 Tất cả các thay đổi đáng kể của dự án F&B Caffe Container được ghi lại tại đây.
 
 ## [Unreleased]
+### 🧹 UI Re-Architecture Phase 6 — Legacy Migration & Dead Code Cleanup
+
+- **remove(pages)** — Executed 5-point safe deletion checklist (0 routes, 0 imports, 0 dependencies, replacement exists, tests green). Removed 9 unreferenced legacy shims and dead prototypes:
+  - `src/pages/AboutUs.tsx`: unrouted re-export shim (`/about` routes directly to canonical `OurStory`).
+  - `src/pages/admin/AdminLayout.tsx`: deprecated layout shim (`admin-routes.tsx` directly renders `AdminShell`).
+  - `src/pages/admin/AdminSidebar.tsx`: legacy sidebar replaced by `AdminShell` / `StitchAdminTerminalNew`.
+  - `src/pages/admin/admin-sidebar-header.tsx`, `admin-sidebar-nav-item.tsx`, `admin-sidebar-nav-config.ts`: subcomponents of retired legacy sidebar.
+  - `src/pages/mobile/offline-queue.tsx`: orphaned mobile prototype with zero imports and zero route declarations.
+  - `src/pages/stitch/our-story/our-story-footer.tsx`: orphaned internal footer component (page uses canonical `LandingFooter`).
+  - `src/pages/stitch/reservation-new/reservation-new-styles.tsx`: orphaned style wrapper with zero imports.
+- **test(stitch)** — Updated `src/components/stitch/__tests__/StitchAdminTerminalNew.test.tsx` to include `TabletSmartphone` and `LayoutGrid` in `lucide-react` mock for complete Admin navigation coverage.
+- **keep(stitch)** — Preserved `src/components/stitch/StitchAppLayout.tsx` as a backward-compatibility shim wrapping `CustomerShell`.
+- **verify** — Complete suite green: 382 files / 3,519 tests PASS, `npx tsc --noEmit` = 0 errors, `npm run build` ok.
+- **invariants** — No D1 schema, OpenAPI contract, customer-safe DTO projection, `calculateOrderSnapshot()` pricing, order snapshot, transition guard, or `resolveCustomerScope()` IDOR boundary was touched.
+
+### 🧹 UI Re-Architecture Phase 4/5 — Migration Matrix Reconciliation
+
+- **fix(plans)** — `plans/ui-rearchitecture/page-migration-matrix.md` Section 5C listed Phase 6 deletion candidates (`stitch/events-1`, `stitch/events-2`, `stitch/events`, `stitch/checkout`, `stitch/referral`) that a filesystem scan proved were already removed. The matrix was stale, not the tree; Section 5C now records each as `DELETED` with `absent from filesystem` evidence.
+- **fix(plans)** — `src/pages/stitch/events-promotions-2/` confirmed live (routed at `/stitch/events-2` via `src/routes/stitch-routes.tsx`), so it is explicitly retained rather than swept up by the stale deletion list.
+- **chore(state)** — No source files changed in this pass; `.ai/state/current.md` and `.ai/state/progress.md` updated. Gate re-verified: 375 files / 3,475 tests PASS, `tsc --noEmit` 0 errors.
+- **invariants** — No D1 schema, OpenAPI contract, customer-safe DTO projection, `calculateOrderSnapshot()` pricing, order snapshot, transition guard, or `resolveCustomerScope()` IDOR boundary was touched.
+
+
+### 🎨 UI Re-Architecture Phase 4/5 — Route Hygiene & Dead Prototype Removal
+
+- **refactor(routes)** — Showcase route table pruned from 10 to 6 canonical `/stitch/*` entries. Removed `/stitch/referral-1`, `/stitch/events-1`, `/stitch/customer-account`, and `/stitch/loyalty`, each of which duplicated a canonical page (`/referral`, `/events`, `/account`, `/loyalty`) with hardcoded static fixtures.
+- **fix(routes)** — `order-management` moved under `OpsShell` alongside `/kds`, `/tv-menu`, and `/pos/table/:tableId`, so the management terminal no longer renders customer chrome or the cart bar.
+- **refactor(ops)** — `src/pages/mobile/mobile-layout.tsx` retired; navigation state moved out of component `useState` into router-owned boundaries in `src/routes/mobile-route-hosts.tsx`, making station-tablet refresh and deep links restore the correct tab.
+- **remove(stitch)** — Deleted `src/pages/stitch/loyalty/` and `src/pages/stitch/mobile/`: static prototypes with zero route consumers and zero import sites, superseded by canonical `src/pages/loyalty.tsx` and `src/pages/mobile/*`. Retired their test file alongside.
+- **keep(stitch)** — `src/pages/stitch/StitchBase.tsx` retained despite the migration matrix listing it as dead: 10+ active components consume `StitchShell` and `StitchNav` from it. Matrix corrected.
+- **fix(gallery)** — `stitch-screen-gallery` screen registry repointed from stale prototype slugs to real canonical routes (`/about`, `/reviews`, `/admin/dashboard`, `/admin/login`, `/events`, `/order`, `/referral`, `/account`); unrouted legacy batch exports (`StitchLandingV2`, `StitchMenuV2`) marked `skipped`.
+- **test** — Full suite green: 375 files / 3,475 tests passing (`tsc --noEmit` 0 errors, `npm run build` ok). The −2 test delta from the 376/3,477 baseline is exactly the retired `pages/__tests__/customer-account.test.tsx` suite for the deleted static mock — no assertion was weakened or skipped.
+- **invariants** — No D1 schema, OpenAPI contract, customer-safe DTO projection, `calculateOrderSnapshot()` pricing, order snapshot, transition guard, or `resolveCustomerScope()` IDOR boundary was touched.
+
+### 🎨 UI Re-Architecture Phase 3 — Deep-Import Shim Conversion
+
+- **refactor(ui)** — Converted all 7 legacy UI primitives into re-export shims pointing at their MD3-backed adapters: `ui/button.tsx` → `ButtonAdapter`, `ui/card.tsx` → `CardAdapter` (`Card`/`CardHeader`/`CardBody`/`CardFooter`), `ui/badge.tsx` → `BadgeAdapter`, `ui/input.tsx` → `InputAdapter`, `ui/modal.tsx` → `ModalAdapter`, `ui/skeleton.tsx` → `SkeletonAdapter`, `ui/toast.tsx` → `ToastAdapter` (`useToast`/`ToastProvider`).
+- **fix(ui)** — Closed the deep-import bypass: 212 import sites across 115 files reached legacy modules directly, skipping both the `src/components/ui/index.ts` barrel and the adapters. Converting the modules themselves (rather than the call sites) migrates every consumer in one step with zero edits at the point of use.
+- **fix(ui/adapters)** — `ButtonAdapter` `destructive` variant rendered the primary container colour because no error mapping existed; it now resolves `var(--md-sys-color-error)` / `var(--md-sys-color-on-error)`.
+- **fix(ui/adapters)** — `BadgeAdapter` rendered an `MD3Chip` `<button>`, which broke the legacy interactive/element expectations; it is now a `<span>` styled with MD3 shape/colour/typography tokens.
+- **fix(md3)** — `md3-text-field` error/helper text now carries `role="alert"` when in the error state, so assistive tech announces validation failures.
+- **test** — Primitive tests retargeted from legacy Tailwind class assertions to M3 semantic tokens (`bg-md-primary`, `border-md-outline`, `text-md-primary`, `var(--md-sys-color-error)`). Full suite green: 376 files / 3,480 tests passing, `tsc --noEmit` 0 errors, `npm run build` ok.
 
 ### 🛒 M4-C Order Pipeline — Server-Authoritative Cart Engine
 

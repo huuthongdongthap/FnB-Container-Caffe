@@ -17,7 +17,7 @@ export function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
       <CheckCircle2 className="mb-4 h-16 w-16 text-[var(--aura-chrome-soft)] opacity-30" aria-hidden="true" />
       <h3
         className="mb-2 text-[32px] leading-[1.2] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]"
-        style={{ fontFamily: "'Syne', sans-serif" }}
+        style={{ fontFamily: 'var(--aura-font-display)' }}
       >
         {t('kds.allClear', 'All Clear!')}
       </h3>

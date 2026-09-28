@@ -30,7 +30,12 @@ export function PwaInstallBanner() {
             </Button>
           </div>
         </div>
-        <button onClick={dismiss} className="text-chrome-light/40 hover:text-chrome-light/80">
+        <button
+          type="button"
+          onClick={dismiss}
+          className="text-chrome-light/40 hover:text-chrome-light/80"
+          aria-label={t('common.close', 'Đóng thông báo')}
+        >
           <X className="h-4 w-4" />
         </button>
       </div>

@@ -78,17 +78,19 @@ const UserIcon = () => <User aria-hidden="true" />;
 /* ─── Logo — AURA CAFE ────────────────────────────────────── */
 function AuraLogo() {
   return (
-    <img
-      src="/images/logo.svg"
-      alt="AURA CAFE"
-      className="h-8 w-auto"
-      // Container logos sit on dark navy — keep original colors
-      onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.display = 'none';
-      }}
-    />
+    <div className="flex items-center gap-2">
+      <img
+        src="/images/logo.svg"
+        alt="AURA CAFE"
+        className="h-9 w-9 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover shadow-[0_0_10px_rgba(201,214,223,0.3)] transition-transform hover:scale-105"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
+        }}
+      />
+    </div>
   );
 }
+
 
 /* ─── Component ───────────────────────────────────────────── */
 export function MD3AppShell({
@@ -164,7 +166,7 @@ export function MD3AppShell({
         className={cn(
           'flex-1',
           showTopAppBar && 'pt-16',
-          showNavigationBar && 'pb-20',
+          showNavigationBar && 'pb-20 md:pb-0',
         )}
       >
         {children}

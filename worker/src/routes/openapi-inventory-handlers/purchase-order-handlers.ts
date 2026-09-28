@@ -6,7 +6,7 @@ import { InventoryRoutes } from '../../schemas/inventory';
 export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/purchase-orders - List purchase orders
   app.openapi(InventoryRoutes.purchaseOrders.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -52,7 +52,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
   // GET /api/inventory/purchase-orders/{id} - Get purchase order by ID
   app.openapi(InventoryRoutes.purchaseOrders.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
@@ -69,7 +69,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
   // POST /api/inventory/purchase-orders - Create purchase order
   app.openapi(InventoryRoutes.purchaseOrders.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -129,7 +129,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
   // PATCH /api/inventory/purchase-orders/{id} - Update purchase order
   app.openapi(InventoryRoutes.purchaseOrders.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -204,7 +204,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
   // POST /api/inventory/purchase-orders/{id}/receive - Receive purchase order items
   app.openapi(InventoryRoutes.purchaseOrders.receive, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');

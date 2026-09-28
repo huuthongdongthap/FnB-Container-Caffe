@@ -105,21 +105,9 @@ export function StitchOrderMgmtNew({
   /* ─── Render ──────────────────────────────────────────────────── */
 
   return (
-    <div className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] font-sans text-[var(--aura-text-primary, #e8e8e8)]">
-      <StitchOrderMgmtHeader
-        brandName={brandName}
-        brandSubtitle={brandSubtitle}
-        headerTitle={headerTitle}
-        headerSubtitle={headerSubtitle}
-        adminName={adminName}
-        adminAvatarUrl={adminAvatarUrl}
-        activeNav={activeNav}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-      />
-
+    <div className="relative min-h-screen font-sans text-[var(--aura-text-primary,#e8e8e8)]">
       <main
-        className={cn('min-h-screen px-4 pb-8 pt-20 md:px-6', 'md:ml-[280px]')}
+        className={cn('min-h-screen px-4 pb-8 pt-4 md:px-6')}
         aria-label={tTerminal('mainContent')}
       >
         <div className="mx-auto w-full max-w-[1440px]">
@@ -134,10 +122,10 @@ export function StitchOrderMgmtNew({
                 className={cn(GLASS_CLASSES, 'flex flex-col justify-center rounded-xl p-6')}
                 aria-label={tTerminal(`stat.${stat.icon}`)}
               >
-                <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
+                <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary,#a0a8b0)]">
                   {stat.label}
                 </span>
-                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #efbd8a)] to-[var(--aura-chrome-light, #d4a574)] bg-clip-text text-transparent">
+                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[var(--aura-chrome-light,#C9D6DF)] via-[var(--aura-chrome-light,#efbd8a)] to-[var(--aura-chrome-light,#d4a574)] bg-clip-text text-transparent">
                   {stat.value}
                 </span>
               </div>

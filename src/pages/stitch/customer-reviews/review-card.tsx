@@ -13,7 +13,7 @@ export function ReviewCard({
 
   return (
     <div
-      className={`rounded-2xl p-6 md:p-8 flex flex-col gap-4 transition-all duration-300 relative overflow-hidden group ${
+      className={`comment review-entry rounded-2xl p-6 md:p-8 flex flex-col gap-4 transition-all duration-300 relative overflow-hidden group ${
         isFeatured
           ? 'bg-white/5 backdrop-blur-[8px] border border-[var(--aura-tertiary)]/30 shadow-[inset_0_0_10px_rgba(212,165,116,0.1)]'
           : 'bg-white/5 backdrop-blur-[8px] border border-white/10 hover:border-[var(--aura-chrome-mid)]/20'
@@ -21,8 +21,8 @@ export function ReviewCard({
     >
       {isFeatured && (
         <div className="absolute top-3 right-3">
-          <span className="bg-[#291500] text-[var(--aura-tertiary)] font-body text-[10px] px-2 py-1 rounded-full uppercase tracking-tighter">
-            Chef&apos;s Choice
+          <span className="bg-[#291500] text-[var(--aura-tertiary)] font-body text-[10px] px-2.5 py-1 rounded-full uppercase tracking-widest font-semibold border border-[var(--aura-tertiary)]/40">
+            Nổi Bật
           </span>
         </div>
       )}
@@ -41,7 +41,7 @@ export function ReviewCard({
       </div>
 
       {/* Text */}
-      <p className="font-body text-[var(--aura-chrome-mid)] leading-relaxed text-sm md:text-base">{review.text}</p>
+      <div className="comment-body font-body text-[var(--aura-chrome-mid)] leading-relaxed text-sm md:text-base">{review.text}</div>
 
       {/* Photos */}
       {hasPhotos && (

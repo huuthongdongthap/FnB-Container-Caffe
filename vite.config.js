@@ -57,7 +57,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8081,
-    open: true,
+    port: 5173,
+    host: true,
   },
 });

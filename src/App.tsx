@@ -12,6 +12,7 @@ import { publicRoutes } from '@/routes/public-routes';
 import { stitchRoutes } from '@/routes/stitch-routes';
 import { mobileRoutes } from '@/routes/mobile-routes';
 import { adminRoutes } from '@/routes/admin-routes';
+import { PageSkeletonLoader } from '@/components/ui/PageSkeletonLoader';
 
 const NotFoundNew = React.lazy(() => import('@/pages/stitch/not-found'));
 const KDSPage = React.lazy(() => import('@/pages/KDS'));
@@ -41,7 +42,7 @@ function AppContent() {
         <AppBanner />
         <OrderQueueIndicator />
         <BrowserRouter>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--md-sys-color-on-surface-variant)]">Loading...</div>}>
+          <React.Suspense fallback={<PageSkeletonLoader />}>
             <Routes>
               {/* ── OPS SHELL ── */}
               <Route element={<OpsShell />}>

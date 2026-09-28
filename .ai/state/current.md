@@ -1,36 +1,37 @@
-# Current State — AURA OS
+# AURA OS — Current State
 
-**Milestone:** M4-C Order Pipeline & Server-Authoritative Cart Engine
-**Status:** Phase 01–05 Complete — Milestone M4-C Done
-**Active Branch:** main
-**Baseline:** 375 test files / 3,464 tests PASS | TypeScript: 0 errors
+**Baseline:** 382 test files / 3,519 tests PASS | TypeScript: 0 errors | Build: OK
 
-## Current Focus
-M4-C Complete: Order Pipeline & Server-Authoritative Cart Engine fully implemented with OpenAPI 3.1 contract, customer-safe DTOs, and layered authorization.
+## Backend Stabilization & Edge Resilience (COMPLETED)
 
-## M4-B Foundation (Verified — DO NOT MODIFY)
-- Canonical `GET /api/menu` + `GET /api/menu/:id` active
-- `@aura/domain-catalog` Customer-Safe DTO with FORBIDDEN_FIELDS contract
-- Integer VND cents (`priceCents`) server-authoritative
-- Backend-derived availability (`toAvailabilityFlag`)
-- OpenAPI 3.1 registered (`MenuRoutes` in `worker/src/lib/openapi.ts`)
-- `useCustomerMenu` hook → `apiClient` → canonical endpoint
-- CRM Order domain (`@aura/domain-order`) exists with state machine
+- **CORS Dynamic Origin & Credentials**: Standardized `getCorsOrigin()` across all handlers and error responses; enables `credentials: 'include'` from frontend clients without wildcard W3C rejection.
+- **Guest Checkout Unblocked**: Transitioned PayOS payment creation to `optionalAuth()`; guest diners can initiate checkout without a customer account, while authenticated users remain IDOR-scoped.
+- **D1 Binding Unification**: Standardized fallback to `c.env.AURA_DB ?? c.env.DB` across loyalty, inventory, and promotions OpenAPI modules.
+- **Web Payment API**: Implemented `POST /api/payments/payment-request` to support Apple Pay and Google Pay payment sheets from `/checkout`.
+- **Reservation RBAC**: Secured admin reservation endpoints (`GET /api/reservations`, `PATCH /:id/approve`, `PATCH /:id/reject`, `DELETE /:id`) with `requireAuth(['owner', 'staff', 'manager'])` while keeping booking and availability public.
+- **SQL Sanitization**: Applied `safeSortColumn` and `safeSortDirection` allowlist checks to all order listing queries.
+- **Dine-in Invariants**: Enforced table presence validation on `dine_in` order placement.
+- **Resilience & Replay**: Implemented KV idempotency caching for order creation and `Last-Event-ID` replay buffer for SSE order status stream.
 
-## M4-C Scope & Progress
-- [x] Phase 01: Pricing Engine & Channel Pricing (Y-03 resolution) — `resolveItemPrice()` with channel deltas, modifier deltas, happy-hour windows in `@aura/domain-catalog`
-- [x] Phase 02: Order Price Snapshot & Immutable Lines — `calculateOrderSnapshot()` in `@aura/domain-order`, wired into `createOrder` so client-supplied prices/totals are discarded; rejects unavailable items
-- [x] Phase 03: State Machine & Transition Guards — `canActorTransition()` + `toActorRole()` layered over `canTransition()`; role matrix (customer/staff/kitchen/rider/manager/admin) enforced in `updateOrder` and the `PATCH /api/orders/:id` route
-- [x] Phase 04: Customer Security & OpenAPI Contract — OpenAPI 3.1 `OrderRoutes` registered in `worker/src/lib/openapi.ts`; server-authoritative `OrderCreateSchema` (intent-only, no client prices); customer-safe positive-projection `CustomerOrderResponseSchema`/`CustomerOrderItemSchema`; `OrderChannelEnum` aligned to catalog pricing channels; dual-gate transition docs (400 state machine + 403 role)
-- [x] Phase 04 (security hardening): closed the `GET /api/orders/:id` IDOR hole via `resolveCustomerScope()` (staff see all; a `customer` token reaches only its own `customer_id`; fail-closed `AND 1=0` otherwise; foreign order → 404). Same ownership scope plus dual-gate authorization (400 structural → 403 role) added to `PATCH /api/orders/:id` and `POST /api/orders/:id/cancel`. Route auth gate widened to admit `'customer'` — previously all order routes were staff-only, which left the scoping unreachable.
-- [x] Phase 05: Acceptance Tests & State Sync — Full vitest (375 files / 3,464 tests) + `tsc --noEmit` (0 errors) green; IDOR, price-tampering and transition-validity acceptance suites in `worker/src/__tests__/routes/openapi-orders.test.ts`; state docs + `docs/12_CHANGELOG.md` updated
+## UI Re-Architecture (M3 / 2026 Standards) — ALL PHASES COMPLETE
 
-## UI Re-Architecture (AURA OS Master Plan)
-- [x] Phase 0: Forensic Audit & Multi-Dimensional Codebase Inspection
-- [x] Phase 1: Shell Authority & Viewport Boundary Enforcement (CustomerShell, OpsShell, AdminShell)
-- [x] Phase 2: M3 Component System & Adapters (`src/components/ui/adapters/`)
-- [x] Phase 3: Customer Experience Re-Architecture & M4-B Canonical Integration
-- [x] Phase 4: Operations Experience Re-Architecture (KDS, TV Menu, Table POS on OpsShell)
-- [x] Phase 5: Admin Experience Re-Architecture (AdminShell with MD3NavigationDrawer)
-- [x] Phase 6: Legacy Migration & Dead Prototype Cleanup (purged unrouted stitch prototypes, updated screen-data.ts)
-- **Baseline:** 374 test files / 3,464 tests PASS | TypeScript: 0 errors | Build: OK
+- **Phase 0 (Forensic Audit)**: 9 audit artifacts in `plans/ui-rearchitecture/`; baseline established.
+- **Phase 1 (Legacy Cleanup)**: 19 dead files + 2 empty directories removed with 5-point proof.
+- **Phase 2 (Design Tokens)**: Token chain operational (`aura-tokens.css` → `--md-sys-*` → Tailwind `@theme` → components); 4 zero-consumer legacy primitives deleted.
+- **Phase 3 (Component Core & Mobile)**: 7/7 legacy primitives converted to re-export shims; 212 deep-import call sites across 115 files resolved to MD3 adapters; `mobile-layout.tsx` retired for router-owned `mobile-route-hosts.tsx`.
+- **Phase 4/5 (Shell Governance & Route Hygiene)**: Three authoritative shells strictly enforced (`CustomerShell`, `OpsShell`, `AdminShell`); showcase routes pruned 10 → 6; `order-management` moved to `OpsShell`; dead prototypes deleted (`stitch/loyalty/`, `stitch/mobile/`); screen gallery repointed.
+- **Phase 6 (Verification & Verdict Artifacts)**: Matrix reconciled against filesystem; `reports/ui/architecture-final.md` and `reports/ui/FINAL-VERDICT.md` generated with green sign-off.
+- **Phase 1 Foundation Verification**: Re-verified per `/cook` mandate; recorded in `reports/ui/phase-01-foundation.md` with 100% GREEN verification across all 6 foundation requirements.
+
+## Verification
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **0 errors** |
+| Full Vitest Suite | **382 files / 3,519 tests PASS** |
+| `npm run build` | **Vite build clean** |
+| Contract invariants | **UNTOUCHED & HARDENED** — D1 schema, OpenAPI, M4-B DTO, `calculateOrderSnapshot()`, order snapshot, transition guards, `resolveCustomerScope()` |
+
+## Status Signal
+
+**READY_FOR_DEPLOYMENT**

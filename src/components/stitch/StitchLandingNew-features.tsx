@@ -53,9 +53,9 @@ const features = [
     titleFallback: 'Menu đa dạng',
     descKey: 'landing.featureMenuDesc',
     descFallback:
-      'Từ những hát Arabica tuyển chọn đến những công thừc trà đặc biệt, được pha chỉ bởi những nghệ nhân barista tận tâm nhất.',
+      'Từ những hạt Robusta tuyển chọn đến những công thức trà đặc biệt, được pha chế bởi những barista tận tâm nhất.',
     linkKey: 'landing.featureMenuLink',
-    linkFallback: 'Xem chi tiết',
+    linkFallback: 'Xem thực đơn',
     href: '/menu',
   },
   {
@@ -64,7 +64,7 @@ const features = [
     titleFallback: 'Đặt bàn nhanh',
     descKey: 'landing.featureReserveDesc',
     descFallback:
-      'Đảm bảo vị trí ngỗ lý tưởng trong không gian lounge sang trọng cho những cuộc gặp gủ quan trọng hoặc những giây phút thu gîn.',
+      'Đảm bảo vị trí ngồi lý tưởng trong không gian lounge sang trọng cho những cuộc gặp gỡ quan trọng hoặc những giây phút thư giãn.',
     linkKey: 'landing.featureReserveLink',
     linkFallback: 'Đặt chỗ ngay',
     href: '/table-reservation',
@@ -77,8 +77,8 @@ const features = [
     descFallback:
       'Thưởng thức hương vị AURA ngay tại nhà hoặc văn phòng với dịch vụ giao hàng nhanh chóng trong khu vực Sa Đéc.',
     linkKey: 'landing.featureDeliveryLink',
-    linkFallback: 'Đặt hàng',
-    href: '/order',
+    linkFallback: 'Đặt món ngay',
+    href: '/menu',
   },
 ];
 

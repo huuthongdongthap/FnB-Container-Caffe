@@ -136,7 +136,7 @@ async function scanCustomers(db: D1Database): Promise<
   try {
     const { results } = await db
       .prepare(
-        `SELECT c.id, c.name, c.phone, c.loyalty_tier, c.lifetime_points,
+        `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
                 MAX(o.created_at) as last_order_at
          FROM customers c
          LEFT JOIN orders o ON o.customer_phone = c.phone
@@ -146,7 +146,7 @@ async function scanCustomers(db: D1Database): Promise<
         id: string;
         name: string | null;
         phone: string | null;
-        loyalty_tier: string;
+        tier: string;
         lifetime_points: number;
         last_order_at: string | null;
       }>();
@@ -177,7 +177,7 @@ function classify(
   return computeFrequencyBand(
     {
       firstOrderAt: row.last_order_at,
-      lastOrderAt: row.last_orderAt ?? row.last_order_at,
+      lastOrderAt: row.last_order_at,
       orderCount: 0,
     },
     policy,

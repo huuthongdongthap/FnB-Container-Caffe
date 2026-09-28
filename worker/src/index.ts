@@ -10,12 +10,25 @@ import type { Env } from './types/env';
 import type { MiddlewareHandler } from 'hono';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { openApiApp } from './lib/openapi';
+// OpenAPI domain routers — these declare full '/api/...' paths and are mounted
+// on openApiApp at '/', so they register their declared paths verbatim.
+import { openApiCategoriesRouter } from './routes/openapi-categories';
+import { openApiProductsRouter } from './routes/openapi-products';
+import { openApiOrdersRouter } from './routes/openapi-orders';
+import { openApiTablesRouter } from './routes/openapi-tables';
+import { openApiAuthRouter } from './routes/openapi-auth';
+import { openApiPaymentsRouter } from './routes/openapi-payments';
+import { openApiStaffRouter } from './routes/openapi-staff';
+import { openApiInventoryRouter } from './routes/openapi-inventory';
+import { openApiLoyaltyRouter } from './routes/openapi-loyalty';
+import { openApiPromotionsRouter } from './routes/openapi-promotions';
+import { openApiCronRouter } from './routes/openapi-cron';
 
 
 // Route modules — pre-existing TS
 import { getCustomerMenu, getCustomerMenuItem } from '@aura/domain-catalog';
 import {
-  createOrder, getOrder, updateOrder, getAdminOrders, getStats,
+  createOrder, updateOrder, getAdminOrders, getStats,
   getLatestOrderTimestamp, splitOrders
 } from '@aura/domain-order';
 import {
@@ -206,7 +219,9 @@ const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
 app.post('/api/orders', orderRateLimit, (c) => createOrder(c.req.raw, c.env, c.executionCtx));
 app.post('/api/orders/split', (c) => splitOrders(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
-app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
+// GET /api/orders and GET /api/orders/:id are intentionally NOT registered here.
+// Both are served by openApiApp (mounted last) so every read passes through
+// resolveCustomerScope() and the guest allowlist projection.
 app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => {
   const user = c.get('user');
   return updateOrder(c.req.raw, c.env, c.req.param('id'), user?.role);
@@ -223,7 +238,9 @@ app.route('/api/orders', orderStreamRouter);
 // ── Realtime WebSocket (DO-backed, public) ──
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 // ── Orders Checkout + Guest Check-in (public + protected) ──
-// ordersHonoRouter provides POST /checkout, POST /guest-checkin, GET /, GET /:id, GET /my-orders, PATCH /:id/status
+// ordersHonoRouter provides POST /checkout, POST /guest-checkin, PATCH /:id/status.
+// Order reads are handled by openApiApp (mounted last), never here — see
+// routes/orders-hono-handlers/query-handlers.ts.
 app.route('/api/orders', ordersHonoRouter);
 
 // ── Admin (protected) ──
@@ -326,9 +343,9 @@ app.route('/api/reports', reportsRouter);
 
 // ── Inventory (protected: read for owner/staff/customer, write for owner/staff) ──
 app.use('/api/inventory/*', requireAuth(['owner', 'staff', 'customer']));
-inventoryCRUD(app);
-inventoryTransactions(app);
-inventorySnapshots(app);
+inventoryCRUD(app as any);
+inventoryTransactions(app as any);
+inventorySnapshots(app as any);
 
 // ── Health check ──
 import { getHealth } from './routes/health';
@@ -374,6 +391,21 @@ app.all('/api/erpnext-invoices/*', (c) =>
 );
 
 // ── OpenAPI Documentation ──
+// ── OpenAPI Sub-Routers ──
+// Sub-routers declare full '/api/...' paths so mounting them at root matches exactly.
+app.route('/', openApiCategoriesRouter);
+app.route('/', openApiProductsRouter);
+app.route('/', openApiOrdersRouter);
+app.route('/', openApiTablesRouter);
+app.route('/', openApiAuthRouter);
+app.route('/', openApiPaymentsRouter);
+app.route('/', openApiStaffRouter);
+app.route('/', openApiInventoryRouter);
+app.route('/', openApiLoyaltyRouter);
+app.route('/', openApiPromotionsRouter);
+app.route('/', openApiCronRouter);
+
+// ── OpenAPI Documentation & Schema Endpoints ──
 app.route('/', openApiApp);
 
 // ── ERPNext Sync (owner + staff) ──

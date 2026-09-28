@@ -19,18 +19,25 @@ vi.mock('react-router-dom', async () => {
 });
 
 function seedOrderInStore() {
+  const now = new Date().toISOString();
   useOrderStore.setState({
     currentOrder: {
       id: 'ORD_1',
+      orderNumber: 'ORD_1',
+      table: null,
+      channel: 'takeaway',
+      subtotal: 70000,
+      discountAmount: 0,
+      taxAmount: 3500,
+      totalAmount: 73500,
       status: 'pending',
-      total: 73500,
-      payment_status: 'unpaid',
-      payment_method: 'cod',
-      customer_name: 'Test User',
-      customer_phone: '0912345678',
-      items: [{ id: '1', name: 'Cà phê', price: 35000, quantity: 2 }],
-      created_at: new Date().toISOString(),
-      customer_address: '123 Test St',
+      paymentStatus: 'pending',
+      notes: null,
+      createdAt: now,
+      updatedAt: now,
+      items: [
+        { name: 'Cà phê', unitPriceCents: 35000, subtotalCents: 70000, quantity: 2, status: 'pending' },
+      ],
     },
     loading: false,
     error: null,
@@ -85,7 +92,7 @@ describe('OrderSuccessPage — polling behavior', () => {
   it('shows pending payment status for PayOS orders', () => {
     seedOrderInStore();
     useOrderStore.setState({
-      currentOrder: { ...useOrderStore.getState().currentOrder!, payment_method: 'payos', status: 'pending', payment_status: 'unpaid' },
+      currentOrder: { ...useOrderStore.getState().currentOrder!, status: 'pending', paymentStatus: 'pending' },
     });
     mockSearchParams.set('order_id', 'ORD_1');
 
@@ -97,7 +104,7 @@ describe('OrderSuccessPage — polling behavior', () => {
   it('shows success status for completed orders', () => {
     seedOrderInStore();
     useOrderStore.setState({
-      currentOrder: { ...useOrderStore.getState().currentOrder!, status: 'delivered', payment_status: 'paid' },
+      currentOrder: { ...useOrderStore.getState().currentOrder!, status: 'delivered', paymentStatus: 'completed' },
     });
     mockSearchParams.set('order_id', 'ORD_1');
 

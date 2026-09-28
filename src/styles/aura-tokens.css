@@ -22,9 +22,9 @@
   --aura-chrome-600: #5A8FB0;    /* Chrome hover */
   --aura-chrome-700: #4A7FA8;    /* Chrome active */
 
-  --aura-bronze-500: #D4AF37;    /* Bronze accent (CTA highlight) */
-  --aura-bronze-400: #E8C547;    /* Bronze hover */
-  --aura-bronze-600: #B8952F;    /* Bronze active */
+  --aura-bronze-500: #C9D6DF;    /* BAZI v5.0 Kim (Bạc) thay thế Gold #D4AF37 (Kim sinh Thủy) */
+  --aura-bronze-400: #E8EEF3;    /* BAZI v5.0 Bạc sáng */
+  --aura-bronze-600: #8898A4;    /* BAZI v5.0 Chrome active */
 
   --aura-noir-void:  #050814;    /* OpsShell background — near-black */
   --aura-noir-900:   #0A1128;    /* Same as navy-900 */
@@ -36,15 +36,39 @@
 
   /* OpsShell / AdminShell surfaces (dark → light) */
   --aura-noir-700:   #16213E;
-  --aura-noir-deep:  #0A0F1E;    /* OpsShell deep layer */
-  --aura-noir-mid:   #16213E;    /* OpsShell mid layer */
+  --aura-noir-deep:  #0A1A2E;    /* OpsShell deep layer */
+  --aura-noir-mid:   #0D1B2A;    /* OpsShell mid layer */
   --aura-noir-bright: #1E2A47;   /* OpsShell raised layer */
   --aura-noir-steel: #334155;    /* OpsShell steel line */
   --aura-noir-mist:  var(--aura-noir-steel);
 
-  --aura-chrome-bright: #8FA3B8;  /* Chrome bright accent */
+  /* Brand surface & canvas tokens (AURA CAFE Deep Navy) */
+  --aura-bg-page:    #0A1A2E;
+  --aura-bg-surface: #0D1B2A;
+  --aura-bg-card:    #0D1B2A;
+  --aura-bg-glass:   rgba(11, 32, 56, 0.6);
+  --aura-glass-bg:   rgba(11, 32, 56, 0.6);
+  --aura-surface-dim: #0A1A2E;
+
+  /* Chrome / Silver accents */
+  --aura-chrome-bright: #E8EEF3;  /* Chrome bright accent */
+  --aura-chrome-mid:    #C9D6DF;  /* Chrome mid accent */
   --aura-chrome-light:  #B8C5D0;  /* Chrome light accent */
+  --aura-chrome-soft:   #A0A8B0;  /* Chrome soft text/accent */
+  --aura-chrome-dim:    rgba(201, 214, 223, 0.2);  /* Chrome dim border */
   --aura-chrome-dark:   #4A6B85;  /* Chrome dark accent */
+  --aura-border-muted:  rgba(255, 255, 255, 0.12);
+  --aura-border-chrome: rgba(201, 214, 223, 0.25);
+  --aura-text-secondary: #A0A8B0;
+  --aura-primary:       #4A7C59;
+  --aura-secondary:     #6B9FB8;
+  --aura-tertiary:      #C9D6DF;
+  --aura-outline:       rgba(255, 255, 255, 0.16);
+
+  /* Typography fonts */
+  --aura-font-display: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --aura-font-body:    'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --aura-font-mono:    'JetBrains Mono', 'SF Mono', Monaco, monospace;
 
   /* Forest — success / biology accents */
   --aura-forest-deep:    #1A2D1F;
@@ -94,7 +118,7 @@
   --md-sys-color-surface: var(--aura-noir-deep);
   --md-sys-color-on-surface: var(--aura-text-primary);
   --md-sys-color-surface-variant: var(--aura-chrome-100);
-  --md-sys-color-on-surface-variant: var(--aura-text-body);
+  --md-sys-color-on-surface-variant: var(--aura-chrome-300); /* WCAG AA: #A8B8C4 on #0D1B2A = 8.4:1 PASS */
 
   --md-sys-color-outline: var(--aura-chrome-400);
   --md-sys-color-outline-variant: var(--aura-navy-500);
@@ -255,36 +279,11 @@
   --md-sys-color-inverse-primary: var(--aura-chrome-500);
 }
 
-/* ── AdminShell Light Override ── */
-[data-shell="admin"] {
-  --md-sys-color-background: var(--aura-pearl-100);
-  --md-sys-color-surface: #FFFFFF;
-  --md-sys-color-on-surface: var(--aura-navy-900);
-  --md-sys-color-on-surface-variant: var(--aura-navy-700);
-  --md-sys-color-primary: var(--aura-chrome-500);
-  --md-sys-color-on-primary: #FFFFFF;
-  --md-sys-color-primary-container: var(--aura-chrome-100);
-  --md-sys-color-on-primary-container: var(--aura-navy-900);
-  --md-sys-color-secondary: var(--aura-navy-700);
-  --md-sys-color-on-secondary: var(--aura-chrome-50);
-  --md-sys-color-secondary-container: var(--aura-chrome-200);
-  --md-sys-color-on-secondary-container: var(--aura-navy-900);
-  --md-sys-color-tertiary: var(--aura-bronze-500);
-  --md-sys-color-on-tertiary: var(--aura-navy-900);
-  --md-sys-color-tertiary-container: var(--aura-bronze-400);
-  --md-sys-color-on-tertiary-container: var(--aura-navy-900);
-  --md-sys-color-error: #EF5350;
-  --md-sys-color-on-error: #FFFFFF;
-  --md-sys-color-error-container: #7F1D1D;
-  --md-sys-color-on-error-container: #FECACA;
-  --md-sys-color-outline: var(--aura-chrome-400);
-  --md-sys-color-outline-variant: var(--aura-navy-500);
-  --md-sys-color-surface-variant: var(--aura-chrome-100);
-  --md-sys-color-on-surface-variant: var(--aura-navy-500);
-  --md-sys-color-inverse-surface: var(--aura-navy-900);
-  --md-sys-color-inverse-on-surface: var(--aura-pearl-50);
-  --md-sys-color-inverse-primary: var(--aura-chrome-300);
-}
+/* ── AdminShell Theme ──
+   AdminShell uses its own dark navy design via Tailwind/inline classes.
+   No global CSS override needed — removing the light override that caused
+   navy text (#0A1128) on navy background (#0A1A2E) collision.
+*/
 
 /* ════════════════ 11. DARK THEME OVERRIDES ════════════════ */
 [data-theme="dark"] {

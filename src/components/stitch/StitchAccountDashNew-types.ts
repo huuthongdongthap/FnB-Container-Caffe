@@ -2,6 +2,8 @@
  * Types for StitchAccountDashNew — AURA CAFE Customer Account Dashboard (v2)
  */
 
+import type { CustomerOrderItem } from '@/hooks/stores/order-store-types';
+
 export interface DashAccountProfile {
   name: string;
   avatar: string;
@@ -22,6 +24,7 @@ export interface DashOrderItem {
   icon: 'coffee' | 'bakery' | 'icecream' | 'cupSoda';
   time: string;
   status: 'preparing' | 'delivered';
+  items?: CustomerOrderItem[];
   rawItems?: string;
 }
 

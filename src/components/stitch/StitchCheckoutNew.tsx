@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingBag, CircleUser, User, Wallet, Award, CreditCard } from 'lucide-react';
+import { User, Wallet, Award, CreditCard, ArrowLeft } from 'lucide-react';
 
 import { CheckoutNewSkeleton } from './StitchCheckoutNew-skeleton';
 import { EmptyCartState } from './StitchCheckoutNew-empty-state';
@@ -37,10 +37,14 @@ export type {
 
 export function StitchCheckoutNew({
   summary,
+  isLoading = false,
   isProcessing = false,
   error = null,
   onPlaceOrder,
   locale = 'vi',
+  onUpdateQuantity,
+  onRemoveItem,
+  onClearCart,
 }: Readonly<StitchCheckoutNewProps>) {
   const { t } = useTranslation();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
@@ -94,7 +98,7 @@ export function StitchCheckoutNew({
     };
   }, []);
 
-  if (!summary) return <CheckoutNewSkeleton />;
+  if (isLoading || !summary) return <CheckoutNewSkeleton />;
   if (summary.items.length === 0) return <EmptyCartState />;
 
   const displayError = error || submitError;
@@ -140,30 +144,30 @@ export function StitchCheckoutNew({
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="min-h-screen bg-[var(--aura-surface-container)] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[var(--aura-chrome-bright, #e5e2e1)] overflow-x-hidden"
+      className="min-h-screen bg-[var(--aura-surface-container)] font-body text-[16px] leading-[1.6] text-[var(--aura-chrome-bright, #e5e2e1)] overflow-x-hidden"
     >
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[var(--aura-noir-void, #131313)]/80 backdrop-blur-[8px] border-b border-[rgba(var(--aura-chrome-light),0.2)] shadow-sm">
-        <a href="/" className="font-['EB_Garamond'] text-2xl sm:text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--aura-chrome-bright)]">AURA CAFE</a>
-        <div className="flex items-center gap-6">
-          <button type="button" className="text-[var(--aura-chrome-light)] hover:text-[var(--aura-chrome-light, #efbd8a)] transition-colors duration-300" aria-label={t('stitch.cart', 'Cart')}>
-            <ShoppingBag className="w-6 h-6" />
-          </button>
-          <button type="button" className="text-[var(--aura-chrome-light)] hover:text-[var(--aura-chrome-light, #efbd8a)] transition-colors duration-300" aria-label={t('stitch.account', 'Account')}>
-            <CircleUser className="w-6 h-6" />
-          </button>
+      {/* TopAppBar provided by CustomerShell */}
+      <main className="py-8 pb-32 px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto">
+        {/* Back Link to Menu */}
+        <div className="mb-6">
+          <a
+            href="/menu"
+            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-mid)] hover:text-white transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>{locale?.startsWith('vi') ? 'Quay lại Thực Đơn / Chọn Thêm Món' : t('stitch.backToMenu', 'Quay lại Thực Đơn')}</span>
+          </a>
         </div>
-      </header>
 
-      <main className="pt-24 pb-32 px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto">
-        <h1 className="font-['EB_Garamond'] text-[32px] sm:text-[40px] lg:text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-12">
-          {locale?.startsWith('vi') ? 'Xác Nhận Đơn Hàng & Thanh Toán' : t('stitch.confirmOrder', 'Finalize Selection')}
+        <h1 className="font-display text-[32px] sm:text-[40px] lg:text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-12">
+          {locale?.startsWith('vi') ? 'Xác Nhận Đơn Hàng & Thanh Toán' : t('stitch.confirmOrder', 'Xác Nhận Đơn Hàng & Thanh Toán')}
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-7 space-y-10">
             {/* Order Type Selection */}
             <section className="p-6 rounded-2xl bg-white/[0.02] border border-[rgba(var(--aura-chrome-light),0.15)]">
-              <label className="block font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] mb-4">
+              <label className="block font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] mb-4">
                 Hình Thức Nhận Món / Order Type
               </label>
               <div className="grid grid-cols-3 gap-3">
@@ -215,7 +219,7 @@ export function StitchCheckoutNew({
             </section>
 
             <section>
-              <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
+              <h2 className="font-display text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
                 <User className="w-8 h-8" aria-hidden="true" />
                 {t('stitch.customerInfo', 'Thông Tin Khách Hàng')}
               </h2>
@@ -310,7 +314,7 @@ export function StitchCheckoutNew({
                 {orderType === 'takeaway' && (
                   <div className="md:col-span-2 p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-[var(--aura-chrome-bright)]/80 flex items-center gap-2">
                     <span className="text-base">📍</span>
-                    <span>Điểm lấy món: Quầy Bar AURA CAFE — 39 Nguyễn Tất Thành, TP. Sa Đéc</span>
+                    <span>Điểm lấy món: Quầy Bar AURA CAFE — 29 Nguyễn Tất Thành, TP. Sa Đéc</span>
                   </div>
                 )}
 
@@ -330,7 +334,13 @@ export function StitchCheckoutNew({
             <PaymentMethodSelector selected={paymentMethod} onSelect={setPaymentMethod} />
           </div>
 
-          <OrderSummaryPanel summary={summary} locale={locale} />
+          <OrderSummaryPanel
+            summary={summary}
+            locale={locale}
+            onUpdateQuantity={onUpdateQuantity}
+            onRemoveItem={onRemoveItem}
+            onClearCart={onClearCart}
+          />
         </div>
       </main>
 

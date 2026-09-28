@@ -101,6 +101,15 @@ describe('Order lifecycle E2E', () => {
         created_at: new Date().toISOString(),
       }] },
       { match: (s) => s.includes('SELECT id, status, items, total'), firstRow: { id: 'ORD-TEST-001', status: 'pending' } },
+      // Canonical read path (GET /api/orders/:id) selects the join alias o.*
+      { match: (s) => s.includes('SELECT o.*') && s.includes('LEFT JOIN tables'), firstRow: {
+        id: 'ORD-TEST-001', status: 'pending', payment_status: 'unpaid',
+        total_amount: 50000, customer_name: 'Nguyen Van A', customer_phone: '0909123456',
+        customer_address: null, payment_method: 'cod', notes: 'Less sugar',
+        delivery_time: 'now', table_id: null, order_type: 'dine_in',
+        tip_amount: 0, service_fee: 0, table_name: null,
+        created_at: new Date().toISOString(),
+      } },
       { match: (s) => s.startsWith('UPDATE orders SET'), rows: [] },
       { match: (s) => s.includes('SELECT id FROM customers'), rows: [] },
       { match: (s) => s.includes('SELECT id FROM referrals'), rows: [] },
@@ -127,9 +136,11 @@ describe('Order lifecycle E2E', () => {
       }),
       env as any, { waitUntil: () => {} } as any
     );
+
     expect(getRes.status).toBe(200);
     const got = await getRes.json() as Record<string, unknown>;
-    expect((got.order as Record<string, unknown>).id).toBe('ORD-TEST-001');
+
+    expect((got.data as Record<string, unknown>).id).toBe('ORD-TEST-001');
 
     const patchRes = await app.fetch(
       new Request('https://test.aura/api/orders/ORD-TEST-001', {

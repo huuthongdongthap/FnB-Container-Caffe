@@ -4,24 +4,9 @@ import { OrderTimeline } from '@/components/tracking/OrderTimeline';
 import { StatusBadge, type OrderStatus } from '@/components/tracking/StatusBadge';
 import { EstimatedTime } from '@/components/tracking/EstimatedTime';
 import type { StatusStep } from '@/components/tracking/track-order-types';
+import type { CustomerOrder, CustomerOrderItem } from '@/hooks/stores/order-store-types';
 
-interface OrderItem {
-  quantity: number;
-  name: string;
-  price: number;
-}
-
-interface OrderData {
-  id: string;
-  status?: string;
-  created_at?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  customer_address?: string;
-  total?: number;
-  payment_method?: string;
-  items?: OrderItem[];
-}
+type OrderData = CustomerOrder;
 
 interface TrackOrderStatusCardProps {
   order: OrderData;
@@ -31,8 +16,8 @@ interface TrackOrderStatusCardProps {
 export function TrackOrderStatusCard({ order, steps }: TrackOrderStatusCardProps) {
   const { t } = useTranslation('trackOrder');
   const orderStatus = order.status ?? 'pending';
-  const orderDate = order.created_at
-    ? new Date(order.created_at).toLocaleDateString('vi-VN')
+  const orderDate = order.createdAt
+    ? new Date(order.createdAt).toLocaleDateString('vi-VN')
     : null;
 
   return (
@@ -41,7 +26,7 @@ export function TrackOrderStatusCard({ order, steps }: TrackOrderStatusCardProps
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-display text-lg font-semibold">
-              {t('orderLabel', { id: order.id })}
+              {t('orderLabel', { id: order.orderNumber })}
             </h3>
             {orderDate && (
               <p className="text-xs text-[color:var(--aura-chrome-bright)]">{t('orderDate', { date: orderDate })}</p>
@@ -53,9 +38,9 @@ export function TrackOrderStatusCard({ order, steps }: TrackOrderStatusCardProps
       <CardBody>
         <OrderTimeline currentStatus={orderStatus} steps={steps} />
 
-        {order.created_at && (
+        {order.createdAt && (
           <div className="mt-4 pt-4 border-t border-white/[0.08]">
-            <EstimatedTime estimatedAt={order.created_at} />
+            <EstimatedTime estimatedAt={order.createdAt} />
           </div>
         )}
 
@@ -79,37 +64,29 @@ function OrderDetailsGrid({ order, t }: { order: OrderData; t: (key: string) => 
     <div className="mt-4 pt-4 border-t border-white/[0.08]">
       <h4 className="text-sm font-semibold mb-2">{t('orderInfo')}</h4>
       <div className="grid grid-cols-2 gap-2 text-sm">
-        {order.customer_name && (
+        {order.table && (
           <>
-            <span className="text-[color:var(--aura-chrome-bright)]">{t('customer')}</span>
-            <span>{order.customer_name}</span>
+            <span className="text-[color:var(--aura-chrome-bright)]">{t('table')}</span>
+            <span>{order.table.name}</span>
           </>
         )}
-        {order.customer_phone && (
+        {order.channel && (
           <>
-            <span className="text-[color:var(--aura-chrome-bright)]">{t('phone')}</span>
-            <span>{order.customer_phone}</span>
+            <span className="text-[color:var(--aura-chrome-bright)]">{t('channel')}</span>
+            <span>{order.channel === 'dine_in' ? 'Tại chỗ' : order.channel === 'takeaway' ? 'Mang đi' : 'Giao hàng'}</span>
           </>
         )}
-        {order.customer_address && (
+        {order.paymentStatus && (
           <>
-            <span className="text-[color:var(--aura-chrome-bright)]">{t('address')}</span>
-            <span>{order.customer_address}</span>
+            <span className="text-[color:var(--aura-chrome-bright)]">{t('paymentStatus')}</span>
+            <span className="capitalize">{order.paymentStatus}</span>
           </>
         )}
-        {order.total !== undefined && (
+        {order.totalAmount !== undefined && (
           <>
             <span className="text-[color:var(--aura-chrome-bright)]">{t('total')}</span>
             <span className="font-semibold">
-              {order.total.toLocaleString('vi-VN')}₫
-            </span>
-          </>
-        )}
-        {order.payment_method && (
-          <>
-            <span className="text-[color:var(--aura-chrome-bright)]">{t('payment')}</span>
-            <span className="capitalize">
-              {order.payment_method === 'cod' ? 'COD' : order.payment_method}
+              {(order.totalAmount / 100).toLocaleString('vi-VN')}₫
             </span>
           </>
         )}
@@ -118,7 +95,7 @@ function OrderDetailsGrid({ order, t }: { order: OrderData; t: (key: string) => 
   );
 }
 
-function OrderItemsList({ items, t }: { items: OrderItem[]; t: (key: string) => string }) {
+function OrderItemsList({ items, t }: { items: CustomerOrderItem[]; t: (key: string) => string }) {
   return (
     <div className="mt-4 pt-4 border-t border-white/[0.08]">
       <h4 className="text-sm font-semibold mb-2">{t('items')}</h4>
@@ -127,7 +104,7 @@ function OrderItemsList({ items, t }: { items: OrderItem[]; t: (key: string) => 
           <li key={i} className="flex justify-between text-sm">
             <span>{item.quantity}x {item.name}</span>
             <span className="text-[color:var(--aura-chrome-bright)]">
-              {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+              {(item.subtotalCents / 100).toLocaleString('vi-VN')}₫
             </span>
           </li>
         ))}

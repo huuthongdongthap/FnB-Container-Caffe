@@ -28,7 +28,7 @@ export function StitchMenuNewCategoryFilter({
             role="tab"
             aria-selected={isActive}
             onClick={() => onCategoryChange(cat.key)}
-            className={`flex-shrink-0 rounded-full border px-6 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
+            className={`flex-shrink-0 rounded-full border px-6 py-2 min-h-[44px] inline-flex items-center justify-center text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
               isActive
                 ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
                 : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-text-body,#c6c6c7)] hover:text-[var(--aura-text-body,#c6c6c7)]'

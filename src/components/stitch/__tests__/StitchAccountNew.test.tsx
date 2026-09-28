@@ -59,7 +59,6 @@ describe('StitchAccountNew', () => {
   it('renders the account page with profile', () => {
     renderWithProviders(<StitchAccountNew />);
     expect(screen.getByText('Julian Vane')).toBeTruthy();
-    expect(screen.getByText('AURA CAFE')).toBeTruthy();
   });
 
   it('renders loyalty progress', () => {
@@ -80,9 +79,8 @@ describe('StitchAccountNew', () => {
     expect(screen.getByText('Visa •• 4242')).toBeTruthy();
   });
 
-  it('renders bottom navigation', () => {
+  it('renders quick order button', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Account')).toBeTruthy();
-    expect(screen.getByText('Orders')).toBeTruthy();
+    expect(screen.getByText('QUICK ORDER')).toBeTruthy();
   });
 });

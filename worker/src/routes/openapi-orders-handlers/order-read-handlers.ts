@@ -3,8 +3,16 @@ import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 const STAFF_ROLES = ['owner', 'manager', 'staff'];
+const ALLOWED_SORT_COLUMNS: Record<string, string> = {
+  created_at: 'o.created_at',
+  total_amount: 'o.total_amount',
+  status: 'o.status',
+  order_number: 'o.order_number',
+  total: 'o.total_amount',
+};
 
 /**
  * Ownership scope for guest sessions. A customer token may only ever reach rows
@@ -38,7 +46,7 @@ function projectForActor<T, U>(
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/orders - List orders with pagination and filtering
   app.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', tableId, locationId, status, paymentStatus, dateFrom, dateTo, customerId } = query;
     const scope = resolveCustomerScope(c);
@@ -82,10 +90,6 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       whereClause += ' AND date(o.created_at) <= ?';
       params.push(dateTo);
     }
-    if (customerId) {
-      whereClause += ' AND o.customer_id = ?';
-      params.push(customerId);
-    }
 
     // Get total count
     const countResult = await db.prepare(
@@ -95,7 +99,9 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Get orders with items and payments
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';
+    const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = await db.prepare(
       `SELECT o.*, t.name as table_name
        FROM orders o
@@ -119,7 +125,7 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/orders/:id - Get order by ID
   app.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const scope = resolveCustomerScope(c);
 
@@ -156,7 +162,7 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/orders/summary - Get order summary statistics
   app.openapi(OrderRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
 

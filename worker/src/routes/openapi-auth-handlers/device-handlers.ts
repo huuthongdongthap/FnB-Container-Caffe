@@ -7,7 +7,7 @@ import { hashPassword, verifyPassword } from './helpers';
 
 export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/reset-password - Request password reset
-  app.openapi(AuthRoutes.resetPassword, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.resetPassword as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -32,7 +32,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/auth/change-password - Change password
-  app.openapi(AuthRoutes.changePassword, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.changePassword as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -56,7 +56,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/auth/devices - List trusted devices
-  app.openapi(AuthRoutes.trustedDevices.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.trustedDevices.list as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -67,7 +67,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     return c.json({
       success: true,
-      data: devices.results.map(d => ({
+      data: devices.results.map((d: any) => ({
         ...d,
         isTrusted: d.is_trusted === 1,
         platform: d.platform,
@@ -80,7 +80,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/auth/devices/{id} - Revoke trusted device
-  app.openapi(AuthRoutes.trustedDevices.revoke, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.trustedDevices.revoke as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -103,7 +103,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/auth/devices - Revoke all trusted devices
-  app.openapi(AuthRoutes.trustedDevices.revokeAll, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.trustedDevices.revokeAll as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
     const now = new Date().toISOString();

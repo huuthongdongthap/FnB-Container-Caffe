@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Coffee, Menu, Bell } from 'lucide-react';
+import { Coffee } from 'lucide-react';
 
 /* ─── Types & Defaults ────────────────────────────────────────── */
 
@@ -37,7 +37,6 @@ import { AccountNewProfileSection } from './StitchAccountNew-profile-section';
 import { AccountNewLoyaltySection } from './StitchAccountNew-loyalty-section';
 import { AccountNewOrderHistory } from './StitchAccountNew-order-history';
 import { AccountNewSettingsCards } from './StitchAccountNew-settings-cards';
-import { AccountNewBottomNav } from './StitchAccountNew-bottom-nav';
 
 /* ─── Re-export Types ────────────────────────────────────────── */
 
@@ -85,34 +84,8 @@ export function StitchAccountNew({
       className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.accountDashboard.pageAriaLabel') || 'Account Dashboard'}
     >
-      {/* ═══════════════ Top App Bar ═══════════════ */}
-      <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(var(--aura-glass-bg),0.06)] bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 backdrop-blur-[8px]"
-        aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
-      >
-        <button
-         type="button"
-          className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
-          aria-label={t('stitch.accountDashboard.openMenu')}
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-
-        <h1 className="font-display text-[clamp(1.25rem,4vw,1.75rem)] tracking-widest text-[var(--aura-chrome-light, #C9D6DF)]">
-          AURA CAFE
-        </h1>
-
-        <button
-         type="button"
-          className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
-          aria-label="Notifications"
-        >
-          <Bell className="w-6 h-6" />
-        </button>
-      </header>
-
-      {/* ═══════════════ Main Content ═══════════════ */}
-      <main className="pt-24 pb-36 px-5 max-w-lg mx-auto w-full space-y-6">
+      {/* ═══════════════ Main Content (Header & BottomNav handled by CustomerShell) ═══════════════ */}
+      <main className="py-6 px-5 max-w-lg mx-auto w-full space-y-6">
         <AccountNewProfileSection profile={profile} />
         <AccountNewLoyaltySection loyalty={loyalty} />
 
@@ -138,9 +111,6 @@ export function StitchAccountNew({
         <AccountNewOrderHistory orders={orders} />
         <AccountNewSettingsCards cards={cards} />
       </main>
-
-      {/* ═══════════════ Bottom Navigation ═══════════════ */}
-      <AccountNewBottomNav />
 
       {/* ═══════════════ Floating Atmosphere Elements ═══════════════ */}
       <div

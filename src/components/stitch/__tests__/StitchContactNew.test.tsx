@@ -44,7 +44,8 @@ vi.mock('lucide-react', () => ({
 describe('StitchContactNew', () => {
   it('renders the hero section', () => {
     renderWithProviders(<StitchContactNew />);
-    expect(screen.getByText('LOCATION & ENQUIRIES')).toBeTruthy();
+    // Hero label is now Vietnamese (hardcoded after localization)
+    expect(screen.getByText(/ĐỊA CHỈ.*LIÊN HỆ/i)).toBeTruthy();
     expect(screen.getByText(/Connect with the Aura/)).toBeTruthy();
   });
 

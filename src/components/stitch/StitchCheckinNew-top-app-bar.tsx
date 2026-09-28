@@ -23,7 +23,7 @@ export function TopAppBar({ onMenu, onAccount }: TopAppBarProps) {
         >
           <Menu className="w-6 h-6" />
         </button>
-        <h1 className="text-[24px] font-bold leading-tight font-['EB_Garamond'] text-[var(--aura-bronze-shimmer)] tracking-tighter">
+        <h1 className="text-[24px] font-bold leading-tight font-display text-[var(--aura-bronze-shimmer)] tracking-tighter">
           AURA CAFE
         </h1>
       </div>

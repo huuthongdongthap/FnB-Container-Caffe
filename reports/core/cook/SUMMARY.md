@@ -2,50 +2,40 @@
 
 ## Invocation
 ```
-/cook next
+/cook next /plan
 ```
 
-## Resolved Next Step
-M4-C Discovery complete → Phase plan written → Implementation ready.
+## Resolved State
+- **UI Re-Architecture (M3 / 2026 Standards)**: All 6 phases completed & reconciled.
+  - Phase 0: Forensic Audit & Baseline
+  - Phase 1: Shell Authority & Viewport Isolation
+  - Phase 2: Design Token Foundation & Adapters
+  - Phase 3: Component Core & Deep-Import Shim Conversion
+  - Phase 4/5: Shell Governance, Route Hygiene & Matrix Reconciliation
+  - Phase 6: Legacy Migration & Dead Code Pruning
+- **UI Localization & Brand Rebuild (`2026-09-21-ui-rebuild-localization`)**: All 5 phases completed.
+  - Phase 1: Master Logo asset distribution
+  - Phase 2: /about authentic Sa Đéc story & real team
+  - Phase 3: /contact & /gallery Sa Đéc 5-zone rebuild
+  - Phase 4: Clean vi.json natural Vietnamese & Top Navbar alignment
+  - Phase 5: Comprehensive verification
+- **Backend Architecture & Stabilization (`plans/concurrent-dancing-stallman.md`)**:
+  - CORS header resolution for credentialed requests
+  - Guest checkout for PayOS payment link creation
+  - Unified D1 database binding accessor (`AURA_DB ?? DB`)
+  - Web payments endpoint (`POST /api/payments/payment-request`)
+  - Secured reservations endpoints (`requireAuth(['owner', 'staff', 'manager'])`)
+  - Sanitized SQL `ORDER BY` with column whitelist
+  - Event replay buffer with `Last-Event-ID` on order status SSE stream
+  - Idempotency key caching with KV storage
 
-## Context Loaded
-- `.ai/state/current.md` — M4-B GREEN, 371 files / 3,395 tests
-- `.ai/state/progress.md` — 5 M4-B phases complete, audit #01–#18 GREEN (only #15 YELLOW: legacy lint)
-- `.ai/state/decisions.md` — D-01 → D-07 recorded
-- `docs/Claude Code CLI — Project Handoff & M4-C Execution Spec.md` — 853 lines, 22 sections
-- `plans/2026-09-18-m4b-final-audit-verdict/` — M4-B verdict artifacts
+## Verification Evidence
+| Gate | Result | Status |
+|---|---|---|
+| `npx tsc --noEmit` | **0 errors** | 🟢 GREEN |
+| `npx vitest run` | **382 test files / 3,519 tests PASS** | 🟢 GREEN |
+| `npm run build` | **Vite build clean** | 🟢 GREEN |
+| **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 
-## Source Inspection (Read-Only)
-| File | Finding |
-|------|---------|
-| `packages/domain/catalog/policies/pricing.ts` | Only `happyHourDiscountFor()` exists — 34 LOC, no channel resolution |
-| `packages/domain/catalog/model/catalog-types.ts` | `Product` has single `price`, no channel columns |
-| `packages/domain/order/model/order-state-machine.ts` | 8 statuses, `canTransition()` complete, terminal guards OK |
-| `packages/domain/order/commands/create-order.ts` | **Reads `data.total` from client payload** — price tampering surface |
-| `packages/domain/crm/commands/place-order.ts` | Server-evaluates `unitPriceCents` from `menu_items` ✅ (canonical pattern) |
-| `worker/src/lib/validators.ts` | `order_type` enum + per-type field validation present |
-| `worker/schema.sql` | `menu_items.price` single column; `orders` has `subtotal`, `shipping_fee`, `discount`, `service_fee`, `tip_amount`, `location_id` |
-| `worker/db/migrations/*` | No `channel_price` / `price_list` tables exist |
-
-## Y-03 Channel Pricing — Root Cause
-- No `channel_prices` table; happy hour applies uniformly; modifiers channel-agnostic.
-- **Resolution:** Extend `pricing.ts` with pure `resolveItemPrice()` + channel delta config map. **No D1 migration required.**
-
-## Artifacts Created
-```
-plans/2026-09-18-m4c-order-pipeline-cart/
-├── plan.md
-├── phase-01-pricing-engine-and-channel.md
-├── phase-02-price-snapshot-and-cart.md
-├── phase-03-order-state-machine-guards.md
-├── phase-04-customer-security-and-api-contract.md
-├── phase-05-acceptance-tests-and-state.md
-└── m4c-discovery-report.md
-reports/core/cook/SUMMARY.md
-```
-
-## Critical Finding (Blocking for M4-C Phase 02)
-`packages/domain/order/commands/create-order.ts:99` inserts `parseInt(String(data.total))` directly from the request payload. The client currently controls the stored order total. M4-C Phase 02 MUST replace this with server-evaluated pricing before any customer-facing order endpoint is exposed.
-
-## Next Task
-Execute Phase 01: `resolveItemPrice()` in `packages/domain/catalog/policies/pricing.ts` + `pricing.test.ts`.
+## Next Step
+- Ready for deployment or staging validation (`/deploy`).

@@ -40,8 +40,8 @@ export function StitchContactNew({
   return (
     <>
       <HelmetHead
-        title="Contact"
-        description="Visit AURA CAFE at 39 Nguyen Tat Thanh, Sa Dec, Dong Thap, Vietnam. Get in touch with our team."
+        title="Liên Hệ — AURA CAFE Sa Đéc"
+        description="Ghé thăm AURA CAFE tại 29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp. Liên hệ với chúng tôi qua điện thoại, email hoặc mạng xã hội."
       />
 
       <Header onNavigate={onNavigate} />
@@ -50,10 +50,10 @@ export function StitchContactNew({
         {/* Hero Section */}
         <section className="relative h-[353px] md:h-[442px] flex items-center px-6 overflow-hidden">
           <div className="relative z-10 w-full">
-            <p className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
-              LOCATION &amp; ENQUIRIES
+            <p className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+              ĐỊA CHỈ &amp; LIÊN HỆ
             </p>
-            <h1 className="font-['EB_Garamond'] text-[36px] md:text-[48px] leading-none tracking-tighter uppercase max-w-xl text-[var(--aura-chrome-bright)]">
+            <h1 className="font-display text-[36px] md:text-[48px] leading-none tracking-tighter uppercase max-w-xl text-[var(--aura-chrome-bright)]">
               Connect with{'\n'}the Aura
             </h1>
           </div>

@@ -38,8 +38,8 @@ export function StitchHeroNewFooter({ brandName }: StitchHeroNewFooterProps) {
             style={LINK_STYLE}
             className="text-[var(--aura-chrome-soft)]"
           >
-            {'©'} 2024 {brandName}.{' '}
-            {t('footer.allRights', 'All rights reserved.')}
+            {`© ${new Date().getFullYear()} ${brandName}. `}
+            {t('footer.allRights', 'Đã đăng ký bản quyền.')}
           </p>
         </div>
 

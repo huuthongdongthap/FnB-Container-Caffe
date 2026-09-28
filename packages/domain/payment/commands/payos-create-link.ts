@@ -5,7 +5,7 @@
  */
 
 import { Hono } from 'hono';
-import { requireAuth } from 'worker/src/middleware/auth';
+import { optionalAuth } from 'worker/src/middleware/auth';
 import { createLogger } from 'worker/src/middleware/logger';
 import { payOSCreateLinkSchema } from 'worker/src/lib/validators';
 import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
@@ -44,9 +44,10 @@ async function buildSignature(
     .join('');
 }
 
-paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), async(c) => {
+paymentRouter.post('/create-link', optionalAuth() as any, async(c) => {
   const db = c.env.AURA_DB;
-  const customerId = c.get('user').id;
+  const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
+  const customerId = user?.id ?? null;
   const mc = createMetricsCollector(db);
   const locale = (c.req.query('locale') || 'vi') as 'vi' | 'en';
 
@@ -75,7 +76,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     const { order_id, description, customer_name } = parsed.data;
 
     const orderRow = await db.prepare(
-      'SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?'
+      'SELECT id, total, payment_status, customer_id, is_cod FROM orders WHERE id = ?'
     ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null; is_cod: number }>();
 
     if (!orderRow) {
@@ -85,7 +86,9 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       return c.json({ success: false, error: errMsg.order_not_found[locale] }, 404);
     }
 
-    if (orderRow.customer_id && orderRow.customer_id !== customerId) {
+    const userRole = user?.role;
+    const isStaffOrOwner = userRole === 'owner' || userRole === 'staff';
+    if (orderRow.customer_id && customerId && orderRow.customer_id !== customerId && !isStaffOrOwner) {
       try {
         c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'forbidden' }));
       } catch { /* executionCtx unavailable */ };

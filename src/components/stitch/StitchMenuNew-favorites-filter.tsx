@@ -18,7 +18,7 @@ export function StitchMenuNewFavoritesFilter({
     <div className="mb-6 flex items-center">
       <button type="button"
         onClick={onToggle}
-        className={`flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
+        className={`flex items-center gap-2 rounded-full border px-5 py-2 min-h-[44px] text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
           showFavoritesOnly
             ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
             : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-text-body,#c6c6c7)] hover:text-[var(--aura-text-body,#c6c6c7)]'

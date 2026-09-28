@@ -1,44 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import type { CustomerOrder } from './stores/order-store-types';
+export type { CustomerOrder, CustomerOrderItem } from './stores/order-store-types';
 
 /* ═══════════════════════════════════════════════════════════════════
-   useOrder — TanStack Query hook for GET /api/orders/:id.
-   Used by OrderSuccess page to poll order status.
+   useOrder — TanStack Query hook for canonical GET /api/orders/:id.
+   Used by OrderSuccess / TrackOrder pages to poll order status.
+   Server projection returns `{ data: CustomerOrder }` (or `{ success: true, data: CustomerOrder }`).
    ═══════════════════════════════════════════════════════════════════ */
 
-export interface Order {
-  id: string;
-  status: string;
-  total: number;
-  payment_status: string;
-  payment_method: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address?: string;
-  customer_email?: string;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-    image?: string;
-  }>;
-  shipping_fee: number;
-  discount: number;
-  notes?: string;
-  created_at: string;
-  updated_at?: string;
-  payment?: {
-    id: string;
-    method: string;
-    amount: number;
-    status: string;
-  } | null;
-}
-
-interface OrderResponse {
-  success: boolean;
-  order: Order;
+export interface OrderResponse {
+  success?: boolean;
+  data: CustomerOrder;
 }
 
 export function useOrder(orderId: string | null, options?: { refetchInterval?: number }) {

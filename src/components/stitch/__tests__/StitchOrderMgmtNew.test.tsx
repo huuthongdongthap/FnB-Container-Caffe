@@ -50,7 +50,7 @@ vi.mock('lucide-react', () => ({
 describe('StitchOrderMgmtNew', () => {
   it('renders the order management page', () => {
     renderWithProviders(<StitchOrderMgmtNew />);
-    expect(screen.getByText('nav.orders')).toBeTruthy();
+    expect(screen.getByLabelText('terminal.mainContent')).toBeTruthy();
   });
 
   it('renders stat cards with their labels', () => {

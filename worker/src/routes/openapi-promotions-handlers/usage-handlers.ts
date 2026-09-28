@@ -6,7 +6,7 @@ import { PromotionRoutes } from '../../schemas/promotions';
 export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions/use - Record promotion usage
   app.openapi(PromotionRoutes.use, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -81,7 +81,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/promotions/summary - Get promotion summary
   app.openapi(PromotionRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
 
     // Verify admin role

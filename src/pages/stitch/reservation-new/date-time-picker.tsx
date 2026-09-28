@@ -1,61 +1,110 @@
-import { TIMES, WEEK_DAYS } from './reservation-new-constants';
+import { useMemo } from 'react';
+import { TIMES } from './reservation-new-constants';
+import { Calendar, Clock } from 'lucide-react';
 
 interface DateTimePickerProps {
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
   selectedTime: string;
   onSelectTime: (time: string) => void;
 }
 
-export function DateTimePicker({ selectedTime, onSelectTime }: DateTimePickerProps) {
+export function DateTimePicker({
+  selectedDate,
+  onSelectDate,
+  selectedTime,
+  onSelectTime,
+}: DateTimePickerProps) {
+  // Generate next 7 days from today
+  const upcomingDays = useMemo(() => {
+    const days = [];
+    const now = new Date();
+    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+
+      const dayNum = d.getDate();
+      const monthNum = d.getMonth() + 1;
+      const dateStr = `${dayNum < 10 ? '0' + dayNum : dayNum}/${monthNum < 10 ? '0' + monthNum : monthNum}`;
+      const weekday = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
+
+      days.push({
+        id: dateStr,
+        dayNum: String(dayNum),
+        weekday,
+        fullLabel: `${weekday}, ${dateStr}`,
+      });
+    }
+    return days;
+  }, []);
+
   return (
-    <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div>
-        <label className="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Date</label>
-        <div className="glass-panel rounded-xl p-4">
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-label-md text-label-md text-on-surface">September 2024</span>
-            <div className="flex space-x-2">
-              <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">chevron_left</span>
-              <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">chevron_right</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-7 gap-2 text-center">
-            {WEEK_DAYS.map(d => (
-              <span key={d} className="font-label-sm text-label-sm text-outline">{d}</span>
-            ))}
-            {['12', '13', '14', '15', '16', '17', '18'].map((day, i) => (
+    <section className="grid grid-cols-1 md:grid-cols-12 gap-8">
+      {/* Date Picker (7 cols on md) */}
+      <div className="md:col-span-7">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar className="w-4 h-4 text-[#4A7C59]" />
+          <label className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)]">
+            2. CHỌN NGÀY
+          </label>
+        </div>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2.5">
+          {upcomingDays.map((day) => {
+            const isSelected = selectedDate === day.id;
+            return (
               <button
-                key={day}
+                key={day.id}
                 type="button"
-                className={`py-2 ${
-                  i === 2
-                    ? 'active-pill bronze-glow rounded-lg'
-                    : 'text-on-surface-variant hover:text-secondary'
+                onClick={() => onSelectDate(day.id)}
+                className={`py-3 px-2 min-h-[44px] rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-1 ${
+                  isSelected
+                    ? 'bg-[var(--aura-chrome-bright)] text-[#0A1A2E] font-bold border-[var(--aura-chrome-bright)] shadow-lg scale-105'
+                    : 'bg-white/5 border-white/10 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-chrome-mid)] hover:text-white'
                 }`}
               >
-                {day}
+                <span className="text-[11px] uppercase tracking-wider font-semibold opacity-90">
+                  {day.weekday}
+                </span>
+                <span className="text-base font-bold font-display">
+                  {day.dayNum}
+                </span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      <div>
-        <label className="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Time</label>
-        <div className="grid grid-cols-2 gap-3">
-          {TIMES.map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onSelectTime(t)}
-              className={`glass-panel py-4 rounded-xl text-center font-label-md text-label-md transition-all ${
-                selectedTime === t ? 'active-pill bronze-glow' : 'text-on-surface-variant hover:border-secondary'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+      {/* Time Picker (5 cols on md) */}
+      <div className="md:col-span-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-4 h-4 text-[#4A7C59]" />
+          <label className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)]">
+            3. KHUNG GIỜ ĐẾN
+          </label>
+        </div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {TIMES.map((t) => {
+            const isSelected = selectedTime === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => onSelectTime(t)}
+                className={`py-3 min-h-[44px] inline-flex items-center justify-center rounded-xl text-center font-body text-xs font-bold tracking-wider transition-all cursor-pointer border ${
+                  isSelected
+                    ? 'bg-[var(--aura-chrome-bright)] text-[#0A1A2E] border-[var(--aura-chrome-bright)] shadow-lg scale-105'
+                    : 'bg-white/5 border-white/10 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-chrome-mid)] hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
+

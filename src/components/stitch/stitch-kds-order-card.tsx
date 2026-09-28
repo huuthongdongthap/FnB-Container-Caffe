@@ -85,7 +85,7 @@ export function TicketCard({
           <div>
             <h2
               className={cn('text-[32px] leading-[1.2] font-bold tracking-tighter', timerColorClass)}
-              style={{ fontFamily: "'Syne', sans-serif" }}
+              style={{ fontFamily: 'var(--aura-font-display)' }}
             >
               {ticket.id}
             </h2>
@@ -168,7 +168,7 @@ export function TicketCard({
           </ActionButton>
         )}
         {isReady && onPickup && (
-          <ActionButton onClick={() => onPickup(ticket.id)} disabled>
+          <ActionButton onClick={() => onPickup(ticket.id)}>
             {t('kds.orderPickedUp', 'ORDER PICKED UP')}
           </ActionButton>
         )}

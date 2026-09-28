@@ -143,27 +143,29 @@
 
 ---
 
-## 7. Phase 6 — Legacy Migration & Dead Code Cleanup
+## 7. Phase 6 — Legacy Migration & Dead Code Cleanup (COMPLETED)
 
 **Goal:** Safely remove unrouted prototype files using the 5-condition checklist.
 
-### Tasks:
-1. **Execute Checklist for ~50 Candidate Files**:
-   - Verify: 0 routes, 0 imports, 0 dependencies, replacement exists, tests pass.
-2. **Batch 1: Dead Stitch Prototype Folders**:
-   - `src/pages/stitch/events-1/`
-   - `src/pages/stitch/events-2/`
-   - `src/pages/stitch/events/` (6 sub-files)
-   - `src/pages/stitch/checkout/`
-   - `src/pages/stitch/referral/`
-3. **Batch 2: Deprecated Layouts & Shims**:
-   - `src/pages/mobile/mobile-layout.tsx`
-   - `src/pages/admin/AdminLayout.tsx` (after migration)
-   - `src/components/stitch/StitchAppLayout.tsx`
+### Completed Tasks:
+1. **Executed Checklist across Candidate Files**:
+   - Verified 5-point protocol: 0 routes, 0 imports, 0 dependencies, replacement exists, tests pass.
+2. **Dead Legacy Shims & Unrouted Submodules Pruned**:
+   - `src/pages/AboutUs.tsx` (unrouted re-export shim; `/about` maps directly to canonical `OurStory`)
+   - `src/pages/admin/AdminLayout.tsx` (deprecated shim; `admin-routes.tsx` directly renders `AdminShell`)
+   - `src/pages/admin/AdminSidebar.tsx` (legacy sidebar replaced by `AdminShell` / `StitchAdminTerminalNew`)
+   - `src/pages/admin/admin-sidebar-header.tsx` (subcomponent of retired legacy admin sidebar)
+   - `src/pages/admin/admin-sidebar-nav-item.tsx` (subcomponent of retired legacy admin sidebar)
+   - `src/pages/admin/admin-sidebar-nav-config.ts` (subcomponent of retired legacy admin sidebar)
+   - `src/pages/mobile/offline-queue.tsx` (orphaned prototype with 0 imports and 0 route declarations)
+   - `src/pages/stitch/our-story/our-story-footer.tsx` (orphaned internal footer; page uses canonical `LandingFooter`)
+   - `src/pages/stitch/reservation-new/reservation-new-styles.tsx` (orphaned style component with 0 imports)
+3. **Compatibility Shim Verified**:
+   - `src/components/stitch/StitchAppLayout.tsx` maintained as backwards-compatibility shim wrapping `CustomerShell`.
 4. **Final Regression & Build Verification**:
-   - `npm run build`
-   - `npx tsc --noEmit`
-   - `npx vitest run` (all 3,464+ tests green)
+   - `npm run build` → vite build ok
+   - `npx tsc --noEmit` → 0 errors
+   - `npx vitest run` → 382 test files / 3,519 tests PASS (100% green)
 
 ---
 

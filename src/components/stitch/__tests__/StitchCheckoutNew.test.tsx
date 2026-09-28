@@ -43,6 +43,14 @@ vi.mock('lucide-react', () => ({
   Package: () => null,
   AlertTriangle: () => null,
   RefreshCw: () => null,
+  ArrowLeft: () => null,
+  ArrowRight: () => null,
+  Minus: () => null,
+  Plus: () => null,
+  Trash2: () => null,
+  Coffee: () => null,
+  Award: () => null,
+  CreditCard: () => null,
 }));
 
 const MOCK_SUMMARY: CheckoutNewSummary = {

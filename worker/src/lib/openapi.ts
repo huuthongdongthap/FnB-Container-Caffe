@@ -66,7 +66,7 @@ export const openApiApp = new OpenAPIHono({
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid request data',
-            details: result.error.flatten(),
+            details: (result as { error: { flatten: () => unknown } }).error.flatten(),
           },
         },
         400
@@ -75,21 +75,10 @@ export const openApiApp = new OpenAPIHono({
   },
 });
 
-// Mount all route handlers
-openApiApp.route('/api/categories', openApiCategoriesRouter);
-openApiApp.route('/api/products', openApiProductsRouter);
-openApiApp.route('/api/orders', openApiOrdersRouter);
-openApiApp.route('/api/tables', openApiTablesRouter);
-openApiApp.route('/api/auth', openApiAuthRouter);
-openApiApp.route('/api/payments', openApiPaymentsRouter);
-openApiApp.route('/api/staff', openApiStaffRouter);
-openApiApp.route('/api/inventory', openApiInventoryRouter);
-openApiApp.route('/api/loyalty', openApiLoyaltyRouter);
-openApiApp.route('/api/promotions', openApiPromotionsRouter);
-openApiApp.route('/api/cron', openApiCronRouter);
-
-// Register all route schemas for OpenAPI spec generation
-// Filter to only include objects with method and path (route definitions), excluding nested objects like TableRoutes.zones
+// Register all route schemas for OpenAPI spec generation BEFORE mounting real routers.
+// This ensures the stub handlers (registered for spec generation only) do NOT shadow
+// the live handlers mounted below. In Hono, later registrations at the same or more
+// specific path win; by registering stubs first, the real routers win.
 const isRouteDef = (r: unknown): r is { method: string; path: string } =>
   !!r && typeof r === 'object' && 'method' in r && 'path' in r;
 
@@ -117,17 +106,38 @@ const routes = [
   ...CronRouteValues.filter(isRouteDef),
 ];
 
+// Validate the collected route definitions before anything is registered.
+// The live handlers are registered by each domain sub-router, which declares
+// the full '/api/...' path and is mounted on the root app (see src/index.ts).
+// openApiApp is mounted last there and therefore never shadows a live handler.
 routes.forEach((route, idx) => {
   if (!route || !route.method || !route.path) {
     console.error(`[DEBUG] Malformed route at index ${idx}:`, JSON.stringify(route, null, 2));
     console.error('[DEBUG] Route keys:', route ? Object.keys(route) : 'null/undefined');
     throw new Error(`Malformed route at index ${idx}: missing method or path`);
   }
+});
+
+// Route definitions still have to be visited so OpenAPIHono knows about them
+// when it renders the spec document; the handlers below are unreachable.
+routes.forEach((route) => {
   openApiApp.openapi(route, async (c) => {
-    // This will never be reached as routes are handled by mounted routers
-    return c.json({ success: true, data: null }, 501);
+    return c.json({ success: false, error: 'Route not bound' }, 501);
   });
 });
+
+// Mount all real route handlers (overrides stubs above)
+openApiApp.route('/', openApiCategoriesRouter);
+openApiApp.route('/', openApiProductsRouter);
+openApiApp.route('/', openApiOrdersRouter);
+openApiApp.route('/', openApiTablesRouter);
+openApiApp.route('/', openApiAuthRouter);
+openApiApp.route('/', openApiPaymentsRouter);
+openApiApp.route('/', openApiStaffRouter);
+openApiApp.route('/', openApiInventoryRouter);
+openApiApp.route('/', openApiLoyaltyRouter);
+openApiApp.route('/', openApiPromotionsRouter);
+openApiApp.route('/', openApiCronRouter);
 
 // Health check route
 const healthRoute = createRoute({

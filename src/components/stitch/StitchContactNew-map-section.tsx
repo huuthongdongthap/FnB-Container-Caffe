@@ -17,11 +17,11 @@ export function MapSection() {
       }}
     >
       <div className="absolute top-4 left-4 z-10 bg-[var(--aura-surface-dim)]/80 p-4 border border-[var(--aura-bronze-shimmer)]/30 backdrop-blur-md rounded">
-        <p className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)]">
-          {t('contact.mapLabel', 'LIVE MAP NAVIGATION')}
+        <p className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)]">
+          {t('contact.mapLabel', 'BẢN ĐỒ ĐIỀU HƯỚNG')}
         </p>
-        <p className="font-['Space_Grotesk'] text-[14px] leading-relaxed text-[var(--aura-chrome-bright)]">
-          {t('contact.mapLocation', 'Sa Dec Industrial Park Hub')}
+        <p className="font-body text-[14px] leading-relaxed text-[var(--aura-chrome-bright)]">
+          {t('contact.mapLocation', '29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp')}
         </p>
       </div>
 

@@ -28,23 +28,23 @@ export function SupportSection({
   return (
     <section className={cn(GLASS_CARD_CLASSES, 'w-full relative p-6 overflow-hidden')}>
       <div className="absolute top-0 left-0 w-full h-[2px] bg-[var(--aura-bronze-shimmer)]" />
-      <h3 className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+      <h3 className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
         {t('orderFailure.helpTitle', 'Need Help?')}
       </h3>
-      <p className="font-['Space_Grotesk'] text-[14px] leading-relaxed text-[var(--aura-chrome-soft)] mb-6">
+      <p className="font-body text-[14px] leading-relaxed text-[var(--aura-chrome-soft)] mb-6">
         {t('orderFailure.helpDesc', 'Our concierge team is available 24/7 to assist with your order issues.')}
       </p>
       <div className="flex flex-col gap-3">
         <button type="button"
           onClick={onChatSupport}
-          className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-['Space_Grotesk'] text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
+          className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-body text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
         >
           <MessageCircle className="w-5 h-5" />
           {t('orderFailure.chat', 'Chat with Support')}
         </button>
         <button type="button"
           onClick={onCallSupport}
-          className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-['Space_Grotesk'] text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
+          className="flex items-center gap-3 text-[var(--aura-chrome-bright)] font-body text-[14px] py-2 border-b border-white/10 hover:text-[var(--aura-bronze-shimmer)] transition-colors text-left"
         >
           <Phone className="w-5 h-5" />
           {t('orderFailure.call', 'Call Us')}
@@ -70,7 +70,7 @@ export function AestheticFillerCard() {
           />
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-['EB_Garamond'] text-[40px] text-white/5 uppercase tracking-tighter select-none">
+          <span className="font-display text-[40px] text-white/5 uppercase tracking-tighter select-none">
             AURA CAFE
           </span>
         </div>
@@ -94,28 +94,28 @@ export function BottomNavBar({
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <UtensilsCrossed className="w-6 h-6 mb-1" />
-        <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.menu', 'Menu')}</span>
+        <span className="font-body text-[10px] font-semibold">{t('nav.menu', 'Menu')}</span>
       </button>
       <button type="button"
         onClick={() => onNavigate?.('/referrals')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <UserPlus className="w-6 h-6 mb-1" />
-        <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.referrals', 'Referrals')}</span>
+        <span className="font-body text-[10px] font-semibold">{t('nav.referrals', 'Referrals')}</span>
       </button>
       <button type="button"
         onClick={() => onNavigate?.('/rewards')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <Award className="w-6 h-6 mb-1" />
-        <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.rewards', 'Rewards')}</span>
+        <span className="font-body text-[10px] font-semibold">{t('nav.rewards', 'Rewards')}</span>
       </button>
       <button type="button"
         onClick={() => onNavigate?.('/profile')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"
       >
         <User className="w-6 h-6 mb-1" />
-        <span className="font-['Space_Grotesk'] text-[10px] font-semibold">{t('nav.profile', 'Profile')}</span>
+        <span className="font-body text-[10px] font-semibold">{t('nav.profile', 'Profile')}</span>
       </button>
     </nav>
   );

@@ -20,7 +20,7 @@ export function BottomNav({ onNavigate }: BottomNavProps) {
           className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors active:scale-95 transition-transform duration-150"
         >
           <UtensilsCrossed className="w-6 h-6" />
-          <span className="font-['Space_Grotesk'] text-[12px] font-medium tracking-[0.08em] mt-1">
+          <span className="font-body text-[12px] font-medium tracking-[0.08em] mt-1">
             {t('nav.menu', 'Menu')}
           </span>
         </button>
@@ -30,7 +30,7 @@ export function BottomNav({ onNavigate }: BottomNavProps) {
           className="flex flex-col items-center justify-center text-[var(--aura-bronze-shimmer)] bg-[var(--aura-bronze-shimmer)]/10 rounded-xl px-4 py-1 active:scale-95 transition-transform duration-150"
         >
           <Receipt className="w-6 h-6" />
-          <span className="font-['Space_Grotesk'] text-[12px] font-medium tracking-[0.08em] mt-1">
+          <span className="font-body text-[12px] font-medium tracking-[0.08em] mt-1">
             {t('nav.orders', 'Orders')}
           </span>
         </button>
@@ -40,7 +40,7 @@ export function BottomNav({ onNavigate }: BottomNavProps) {
           className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors active:scale-95 transition-transform duration-150"
         >
           <User className="w-6 h-6" />
-          <span className="font-['Space_Grotesk'] text-[12px] font-medium tracking-[0.08em] mt-1">
+          <span className="font-body text-[12px] font-medium tracking-[0.08em] mt-1">
             {t('nav.profile', 'Profile')}
           </span>
         </button>

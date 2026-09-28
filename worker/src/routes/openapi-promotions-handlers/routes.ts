@@ -8,7 +8,7 @@ import { registerUsageHandlers } from './usage-handlers';
 export const openApiPromotionsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiPromotionsRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
+openApiPromotionsRouter.use('/api/promotions/*', requireAuth(['owner', 'manager', 'staff']));
 
 // Register handlers
 registerCrudHandlers(openApiPromotionsRouter);

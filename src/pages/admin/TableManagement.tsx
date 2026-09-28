@@ -130,8 +130,8 @@ export default function TableManagementPage() {
 								className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors">
 								{t("admin.tableManagement.openAll", { fallback: "Open all" })}
 							</button>
-							<button onClick={() => {/* future */}}
-								className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">
+							<button onClick={() => bulkSetStatus('Reserved')} disabled={updating === 'BULK'}
+								className="px-3 py-1.5 text-xs rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors">
 								{t("admin.tableManagement.bookAll", { fallback: "Book all" })}
 							</button>
 							<button onClick={loadTables}

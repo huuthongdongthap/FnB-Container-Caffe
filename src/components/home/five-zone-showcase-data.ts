@@ -55,13 +55,13 @@ export const ZONES: Zone[] = [
     badge: 'NOIR CABIN',
     tagline: 'Ấm Cúng & Công Nghiệp',
     description:
-      'Không gian khép kín bên trong container 40ft. Vách thép đen rỉ tự nhiên thô mộc, kết hợp sofa da navy sang trọng. Riêng tư tuyệt đối, ấm cúng.',
+      'Không gian khép kín bên trong container 40ft. Vách thép đen rỉ tự nhiên thô mộc, kết hợp ghế mây và ghế nệm êm ái. Riêng tư tuyệt đối, ấm cúng.',
     specs: [
       { label: 'Tiện nghi', value: 'Điều hòa & Cách âm' },
       { label: 'Sức chứa', value: '25 khách' },
-      { label: 'Vật liệu', value: 'Thép đen rỉ & Da navy' },
+      { label: 'Ghế ngồi', value: 'Ghế mây & Ghế nệm' },
     ],
-    icon: 'sofa',
+    icon: 'armchair',
     imageUrl: '/photos/IMG_6556-frame.webp',
   },
   {

@@ -1,5 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { MD3Button, type MD3ButtonProps } from '@/components/md3/md3-button';
+import { cn } from '@/lib/cn';
 
 /**
  * ButtonAdapter — backward-compatible wrapper around MD3Button.
@@ -25,6 +26,9 @@ const sizeMap: Record<NonNullable<ButtonAdapterProps['size']>, MD3ButtonProps['s
   lg: 'default',
 };
 
+const destructiveClasses =
+  'bg-[var(--md-sys-color-error)] text-[var(--md-sys-color-on-error)] hover:bg-[var(--md-sys-color-error)]/90 active:bg-[var(--md-sys-color-error)]/80';
+
 export const Button = forwardRef<HTMLButtonElement, ButtonAdapterProps>(
   function Button(
     {
@@ -42,6 +46,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonAdapterProps>(
     const isDisabled = disabled || loading;
     const md3Variant = variantMap[variant];
     const md3Size = sizeMap[size];
+    const isDestructive = variant === 'destructive';
 
     return (
       <MD3Button
@@ -49,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonAdapterProps>(
         variant={md3Variant}
         size={md3Size}
         disabled={isDisabled}
-        className={className}
+        className={cn(isDestructive && destructiveClasses, className)}
         type={type}
         {...rest}
       >

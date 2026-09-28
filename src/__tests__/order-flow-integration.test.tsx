@@ -19,14 +19,18 @@ const MOCK_ORDER_RESPONSE = {
   success: true,
   data: {
     id: 'ORD-001',
+    orderNumber: 'ORD-001',
     status: 'pending',
-    total: 90000,
-    payment_status: 'unpaid',
-    payment_method: 'cod',
-    customer_name: 'Test User',
-    customer_phone: '0901234567',
-    items: [{ id: 'prod-1', name: 'Ca Phe Sua Da', price: 45000, quantity: 2 }],
-    created_at: new Date().toISOString(),
+    paymentStatus: 'pending',
+    subtotal: 90000,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: 90000,
+    channel: 'takeaway',
+    table: null,
+    items: [{ name: 'Ca Phe Sua Da', unitPriceCents: 45000, subtotalCents: 90000, quantity: 2, status: 'pending' }],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
 };
 
@@ -146,15 +150,15 @@ describe('Order Creation', () => {
     expect(order!.status).toBe('pending');
   });
 
-  it('create order with delivery -> shipping fee included', async () => {
-    const payloadWithDelivery = { ...PAYLOAD, shipping_fee: 15000, total: 105000 };
+  it('create order with delivery -> discount/tax reflected in totalAmount', async () => {
+    const payloadWithDelivery = { ...PAYLOAD, discount: 5000, total: 100000 };
     mockFetch(201, {
       success: true,
-      data: { ...MOCK_ORDER_RESPONSE.data, total: 105000, shipping_fee: 15000 },
+      data: { ...MOCK_ORDER_RESPONSE.data, totalAmount: 100000, discountAmount: 5000 },
     });
     const order = await useOrderStore.getState().createOrder(payloadWithDelivery);
-    expect(order!.total).toBe(105000);
-    expect(order!.shipping_fee).toBe(15000);
+    expect(order!.totalAmount).toBe(100000);
+    expect(order!.discountAmount).toBe(5000);
   });
 
   it('create order failure -> error state', async () => {
@@ -310,7 +314,7 @@ describe('Payment Methods', () => {
       payment_method: 'cod',
     });
     expect(order).not.toBeNull();
-    expect(order!.payment_method).toBe('cod');
+    expect(order!.paymentStatus).toBe('pending');
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/orders'),
       expect.objectContaining({ method: 'POST' }),
@@ -320,14 +324,14 @@ describe('Payment Methods', () => {
   it('PayOS selected -> order created then redirect expected', async () => {
     mockFetch(201, {
       success: true,
-      data: { ...MOCK_ORDER_RESPONSE.data, payment_method: 'payos' },
+      data: { ...MOCK_ORDER_RESPONSE.data, paymentStatus: 'paid' },
     });
     const order = await useOrderStore.getState().createOrder({
       ...BASE_PAYLOAD,
       payment_method: 'payos',
     });
     expect(order).not.toBeNull();
-    expect(order!.payment_method).toBe('payos');
+    expect(order!.paymentStatus).toBe('paid');
   });
 
   it('payment failure -> error + retry available', async () => {

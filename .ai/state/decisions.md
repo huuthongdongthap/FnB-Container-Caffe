@@ -1,5 +1,42 @@
 # Decisions — AURA OS
 
+## Backend Stabilization & Edge Resilience
+
+### D-17: Guest Checkout Unblocked via Optional Authentication on Payment Creation
+**Decision:** `POST /api/payment/create-link` (PayOS) and `POST /momo/create/create` use `optionalAuth()` instead of `requireAuth()`.
+**Rationale:** Guests scanning QR codes at tables or placing orders from the web storefront do not have customer JWT accounts. Enforcing `requireAuth` returned 401 Unauthorized, completely blocking the payment funnel for guest diners. With `optionalAuth()`, unauthenticated guests can initiate payments while authenticated customer sessions remain protected against IDOR.
+**Verification:** `tests/payments.test.ts` and `worker/src/__tests__/routes/payments-momo-smoke.test.ts` assert guest link creation succeeds and cross-customer tampering is rejected with 403.
+
+## M4-D Customer Order Tracking & History UI
+
+### D-12: Domain-Scoped Sub-Router Middleware
+**Decision:** Every OpenAPI sub-router applies auth via a domain-prefixed path — `router.use('/api/orders/*', requireAuth(...))` — never `use('*', ...)`.
+**Rationale:** Hono sub-routers mounted at the app root (e.g. `app.route('/', openApiOrdersRouter)`) match their wildcard middleware against *every* inbound request, not just their own. A `use('*', ...)` gate therefore 401'd unrelated public endpoints (`/api/health`, `/api/version`) and made the failure look like a broken health check rather than a routing-scope bug.
+**Reversibility:** Low — a regression here silently locks down unrelated routes.
+**Verification:** `tests/api-versioning.test.ts` asserts `/api/health` and `/api/version` are reachable without credentials.
+
+### D-13: Payments Webhook Path Exempted From Sub-Router Auth
+**Decision:** `openApiPaymentsRouter` scopes `requireAuth` to `/api/payments/*` but keeps the inbound provider webhook path outside the gate; the webhook authenticates by signature instead of bearer token.
+**Rationale:** Payment providers call the webhook server-to-server and cannot present a user JWT. Applying the domain-wide gate indiscriminately would have broken payment confirmation — a failure mode only reachable once D-12's scoping was introduced.
+**Verification:** Payment route tests exercise the webhook path without an `Authorization` header.
+
+### D-14: Positive-Allowlist Customer Projection
+**Decision:** `formatCustomerOrder()` builds its object literal field-by-field from an allowlist. It must never spread the raw DB row.
+**Rationale:** A spread inverts the default: any column added to `orders` later (margin inputs, supplier references, `server_staff_id`) leaks automatically. An explicit allowlist means new columns stay private until deliberately exposed.
+**Fields deliberately omitted:** `source`, `payments`, `customer_id`, `location_id`, `table_id`, `happyHourApplied`, `server_staff_id`, `served_at`, `completed_at`, `cancelled_at`.
+**Verification:** `tests/m4d-customer-order-projection.test.ts` asserts each omitted key is `undefined` and that output passes `CustomerOrderResponseSchema`.
+
+### D-15: Line-Item Identifiers Stripped From Guest Payloads
+**Decision:** `formatCustomerOrderItem()` drops `id`, `order_id`, `product_id`, `menuItemId`, and reduces modifiers to `{ name, priceAdjustment }`.
+**Rationale:** Product and modifier-option IDs are procurement-side references. A guest needs to recognise what they ordered, not resolve it back into the catalog graph. Retaining them would let a client enumerate internal product IDs from order history.
+**Verification:** `tests/m4d-customer-order-projection.test.ts` asserts item keys and modifier shapes.
+
+### D-16: Retire Unauthenticated Legacy Order Reads
+**Decision:** Removed the unauthenticated `GET /api/orders/:id` and the phone-number-based `GET /api/orders/my-orders`. Order reads flow only through the scoped `GET /api/orders` and `GET /api/orders/:id` handlers.
+**Rationale:** The phone-based lookup accepted a caller-supplied number and returned the matching customer's orders with no proof of ownership — a straight data-leak path, and the direct motivation for M4-D.
+**Reversibility:** None — deliberately irreversible.
+**Verification:** `tests/m4d-order-history.test.ts` asserts a customer token reaches only its own `customer_id` and that unauthenticated callers receive 401.
+
 ## M4-C Order Pipeline & Server-Authoritative Cart Engine
 
 ### D-08: Server-Authoritative Price Evaluation

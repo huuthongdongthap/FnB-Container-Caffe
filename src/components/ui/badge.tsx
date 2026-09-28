@@ -1,33 +1,6 @@
-import { type HTMLAttributes, type ReactNode } from 'react';
-import { cn } from '@/lib/cn';
-
-type BadgeVariant = 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'outline';
-
-interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  children: ReactNode;
-  variant?: BadgeVariant;
-}
-
-const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-muted/20 text-foreground',
-  success: 'bg-green-500/15 text-green-400',
-  warning: 'bg-yellow-500/15 text-yellow-400',
-  destructive: 'bg-red-500/15 text-red-400',
-  info: 'bg-blue-500/15 text-blue-400',
-  outline: 'border border-current',
-};
-
-export function Badge({ className, children, variant = 'default', ...props }: BadgeProps) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium font-utility',
-        variantClasses[variant],
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </span>
-  );
-}
+/**
+ * Compatibility shim — canonical implementation lives in BadgeAdapter,
+ * rendering the MD3Chip primitive with Material Design 3 tokens.
+ * Kept so deep imports (`@/components/ui/badge`) resolve to the MD3 component.
+ */
+export { Badge, type BadgeAdapterProps as BadgeProps } from '@/components/ui/adapters/BadgeAdapter';

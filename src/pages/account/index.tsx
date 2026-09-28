@@ -70,17 +70,16 @@ export default function AccountPage() {
     };
 
     const dashOrders: DashOrderItem[] = orders.map((order) => {
-      let items: { product_name: string; quantity: number }[] = [];
-      try { items = JSON.parse(order.items) as { product_name: string; quantity: number }[]; } catch { items = []; }
-      const productName = items.length > 0 ? items[0]!.product_name : 'Order';
+      const first = order.items?.[0];
+      const productName = first?.name ?? 'Order';
 
       return {
-        id: order.id,
+        id: order.orderNumber || order.id,
         itemName: productName,
         icon: mapOrderItemIcon(productName),
-        time: formatTimeAgo(order.created_at, t),
+        time: formatTimeAgo(order.createdAt, t),
         status: mapOrderStatus(order.status),
-        rawItems: order.items,
+        items: order.items,
       };
     });
 

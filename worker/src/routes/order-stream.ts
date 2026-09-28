@@ -29,21 +29,66 @@ interface OrderEvent {
   timestamp: string;
 }
 
+// Event log entry stored in KV for replay
+interface EventLogEntry {
+  eventId: string;    // monotonically increasing ID (timestamp)
+  orderId: string;
+  type: string;       // 'update_order', etc.
+  data: unknown;
+  timestamp: string;
+}
+
 // Max SSE connection duration: 120 seconds
 const SSE_TIMEOUT_MS = 120_000;
 // Poll KV/D1 every 3 seconds for changes
 const POLL_INTERVAL_MS = 3_000;
+
+async function appendEventToLog(kv: { get: (k: string) => Promise<string | null>; put: (k: string, v: string, o?: { expirationTtl?: number }) => Promise<void> }, orderId: string, event: EventLogEntry) {
+  try {
+    const raw = await kv.get(`order_events_log:${orderId}`);
+    const list: EventLogEntry[] = raw ? JSON.parse(raw) : [];
+    list.push(event);
+    const trimmed = list.slice(-20);
+    await kv.put(`order_events_log:${orderId}`, JSON.stringify(trimmed), { expirationTtl: 3600 });
+  } catch {
+    // Ignore KV write errors
+  }
+}
+
+async function getEventsAfter(kv: { get: (k: string) => Promise<string | null> }, orderId: string, afterEventId: string): Promise<EventLogEntry[]> {
+  try {
+    const raw = await kv.get(`order_events_log:${orderId}`);
+    if (!raw) return [];
+    const list: EventLogEntry[] = JSON.parse(raw);
+    const index = list.findIndex(e => e.eventId === afterEventId);
+    if (index === -1) {
+      const afterTs = Number(afterEventId) || new Date(afterEventId).getTime();
+      if (!isNaN(afterTs)) {
+        return list.filter(e => {
+          const itemTs = Number(e.eventId) || new Date(e.timestamp).getTime();
+          return itemTs > afterTs;
+        });
+      }
+      return list;
+    }
+    return list.slice(index + 1);
+  } catch {
+    return [];
+  }
+}
 
 export const orderStreamRouter = new Hono<{ Bindings: Env }>();
 
 /**
  * GET /api/orders/:id/events — SSE endpoint
  * Sends 'update_order' events when the order status changes.
+ * Supports Last-Event-ID header and query param for event replay.
  */
 orderStreamRouter.get('/:id/events', async(c) => {
   const db = c.env.AURA_DB;
   const kv = c.env.AUTH_KV;
   const orderId = c.req.param('id');
+  const lastEventId = c.req.header('Last-Event-ID') || c.req.query('lastEventId');
 
   if (!kv) {
     return c.json({ error: 'KV not available' }, 500);
@@ -66,11 +111,13 @@ orderStreamRouter.get('/:id/events', async(c) => {
       const encoder = new TextEncoder();
       let closed = false;
 
-      const send = (type: string, data: unknown) => {
+      const send = (type: string, data: unknown, eventId?: string) => {
         if (closed) {
           return;
         }
         try {
+          const id = eventId || String(Date.now());
+          controller.enqueue(encoder.encode(`id: ${id}\n`));
           controller.enqueue(encoder.encode(`event: ${type}\n`));
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch {
@@ -78,13 +125,36 @@ orderStreamRouter.get('/:id/events', async(c) => {
         }
       };
 
-      // Initial: send current order state
+      // ── Event Replay Buffer: replay missed events if Last-Event-ID is provided ──
+      let replayedCount = 0;
+      if (lastEventId) {
+        const replayedEvents = await getEventsAfter(kv, orderId, lastEventId);
+        for (const ev of replayedEvents) {
+          send(ev.type, ev.data, ev.eventId);
+          if (ev.type === 'update_order' && typeof ev.data === 'object' && ev.data && 'status' in ev.data) {
+            currentStatus = String((ev.data as { status: string }).status);
+          }
+          replayedCount++;
+        }
+      }
+
+      // Initial: send current order state if not already replayed
       const initialOrder = await db.prepare(
         'SELECT * FROM orders WHERE id = ?'
       ).bind(orderId).first<OrderRecord>();
       if (initialOrder) {
-        currentStatus = initialOrder.status;
-        send('update_order', initialOrder);
+        if (replayedCount === 0 || initialOrder.status !== currentStatus) {
+          currentStatus = initialOrder.status;
+          const initialEventId = String(Date.now());
+          send('update_order', initialOrder, initialEventId);
+          await appendEventToLog(kv, orderId, {
+            eventId: initialEventId,
+            orderId,
+            type: 'update_order',
+            data: initialOrder,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
 
       // Polling loop: check for status changes
@@ -108,7 +178,15 @@ orderStreamRouter.get('/:id/events', async(c) => {
                   'SELECT * FROM orders WHERE id = ?'
                 ).bind(orderId).first<OrderRecord>();
                 if (updatedOrder) {
-                  send('update_order', updatedOrder);
+                  const eventId = String(Date.now());
+                  send('update_order', updatedOrder, eventId);
+                  await appendEventToLog(kv, orderId, {
+                    eventId,
+                    orderId,
+                    type: 'update_order',
+                    data: updatedOrder,
+                    timestamp: new Date().toISOString()
+                  });
                 }
                 continue;
               }
@@ -124,7 +202,15 @@ orderStreamRouter.get('/:id/events', async(c) => {
                 'SELECT * FROM orders WHERE id = ?'
               ).bind(orderId).first<OrderRecord>();
               if (fullOrder) {
-                send('update_order', fullOrder);
+                const eventId = String(Date.now());
+                send('update_order', fullOrder, eventId);
+                await appendEventToLog(kv, orderId, {
+                  eventId,
+                  orderId,
+                  type: 'update_order',
+                  data: fullOrder,
+                  timestamp: new Date().toISOString()
+                });
               }
             }
           } catch {

@@ -33,10 +33,14 @@ export interface CheckoutNewFormData {
 
 export interface StitchCheckoutNewProps {
   summary: CheckoutNewSummary | null;
+  isLoading?: boolean;
   isProcessing?: boolean;
   error?: string | null;
   onPlaceOrder: (data: CheckoutNewFormData) => Promise<void>;
   locale?: string;
+  onUpdateQuantity?: (id: string, quantity: number) => void;
+  onRemoveItem?: (id: string) => void;
+  onClearCart?: () => void;
 }
 
 export type PaymentMethod = 'payos' | 'cod' | 'apple_pay' | 'google_pay';

@@ -71,7 +71,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
               color: 'var(--aura-chrome-bright)',
             }}
           >
-            {t('landing.gallerySubtitle', 'Kiến Trúc Độc Bản')}
+            {t('landing.gallerySubtitle', '3 Khu Không Gian')}
           </span>
           <h2
             className="mb-8"
@@ -84,7 +84,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
               color: 'var(--aura-chrome-bright)',
             }}
           >
-            {t('landing.galleryTitle', 'Nổi Công Nghiệp Gặp Gủ Sự Sang Trọng')}
+            {t('landing.galleryTitle', 'Mỗi Góc Một Cảm Giác')}
           </h2>
           <p
             className="mb-10 leading-relaxed"
@@ -98,22 +98,29 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           >
             {t(
               'landing.galleryDescription',
-              'Aura Cafe không chỉ là một quán cà phê; đó là một từ nguyên về phong cách sống. Những khối container thô cứng được chúng tôi biến đổi thành không gian nghệ thuật với vật liệu cao cấp, ánh sáng thông minh và tâm hôn của những người yêu cái đẹp.',
+              'Ba khu không gian khác biệt hoàn toàn trong một quán — sân ngoài trời thoáng gió, rooftop tầng thượng ngắm làng hoa, và phòng container 40ft mát lạnh yên tĩnh.',
             )}
           </p>
           <div className="space-y-6">
             <GalleryBullet
               titleKey="landing.galleryBullet1Title"
-              titleFallback="Vật liệu tinh tuyển"
+              titleFallback="Sân Ngoài Trời"
               descKey="landing.galleryBullet1Desc"
-              descFallback="Sự kết hợp giữa thép không gì, kính cường lực mô và gỗ sối tự nhiên."
+              descFallback="Container 20ft mở hai đầu hứng gió tự nhiên, bao quanh bởi cây xanh và sân vườn làng hoa Sa Đéc."
               t={t}
             />
             <GalleryBullet
               titleKey="landing.galleryBullet2Title"
-              titleFallback="Ánh sáng cảm xúc"
+              titleFallback="Rooftop Tầng Thượng"
               descKey="landing.galleryBullet2Desc"
-              descFallback="Hệ thống chiếu sáng được thiết kế bởi chuyên gia, tối ưu cho trải nghiệm buổi tối."
+              descFallback="Sân thượng mở thoáng trời — view đêm lung linh, lý tưởng cho những buổi chill cuối tuần."
+              t={t}
+            />
+            <GalleryBullet
+              titleKey="landing.galleryBullet3Title"
+              titleFallback="Phòng Container"
+              descKey="landing.galleryBullet3Desc"
+              descFallback="Container 40ft có máy lạnh — yên tĩnh, riêng tư, phù hợp làm việc hoặc họp nhóm nhỏ."
               t={t}
             />
           </div>

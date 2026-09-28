@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { MapPin, Clock, Phone } from 'lucide-react';
+import { MapPin, Clock, Phone, Navigation } from 'lucide-react';
+
+/** Real Google Maps pin for AURA CAFE Sa Đéc */
+const AURA_MAPS_URL = 'https://maps.app.goo.gl/KMKbeDY4gM2FBBpw9';
 
 interface LocationSectionProps {
   locationMapUrl: string;
@@ -36,16 +39,30 @@ export function LocationSection({ locationMapUrl }: LocationSectionProps) {
             >
               {t('landing.locationTitle', 'Ghé thăm chúng tôi tại Sa Đéc')}
             </h2>
-            <div className="space-y-4">
-              <ContactRow icon={MapPin} labelKey="landing.locationAddress" labelFallback="Đường Nguyễn Sinh Sắc, Phường 2, Sa Đéc, Đồng Tháp" t={t} />
-              <ContactRow icon={Clock} labelKey="landing.locationHours" labelFallback="Mở cửa: 07:00 - 23:00 mỗi ngày" t={t} />
-              <ContactRow icon={Phone} labelKey="landing.locationPhone" labelFallback="+84 277 123 456" t={t} />
+            <div className="space-y-4 mb-8">
+              <ContactRow icon={MapPin} labelKey="landing.locationAddress" labelFallback="29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp" t={t} />
+              <ContactRow icon={Clock} labelKey="landing.locationHours" labelFallback="Mở cửa: 06:00 - 23:00 mỗi ngày" t={t} />
+              <ContactRow icon={Phone} labelKey="landing.locationPhone" labelFallback="+84 946 013 633" t={t} />
             </div>
+            {/* Directions CTA */}
+            <a
+              href={AURA_MAPS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-[var(--aura-chrome-bright)]/40 text-sm font-semibold text-[var(--aura-chrome-bright)] hover:bg-[var(--aura-chrome-bright)]/10 transition-all"
+            >
+              <Navigation className="w-4 h-4" aria-hidden="true" />
+              Chỉ đường trên Google Maps
+            </a>
           </div>
 
-          {/* Map image */}
-          <div
-            className="w-full md:w-1/2 h-64 overflow-hidden"
+          {/* Map image — clickable to open Maps */}
+          <a
+            href={AURA_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-1/2 h-64 overflow-hidden block group"
+            aria-label="Mở bản đồ AURA CAFE trên Google Maps"
             style={{
               background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
               backdropFilter: 'blur(12px)',
@@ -54,16 +71,21 @@ export function LocationSection({ locationMapUrl }: LocationSectionProps) {
             }}
             data-glass-panel
           >
-            <div
-              className="w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `url('${locationMapUrl}')` }}
-              role="img"
-              aria-label={t(
-                'landing.locationMapAlt',
-                'Map showing AURA CAFE location in Sa Dec, Dong Thap',
-              )}
-            />
-          </div>
+            <div className="relative w-full h-full">
+              <div
+                className="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                style={{ backgroundImage: `url('${locationMapUrl}')` }}
+                role="img"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-[#0A1A2E]/80 text-[var(--aura-chrome-bright)] text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-1.5">
+                  <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
+                  Mở Google Maps
+                </span>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
     </section>

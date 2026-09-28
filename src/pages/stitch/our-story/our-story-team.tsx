@@ -7,12 +7,11 @@ export function TeamSection() {
         <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
           <div>
             <h2 className="font-display text-3xl md:text-4xl text-[var(--aura-chrome-bright)] mb-4">
-              The Minds Behind{'\n'}the Machine
+              Con Người Đằng Sau{'\n'}AURA CAFE
             </h2>
-            <p className="text-[var(--aura-chrome-mid)] max-w-md font-body">
-              Our team consists of industrial designers, chemical engineers, and master roasters
-              united by a singular focus.
-            </p>
+            <div className="text-[var(--aura-chrome-mid)] max-w-md font-body">
+              Đội ngũ sáng lập, quản lý và các barista tận tâm luôn nỗ lực kiến tạo hương vị nguyên bản và không gian thư thái nhất cho từng vị khách tại Sa Đéc.
+            </div>
           </div>
           <div className="h-px w-full md:w-64 bg-[var(--aura-chrome-mid)]/20 hidden md:block" />
         </div>
@@ -30,9 +29,9 @@ export function TeamSection() {
               <h4 className="text-white text-lg font-bold tracking-tight mb-1 font-display">
                 {member.name}
               </h4>
-              <p className="text-[var(--aura-chrome-mid)] font-body text-xs uppercase tracking-widest font-bold">
+              <div className="text-[var(--aura-chrome-mid)] font-body text-xs uppercase tracking-widest font-bold">
                 {member.role}
-              </p>
+              </div>
             </div>
           ))}
         </div>

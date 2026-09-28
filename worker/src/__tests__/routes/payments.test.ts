@@ -93,7 +93,9 @@ beforeEach(() => {
 // ── Auth Tests ────────────────────────────────────────────────────────
 
 describe('PayOS create-link auth', () => {
-  it('rejects unauthenticated request', async() => {
+  // Phase 1.2: guests (unauthenticated QR diners) are allowed to create links.
+  // Without a JWT the route still resolves the order first — unknown order → 404.
+  it('treats unauthenticated request as guest (order-not-found → 404, not 401)', async() => {
     const app = await createTestRouter();
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
@@ -101,7 +103,38 @@ describe('PayOS create-link auth', () => {
       body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, makeEnv());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
+  });
+
+  it('allows guest to pay an order with no customer_id (guest order)', async() => {
+    const app = await createTestRouter();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 })
+    ));
+    const env = makeEnv({ AURA_DB: paymentMockDB({ orderCustomerId: '' }) });
+    const req = new Request('https://test.aura/api/payment/create-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: 'ORD_1' })
+    });
+    const res = await app.fetch(req, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; checkoutUrl?: string };
+    expect(body.success).toBe(true);
+    expect(body.checkoutUrl).toBeTruthy();
+  });
+
+  it('rejects customer paying an order owned by a different customer (403)', async() => {
+    const app = await createTestRouter();
+    const token = await generateJWT({ email: 'other@b.com', name: 'Other', id: 'USR_2', role: 'customer' }, TEST_JWT_SECRET);
+    const env = makeEnv({ AURA_DB: paymentMockDB({ orderCustomerId: 'USR_1' }) });
+    const req = new Request('https://test.aura/api/payment/create-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ order_id: 'ORD_1' })
+    });
+    const res = await app.fetch(req, env);
+    expect(res.status).toBe(403);
   });
 
   it('rejects request with missing order_id', async() => {

@@ -67,6 +67,7 @@ export { StitchMenu2New } from './StitchMenu2New';
 export type { StitchMenu2NewProps, MenuItem2Data } from './StitchMenu2New';
 
 export { StitchMenuNew } from './StitchMenuNew';
+export { StitchMenuNewSkeleton } from './StitchMenuNew-skeleton';
 export type { StitchMenuNewProps, MenuItemData } from './StitchMenuNew';
 
 export { StitchMobileOrderNew } from './StitchMobileOrderNew';

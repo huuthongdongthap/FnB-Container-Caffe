@@ -28,15 +28,17 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
   const recommendations = useMemo(() => {
     if (menuItems.length === 0) return [];
 
-    // Build order history from past orders
+    // Build order history from past orders.
+    // Canonical CustomerOrderItem carries no menu id, so resolve by name against
+    // the live menu; unmatched lines are skipped (they would be unusable anyway).
+    const idByName = new Map(menuItems.map((m) => [m.name.toLowerCase(), m.id]));
     const history: Array<Array<{ id: string; name: string; quantity: number }>> = [];
     for (const order of orderHistory) {
       if (Array.isArray(order.items) && order.items.length > 0) {
-        history.push(
-          order.items
-            .filter((i) => i.id)
-            .map((i) => ({ id: String(i.id), name: i.name, quantity: i.quantity })),
-        );
+        const lines = order.items
+          .map((i) => ({ id: idByName.get(i.name.toLowerCase()), name: i.name, quantity: i.quantity }))
+          .filter((i): i is { id: string; name: string; quantity: number } => Boolean(i.id));
+        if (lines.length > 0) history.push(lines);
       }
     }
 

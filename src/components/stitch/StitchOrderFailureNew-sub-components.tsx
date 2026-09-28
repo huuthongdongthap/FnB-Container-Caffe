@@ -35,10 +35,10 @@ export function PaymentOption({
       <div className="flex items-center gap-6">
         <Icon className="w-6 h-6 text-[var(--aura-chrome-bright)]" />
         <div className="text-left">
-          <p className="font-['Space_Grotesk'] text-[14px] leading-relaxed text-[var(--aura-chrome-bright)] font-bold">
+          <p className="font-body text-[14px] leading-relaxed text-[var(--aura-chrome-bright)] font-bold">
             {title}
           </p>
-          <p className="font-['Space_Grotesk'] text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)]">
+          <p className="font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)]">
             {description}
           </p>
         </div>
@@ -65,7 +65,7 @@ export function TopAppBar({
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
-      <h1 className="font-['Space_Grotesk'] text-[20px] font-bold leading-tight uppercase tracking-widest text-[var(--aura-chrome-bright)]">
+      <h1 className="font-body text-[20px] font-bold leading-tight uppercase tracking-widest text-[var(--aura-chrome-bright)]">
         {t('orderFailure.title', 'ORDER FAILED')}
       </h1>
       <button type="button"
@@ -100,10 +100,10 @@ export function ErrorHeroSection() {
         />
       </div>
       <div className="space-y-2">
-        <h2 className="font-['EB_Garamond'] text-[36px] leading-none tracking-tighter uppercase text-[var(--aura-chrome-bright)]">
+        <h2 className="font-display text-[36px] leading-none tracking-tighter uppercase text-[var(--aura-chrome-bright)]">
           {t('orderFailure.heading', 'Payment Failed')}
         </h2>
-        <p className="font-['Space_Grotesk'] text-[18px] leading-relaxed text-[var(--aura-chrome-soft)] max-w-[280px]">
+        <p className="font-body text-[18px] leading-relaxed text-[var(--aura-chrome-soft)] max-w-[280px]">
           {t('orderFailure.description', "The transaction couldn't be processed. Please check your card details or try another method.")}
         </p>
       </div>
@@ -126,7 +126,7 @@ export function RetryButton({
       <button type="button"
         onClick={onRetry}
         disabled={isProcessing}
-        className="w-full bg-[var(--aura-bronze-shimmer)] text-white font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase py-6 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-[var(--aura-bronze-shimmer)] text-white font-body text-[12px] font-semibold tracking-[0.1em] uppercase py-6 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ boxShadow: '0 0 20px 0 rgba(212, 165, 116, 0.15)' }}
       >
         {isProcessing ? (
@@ -156,7 +156,7 @@ export function PaymentOptionsSection({
     <section className="w-full space-y-6">
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-white/10" />
-        <span className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)]">
+        <span className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)]">
           {t('orderFailure.otherOptions', 'Other Options')}
         </span>
         <div className="h-px flex-1 bg-white/10" />

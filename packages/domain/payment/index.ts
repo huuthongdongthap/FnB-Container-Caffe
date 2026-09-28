@@ -3,3 +3,4 @@
 export { paymentRouter } from './commands/payos-create-link';
 export { momoCreate } from './commands/momo-create';
 export { nowPaymentsIPN } from './commands/nowpayments-ipn';
+export { webPaymentRouter, registerWebPaymentHandlers } from './commands/process-web-payment';
