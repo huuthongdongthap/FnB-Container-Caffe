@@ -18,6 +18,7 @@ export function CheckoutFooter({
   displayError,
 }: Readonly<CheckoutFooterProps>) {
   const { t } = useTranslation();
+  const totalQuantity = summary.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <footer className="fixed bottom-0 left-0 w-full z-50">
@@ -31,17 +32,17 @@ export function CheckoutFooter({
           <div className="flex items-center gap-8">
             <div className="hidden md:flex flex-col">
               <span className="text-xs text-[var(--aura-chrome-soft)] uppercase tracking-widest">
-                {t('stitch.selectedItems', 'Selected Items')}
+                {t('stitch.selectedItems', 'Món đã chọn')}
               </span>
-              <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--aura-chrome-bright, #E8EEF3)]">
-                {summary.items.length} {t('stitch.items', 'Nocturnal Crafts')}
+              <span className="font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--aura-chrome-bright, #E8EEF3)]">
+                {totalQuantity} {t('stitch.items', 'món')}
               </span>
             </div>
             <div className="flex flex-col items-center md:items-start">
               <span className="text-xs font-bold text-[var(--aura-chrome-bright)] uppercase tracking-widest">
-                {t('stitch.totalAmount', 'Total Amount')}
+                {t('stitch.totalAmount', 'Tổng thanh toán')}
               </span>
-              <span className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-chrome-bright)]">
+              <span className="font-display text-[32px] leading-[1.2] font-medium text-[var(--aura-chrome-bright)]">
                 {formatPrice(summary.total, locale)}
               </span>
             </div>
@@ -49,12 +50,12 @@ export function CheckoutFooter({
 
           <button
             type="submit"
-            disabled={processing}
+            disabled={processing || totalQuantity === 0}
             className={cn(
-              'min-w-[min(240px,60vw)] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
+              'min-w-[min(240px,60vw)] px-12 py-4 rounded-full font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all cursor-pointer',
               'bg-gradient-to-br from-[var(--aura-chrome-bright, #E3E2E3)] via-[var(--aura-text-body, #C6C6C7)] to-[var(--aura-chrome-dim)]',
               'text-[var(--aura-surface-container)]',
-              processing
+              processing || totalQuantity === 0
                 ? 'cursor-not-allowed opacity-60'
                 : 'hover:brightness-110 active:scale-95',
             )}
@@ -62,12 +63,12 @@ export function CheckoutFooter({
             {processing ? (
               <span className="flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin" aria-hidden="true" />
-                {t('stitch.processing', 'Processing...')}
+                {t('stitch.processing', 'Đang xử lý...')}
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">
                 <ShoppingBag className="w-4 h-4" aria-hidden="true" />
-                {t('stitch.placeOrder', 'Place Order')}
+                {t('stitch.placeOrder', 'Xác Nhận Đặt Hàng')}
               </span>
             )}
           </button>

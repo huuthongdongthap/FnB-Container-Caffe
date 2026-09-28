@@ -7,7 +7,7 @@ export type {
   ShiftReconciliation,
   ReconciliationInput,
   VarianceStatus,
-} from './model/reconciliation-types';
+} from './src/model/reconciliation-types';
 // commands
 export { shiftsRouter } from './commands/shifts';
 // policies

@@ -2,22 +2,24 @@
 
 import { useCallback } from 'react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Fixed top navigation header for StitchAbout page.
  */
 export function HeaderNav() {
+  const { t } = useTranslation();
   const scrollToOrder = useCallback(() => {
     const el = document.getElementById("order-section");
     el?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   const navLinks = [
-    { label: "Home", href: "/" },
-    { label: "Order", href: "#order-section" },
-    { label: "Events", href: "/#events" },
-    { label: "About", href: "/about", active: true },
-    { label: "Contact", href: "/#contact" },
+    { label: t('nav.home', 'Trang chủ'), href: "/" },
+    { label: t('nav.menu', 'Thực đơn'), href: "/menu" },
+    { label: t('landing.promotions', 'Ưu đãi'), href: "/promotions" },
+    { label: t('landing.about', 'Giới thiệu'), href: "/about", active: true },
+    { label: t('landing.contact', 'Liên hệ'), href: "/contact" },
   ];
 
   return (
@@ -58,7 +60,7 @@ export function HeaderNav() {
           className="rounded px-6 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
           style={{ backgroundColor: "var(--aura-tertiary, var(--aura-chrome-light, #C9D6DF))", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
         >
-          Order Now
+          {t('landing.orderNow', 'Gọi món ngay')}
         </button>
       </div>
     </header>

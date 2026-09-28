@@ -24,7 +24,7 @@ export function StitchMenuNewSearchBar({
         type="text"
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder={t('stitch.searchPlaceholder', { defaultValue: 'Search our craft...' })}
+        placeholder={t('stitch.searchPlaceholder', { defaultValue: 'Tìm món đồ uống...' })}
         aria-label={t('stitch.searchAriaLabel')}
         className="w-full rounded-full border border-[var(--aura-chrome-dim)]/50 bg-[var(--aura-noir-deep,#061c35)] py-3 pl-12 pr-12 text-base text-[var(--aura-text-body,#c6c6c7)] placeholder-[var(--aura-chrome-dim)] transition-all focus:border-[var(--aura-text-body,#c6c6c7)] focus:outline-none"
         style={{ fontFamily: 'var(--aura-font-body)' }}

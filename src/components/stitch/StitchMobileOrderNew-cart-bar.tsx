@@ -6,6 +6,9 @@ import { ShoppingCart, ChevronRight } from 'lucide-react';
 import type { CartItem } from './StitchMobileOrderNew-types';
 
 function formatPrice(price: number): string {
+  if (price >= 1000) {
+    return new Intl.NumberFormat('vi-VN').format(price) + '₫';
+  }
   return `$${price.toFixed(2)}`;
 }
 

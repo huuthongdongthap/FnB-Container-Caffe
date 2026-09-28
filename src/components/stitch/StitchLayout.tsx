@@ -27,9 +27,19 @@ const bgClass = scrollEffect
 
 return (
 <header className={`${base} ${bgClass} ${className}`}>
-<div className="font-display text-headline-sm text-[var(--aura-tertiary)] tracking-wider">
-{brand}
-</div>
+<a href="/" className="flex items-center gap-2.5">
+  <img
+    src="/images/aura-logo-256.png"
+    alt="AURA CAFE Logo"
+    className="h-7 w-7 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover"
+    onError={(e) => {
+      (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
+    }}
+  />
+  <span className="font-display text-headline-sm text-[var(--aura-chrome-bright)] tracking-wider">
+    {brand}
+  </span>
+</a>
 {rightContent && (
 <div className="flex items-center gap-3">{rightContent}</div>
 )}

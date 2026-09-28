@@ -6,12 +6,12 @@ interface LocationMapProps {
 }
 
 const ADDRESS = {
-  street: '39 Nguyễn Tất Thành',
+  street: '29 Nguyễn Tất Thành',
   ward: 'Phường Sa Đéc',
   city: 'Đồng Tháp, Việt Nam',
 };
 
-const MAPS_QUERY = '39+Nguy%E1%BB%85n+T%E1%BA%A5t+Th%C3%A0nh,+Sa+%C4%90%C3%A9c,+%C4%90%E1%BB%93ng+Th%C3%A1p';
+const MAPS_URL = 'https://maps.app.goo.gl/KMKbeDY4gM2FBBpw9';
 
 export function LocationMap({ className }: LocationMapProps) {
   return (
@@ -28,7 +28,7 @@ export function LocationMap({ className }: LocationMapProps) {
           <p>{ADDRESS.city}</p>
         </address>
         <a
-          href={`https://maps.google.com/?q=${MAPS_QUERY}`}
+          href={MAPS_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent transition-colors hover:text-accent-warm"
@@ -55,7 +55,7 @@ export function LocationMap({ className }: LocationMapProps) {
       {/* Static map fallback */}
       <div className="overflow-hidden rounded-2xl border border-border">
         <a
-          href={`https://maps.google.com/?q=${MAPS_QUERY}`}
+          href={MAPS_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="block"

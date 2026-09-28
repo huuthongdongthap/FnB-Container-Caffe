@@ -16,13 +16,13 @@ export function Footer({ onNavigate }: { onNavigate?: (path: string) => void }) 
           <button type="button"
             key={link.path}
             onClick={() => onNavigate?.(link.path)}
-            className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
+            className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
           >
             {t(link.i18nKey, link.fallback)}
           </button>
         ))}
       </div>
-      <p className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)]">
+      <p className="font-body text-[12px] font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)]">
         &copy; 2024 AURA CAFE. ALL RIGHTS RESERVED.
       </p>
     </footer>

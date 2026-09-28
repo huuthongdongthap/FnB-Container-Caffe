@@ -70,6 +70,37 @@ describe('StitchCheckoutNew', () => {
     expect(screen.getByText('Hot • 2x')).toBeInTheDocument();
   });
 
+  it('triggers onUpdateQuantity when quantity stepper buttons are clicked', async () => {
+    const user = userEvent.setup();
+    const onUpdateQuantity = vi.fn();
+    renderWithProviders(
+      <StitchCheckoutNew {...defaultProps} onUpdateQuantity={onUpdateQuantity} />
+    );
+    const increaseBtn = screen.getByRole('button', { name: /tăng 1/i });
+    await user.click(increaseBtn);
+    expect(onUpdateQuantity).toHaveBeenCalledWith('1', 3);
+
+    const decreaseBtn = screen.getByRole('button', { name: /giảm 1/i });
+    await user.click(decreaseBtn);
+    expect(onUpdateQuantity).toHaveBeenCalledWith('1', 1);
+  });
+
+  it('triggers onRemoveItem when delete button is clicked', async () => {
+    const user = userEvent.setup();
+    const onRemoveItem = vi.fn();
+    renderWithProviders(
+      <StitchCheckoutNew {...defaultProps} onRemoveItem={onRemoveItem} />
+    );
+    const removeBtn = screen.getByRole('button', { name: /xóa espresso/i });
+    await user.click(removeBtn);
+    expect(onRemoveItem).toHaveBeenCalledWith('1');
+  });
+
+  it('renders link to add more items from menu', () => {
+    renderWithProviders(<StitchCheckoutNew {...defaultProps} />);
+    expect(screen.getByText(/Thêm Món Khác Từ Thực Đơn/i)).toBeInTheDocument();
+  });
+
   it('blocks submit with alert when phone empty (VN format required)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<StitchCheckoutNew {...defaultProps} />);

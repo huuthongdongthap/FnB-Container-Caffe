@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockDB, createMockEnv } from '../test-utils';
 
 vi.mock('../../middleware/auth', () => ({
-  requireAuth: () => (_c: any, next: any) => next()
+  optionalAuth: () => (_c: any, next: any) => next()
 }));
 
 describe('Payments MoMo smoke', () => {

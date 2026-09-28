@@ -10,7 +10,7 @@ export function LocationMap() {
             Tìm Chúng Tôi
           </h2>
           <p className="mx-auto mt-3 text-chrome-light/60">
-            39 Nguyễn Tất Thành, Phường 1, Sa Đéc, Đồng Tháp
+            29 Nguyễn Tất Thành, Phường 1, Sa Đéc, Đồng Tháp
           </p>
         </div>
 
@@ -25,7 +25,7 @@ export function LocationMap() {
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               title="Bản đồ AURA CAFE"
-              aria-label="Google Maps hiển thị vị trí AURA CAFE tại 39 Nguyễn Tất Thành, Sa Đéc"
+              aria-label="Google Maps hiển thị vị trí AURA CAFE tại 29 Nguyễn Tất Thành, Sa Đéc"
             />
           </div>
         </div>

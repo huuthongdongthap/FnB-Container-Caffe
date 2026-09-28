@@ -74,22 +74,42 @@ export async function apiFetch<T = unknown>(
   };
 
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include', // Send cookies cross-origin
-    headers,
-  });
+
+  // Network-level fetch — catches Safari "Load failed" / Chrome "Failed to fetch"
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      credentials: 'include', // Send cookies cross-origin
+      headers,
+    });
+  } catch (networkErr) {
+    // Translate browser-level network errors into readable Vietnamese messages
+    const isNetworkError =
+      networkErr instanceof TypeError &&
+      (networkErr.message === 'Load failed' ||
+        networkErr.message === 'Failed to fetch' ||
+        networkErr.message.includes('NetworkError'));
+    const friendlyMessage = isNetworkError
+      ? 'Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.'
+      : (networkErr instanceof Error ? networkErr.message : 'Lỗi kết nối không xác định');
+    const apiError = new ApiClientError({ status: 0, message: friendlyMessage });
+    reportError(apiError, path, options.method ?? 'GET');
+    throw apiError;
+  }
 
   if (!res.ok) {
-    let body: Partial<ApiError> = {};
+    let body: Partial<ApiError> & { error?: string; success?: boolean } = {};
     try {
       body = await res.json();
     } catch {
       // non-JSON error response
     }
+    // Some endpoints return { success: false, error: "..." } shape
+    const message = body.error || body.message || `Lỗi máy chủ (${res.status})`;
     const apiError = new ApiClientError({
       status: res.status,
-      message: body.message || `Request failed: ${res.status}`,
+      message,
       errors: body.errors,
     });
     reportError(apiError, path, options.method ?? 'GET');

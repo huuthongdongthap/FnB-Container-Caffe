@@ -32,6 +32,8 @@ export function CheckoutPage() {
     subtotal,
     serviceFee,
     total,
+    updateQuantity,
+    removeItem,
     clearCart,
   } = useCart();
 
@@ -60,9 +62,9 @@ export function CheckoutPage() {
     })),
     subtotal,
     tax: serviceFee,
-    taxLabel: t('luxuryTax'),
+    taxLabel: t('serviceFee', 'Phí phục vụ'),
     deliveryFee: 0,
-    deliveryLabel: t('deliveryFee'),
+    deliveryLabel: t('deliveryFee', 'Phí giao hàng'),
     total,
   }), [items, subtotal, serviceFee, total, t]);
 
@@ -75,6 +77,12 @@ export function CheckoutPage() {
     setPayosError(null);
     clearPaymentError();
 
+    // Normalize: dine_in without tableNumber → takeaway (avoids server validation error)
+    const effectiveOrderType =
+      formData.orderType === 'dine_in' && !formData.tableNumber?.trim()
+        ? 'takeaway'
+        : formData.orderType;
+
     const payload = {
       items: items.map((i) => ({
         id: i.id,
@@ -86,11 +94,13 @@ export function CheckoutPage() {
       customer_name: formData.fullName,
       customer_phone: formData.phone,
       customer_email: '',
-      customer_address: formData.orderType === 'delivery'
+      customer_address: effectiveOrderType === 'delivery'
         ? formData.address
-        : (formData.orderType === 'takeaway' ? 'Nhận tại quầy bar AURA' : (formData.tableNumber ? `Bàn ${formData.tableNumber}` : 'Tại quán')),
-      order_type: formData.orderType,
-      table_id: formData.orderType === 'dine_in' ? formData.tableNumber : undefined,
+        : (effectiveOrderType === 'takeaway' ? 'Nhận tại quầy bar AURA' : `Bàn ${formData.tableNumber ?? ''}`),
+      order_type: effectiveOrderType,
+      ...(effectiveOrderType === 'dine_in' && formData.tableNumber?.trim()
+        ? { table_id: formData.tableNumber.trim() }
+        : {}),
       payment_method: formData.paymentMethod,
       notes: formData.notes,
       delivery_time: 'now',
@@ -142,7 +152,7 @@ export function CheckoutPage() {
 
         if (result.success) {
           await response.complete('success');
-          try { localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.total, payment_method: formData.paymentMethod, items: order.items, customer_name: formData.fullName })); } catch { /* */ }
+          try { localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.totalAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName })); } catch { /* */ }
           clearCart();
           navigate(`/order-success?order_id=${order.id}`);
         } else {
@@ -171,9 +181,8 @@ export function CheckoutPage() {
       try {
         localStorage.setItem('pendingOrder', JSON.stringify({
           id: order.id,
-          total: order.total,
-          payment_method: order.payment_method,
-          items: order.items,
+          total: order.totalAmount,
+          payment_method: formData.paymentMethod,
           customer_name: formData.fullName,
         }));
       } catch { /* storage unavailable */ }
@@ -201,6 +210,8 @@ export function CheckoutPage() {
     }
   }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 
+  const isRedirecting = Boolean(searchParams.get('payment') && searchParams.get('order_id'));
+
   return (
     <>
       <HelmetHead
@@ -209,12 +220,16 @@ export function CheckoutPage() {
         canonical="/checkout"
       />
       <StitchCheckoutNew
-      summary={summary}
-      isProcessing={payosRetrying}
-      error={payosError}
-      onPlaceOrder={handlePlaceOrder}
-      locale="vi"
-    />
+        summary={summary}
+        isLoading={payosRetrying || isRedirecting}
+        isProcessing={payosRetrying}
+        error={payosError}
+        onPlaceOrder={handlePlaceOrder}
+        locale="vi"
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeItem}
+        onClearCart={clearCart}
+      />
     </>
   );
 }

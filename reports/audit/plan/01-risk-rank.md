@@ -1,46 +1,62 @@
-# Audit Plan — Risk Rank (Stage 1/3)
+# Audit Stage 1: Risk Ranking (Risk-Rank) — AURA CAFE Post-Rearchitecture & Go-Live
 
-**Goal:** Refactor codebase theo chuẩn quán cà phê container Sa Đéc mộc mạc (rustic) — KHÔNG sang trọng/hiện đại quá mức.
-**Method:** risk-rank --annual (recipe: audit-plan DAG group 1)
+**Target System:** AURA OS (Cloudflare Workers + D1 + KV + React 19 PWA)
+**Date:** 2026-09-28
+**Scope:** Post-Merge Audit Planning across Security, Data Integrity, Operations, UI/UX, and Performance.
+**Baseline:** 382 test files / 3,519 tests PASS | TypeScript: 0 errors | Build: OK
 
-## Baseline state (verified)
+---
 
-| Asset | Current state | Rustic gap |
-|---|---|---|
-| Brand tokens v6 (`src/styles/brand-tokens.css`) | ✅ DONE — Quicksand + Be Vietnam Pro, forest primary #4A7C59, blur 8px, gold hexes removed from hero/luxury-landing | None — foundation complete |
-| Rebrand plan P1-P3 (`plans/260826-1400-container-ban-dia-rebrand/`) | Executed (fonts loaded in index.html:15-16, tokens remapped) | None |
-| Serif fonts hardcoded | ❌ 46 stitch files still use `EB Garamond` inline `fontFamily` (bypasses `--aura-font-display` token) | HIGH — luxury serif contradicts mộc mạc |
-| Locale luxury copy | ❌ `luxuryTax` = "Thuế cao cấp (5%)" vi:276, "Luxury Tax (5%)" en:276+447, `checkout.luxuryTax` "Luxurytax" en:1790 | MEDIUM — user-facing copy tone |
-| Luxury-named routes/pages | 5 pages (`luxury-cafe-1/2`, `luxury-landing`, `luxury-landing-hero`, `premium-checkout`) — all stitch-preview only, not production paths | LOW (internal URLs, out of scope per prior decision) |
-| Test suite | 389/389 stitch tests pass, 3115 total pass | Constraint — font/copy changes must update tests |
+## 1. Risk Evaluation Methodology
 
-## Risk-ranked areas (annual view — likelihood × impact)
+Each risk dimension is scored using the standardized Formula:
+$$\text{Risk Score} = \text{Severity} (1\text{–}10) \times \text{Likelihood} (0.1\text{–}1.0) \times \text{Business Impact} (1\text{–}10) \div 10$$
 
-| Rank | Risk area | Likelihood | Impact | Score | Rationale |
-|---|---|---|---|---|---|
-| R1 | Serif font hardcode (46 files) | Certain (exists) | High visual | **9.0** | Every page renders luxury serif despite Quicksand token; single-largest rustic contradiction |
-| R2 | Locale luxury copy (luxuryTax + premium keys) | Certain | Medium (user-facing) | **7.5** | "Luxury Tax" on checkout contradicts bản địa tone; fallback strings in components leak |
-| R3 | Glass/gradient/blur luxury effects concentration | High | Medium visual | **7.0** | Verified: 279 blur usages, ~95% exceed 8px token (24px×44, 12px×40, 20px×29, max 100px); 431 hardcoded hex (368 components + 63 pages); gradients concentrate in StitchAdminLoginNew-styles (5), StitchMenuNew-styles (4); 51 shadows |
-| R4 | Test breakage from copy/font assertions | High (if R1/R2 done naively) | CI blocking | **6.5** | Tests assert `industrial-luxury` strings, font names; must be updated in same change |
-| R5 | Duplicate stitch↔public routes (21 pairs) | Medium | Low (internal) | **4.0** | Preview-only; cleanup optional, out of rustic scope |
-| R6 | SEO meta (index.html description "industrial-luxury") | Certain | Low-Med | **5.0** | One-line fix, included with R2 |
+Severity Categories:
+- **Critical (Score ≥ 7.0)**: P0 blocker to real-money dining and live staff operations.
+- **High (Score 5.0 – 6.9)**: P1 issue impacting user experience, data latency, or operational stability.
+- **Medium (Score 3.0 – 4.9)**: P2 compliance, aesthetic, or edge-case UX defect.
+- **Low (Score < 3.0)**: P3 cosmetic or minor documentation drift.
 
-## Stage 1 verdict
+---
 
-Prioritize **R1 (fonts) → R2 (copy) → R3 (visual effects)** as the audit-critical path. R4 is a constraint on R1/R2 execution, not independent work. R5/R6 are bycatch.
+## 2. Risk Registry & Ranking
 
-## Subagent inventory (complete)
+| ID | Domain | Risk Description | Severity | Likelihood | Impact | Score | Rank |
+|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **R1** | Security & Auth | **IDOR & Webhook Spoofing**: Incomplete actor scoping on order mutations, unverified webhook signatures, or CORS credential leak under multi-tenant edge. | 9.5 | 0.8 | 9.5 | **7.22** | **1** |
+| **R2** | Financial Integrity | **Cart & Pricing Tampering**: Client-side total overrides, rounding discrepancies in VAT/service fees, or race conditions during PayOS / QR checkout link creation. | 9.0 | 0.7 | 9.0 | **5.67** | **2** |
+| **R3** | Operations & KDS | **Real-Time Ticket Loss & SSE Stalling**: Dropped SSE connections on station tablets during peak rush hours, lost `Last-Event-ID` buffers, or KDS ticket state desync. | 8.5 | 0.6 | 8.5 | **4.34** | **3** |
+| **R4** | UI/UX & Touch | **Mobile Touch Targets & Viewport Bleed**: Non-standard touch targets (<44px), virtual keyboard layout shifting on iOS Safari, or bottom navigation overlaying action buttons. | 7.0 | 0.6 | 7.0 | **2.94** | **4** |
+| **R5** | Data Consistency | **D1 SQLite Concurrency & Migrations**: Unindexed queries in order history, lock contention during simultaneous table orders, or unmigrated schema drift. | 7.5 | 0.4 | 7.5 | **2.25** | **5** |
+| **R6** | Localization & Copy | **Brand Drift & Translation Artifacts**: Stale machine-translation strings in toasts/modals, broken asset links on CDN, or missing Sa Đéc regional copy. | 5.0 | 0.4 | 5.0 | **1.00** | **6** |
 
-### Test-assertion constraints (R4)
-- `src/components/brand/__tests__/typography-showcase.test.tsx:7,14` — FONTS_DATA pins `EB Garamond`
-- `src/components/home/__tests__/hero-section.test.tsx:14` — asserts `/industrial-luxury/`
-- `src/components/stitch/__tests__/StitchCheckoutNew.test.tsx:25,88` — mocks/asserts `'stitch.tax': 'Luxury Tax (5%)'`
+---
 
-### Luxury copy surfaces (R2)
-Components with luxury/premium refs (all user-facing): HeroSection, hero-section, five-zone-showcase-data ("Industrial Luxury đẳng cấp"), StitchContainerNew1/2, StitchLandingNew-hero/gallery, StitchMenuNew-footer ("Industrial Luxury Dining"), StitchStoryNew-hero/story, StitchCheckoutNew-order-summary (fallback `'Luxury Tax (5%)'`), StitchMobileOrderNew, loyalty-tier-card, StitchSubscriptionsNew.
-Locale keys: `landing.pageAriaLabel` "sang trọng", `containerNew2.heroTag` "Cà Phê Đặc Biệt Cao Cấp", `feature1Desc` "xa xỉ hiện đại", `premiumRewardPoints`, `fieldPlanNamePlaceholder` "Container Cao Cấp", `checkout.luxuryTax` "Phí xa xỉ".
+## 3. Deep Analysis of Critical Risks
 
-### Visual effects hotspots (R3)
-- Blur > 8px: skeleton components (StitchReferralNew2-skeleton 19 hex, StitchAccountNew-skeleton 17), loyalty/rewards cluster, referral/account/checkin pages, 404 overlays (100px in StitchAccountNew/StitchStoryNew-footer/checkin-new; 80px referral-rewards-1)
-- Marketing copy surfaces: "nocturnal luxury", "chrome", "moody"
-- stitch-exports/ has 27 screen dirs; only color doc is BRAND_v6_MINERAL_PLAN.md (pearl/cream/blue-grey — conflicts with both noir tokens and rustic goal); no wood/kraft/terracotta texture assets exist
+### R1: Security, IDOR & Webhook Tampering (Rank 1 — Score 7.22)
+- **Vulnerability Surface:**
+  - `worker/src/routes/openapi-orders-handlers/` — While `resolveCustomerScope()` was wired for order reads, all mutation handlers (`PATCH /orders/:id`, `POST /orders/:id/cancel`) must be verified to ensure customer tokens cannot mutate orders owned by other diners or tables.
+  - `packages/domain/payment/commands/payos-create-link.ts` & webhook endpoints — PayOS webhook signature verification (`verifyPaymentWebhookData`) must fail closed on invalid checksums, and replay attacks must be blocked via KV idempotency keys.
+  - CORS with credentials: Dynamic origin check in `getCorsOrigin()` must prevent arbitrary origins from masquerading as trusted subdomains (e.g. `malicious-auracafe.vn`).
+
+### R2: Financial Integrity & Server-Authoritative Pricing (Rank 2 — Score 5.67)
+- **Vulnerability Surface:**
+  - `calculateOrderSnapshot()` in `@aura/domain-order` — Must guarantee that all discount codes, promotional tier deductions, vat amounts (8% vs 10%), and 5% service fees are strictly computed on Cloudflare Workers.
+  - PayOS payment amount validation: Ensure the generated PayOS payment link amount matches `snapshot.total_amount` down to the exact integer VND cent without truncation or floating point rounding error.
+
+### R3: Operational Reliability & Kitchen Display Real-Time Stream (Rank 3 — Score 4.34)
+- **Vulnerability Surface:**
+  - `worker/src/routes/order-stream.ts` & `query-handlers.ts` — When baristas or kitchen staff lose WiFi connectivity on their tablets, the reconnect handshake with `Last-Event-ID` must replay all missed transitions (e.g., `preparing` → `ready` → `served`).
+  - Audio notification trigger: Web Audio API context unlock on iOS/Android tablets when a new dine-in or takeaway order arrives.
+
+### R4: Mobile PWA Touch, Ergonomics & Accessibility (Rank 4 — Score 2.94)
+- **Vulnerability Surface:**
+  - Mobile bottom navigation bar (`MD3NavigationBar`) and `CartBottomBar` z-index layering on iPhone Dynamic Island and Android navigation bars (`env(safe-area-inset-bottom)`).
+  - Tap target size: Ensure all modifier checkboxes, quantity increment buttons, and table selectors meet the Apple HIG / MD3 44×44px minimum touch target threshold.
+
+---
+
+## 4. Conclusion & Stage Hand-off
+Risks **R1**, **R2**, and **R3** form the critical security and operational core that must be rigorously audited before public launch. Risks **R4** and **R5** will be addressed in the ergonomics and performance audit wave.

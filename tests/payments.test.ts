@@ -22,9 +22,15 @@ delete (globalThis as any).crypto;
   },
 };
 
-// ── Mock requireAuth ──────────────────────────────────────────────
+// ── Mock requireAuth & optionalAuth ───────────────────────────────
 vi.mock('../worker/src/middleware/auth', () => ({
   requireAuth: () => {
+    return async (c: any, next: any) => {
+      c.set('user', { id: 'cust-1', email: 'customer@test.com', name: 'Test Customer', role: 'customer' });
+      await next();
+    };
+  },
+  optionalAuth: () => {
     return async (c: any, next: any) => {
       c.set('user', { id: 'cust-1', email: 'customer@test.com', name: 'Test Customer', role: 'customer' });
       await next();

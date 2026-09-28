@@ -17,6 +17,7 @@ import { LoginFooter } from './StitchAdminLoginNew-footer';
 
 export function StitchAdminLoginNew({
   onLogin,
+  onGuestLogin,
   status: externalStatus,
   errorMessage: externalError,
   brandName = BRAND,
@@ -89,8 +90,9 @@ export function StitchAdminLoginNew({
           <div className="flex flex-col gap-4 w-full text-center">
             <button
              type="button"
-              className="font-label-caps text-label-caps text-primary/60 hover:text-primary transition-all tracking-[0.2em] uppercase cursor-pointer"
+              className="w-full py-3 rounded-lg border border-amber-400/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400/80 transition-all tracking-[0.15em] uppercase text-sm font-semibold cursor-pointer flex items-center justify-center gap-2"
               aria-label={t('adminLogin.guestAriaLabel')}
+              onClick={onGuestLogin}
             >
               {t('adminLogin.enterAsGuest')}
             </button>

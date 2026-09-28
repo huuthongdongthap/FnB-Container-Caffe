@@ -175,7 +175,7 @@ kitchenStationsRouter.get('/:id/tickets', async (c) => {
   const tickets: Array<Record<string, unknown>> = [];
   for (const order of activeOrders) {
     const itemsForStation = filterItemsForStation(order.items as string, stationId, categoryIndex);
-    const hasAssignedItems = assignedOrderIds.has(order.id);
+    const hasAssignedItems = assignedOrderIds.has(order.id as string);
     if (itemsForStation.length === 0 && !hasAssignedItems) continue;
     tickets.push({
       id: order.id,

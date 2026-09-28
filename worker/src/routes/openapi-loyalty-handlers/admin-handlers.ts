@@ -6,7 +6,7 @@ import { LoyaltyRoutes } from '../../schemas/loyalty';
 export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/loyalty/admin/adjust-points - Adjust customer points (admin)
   app.openapi(LoyaltyRoutes.admin.adjustPoints, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -67,7 +67,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/loyalty/admin/accounts - List all loyalty accounts (admin)
   app.openapi(LoyaltyRoutes.admin.accounts, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const query = c.req.valid('query');
 
@@ -121,7 +121,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/loyalty/admin/summary - Get loyalty program summary (admin)
   app.openapi(LoyaltyRoutes.admin.summary, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
 
     // Verify admin role

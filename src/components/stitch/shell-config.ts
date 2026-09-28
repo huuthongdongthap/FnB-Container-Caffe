@@ -8,20 +8,27 @@ export interface ShellRouteConfig {
 }
 
 export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
-  // Tab pages — full shell (TopAppBar + NavBar)
+  // Tab pages — full shell (TopAppBar on mobile if not custom, Bottom NavBar on mobile)
   { match: '/', exact: true, title: 'AURA CAFE', variant: 'small', showNav: true, showTop: false },
   { match: '/menu', title: 'Thực đơn', variant: 'small', showNav: true, showTop: true },
-  { match: '/table-reservation', title: 'Đặt bàn', variant: 'small', showNav: true, showTop: true },
-  { match: '/promotions', title: 'Ưu đãi', variant: 'small', showNav: true, showTop: true },
+  { match: '/table-reservation', title: 'Đặt bàn', variant: 'small', showNav: true, showTop: false },
+  { match: '/promotions', title: 'Ưu đãi hội viên', variant: 'small', showNav: true, showTop: false },
   { match: '/account', title: 'Tài khoản', variant: 'center-aligned', showNav: true, showTop: true },
-  { match: '/loyalty', title: 'Thành viên', variant: 'small', showNav: true, showTop: true },
-  { match: '/referral', title: 'Giới thiệu', variant: 'small', showNav: true, showTop: true },
+  { match: '/loyalty', title: 'Thành viên & Tích điểm', variant: 'small', showNav: true, showTop: true },
+  { match: '/referral', title: 'Giới thiệu bạn bè', variant: 'small', showNav: true, showTop: true },
+
+  // Story & Brand pages — LandingNav + LandingFooter, no mobile bottom nav
+  { match: '/about', title: 'Về AURA CAFE', variant: 'small', showNav: false, showTop: false },
+  { match: '/gallery', title: 'Không gian & Góc ảnh', variant: 'small', showNav: false, showTop: false },
+  { match: '/contact', title: 'Liên hệ', variant: 'small', showNav: false, showTop: false },
 
   // Functional customer pages — TopAppBar only, KHÔNG Bottom Nav
-  { match: '/checkout', title: 'Thanh toán', variant: 'small', showNav: false, showTop: true },
-  { match: '/order', title: 'Đặt món', variant: 'small', showNav: false, showTop: true },
-  { match: '/checkin', title: 'Check-in', variant: 'small', showNav: false, showTop: true },
-  { match: '/track-order', title: 'Tra cứu', variant: 'small', showNav: false, showTop: true },
+  { match: '/checkout', title: 'Thanh toán đơn hàng', variant: 'small', showNav: false, showTop: true },
+  { match: '/order', title: 'Gọi món tại bàn', variant: 'small', showNav: false, showTop: false },
+  { match: '/checkin', title: 'Check-in tại quán', variant: 'small', showNav: false, showTop: true },
+  { match: '/track-order', title: 'Tra cứu đơn hàng', variant: 'small', showNav: false, showTop: true },
+  { match: '/hub', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },
+  { match: '/portal', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },
 ];
 
 export function getShellConfig(pathname: string): ShellRouteConfig | undefined {

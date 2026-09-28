@@ -11,8 +11,8 @@ export const keyframeStyles = `
     50% { opacity: 0.3; }
   }
   @keyframes aura-scan {
-    0% { top: 0%; }
-    50% { top: 100%; }
-    100% { top: 0%; }
+    0% { transform: translateY(0); }
+    50% { transform: translateY(180px); }
+    100% { transform: translateY(0); }
   }
 `;

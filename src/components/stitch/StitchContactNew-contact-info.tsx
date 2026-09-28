@@ -15,11 +15,11 @@ export function ContactInfoCard({ onNavigate }: { onNavigate?: (path: string) =>
   return (
     <div className={cn(glassPanelClasses, 'md:col-span-5 p-6 flex flex-col gap-6')}>
       <div>
-        <h3 className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+        <h3 className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
           {t('contact.address', 'ADDRESS')}
         </h3>
-        <p className="font-['Space_Grotesk'] text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
-          39 Nguyen Tat Than, Sa Dec,<br />
+        <p className="font-body text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
+          29 Nguyen Tat Than, Sa Dec,<br />
           Dong Thap, Vietnam
         </p>
       </div>
@@ -27,10 +27,10 @@ export function ContactInfoCard({ onNavigate }: { onNavigate?: (path: string) =>
       <div className="w-full h-px bg-white/10" />
 
       <div>
-        <h3 className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+        <h3 className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
           {t('contact.phone', 'DIRECT LINE')}
         </h3>
-        <p className="font-['Space_Grotesk'] text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
+        <p className="font-body text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
           (000) 000-0000
         </p>
       </div>
@@ -38,10 +38,10 @@ export function ContactInfoCard({ onNavigate }: { onNavigate?: (path: string) =>
       <div className="w-full h-px bg-white/10" />
 
       <div>
-        <h3 className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+        <h3 className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
           {t('contact.email', 'ELECTRONIC MAIL')}
         </h3>
-        <p className="font-['Space_Grotesk'] text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
+        <p className="font-body text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
           contact@auracafe.vn
         </p>
       </div>

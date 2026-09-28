@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+@import './aura-tokens.css';
+@import './brand-tokens.css';
+@import './typography.css';
+@import './density.css';
 
 /* ═══════════════════════════════════════════════════════════════════
    AURA CAFE · GLOBAL STYLES — Tailwind v4 + Brand Tokens v5.1
@@ -10,11 +14,40 @@
 .label-large   { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; letter-spacing: 0.006em; }
 .headline-small { font-size: 1.5rem;   line-height: 2rem;    font-weight: 600; letter-spacing: 0; }
 
-/* Brand tokens — Quicksand (body) + Be Vietnam Pro (display) */
-@import './brand-tokens.css';
-@import './aura-tokens.css';
-@import './typography.css';
-@import './density.css';
+/* ── Common UI utility classes ── */
+.aura-glass, .glass-panel {
+  background: var(--aura-bg-glass, rgba(11, 32, 56, 0.6));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--aura-border-chrome, rgba(201, 214, 223, 0.2));
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201, 214, 223, 0.12);
+  border-radius: 24px;
+}
+
+.glass-card-about {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(201, 214, 223, 0.15);
+  border-radius: 32px;
+}
+
+.bronze-glow, .chrome-glow {
+  box-shadow: 0 0 20px rgba(201, 214, 223, 0.25);
+}
+
+
+.active-pill {
+  background: var(--aura-chrome-bright, #E8EEF3);
+  color: var(--aura-noir-deep, #0A1A2E);
+  font-weight: 600;
+}
 
 /* Tailwind v4 theme — maps AURA CAFE design tokens to Tailwind utility classes */
 @theme {
@@ -26,6 +59,9 @@
   --color-accent: var(--aura-primary);
   --color-accent-warm: var(--aura-tertiary);
   --color-chrome-light: var(--aura-chrome-light);
+  --color-gold: var(--aura-chrome-mid, #6B9FB8);
+  --color-gold-master: var(--aura-chrome-light, #C9D6DF);
+  --color-gold-electric: var(--aura-chrome-bright, #E8EEF3);
   --color-muted: var(--aura-text-secondary);
   --color-border: var(--aura-outline);
   --color-destructive: #DC2626;
@@ -171,9 +207,9 @@
 
 /* ─── M3 Component Animations (md3 primitives) ────────────────── */
 @keyframes md3-linear-slide {
-  0%   { left: -33%; opacity: 1; }
-  50%  { left: 50%; opacity: 1; }
-  100% { left: 100%; opacity: 0; }
+  0%   { transform: translateX(-100%); opacity: 1; }
+  50%  { transform: translateX(150%); opacity: 1; }
+  100% { transform: translateX(300%); opacity: 0; }
 }
 
 @keyframes md3-circular-rotate {

@@ -8,7 +8,7 @@ import { Users } from 'lucide-react';
 export function TeamSection() {
   const team = [
     { name: "Nguyen Van Minh", role: "Founder & Head Roaster", desc: "15+ years in specialty coffee. Curates every bean lot and roast profile." },
-    { name: "Tran Thi Lan", role: "Operations Director", desc: "Ensures seamless service across all 5 container zones, from Jade Counter to VIP Steel Nest." },
+    { name: "Tran Thi Lan", role: "Operations Director", desc: "Ensures seamless service across all 5 experience zones crafted from 3 container blocks." },
     { name: "Le Hoang Duc", role: "Creative & Brand Lead", desc: "Industrial-design-first brand identity from container architecture to digital touchpoints." },
     { name: "Pham Quoc Bao", role: "Tech & Systems Architect", desc: "QR ordering, POS integrations, and the digital ecosystem that runs AURA." },
   ];

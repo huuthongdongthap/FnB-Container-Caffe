@@ -39,7 +39,7 @@ export function MD3LinearProgress({ value, buffer, className }: MD3LinearProgres
         <div className="absolute inset-0">
           {/* indeterminate shimmer slide */}
           <div
-            className="absolute inset-y-0 w-1/3 bg-md-primary"
+            className="absolute inset-y-0 left-0 w-1/3 bg-md-primary will-change-transform"
             style={{
               animation: 'md3-linear-slide 1.2s ease-in-out infinite',
               borderRadius: 'inherit',

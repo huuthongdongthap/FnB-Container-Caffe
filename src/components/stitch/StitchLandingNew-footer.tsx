@@ -9,7 +9,7 @@ const footerLinkStyle = {
 };
 
 /** Footer with branding, navigation links, social links and copyright. */
-export function LandingFooter() {
+export function LandingFooter({ brandName = 'AURA CAFE' }: { brandName?: string } = {}) {
   const { t } = useTranslation();
 
   return (
@@ -22,41 +22,53 @@ export function LandingFooter() {
     >
       <div className="flex flex-col md:flex-row justify-between items-center px-16 py-12 w-full gap-8">
         {/* Brand */}
-        <div className="flex flex-col gap-4">
-          <div
-            style={{
-              fontFamily: "var(--aura-font-display)",
-              fontSize: '24px',
-              lineHeight: '1.4',
-              fontWeight: 600,
-              color: 'var(--aura-chrome-bright)',
-            }}
-          >
-            AURA CAFE
-          </div>
+        <div className="flex flex-col gap-3">
+          <a href="/" className="flex items-center gap-2.5">
+            <img
+              src="/images/aura-emblem.png"
+              alt="AURA CAFE Logo"
+              className="h-8 w-8 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover shadow-[0_0_8px_rgba(201,214,223,0.3)]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
+              }}
+            />
+            <span
+              style={{
+                fontFamily: "var(--aura-font-display)",
+                fontSize: '22px',
+                lineHeight: '1.2',
+                fontWeight: 700,
+                color: 'var(--aura-chrome-bright)',
+              }}
+            >
+              {brandName}
+            </span>
+          </a>
           <p
-            className="max-w-xs uppercase tracking-widest"
-            style={{ ...footerLinkStyle, opacity: 0.6 }}
+            className="max-w-xs uppercase tracking-widest text-[11px]"
+            style={{ ...footerLinkStyle, opacity: 0.7 }}
           >
-            {t('landing.footerTagline', 'Architectural Container Coffee Experience')}
+            {t('landing.footerTagline', 'Không gian cà phê container độc bản tại Sa Đéc • EST. 2018')}
           </p>
         </div>
 
         {/* Links */}
-        <div className="flex flex-wrap justify-center gap-8 md:gap-12">
-          <FooterLink href="/contact" linkKey="landing.footerContact" fallback="Contact Us" t={t} />
-          <FooterLink href="/privacy" linkKey="landing.footerPrivacy" fallback="Privacy Policy" t={t} />
-          <FooterLink href="/terms" linkKey="landing.footerTerms" fallback="Terms of Service" t={t} />
-          <FooterLink href="https://instagram.com/auracafe" linkKey="landing.footerInstagram" fallback="Instagram" t={t} external />
-          <FooterLink href="https://facebook.com/auracafe" linkKey="landing.footerFacebook" fallback="Facebook" t={t} external />
+        <div className="flex flex-wrap justify-center gap-6 md:gap-8">
+          <FooterLink href="/menu" linkKey="landing.footerMenu" fallback="Thực đơn" t={t} />
+          <FooterLink href="/table-reservation" linkKey="landing.footerReservation" fallback="Đặt bàn" t={t} />
+          <FooterLink href="/promotions" linkKey="landing.footerPromotions" fallback="Ưu đãi" t={t} />
+          <FooterLink href="/about" linkKey="landing.footerAbout" fallback="Câu chuyện AURA" t={t} />
+          <FooterLink href="/gallery" linkKey="landing.footerGallery" fallback="Không gian" t={t} />
+          <FooterLink href="/reviews" linkKey="landing.footerReviews" fallback="Đánh giá" t={t} />
+          <FooterLink href="/contact" linkKey="landing.footerContact" fallback="Liên hệ" t={t} />
         </div>
 
         {/* Copyright */}
         <div
-          className="text-center md:text-left"
+          className="text-center md:text-left text-xs"
           style={{ ...footerLinkStyle, opacity: 0.6 }}
         >
-          {t('landing.copyright', '© 2024 AURA CAFE SA DEC. ALL RIGHTS RESERVED.')}
+          {`© ${new Date().getFullYear()} AURA CAFE SA ĐÉC. ĐÃ ĐĂNG KÝ BẢN QUYỀN.`}
         </div>
       </div>
     </footer>

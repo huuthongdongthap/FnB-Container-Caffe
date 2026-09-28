@@ -23,7 +23,7 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
         {/* 404 hero */}
         <div className="mb-1">
           <h2
-            className="font-['EB_Garamond'] text-[120px] md:text-[180px] leading-none tracking-tighter opacity-90 select-none"
+            className="font-display text-[120px] md:text-[180px] leading-none tracking-tighter opacity-90 select-none"
             style={{
               color: 'var(--aura-chrome-bright)',
               textShadow: '0 0 20px rgba(var(--aura-chrome-light), 0.2)',
@@ -35,10 +35,10 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
 
         {/* Message cluster */}
         <div className="space-y-2 mb-12">
-          <p className="font-['Space_Grotesk'] text-[24px] font-bold leading-tight text-[var(--aura-text-primary)] uppercase tracking-widest">
+          <p className="font-body text-[24px] font-bold leading-tight text-[var(--aura-text-primary)] uppercase tracking-widest">
             {t('notFound.title', 'Page not found')}
           </p>
-          <p className="font-['Space_Grotesk'] text-[16px] leading-relaxed italic text-[var(--aura-chrome-soft)]">
+          <p className="font-body text-[16px] leading-relaxed italic text-[var(--aura-chrome-soft)]">
             {t('notFound.subtitle', 'Khong tim thay trang')}
           </p>
         </div>
@@ -47,7 +47,7 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
         <div className="flex flex-col items-center gap-6">
           <button type="button"
             onClick={onNavigateHome}
-            className="inline-flex items-center justify-center gap-3 bg-[var(--aura-bronze-shimmer)] text-[var(--aura-text-primary)] px-8 py-4 font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm transition-transform active:scale-95 hover:brightness-110 overflow-hidden relative group/btn"
+            className="inline-flex items-center justify-center gap-3 bg-[var(--aura-bronze-shimmer)] text-[var(--aura-text-primary)] px-8 py-4 font-body text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm transition-transform active:scale-95 hover:brightness-110 overflow-hidden relative group/btn"
           >
             <Home className="w-4 h-4" />
             {t('notFound.returnHome', 'Return Home / Quay ve trang chu')}

@@ -1,193 +1,140 @@
-import { useEffect, useRef, useState } from 'react';
-import { StitchShell } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
-
-const ICON_MENU = '☰';
-const ICON_PERSON = '\u{1F464}';
-const ICON_QR = '\u{1F4BF}';
-const ICON_HISTORY = '\u{1F4D6}';
+import { useState, useRef } from 'react';
+import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
+import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
+import { HelmetHead } from '@/components/seo/HelmetHead';
+import { QrCode, Sparkles, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export default function CheckinNew() {
   const [phone, setPhone] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
-    setPhone(!raw?.[2]
-      ? (raw?.[1] || '')
-      : `(${raw[1]}) ${raw[2]}${raw[3] ? `-${raw[3]}` : ''}`);
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(digits);
   };
 
-  const handleCheckin = () => {
-    void 0;
+  const handleCheckin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phone.length < 10) return;
+    setIsSuccess(true);
   };
-
-  useEffect(() => {
-    const el = phoneInputRef.current;
-    if (!el) return;
-    const handler = () => setFocused(el.value.length > 0);
-    el.addEventListener('focus', handler);
-    el.addEventListener('blur', handler);
-    return () => {
-      el.removeEventListener('focus', handler);
-      el.removeEventListener('blur', handler);
-    };
-  }, []);
 
   return (
-    <StitchShell>
-      {/* Ambient orbs */}
-      <div
-        className="fixed pointer-events-none overflow-hidden rounded-full animated-pulse-slow"
-        style={{
-          width: 256,
-          height: 256,
-          background: 'radial-gradient(circle, rgba(242,192,141,0.05) 0%, transparent 70%)',
-          filter: 'blur(8px)',
-          top: '-6rem',
-          right: '-6rem',
-          animationDelay: '0s',
-        }}
-        aria-hidden="true"
+    <div className="relative min-h-screen bg-[#0A1A2E] text-[var(--aura-chrome-bright)] font-body selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] flex flex-col justify-between">
+      <HelmetHead
+        title="Tích Điểm Hội Viên &amp; Check-in — AURA CAFE"
+        description="Tích lũy AURA Points cho mỗi lần ghé quán tại 29 Nguyễn Tất Thành, Sa Đéc. Nhận ưu đãi chiết khấu lên đến 10% cho thành viên Platinum."
+        canonical="/checkin"
       />
-      <div
-        className="fixed pointer-events-none overflow-hidden rounded-full animated-pulse-slow"
-        style={{
-          width: 320,
-          height: 320,
-          background: 'radial-gradient(circle, rgba(242,192,141,0.05) 0%, transparent 70%)',
-          filter: 'blur(8px)',
-          top: '50%',
-          left: '-8rem',
-          animationDelay: '2s',
-        }}
-        aria-hidden="true"
-      />
+      <LandingNav />
 
-      {/* Top AppBar */}
-<PageHeader brand="AURA CAFE" scrollEffect />
-
-      {/* Main */}
-      <main className="pt-24 pb-32 px-5 max-w-md mx-auto">
-        {/* Hero Card */}
-        <section className="glass-panel rounded-xl p-8 mb-8 relative overflow-hidden">
-          <div className="relative z-10">
-            <p className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">LOYALTY PROGRAM</p>
-            <h2 className="font-headline-md text-headline-md text-on-surface mb-4">Check-In</h2>
-            <p className="font-body-md text-on-surface leading-relaxed">
-              Welcome back to Aura. Enter your mobile number to earn{' '}
-              <span className="text-[var(--aura-tertiary)] font-bold">Aura Points</span> for your visit today.
+      <div role="region" aria-label="Tích Điểm Hội Viên" className="pt-28 pb-20 px-5 max-w-lg mx-auto w-full flex-1 flex flex-col justify-center">
+        {isSuccess ? (
+          <div className="bg-white/5 backdrop-blur-[12px] border border-white/10 rounded-[32px] p-8 sm:p-10 border-t border-[var(--aura-chrome-mid)]/40 text-center shadow-2xl animate-fade-in">
+            <div className="w-16 h-16 rounded-full bg-[#4A7C59]/20 border border-[#4A7C59] flex items-center justify-center mx-auto mb-6 text-[#4A7C59]">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#4A7C59] block mb-2">
+              TÍCH ĐIỂM THÀNH CÔNG
+            </span>
+            <h2 className="font-display text-3xl text-white font-semibold mb-3">
+              Cảm Ơn Quý Khách!
+            </h2>
+            <p className="text-[var(--aura-chrome-soft)] text-sm max-w-sm mx-auto mb-6 font-light leading-relaxed">
+              Điểm thưởng của lượt ghé hôm nay đã được ghi nhận cho số điện thoại <span className="font-mono text-white font-semibold">{phone}</span>.
             </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href="/menu"
+                className="bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] px-6 py-3 rounded-full font-body text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Khám Phá Menu
+              </a>
+              <button
+                onClick={() => {
+                  setIsSuccess(false);
+                  setPhone('');
+                }}
+                className="border border-white/20 text-[var(--aura-chrome-bright)] hover:border-white px-6 py-3 rounded-full font-body text-xs font-semibold uppercase tracking-widest transition-all"
+              >
+                Nhập Số Khác
+              </button>
+            </div>
           </div>
-          <div className="absolute right-0 top-0 h-full w-1 bg-gradient-to-b from-transparent via-[var(--aura-tertiary)]/20 to-transparent" aria-hidden="true" />
-        </section>
+        ) : (
+          <div className="bg-white/5 backdrop-blur-[12px] border border-white/10 rounded-[32px] p-8 sm:p-10 border-t border-[var(--aura-chrome-mid)]/40 shadow-2xl">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--aura-chrome-mid)]/10 border border-[var(--aura-chrome-mid)]/20 mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--aura-chrome-bright)]" />
+                <span className="text-[var(--aura-chrome-mid)] text-xs uppercase tracking-widest font-semibold">
+                  Hội Viên AURA
+                </span>
+              </div>
+              <h1 className="font-display text-3xl sm:text-4xl text-white font-semibold mb-3">
+                Check-in Tích Điểm
+              </h1>
+              <p className="text-[var(--aura-chrome-soft)] text-sm font-light leading-relaxed">
+                Nhập số điện thoại để tích lũy điểm thưởng <span className="text-[var(--aura-chrome-bright)] font-semibold">AURA Points</span> cho hoá đơn hôm nay tại Sa Đéc.
+              </p>
+            </div>
 
-        {/* Input Section */}
-        <section className="space-y-6 mb-12">
-          <div className="space-y-2">
-            <label className="font-label-caps text-label-caps text-secondary block ml-1" htmlFor="phone">
-              PHONE NUMBER
-            </label>
-            <div className="relative">
-              <input
-                ref={phoneInputRef}
-                id="phone"
-                value={phone}
-                onChange={handlePhoneChange}
-                placeholder="(000) 000-0000"
-                type="tel"
-                className={`w-full bg-surface-container-low border-b border-secondary/30 focus:border-[var(--aura-tertiary)] text-on-surface py-4 px-1 font-mono-data text-xl outline-none transition-all placeholder:text-on-surface-variant/30 ${
-                  focused ? 'border-[var(--aura-tertiary)]' : ''
-                }`}
-              />
-              <div className="absolute right-0 bottom-4 text-[var(--aura-tertiary)]/40" aria-hidden="true">
-                {ICON_QR}
+            {/* Form */}
+            <form onSubmit={handleCheckin} className="space-y-6">
+              <div>
+                <label htmlFor="phone" className="block text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-2">
+                  Số Điện Thoại
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[var(--aura-chrome-mid)]">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <input
+                    ref={phoneInputRef}
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    placeholder="0912 345 678"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-lg font-mono text-white placeholder-[var(--aura-chrome-mid)]/40 focus:outline-none focus:border-[var(--aura-chrome-bright)] transition-colors"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={phone.length < 10}
+                className="w-full py-4 rounded-2xl bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] font-body text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 shadow-xl hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              >
+                Xác Nhận &amp; Tích Điểm
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+
+            {/* QR Scanner visual option */}
+            <div className="relative my-8 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative inline-block bg-[#0A1A2E] px-4 text-[10px] uppercase tracking-widest text-[var(--aura-chrome-mid)] font-semibold">
+                Hoặc Quét Mã Tại Bàn
               </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleCheckin}
-            className="w-full py-5 bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] font-headline-md text-headline-md rounded-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 bronze-glow"
-          >
-            Check-In & Earn Points
-            <span className="material-symbols-outlined">chevron_right</span>
-          </button>
-        </section>
-
-        {/* QR Divider */}
-        <div className="flex items-center gap-4 mb-12">
-          <div className="h-[1px] flex-1 bg-white/10" />
-          <span className="font-label-caps text-label-caps text-secondary/50">OR SCAN CODE</span>
-          <div className="h-[1px] flex-1 bg-white/10" />
-        </div>
-
-        {/* QR Scanner */}
-        <section className="flex flex-col items-center">
-          <div className="scan-frame flex items-center justify-center glass-panel rounded-lg overflow-hidden group w-[180px] h-[180px]">
-            <span className="absolute inset-0 pointer-events-none" />
-            <div className="w-full h-full relative">
-              <img
-                className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-700"
-                role="img"
-                aria-label="A macro close-up of a technical smartphone screen displaying a complex geometric QR code. The surrounding environment is a dimly lit, high-end industrial cafe with brushed metal surfaces and warm bronze lighting. The focus is sharp on the digital pixels of the code, while the background bokeh shows hints of espresso machines and architectural glass. Deep navy and metallic chrome tones dominate the cinematic composition."
-                src="/photos/IMG_6581.webp"
-              />
-              <div className="absolute left-0 w-full h-[2px] bg-[var(--aura-tertiary)] shadow-[0px_0px_10px_#f2c08d]" style={{ animation: 'scan 3s ease-in-out infinite' }} />
-            </div>
-            <div className="absolute inset-0 bg-[var(--aura-tertiary)]/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="material-symbols-outlined text-4xl text-[var(--aura-tertiary)]">{ICON_QR}</span>
+            <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-white/[0.02] border border-dashed border-white/15 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--aura-chrome-mid)]/10 border border-[var(--aura-chrome-mid)]/20 flex items-center justify-center text-[var(--aura-chrome-bright)] mb-3">
+                <QrCode className="w-6 h-6" />
+              </div>
+              <p className="text-xs text-[var(--aura-chrome-soft)] font-light max-w-xs">
+                Mỗi bàn tại AURA CAFE đều có sẵn mã QR riêng để quý khách mở thực đơn và tích điểm tự động.
+              </p>
             </div>
           </div>
-          <p className="mt-6 font-label-caps text-label-caps text-secondary text-center tracking-widest">
-            POSITION QR CODE IN FRAME
-          </p>
-        </section>
-      </main>
+        )}
+      </div>
 
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-5 py-4 bg-[var(--aura-surface-container)]/90 backdrop-blur-[8px] border-t border-white/10">
-        <a className="flex flex-col items-center justify-center text-on-surface-variant p-3 hover:text-[var(--aura-tertiary)] transition-colors active:scale-90" href="#" aria-label="Home">
-          <span className="material-symbols-outlined">home</span>
-        </a>
-        <a className="flex flex-col items-center justify-center bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] rounded-full p-3 shadow-[0px_0px_12px_rgba(212,165,116,0.4)] active:scale-90" href="#" aria-label="QR Scanner">
-          <span className="material-symbols-outlined">{ICON_QR}</span>
-        </a>
-        <a className="flex flex-col items-center justify-center text-on-surface-variant p-3 hover:text-[var(--aura-tertiary)] transition-colors active:scale-90" href="#" aria-label="History">
-          <span className="material-symbols-outlined">{ICON_HISTORY}</span>
-        </a>
-      </nav>
-
-      <style>{`
-        @keyframes scan {
-          0% { top: 0%; }
-          50% { top: 100%; }
-          100% { top: 0%; }
-        }
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.1; }
-          50% { opacity: 0.3; }
-        }
-        .scan-frame {
-          position: relative;
-          width: 180px;
-          height: 180px;
-        }
-        .scan-frame::before, .scan-frame::after, .scan-frame span::before, .scan-frame span::after {
-          content: '';
-          position: absolute;
-          width: 20px;
-          height: 20px;
-          border-color: #c6c6c7;
-          border-style: solid;
-        }
-        .scan-frame::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
-        .scan-frame::after { top: 0; right: 0; border-width: 2px 2px 0 0; }
-        .scan-frame span::before { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
-        .scan-frame span::after { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
-      `}</style>
-    </StitchShell>
+      <LandingFooter />
+    </div>
   );
 }

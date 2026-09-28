@@ -52,7 +52,7 @@ export { computeFrequencyBand, resolveBandPolicy, DEFAULT_BAND_POLICY } from './
 export type { FrequencyBand, BandPolicy, OrderSummary } from './commands/frequency-band';
 
 export { extractPreferences, parseOrderItems } from './commands/preferences';
-export type { CustomerPreferences, OrderItemInput, RawOrderForPreferences } from './commands/preferences';
+export type { CustomerPreferences, OrderItemInput as PreferenceOrderItemInput, RawOrderForPreferences } from './commands/preferences';
 
 export { getCustomer360 } from './commands/customer-360';
 export type { Customer360, Customer360Options } from './commands/customer-360';

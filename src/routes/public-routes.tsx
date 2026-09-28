@@ -36,8 +36,13 @@ const GalleryNew = React.lazy(() => import('@/pages/stitch/gallery-new'));
 const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
 const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/customer-reviews'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
+const SystemHubPage = React.lazy(() => import('@/pages/SystemHub'));
 
 export const publicRoutes = [
+  // Cổng điều hành & Danh mục hệ thống
+  <Route key="/hub" path="/hub" element={guarded(<SystemHubPage />)} />,
+  <Route key="/portal" path="/portal" element={guarded(<SystemHubPage />)} />,
+
   // Tab 1: Trang chủ
   <Route key="/" path="/" element={guarded(<HomePage />)} />,
   <Route key="/container" path="/container" element={guarded(<ContainerPage />)} />,

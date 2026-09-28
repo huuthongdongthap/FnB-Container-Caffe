@@ -58,7 +58,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     cashback_earned?: number;
   } | null>(null);
 
-  // Load cached pending order from localStorage
+  // Load cached pending order from localStorage and clean up state
   useEffect(() => {
     try {
       const raw = localStorage.getItem('pendingOrder');
@@ -72,11 +72,14 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
           points_earned: Number(parsed.points_earned ?? 0) || undefined,
           cashback_earned: Number(parsed.cashback_earned ?? 0) || undefined,
         });
-        localStorage.removeItem('pendingOrder');
       }
     } catch {
       /* ignore */
+    } finally {
+      localStorage.removeItem('pendingOrder');
     }
+    // Ensure cart is cleared after completed order checkout
+    useCartStore.getState().clearCart();
   }, []);
 
   // Subscribe to SSE for real-time updates
@@ -126,33 +129,45 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     clearCart();
     currentOrder.items.forEach((item) => {
       for (let i = 0; i < item.quantity; i++) {
-        addItem({ id: String(item.id), name: item.name, price: item.price });
+        addItem({ id: item.name, name: item.name, price: item.unitPriceCents });
       }
     });
     showToast('Đã thêm lại vào giỏ hàng', 'success');
     navigate('/menu');
   }, [currentOrder, clearCart, addItem, showToast, navigate]);
 
-  // Map order data to OrderSuccessNewData format
+  // Map canonical CustomerOrder to the presentation view model.
+  // Money is stored in cents server-side; convert once at this boundary.
   const orderSuccessData: OrderSuccessNewData | null = useMemo(() => {
-    const source = currentOrder || pendingOrder;
-    if (!source) return null;
-    return {
-      orderId: source.id || '---',
-      items: (currentOrder?.items || []).map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      total: source.total || 0,
-      estimatedMinutes: 10,
-      locationName: 'AURA CAFE',
-      customerName: currentOrder?.customer_name || '',
-      table: currentOrder?.table_id,
-      pointsEarned: source.points_earned,
-      cashbackEarned: source.cashback_earned,
-    };
+    if (currentOrder) {
+      return {
+        orderId: currentOrder.orderNumber || currentOrder.id || '---',
+        items: currentOrder.items.map((item, index) => ({
+          id: `${currentOrder.id}-${index}`,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.unitPriceCents,
+        })),
+        total: currentOrder.totalAmount,
+        estimatedMinutes: 10,
+        locationName: 'AURA CAFE',
+        customerName: '',
+        table: currentOrder.table?.name,
+      };
+    }
+    if (pendingOrder) {
+      return {
+        orderId: pendingOrder.id || '---',
+        items: [],
+        total: pendingOrder.total || 0,
+        estimatedMinutes: 10,
+        locationName: 'AURA CAFE',
+        customerName: '',
+        pointsEarned: pendingOrder.points_earned,
+        cashbackEarned: pendingOrder.cashback_earned,
+      };
+    }
+    return null;
   }, [currentOrder, pendingOrder]);
 
   return (

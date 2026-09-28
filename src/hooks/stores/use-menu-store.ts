@@ -123,7 +123,10 @@ export const useMenuStore = create<MenuState>((set, get) => ({
         // non-fatal
       }
     } catch (err) {
-      const message = err instanceof ApiClientError ? (err as ApiClientError).message : 'Lỗi kết nối';
+      const message =
+        err instanceof ApiClientError
+          ? (err.status === 0 ? 'Lỗi kết nối' : err.message)
+          : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }
   },

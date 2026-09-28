@@ -36,7 +36,7 @@ export function TimelineStep({
       </div>
       <div>
         <h3
-          className="font-['Space_Grotesk'] text-[14px] font-medium tracking-[0.05em] uppercase"
+          className="font-body text-[14px] font-medium tracking-[0.05em] uppercase"
           style={{
             color: isHighlighted ? 'var(--aura-bronze-shimmer)' : 'var(--aura-chrome-soft)',
             opacity: textOpacity,

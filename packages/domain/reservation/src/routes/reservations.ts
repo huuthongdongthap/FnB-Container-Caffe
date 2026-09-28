@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { requireAuth } from 'worker/src/middleware/auth';
 
 const reservationSchema = z.object({
   table_id: z.string().min(1),
@@ -114,7 +115,7 @@ reservationsRouter.post('/', async (c) => {
 });
 
 // GET /api/reservations?date=&limit=&offset=
-reservationsRouter.get('/', async (c) => {
+reservationsRouter.get('/', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -137,7 +138,7 @@ reservationsRouter.get('/', async (c) => {
 });
 
 // PATCH /api/reservations/:id/approve
-reservationsRouter.patch('/:id/approve', async (c) => {
+reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -151,7 +152,7 @@ reservationsRouter.patch('/:id/approve', async (c) => {
 });
 
 // PATCH /api/reservations/:id/reject
-reservationsRouter.patch('/:id/reject', async (c) => {
+reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -166,7 +167,7 @@ reservationsRouter.patch('/:id/reject', async (c) => {
 });
 
 // DELETE /api/reservations/:id
-reservationsRouter.delete('/:id', async (c) => {
+reservationsRouter.delete('/:id', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 

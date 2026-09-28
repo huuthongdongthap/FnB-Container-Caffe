@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
-import { hasM3NavBar } from '@/components/stitch/StitchAppLayout';
+import { hasM3NavBar } from '@/components/stitch/shell-config';
 
 export default function CartBottomBar() {
   const items = useCartStore((s) => s.items);
@@ -15,12 +15,12 @@ export default function CartBottomBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [visible, setVisible] = useState(false);
-  // Float above the MD3 NavigationBar on shell pages so both stay tappable
+  // Float above the MD3 NavigationBar on mobile shell pages; on desktop sits cleanly at bottom-4
   const onShell = hasM3NavBar(location.pathname);
-  const lift = onShell ? 'bottom-20' : 'bottom-0';
+  const lift = onShell ? 'bottom-20 md:bottom-4' : 'bottom-0 md:bottom-4';
   // When lifted over the 80px nav zone, translate-y-full strands the bar
   // mid-screen; slide past the nav zone too so it fully exits the viewport
-  const hide = onShell ? 'translate-y-[calc(100%+5rem)]' : 'translate-y-full';
+  const hide = onShell ? 'translate-y-[calc(100%+5rem)] md:translate-y-full' : 'translate-y-full';
 
   const count = totalItems();
   const total = subtotal();
@@ -34,7 +34,12 @@ export default function CartBottomBar() {
     setVisible(false);
   }, [count]);
 
-  if (count === 0) return null;
+  if (
+    count === 0 ||
+    location.pathname.startsWith('/checkout') ||
+    location.pathname.startsWith('/order-success') ||
+    location.pathname.startsWith('/order')
+  ) return null;
 
   const formatPrice = (n: number) =>
     n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });

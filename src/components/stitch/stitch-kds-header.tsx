@@ -54,7 +54,7 @@ export function Header({
         </button>
         <h1
           className="text-[48px] leading-[1.1] font-black tracking-tighter text-[var(--aura-chrome-bright,#d4e4fa)]"
-          style={{ fontFamily: "'Syne', sans-serif" }}
+          style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {t('kds.title', 'HEARTH & STEEL KDS')}
         </h1>

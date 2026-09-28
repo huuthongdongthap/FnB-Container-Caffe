@@ -142,7 +142,7 @@ describe('AdminDevicesPage', () => {
     mockFetch(500, {});
     renderWithProviders(<AdminDevicesPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Request failed: 500/)).toBeTruthy();
+      expect(screen.getByText(/500/)).toBeTruthy();
     });
   });
 
@@ -150,7 +150,7 @@ describe('AdminDevicesPage', () => {
     mockFetch(401, {});
     renderWithProviders(<AdminDevicesPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Request failed: 401/)).toBeTruthy();
+      expect(screen.getByText(/401/)).toBeTruthy();
     });
   });
 

@@ -6,7 +6,7 @@ import { LoyaltyRoutes } from '../../schemas/loyalty';
 export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/account - Get current user's loyalty account
   app.openapi(LoyaltyRoutes.account.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
 
     const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
@@ -32,7 +32,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/loyalty/account/transactions - Get loyalty transactions for current user
   app.openapi(LoyaltyRoutes.account.transactions, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const query = c.req.valid('query');
 
@@ -73,7 +73,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/loyalty/account/birthday-bonus - Claim birthday bonus points
   app.openapi(LoyaltyRoutes.account.claimBirthdayBonus, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();

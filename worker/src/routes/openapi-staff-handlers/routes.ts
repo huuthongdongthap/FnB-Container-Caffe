@@ -8,7 +8,7 @@ import { registerAttendanceHandlers } from './attendance-handlers';
 export const openApiStaffRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiStaffRouter.use('*', requireAuth(['owner', 'manager']));
+openApiStaffRouter.use('/api/staff/*', requireAuth(['owner', 'manager']));
 
 // Register sub-handlers
 registerStaffHandlers(openApiStaffRouter);

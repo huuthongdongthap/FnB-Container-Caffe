@@ -59,7 +59,7 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
 
     // ── Category revenue summary (parse items JSON) ──
     const { results: ordersWithItems } = await db.prepare(
-      `SELECT items FROM orders WHERE status != 'cancelled' AND DATE(created_at) BETWEEN ? AND ?`
+      'SELECT items FROM orders WHERE status != \'cancelled\' AND DATE(created_at) BETWEEN ? AND ?'
     ).bind(from, to).all<{ items: string }>();
 
     // Build payment method aggregation

@@ -43,7 +43,7 @@ export function MD3NavigationBar({
         role="navigation"
         aria-label="Main navigation"
         className={cn(
-          'fixed bottom-0 inset-x-0 z-50 flex items-center justify-around',
+          'fixed bottom-0 inset-x-0 z-50 flex items-center justify-around md:hidden',
           'h-20 bg-md-surface-container',
           'shadow-[0_-2px_6px_rgba(0,0,0,0.08)]',
           className,

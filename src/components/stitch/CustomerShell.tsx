@@ -4,6 +4,7 @@ import { getShellConfig } from './shell-config';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import CartBottomBar from '@/components/cart/cart-bottom-bar';
 
 export default function CustomerShell({ children }: { children?: ReactNode }) {
   const location = useLocation();
@@ -25,6 +26,7 @@ export default function CustomerShell({ children }: { children?: ReactNode }) {
       >
         <ErrorBoundary>{children ?? <Outlet />}</ErrorBoundary>
       </MD3AppShell>
+      <CartBottomBar />
     </div>
   );
 }

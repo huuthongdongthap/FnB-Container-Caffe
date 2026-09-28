@@ -183,7 +183,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/auth/session - Get current session
-  app.openapi(AuthRoutes.session, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.session as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -225,7 +225,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/auth/verify-email - Verify email
-  app.openapi(AuthRoutes.verifyEmail, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.verifyEmail as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();

@@ -70,3 +70,40 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
     await next();
   };
 }
+
+/**
+ * Middleware: optionalAuth
+ * Extracts JWT token if present and sets c.set('user', ...),
+ * but does NOT reject if token is missing or invalid (allows guest access).
+ */
+export function optionalAuth(): import('hono').MiddlewareHandler<{ Bindings: Env }> {
+  return async(c, next) => {
+    const jwtSecret = (c.env as Env)?.JWT_SECRET;
+    if (jwtSecret) {
+      const token = getAuthToken(c.req.raw);
+      if (token) {
+        try {
+          const payload = await verifyJWT(token, jwtSecret);
+          if (payload) {
+            const authKv = (c.env as Env)?.AUTH_KV;
+            const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
+            if (!revoked) {
+              const userRole = payload.role || 'customer';
+              c.set('user', {
+                id: payload.id,
+                email: payload.email,
+                name: payload.name,
+                role: userRole as AuthUser['role'],
+                tenantId: (payload as { tenantId?: string }).tenantId,
+                tier: (payload as { tier?: string }).tier
+              });
+            }
+          }
+        } catch {
+          // Ignore invalid token — guest request
+        }
+      }
+    }
+    await next();
+  };
+}

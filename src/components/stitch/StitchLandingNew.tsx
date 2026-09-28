@@ -56,6 +56,10 @@ export function StitchLandingNew({
         />
 
         <HeroSection heroBgUrl={heroBgUrl} />
+
+
+
+
         <FeaturesSection />
         <GallerySection galleryMainUrl={galleryMainUrl} galleryInsetUrl={galleryInsetUrl} />
         <LocationSection locationMapUrl={locationMapUrl} />

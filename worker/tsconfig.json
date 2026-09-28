@@ -3,6 +3,7 @@
     "target": "es2022",
     "module": "es2022",
     "moduleResolution": "bundler",
+    "rootDir": "..",
     "lib": ["es2022", "dom", "dom.iterable"],
     "types": ["@cloudflare/workers-types"],
     "strict": false,
@@ -36,7 +37,9 @@
       "@aura/domain-inventory": ["../packages/domain/inventory/index.ts"],
       "@aura/domain-inventory/*": ["../packages/domain/inventory/*"],
       "worker/*": ["./*"],
-      "worker/src/*": ["./src/*"]
+      "worker/src/*": ["./src/*"],
+      "hono": ["./node_modules/hono"],
+      "hono/*": ["./node_modules/hono/*"]
     }
   },
   "include": ["src/**/*.ts"],

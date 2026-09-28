@@ -29,6 +29,13 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// The cart bar is the customer-only affordance; shell tests assert its
+// presence/absence without booting the whole cart store.
+const cartState = { count: 0 };
+vi.mock('@/components/cart/cart-bottom-bar', () => ({
+  default: () => (cartState.count > 0 ? <div>CartBottomBar Under Test</div> : null),
+}));
+
 describe('Experience Shells Architecture', () => {
   describe('CustomerShell', () => {
     it('renders top app bar, navigation bar, and children on /menu', () => {
@@ -62,6 +69,23 @@ describe('Experience Shells Architecture', () => {
       expect(screen.getByText('Checkout page content')).toBeInTheDocument();
       expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
     });
+
+    it('renders the customer cart bar when cart has items', () => {
+      cartState.count = 1;
+      try {
+        render(
+          <MemoryRouter initialEntries={['/menu']}>
+            <CustomerShell>
+              <div>Menu page content</div>
+            </CustomerShell>
+          </MemoryRouter>,
+        );
+
+        expect(screen.getByText('CartBottomBar Under Test')).toBeInTheDocument();
+      } finally {
+        cartState.count = 0;
+      }
+    });
   });
 
   describe('OpsShell', () => {
@@ -79,6 +103,18 @@ describe('Experience Shells Architecture', () => {
       expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
       expect(screen.getByTestId('ops-shell')).toBeInTheDocument();
     });
+
+    it('never renders the customer cart bar on operations routes', () => {
+      render(
+        <MemoryRouter initialEntries={['/kds']}>
+          <OpsShell>
+            <div>Kitchen Display View</div>
+          </OpsShell>
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByText('Thanh toán →')).not.toBeInTheDocument();
+    });
   });
 
   describe('AdminShell', () => {
@@ -92,6 +128,18 @@ describe('Experience Shells Architecture', () => {
       );
 
       expect(screen.getByText('Admin Dashboard View')).toBeInTheDocument();
+    });
+
+    it('never renders the customer cart bar on admin routes', () => {
+      render(
+        <MemoryRouter initialEntries={['/admin/dashboard']}>
+          <AdminShell>
+            <div>Admin Dashboard View</div>
+          </AdminShell>
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByText('Thanh toán →')).not.toBeInTheDocument();
     });
   });
 

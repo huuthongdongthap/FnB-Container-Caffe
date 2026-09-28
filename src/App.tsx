@@ -7,17 +7,18 @@ import OrderQueueIndicator from '@/components/pwa/OrderQueueIndicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import CustomerShell from '@/components/stitch/CustomerShell';
 import OpsShell from '@/components/stitch/OpsShell';
-import CartBottomBar from '@/components/cart/cart-bottom-bar';
 import { ToastProvider } from '@/components/ui/toast';
 import { publicRoutes } from '@/routes/public-routes';
 import { stitchRoutes } from '@/routes/stitch-routes';
 import { mobileRoutes } from '@/routes/mobile-routes';
 import { adminRoutes } from '@/routes/admin-routes';
+import { PageSkeletonLoader } from '@/components/ui/PageSkeletonLoader';
 
 const NotFoundNew = React.lazy(() => import('@/pages/stitch/not-found'));
 const KDSPage = React.lazy(() => import('@/pages/KDS'));
 const TVMenuPage = React.lazy(() => import('@/pages/TVMenu'));
 const TableOrder = React.lazy(() => import('@/pages/TableOrder'));
+const OrderManagementTerminal = React.lazy(() => import('@/pages/stitch/order-management'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,20 +42,21 @@ function AppContent() {
         <AppBanner />
         <OrderQueueIndicator />
         <BrowserRouter>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--md-sys-color-on-surface-variant)]">Loading...</div>}>
+          <React.Suspense fallback={<PageSkeletonLoader />}>
             <Routes>
               {/* ── OPS SHELL ── */}
               <Route element={<OpsShell />}>
                 <Route path="/kds" element={<KDSPage />} />
                 <Route path="/tv-menu" element={<TVMenuPage />} />
                 <Route path="/pos/table/:tableId" element={<TableOrder />} />
+                <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
+
+                {/* ── MOBILE ROUTES (ops staff surfaces) ── */}
+                {mobileRoutes}
               </Route>
 
-              {/* ── ADMIN ROUTES ── */}
+              {/* ── ADMIN ROUTES (Protected routes wrapped with AdminShell) ── */}
               {adminRoutes}
-
-              {/* ── MOBILE ROUTES ── */}
-              {mobileRoutes}
 
               {/* ── CUSTOMER SHELL ── */}
               <Route element={<CustomerShell />}>
@@ -65,7 +67,6 @@ function AppContent() {
               <Route path="*" element={<NotFoundNew />} />
             </Routes>
           </React.Suspense>
-          <CartBottomBar />
         </BrowserRouter>
       </ToastProvider>
     </AuthProvider>

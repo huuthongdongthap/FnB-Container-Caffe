@@ -95,8 +95,8 @@ export default function KDSPage() {
           items: o.items.map((item) => ({
             name: item.name,
             quantity: item.quantity,
-            ...(item.modifiers?.[0]
-              ? { modifier: item.modifiers[0] }
+            ...(item.modifiers?.length
+              ? { modifier: item.modifiers.join(' · ') }
               : {}),
           })),
           elapsedSeconds,

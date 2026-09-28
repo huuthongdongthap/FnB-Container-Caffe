@@ -166,17 +166,16 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
   });
 
   describe('GET /', () => {
-    it('returns recent orders list', async() => {
+    it('no longer serves unauthenticated order reads', async() => {
+      // Order reads moved to the authenticated OpenAPI router. Reaching this
+      // mount unauthenticated must not disclose the order list.
       const db = stubDB();
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders', {
         method: 'GET'
       });
       const res = await fetchRouter('/', req, env);
-      expect(res.status).toBe(200);
-      const body = await res.json() as Record<string, unknown>;
-      expect(body.success).toBe(true);
-      expect(Array.isArray(body.data)).toBe(true);
+      expect(res.status).not.toBe(200);
     });
   });
 });

@@ -71,6 +71,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 <input
                   type="text"
                   placeholder={t('chat.yourName')}
+                  aria-label={t('chat.yourName')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -79,6 +80,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 <input
                   type="tel"
                   placeholder={t('chat.yourPhone')}
+                  aria-label={t('chat.yourPhone')}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   required
@@ -114,6 +116,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 ref={inputRef}
                 type="text"
                 placeholder="Nhap tin nhan..."
+                aria-label="Nhập tin nhắn chat"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 disabled={sendState.sending}
@@ -121,9 +124,9 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
               />
               <button
                 type="submit"
+                aria-label="Gửi tin nhắn"
                 disabled={sendState.sending || !inputText.trim()}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-accent-warm to-wood text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                aria-label="Gui"
               >
                 {sendState.sending ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

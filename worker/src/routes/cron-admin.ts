@@ -21,7 +21,7 @@ function checkCronSecret(c: {
   env: Env;
   req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
 }): boolean {
-/* eslint-enable no-unused-vars */
+
   if (!c.env.CRON_SECRET) {
     return false;
   } // not configured — fail-closed

@@ -49,3 +49,16 @@ export async function executeBatch(
   });
   return await db.batch(prepared);
 }
+
+/**
+ * Unified D1 accessor — resolves the database binding regardless of
+ * whether handlers reference `AURA_DB` (canonical) or legacy `DB`.
+ * Throws a descriptive error when neither binding is configured.
+ */
+export function getDatabase(c: { env: Record<string, unknown> }): D1Database {
+  const db = (c.env.AURA_DB ?? c.env.DB) as D1Database | undefined;
+  if (!db) {
+    throw new Error('D1 database binding missing: expected AURA_DB (or legacy DB)');
+  }
+  return db;
+}

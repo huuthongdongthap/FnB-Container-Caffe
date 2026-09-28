@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/cn';
 
 const inputClasses =
-  "w-full bg-transparent border-0 border-b py-2 text-[var(--aura-chrome-bright)] outline-none transition-colors placeholder:text-[var(--aura-chrome-soft)]/40 font-['Space_Grotesk']";
+  "w-full bg-transparent border-0 border-b py-2 text-[var(--aura-chrome-bright)] outline-none transition-colors placeholder:text-[var(--aura-chrome-soft)]/40 font-body";
 
 export function FormField({
   label,
@@ -31,7 +31,7 @@ export function FormField({
   return (
     <div className="group">
       <label
-        className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase block mb-1 transition-colors"
+        className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase block mb-1 transition-colors"
         style={{ color: showBronze ? 'var(--aura-bronze-shimmer)' : 'var(--aura-chrome-soft)' }}
       >
         {label}

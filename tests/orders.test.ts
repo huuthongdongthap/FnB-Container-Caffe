@@ -221,7 +221,7 @@ describe('updateOrder', () => {
       body: JSON.stringify({ status: 'confirmed' }),
     });
 
-    const res = await updateOrder(req, env, 'ORD_1');
+    const res = await updateOrder(req, env, 'ORD_1', 'staff');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);

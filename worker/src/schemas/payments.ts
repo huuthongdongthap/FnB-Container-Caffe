@@ -57,6 +57,26 @@ export const PayOSWebhookSchema = z.object({
   signature: z.string(),
 }).openapi('PayOSWebhook');
 
+/**
+ * Apple Pay / Google Pay web payment request.
+ * payment_token is opaque — structure depends on wallet provider
+ * (Apple Pay PKPaymentToken or Google Pay PaymentData).
+ */
+export const WebPaymentRequestSchema = z.object({
+  order_id: z.string().min(1),
+  payment_token: z.record(z.string(), z.unknown()),
+  amount: z.number().int().positive(),
+  currency: z.string().length(3).default('VND'),
+}).openapi('WebPaymentRequest');
+
+export const WebPaymentResponseSchema = z.object({
+  transaction_id: z.string(),
+  status: z.enum(['succeeded', 'failed']),
+  payment_method: z.enum(['apple_pay', 'google_pay']),
+  amount: z.number().int().positive(),
+  currency: z.string().length(3),
+}).openapi('WebPaymentResponse');
+
 export const PaymentResponseSchema = z.object({
   id: z.string().uuid(),
   orderId: z.string().uuid(),
@@ -118,6 +138,8 @@ export const PaymentSummarySchema = z.object({
 export type PaymentIntent = z.infer<typeof PaymentIntentSchema>;
 export type PaymentIntentResponse = z.infer<typeof PaymentIntentResponseSchema>;
 export type PayOSWebhook = z.infer<typeof PayOSWebhookSchema>;
+export type WebPaymentRequest = z.infer<typeof WebPaymentRequestSchema>;
+export type WebPaymentResponse = z.infer<typeof WebPaymentResponseSchema>;
 export type PaymentResponse = z.infer<typeof PaymentResponseSchema>;
 export type PaymentListResponse = z.infer<typeof PaymentListResponseSchema>;
 export type RefundRequest = z.infer<typeof RefundRequestSchema>;
@@ -213,6 +235,19 @@ export const PaymentRoutes = {
     },
     responses: {
       200: { description: 'Payment summary', content: { 'application/json': { schema: SuccessResponseSchema(PaymentSummarySchema) } } },
+    },
+  },
+  paymentRequest: {
+    method: 'post',
+    path: '/api/payments/payment-request',
+    summary: 'Process Apple Pay / Google Pay payment token',
+    tags: ['Payments'],
+    request: { body: { content: { 'application/json': { schema: WebPaymentRequestSchema } } } },
+    responses: {
+      200: { description: 'Payment processed successfully', content: { 'application/json': { schema: SuccessResponseSchema(WebPaymentResponseSchema) } } },
+      400: { description: 'Validation or payment error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      404: { description: 'Order not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      409: { description: 'Order already paid', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   webhook: {

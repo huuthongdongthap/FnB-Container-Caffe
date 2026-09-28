@@ -7,12 +7,18 @@ import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { parseJSON } from '../model/helpers';
 import { canTransition } from '../model/order-state-machine';
+import { canActorTransition, toActorRole } from '../policies/transition-authorization';
 import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
 
 const log = createLogger({ route: 'orders' });
 
-export async function updateOrder(request: Request, env: Record<string, unknown>, id: string) {
+export async function updateOrder(
+  request: Request,
+  env: Record<string, unknown>,
+  id: string,
+  actorRole?: string
+) {
   try {
     const body = await parseJSON(request);
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
@@ -28,8 +34,13 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
     if (body.status !== undefined) {
       const currentStatus = results[0].status as string;
-      const check = canTransition(currentStatus, body.status as string);
-      if (!check.ok) return errorResponse(check.error!, 400);
+      const structural = canTransition(currentStatus, body.status as string);
+      if (!structural.ok) return errorResponse(structural.error!, 400);
+
+      // Role-based authorization gate (Phase 03)
+      const role = toActorRole(actorRole);
+      const authCheck = canActorTransition(role, currentStatus, body.status as string);
+      if (!authCheck.ok) return errorResponse(authCheck.error!, 403);
     }
 
     const updatableFields = ['status', 'payment_status', 'notes', 'delivery_time'];

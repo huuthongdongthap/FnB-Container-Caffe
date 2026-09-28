@@ -52,4 +52,13 @@ describe('StitchAdminLoginNew', () => {
     await user.click(screen.getByRole('button', { name: /adminLogin\.submitAriaLabel/i }));
     expect(onLogin).toHaveBeenCalledWith('admin@test.com', 'pass123');
   });
+
+  it('calls onGuestLogin when clicking enter as guest', async () => {
+    const onGuestLogin = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<StitchAdminLoginNew onGuestLogin={onGuestLogin} />);
+    const guestBtn = screen.getByRole('button', { name: /adminLogin\.guestAriaLabel/i });
+    await user.click(guestBtn);
+    expect(onGuestLogin).toHaveBeenCalled();
+  });
 });

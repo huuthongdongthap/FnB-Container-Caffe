@@ -15,52 +15,52 @@ export interface TeamMember {
 
 export const TIMELINE: readonly TimelineItem[] = [
   {
-    phase: 'PHASE 01: 2022',
-    title: 'The Concept Blueprint',
-    desc: 'Initial visioning of a cafe that exists at the intersection of container architecture and technical brewing precision.',
+    phase: 'GIAI ĐOẠN 01: 2018',
+    title: 'Khởi Nguồn Ý Tưởng & Đam Mê',
+    desc: 'Khởi nguồn từ niềm đam mê hạt cà phê mộc và mong muốn kiến tạo một không gian cà phê độc bản giao hòa giữa kiến trúc hiện đại và bản sắc phù sa Sa Đéc.',
     img: '/photos/IMG_6698.webp',
-    alt: 'Technical architectural drawings of a shipping container cafe layout on a dark metal desk with chrome pens and a matte black coffee cup.',
+    alt: 'Bản vẽ phác thảo kiến trúc các khối container AURA CAFE.',
   },
   {
-    phase: 'PHASE 02: 2023',
-    title: 'Structural Assembly',
-    desc: 'Salvaging three high-cube containers and re-engineering them with reinforced frames and panoramic glass panels.',
+    phase: 'GIAI ĐOẠN 02: 2021 - 2023',
+    title: 'Kiến Thiết Không Gian Container Độc Bản',
+    desc: 'Cải tạo và lắp ghép 3 khối container hàng hải tại 29 Nguyễn Tất Thành, phân bổ thành 5 khu vực trải nghiệm với khung thép kiên cố, vách kính mở toàn cảnh và phủ xanh khuôn viên phong thủy Thủy — Mộc.',
     img: '/photos/IMG_6703.webp',
-    alt: 'Macro photo of a welding spark flying from a steel container frame in a dark industrial workshop.',
+    alt: 'Quá trình thi công hoàn thiện khung container và vách kính AURA CAFE.',
   },
   {
-    phase: 'PHASE 03: 2024',
-    title: 'Activation',
-    desc: 'Aura Cafe opens its doors, establishing a new standard for the nocturnal coffee experience in the city center.',
+    phase: 'GIAI ĐOẠN 03: 2024 - 2026',
+    title: 'Nâng Tầm Trải Nghiệm & Vận Hành Số',
+    desc: 'AURA CAFE chính thức ra mắt nhận diện Luxury Coffee Experience, 5 phân khu trải nghiệm, tiên phong tích hợp gọi món QR, thanh toán số và chăm sóc khách hàng thân thiết.',
     img: '/photos/IMG_6631.webp',
-    alt: 'The finished Aura Cafe at night, a glowing glass and steel structure against a dark urban background.',
+    alt: 'Toàn cảnh AURA CAFE lung linh ánh đèn về đêm tại Sa Đéc.',
   },
 ] as const;
 
 export const TEAM: readonly TeamMember[] = [
   {
-    name: 'Elias Thorne',
-    role: 'Principal Architect',
+    name: 'Nguyễn Hữu Còn',
+    role: 'Nhà Sáng Lập & Điều Hành',
     img: '/photos/IMG_6593.webp',
-    alt: 'Portrait of Elias Thorne, male architectural designer in a minimalist black turtleneck.',
+    alt: 'Chân dung anh Nguyễn Hữu Còn, người sáng lập AURA CAFE Sa Đéc.',
   },
   {
-    name: 'Sarah Chen',
-    role: 'Extraction Engineer',
+    name: 'Quản Lý Vận Hành',
+    role: 'Điều Phối Dịch Vụ & Trải Nghiệm',
     img: '/photos/IMG_6581.webp',
-    alt: 'Portrait of Sarah Chen, female coffee scientist in a lab setting.',
+    alt: 'Đội ngũ quản lý vận hành AURA CAFE.',
   },
   {
-    name: 'Marcus Vane',
-    role: 'Head of Roast',
+    name: 'Đội Ngũ Barista',
+    role: 'Pha Chế Chuyên Nghiệp',
     img: '/photos/IMG_6554-frame.webp',
-    alt: 'Portrait of Marcus Vane, master roaster with a well-groomed beard in a warehouse.',
+    alt: 'Barista tay nghề cao tại quầy bar AURA CAFE.',
   },
   {
-    name: 'Lena Rossi',
-    role: 'Operations Lead',
+    name: 'Đội Ngũ Phục Vụ',
+    role: 'Tận Tâm & Chu Đáo',
     img: '/photos/IMG_6555-frame.webp',
-    alt: 'Portrait of Lena Rossi, professional operations manager in a modern cafe.',
+    alt: 'Nhân viên phục vụ nhiệt huyết và hiếu khách.',
   },
 ] as const;
 

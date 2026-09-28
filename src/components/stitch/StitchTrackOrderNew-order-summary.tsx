@@ -13,16 +13,23 @@ interface OrderSummaryProps {
   total: number;
 }
 
+function formatAmount(val: number): string {
+  if (val >= 1000) {
+    return new Intl.NumberFormat('vi-VN').format(val) + '₫';
+  }
+  return `$${val.toFixed(2)}`;
+}
+
 export function OrderSummary({ items, total }: OrderSummaryProps) {
   const { t } = useTranslation();
 
   return (
     <section className={cn(GLASS_CARD_CLASSES, 'rounded-xl p-6')}>
       <div className="flex items-center justify-between mb-4">
-        <h4 className="font-['Space_Grotesk'] text-[14px] font-medium tracking-[0.05em] uppercase text-[var(--aura-chrome-soft)]">
-          {t('trackOrder.summary', 'Order Summary')}
+        <h4 className="font-display text-[15px] font-bold tracking-[0.05em] uppercase text-white">
+          {t('trackOrder.summary', 'Chi Tiết Đơn Hàng')}
         </h4>
-        <Receipt className="w-5 h-5 text-[var(--aura-chrome-soft)]" />
+        <Receipt className="w-5 h-5 text-[var(--aura-chrome-mid)]" />
       </div>
 
       <ul className="space-y-4">
@@ -31,35 +38,35 @@ export function OrderSummary({ items, total }: OrderSummaryProps) {
           return (
             <li
               key={item.id}
-              className="flex justify-between items-center py-3 border-b border-[var(--aura-chrome-bright)]/10"
+              className="flex justify-between items-center py-3 border-b border-white/10"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[var(--aura-surface-dim)]/60 border border-[var(--aura-chrome-bright)]/10 flex items-center justify-center">
-                  <ItemIcon className="w-5 h-5 text-[var(--aura-bronze-shimmer)]" />
+                <div className="w-12 h-12 rounded-lg bg-[var(--aura-surface-dim)]/80 border border-white/10 flex items-center justify-center">
+                  <ItemIcon className="w-5 h-5 text-[var(--aura-chrome-mid)]" />
                 </div>
                 <div>
-                  <p className="font-['Space_Grotesk'] text-[16px] leading-relaxed text-[var(--aura-chrome-bright)]">
+                  <p className="font-body text-[15px] font-medium leading-relaxed text-white">
                     {item.name}
                   </p>
-                  <p className="font-['Space_Grotesk'] text-[12px] font-medium tracking-[0.08em] text-[var(--aura-chrome-soft)]">
-                    {t('trackOrder.qty', 'Qty')}: {item.quantity}
+                  <p className="font-body text-[12px] font-medium tracking-[0.08em] text-[var(--aura-chrome-soft)]">
+                    {t('trackOrder.qty', 'Số lượng')}: {item.quantity}
                   </p>
                 </div>
               </div>
-              <span className="font-['Space_Grotesk'] text-[14px] font-medium tracking-[0.05em] text-[var(--aura-chrome-bright)]">
-                ${item.price.toFixed(2)}
+              <span className="font-body text-[14px] font-semibold text-[var(--aura-chrome-bright)]">
+                {formatAmount(item.price)}
               </span>
             </li>
           );
         })}
       </ul>
 
-      <div className="mt-6 flex justify-between items-center">
-        <span className="font-['Space_Grotesk'] text-[14px] font-medium tracking-[0.05em] uppercase text-[var(--aura-chrome-soft)]">
-          {t('trackOrder.total', 'TOTAL')}
+      <div className="mt-6 flex justify-between items-center pt-2">
+        <span className="font-body text-[14px] font-bold tracking-wider uppercase text-[var(--aura-chrome-soft)]">
+          {t('trackOrder.total', 'TỔNG CỘNG')}
         </span>
-        <span className="font-['Space_Grotesk'] text-[20px] font-bold leading-tight text-[var(--aura-bronze-shimmer)]">
-          ${total.toFixed(2)}
+        <span className="font-display text-[22px] font-bold text-[var(--aura-chrome-bright)]">
+          {formatAmount(total)}
         </span>
       </div>
     </section>

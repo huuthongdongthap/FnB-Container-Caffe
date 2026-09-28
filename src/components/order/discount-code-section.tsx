@@ -21,6 +21,7 @@ export function DiscountCodeSection({
         <input
           type="text"
           placeholder={t('order.discountPlaceholder')}
+          aria-label={t('order.discountCode')}
           value={discountCode ?? ''}
           onChange={(e) => onChange('discountCode', e.target.value)}
           disabled={disabled}

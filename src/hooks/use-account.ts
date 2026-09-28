@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch } from '@/lib/api-client';
+import type { CustomerOrder } from '@/hooks/stores/order-store-types';
 
 export interface CustomerProfile {
   id: string;
@@ -17,14 +18,15 @@ export interface CustomerProfile {
   created_at: string;
 }
 
-export interface OrderSummary {
-  id: string;
-  customer_name: string;
-  items: string;
-  total: number;
-  status: string;
-  payment_method: string;
-  created_at: string;
+/* Canonical customer-facing order projection from GET /api/orders.
+   See worker/src/schemas/orders.ts (CustomerOrderResponseSchema). */
+export type OrderSummary = CustomerOrder;
+
+interface OrdersListResponse {
+  success: boolean;
+  data: { orders: CustomerOrder[]; meta: { page: number; limit: number; total: number; totalPages: number } };
+  error?: string;
+  message?: string;
 }
 
 interface ProfileUpdate {
@@ -59,8 +61,8 @@ export function useAccount() {
     if (!user) { setOrdersLoading(false); return; }
     setOrdersError(null);
     try {
-      const ordersData = await apiFetch<{ success: boolean; data: OrderSummary[]; error?: string; message?: string }>('/api/orders/my-orders');
-      if (ordersData.success) setOrders(ordersData.data || []);
+      const ordersData = await apiFetch<OrdersListResponse>('/api/orders?limit=50&sort=created_at&order=desc');
+      if (ordersData.success) setOrders(ordersData.data?.orders || []);
       else setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
     } catch {
       setOrdersError('Lỗi kết nối mạng');

@@ -27,21 +27,11 @@ export function Field({
     'focus:outline-none focus:shadow-[0_4px_12px_-4px_color-mix(in_srgb,var(--aura-chrome-bright)_30%,transparent)]',
   );
 
-  const handleFocus = (e: React.FocusEvent<HTMLElement>) => {
-    const parent = (e.target as HTMLElement).parentElement;
-    if (parent) parent.classList.add('scale-[1.01]');
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-    const parent = (e.target as HTMLElement).parentElement;
-    if (parent) parent.classList.remove('scale-[1.01]');
-  };
-
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 transition-transform duration-200 focus-within:scale-[1.01]">
       <label
         htmlFor={fieldId}
-        className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)]"
+        className="font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)]"
       >
         {label}
       </label>
@@ -51,8 +41,6 @@ export function Field({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
           rows={rows}
           className={cn('resize-none', sharedClasses)}
           aria-label={label}
@@ -64,8 +52,6 @@ export function Field({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
           className={sharedClasses}
           aria-label={label}
         />

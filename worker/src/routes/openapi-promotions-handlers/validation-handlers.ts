@@ -6,11 +6,11 @@ import { PromotionRoutes } from '../../schemas/promotions';
 export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions/validate - Validate promotion code
   app.openapi(PromotionRoutes.validate, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const body = c.req.valid('json');
 
     const promotion = await db.prepare(
-      `SELECT * FROM promotions WHERE code = ? AND is_active = 1`
+      'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
     ).bind(body.code.toUpperCase()).first();
 
     if (!promotion) {

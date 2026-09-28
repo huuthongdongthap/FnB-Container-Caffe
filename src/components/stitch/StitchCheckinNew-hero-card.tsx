@@ -12,13 +12,13 @@ export function HeroCard() {
   return (
     <section className={cn(glassCardClasses, 'rounded-xl p-8 mb-8 relative overflow-hidden')}>
       <div className="relative z-10">
-        <p className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
+        <p className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-bronze-shimmer)] mb-2">
           {t('checkin.loyaltyProgram', 'LOYALTY PROGRAM')}
         </p>
-        <h2 className="text-[24px] font-bold leading-tight font-['EB_Garamond'] text-[var(--aura-chrome-bright)] mb-4">
+        <h2 className="text-[24px] font-bold leading-tight font-display text-[var(--aura-chrome-bright)] mb-4">
           {t('checkin.title', 'Check-In')}
         </h2>
-        <p className="font-['Space_Grotesk'] text-[16px] leading-relaxed text-[var(--aura-chrome-soft)]">
+        <p className="font-body text-[16px] leading-relaxed text-[var(--aura-chrome-soft)]">
           {t('checkin.description', 'Welcome back to Aura. Enter your mobile number to earn')}{' '}
           <span className="text-[var(--aura-bronze-shimmer)] font-bold">Aura Points</span>{' '}
           {t('checkin.forVisit', 'for your visit today.')}

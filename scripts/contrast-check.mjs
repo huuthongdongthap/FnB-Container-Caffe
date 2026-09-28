@@ -13,7 +13,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CSS_PATH = resolve(__dirname, "../src/styles/brand-tokens.css");
+const CSS_PATH = resolve(__dirname, "../src/styles/aura-tokens.css");
 
 // ── sRGB linearization ──────────────────────────────────────────────
 function srgbToLinear(c) {

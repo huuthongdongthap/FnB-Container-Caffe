@@ -33,7 +33,7 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
           className="mx-auto mb-12 max-w-xl font-light leading-relaxed"
           style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
         >
-          39 Nguyen Tat Thanh, Sa Dec, Dong Thap. Where industrial container style meets premium coffee experience.
+          {t('about.visitAddress', '29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp — Nơi không gian container công nghiệp hòa quyện cùng cà phê thượng hạng.')}
         </p>
         <button
          type="button"

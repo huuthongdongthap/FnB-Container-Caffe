@@ -94,7 +94,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
     });
 
@@ -112,7 +112,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
     });
 
@@ -130,7 +130,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
     });
 
@@ -148,7 +148,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
     });
 
@@ -161,7 +161,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(400);
       const bodyJs = await result.json();
       expect(bodyJs.error).toContain('Invalid transition');
@@ -176,7 +176,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'NO_ORDER');
+      const result = await updateOrder(req, env, 'NO_ORDER', 'staff');
       expect(result.status).toBe(404);
       const bodyJs = await result.json();
       expect(bodyJs.error).toBe('Order not found');
@@ -191,10 +191,58 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(400);
       const bodyJs = await result.json();
       expect(bodyJs.error).toBe('No valid fields to update');
+    });
+
+    it('forbids customer from confirming pending order (403)', async() => {
+      const db = makeDB([makeChain(undefined, [{ id: 'ORD_1', status: 'pending' }])]);
+      const env = makeEnv(db);
+
+      const body = new TextEncoder().encode(JSON.stringify({ status: 'confirmed' }));
+      const req = new Request('https://test.aura/api/orders/ORD_1', {
+        method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await updateOrder(req, env, 'ORD_1', 'customer');
+      expect(result.status).toBe(403);
+      const bodyJs = await result.json();
+      expect(bodyJs.error).toContain("Role 'customer' may not transition pending → confirmed");
+    });
+
+    it('allows customer to cancel their own pending order (200)', async() => {
+      const db = makeDB([
+        makeChain(undefined, [{ id: 'ORD_1', status: 'pending' }]),
+        makeChain(undefined, undefined, { success: true, changes: 1 }),
+        makeChain(),
+        makeChain()
+      ]);
+      const env = makeEnv(db);
+
+      const body = new TextEncoder().encode(JSON.stringify({ status: 'cancelled' }));
+      const req = new Request('https://test.aura/api/orders/ORD_1', {
+        method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await updateOrder(req, env, 'ORD_1', 'customer');
+      expect(result.status).toBe(200);
+    });
+
+    it('forbids kitchen station from completing served orders (403)', async() => {
+      const db = makeDB([makeChain(undefined, [{ id: 'ORD_1', status: 'served' }])]);
+      const env = makeEnv(db);
+
+      const body = new TextEncoder().encode(JSON.stringify({ status: 'completed' }));
+      const req = new Request('https://test.aura/api/orders/ORD_1', {
+        method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await updateOrder(req, env, 'ORD_1', 'kitchen');
+      expect(result.status).toBe(403);
+      const bodyJs = await result.json();
+      expect(bodyJs.error).toContain("Role 'kitchen' may not transition served → completed");
     });
 
     it('updates non-status fields: notes and delivery_time', async() => {
@@ -214,7 +262,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
     });
 
@@ -232,7 +280,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      await updateOrder(req, env, 'ORD_1');
+      await updateOrder(req, env, 'ORD_1', 'staff');
 
       const calls = db.prepare.mock.calls as unknown[][];
       expect(calls[0][0]).toContain('SELECT');
@@ -252,7 +300,7 @@ describe('update-order', () => {
         method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
       });
 
-      const result = await updateOrder(req, env, 'ORD_1');
+      const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(500);
       const bodyJs = await result.json();
       expect(bodyJs.success).toBe(false);

@@ -25,36 +25,36 @@ export const defaultTimelineImages = [
 
 export const defaultTeamMembers: TeamMember[] = [
   {
-    name: 'Elias Thorne',
+    name: 'Nguyễn Hữu Còn',
     role: 'storyNew.teamRole1',
     imageUrl:
       '/photos/IMG_6593.webp',
     imageAlt:
-      'Portrait of a male architectural designer in his late 30s with short hair and glasses, wearing a minimalist black turtleneck. He is standing in front of a blurred industrial structure. The lighting is moody, high-contrast, and cold with a focus on sharp professional features. Dark navy aesthetic.',
+      'Chân dung Người sáng lập AURA CAFE Sa Đéc.',
   },
   {
-    name: 'Sarah Chen',
+    name: 'Nguyễn Văn Minh',
     role: 'storyNew.teamRole2',
     imageUrl:
       '/photos/IMG_6581.webp',
     imageAlt:
-      'Portrait of a female coffee scientist in her late 20s with her hair pulled back, wearing a minimalist dark grey uniform. She is holding a glass beaker in a high-tech lab setting. The lighting is crisp and cool, emphasizing precision and scientific expertise. Dark navy and chrome atmosphere.',
+      'Chân dung Quản lý vận hành AURA CAFE.',
   },
   {
-    name: 'Marcus Vane',
+    name: 'Lê Hoàng Đức',
     role: 'storyNew.teamRole3',
     imageUrl:
       '/photos/IMG_6554-frame.webp',
     imageAlt:
-      'Portrait of a master roaster, a man with a well-groomed beard wearing an apron, standing in a warehouse filled with burlap coffee sacks. The environment is dark and industrial with a warm spotlight on him. Serious and dedicated expression. Deep navy and bronze color tones.',
+      'Chân dung Trưởng nhóm pha chế AURA CAFE.',
   },
   {
-    name: 'Lena Rossi',
+    name: 'Trần Thị Lan',
     role: 'storyNew.teamRole4',
     imageUrl:
       '/photos/IMG_6555-frame.webp',
     imageAlt:
-      'Portrait of a professional operations manager, a woman in a sleek navy suit, standing in a modern cafe with blurred chrome surfaces behind her. She looks confident and organized. The lighting is soft but directed, highlighting luxury hospitality. Professional dark mode aesthetic.',
+      'Chân dung Chăm sóc khách hàng AURA CAFE.',
   },
 ];
 

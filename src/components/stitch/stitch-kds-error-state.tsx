@@ -17,7 +17,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       <AlertTriangle className="mb-4 h-16 w-16 text-[var(--aura-error)]" aria-hidden="true" />
       <h3
         className="mb-2 text-[32px] leading-[1.2] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]"
-        style={{ fontFamily: "'Syne', sans-serif" }}
+        style={{ fontFamily: 'var(--aura-font-display)' }}
       >
         {t('common.error', 'Error')}
       </h3>

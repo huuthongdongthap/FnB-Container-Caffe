@@ -13,7 +13,7 @@ const JSON_LD = {
   servingCuisine: ['Coffee', 'Tea', 'Beverages'],
   address: {
     '@type': 'PostalAddress',
-    streetAddress: '39 Nguyen Tat Thanh',
+    streetAddress: '29 Nguyen Tat Thanh',
     addressLocality: 'Sa Dec',
     addressRegion: 'Dong Thap',
     addressCountry: 'VN',

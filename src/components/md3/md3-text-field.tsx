@@ -170,6 +170,7 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
           <div className="flex items-center justify-between px-3">
             <span
               id={error ? `${id}-error` : `${id}-helper`}
+              role={error ? 'alert' : undefined}
               className={cn(
                 'text-xs',
                 error ? 'text-md-error' : 'text-md-on-surface-variant',

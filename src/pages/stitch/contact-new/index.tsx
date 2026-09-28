@@ -1,165 +1,204 @@
-import { useEffect, useRef } from 'react';
-import { StitchShell } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
+import { useState } from 'react';
+import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
+import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
+import { HelmetHead } from '@/components/seo/HelmetHead';
+import { MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
 
 export default function ContactNew() {
-  const formRef = useRef<HTMLFormElement | null>(null);
-
-  useEffect(() => {
-    document.querySelectorAll('input, textarea').forEach(el => {
-      const prev = el.previousElementSibling as HTMLElement | null;
-      const handleFocus = () => {
-        prev && (prev.style.color = 'var(--aura-primary)');
-      };
-      const handleBlur = () => {
-        const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
-        if (!inputEl.value) prev && (prev.style.color = '');
-      };
-      el.addEventListener('focus', handleFocus);
-      el.addEventListener('blur', handleBlur);
-      return () => {
-        el.removeEventListener('focus', handleFocus);
-        el.removeEventListener('blur', handleBlur);
-      };
-    });
-  }, []);
+  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState({ name: '', contact: '', message: '' });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    void 0;
+    if (!formData.name || !formData.contact) return;
+    setSubmitted(true);
   };
 
   return (
-    <StitchShell>
+    <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E]">
+      <HelmetHead
+        title="Liên Hệ &amp; Vị Trí — AURA CAFE"
+        description="Thông tin liên hệ, hotline, địa chỉ và bản đồ chỉ đường đến AURA CAFE tại 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp."
+        canonical="/contact"
+      />
       {/* Top Navigation */}
-<PageHeader brand="AURA CAFE" scrollEffect />
+      <LandingNav />
 
-      <main className="pt-16 min-h-screen">
+      <div role="region" aria-label="Liên Hệ" className="pt-24 min-h-screen">
         {/* Hero */}
-        <section className="relative h-[353px] md:h-[442px] flex items-center px-6 overflow-hidden">
-          <div className="relative z-10 w-full">
-            <p className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">LOCATION &amp; ENQUIRIES</p>
-            <h1 className="font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg text-on-surface uppercase tracking-tighter max-w-xl">
-              Connect with <br />
-              the Aura
+        <section className="relative py-16 px-6 text-center overflow-hidden">
+          <div className="relative z-10 max-w-2xl mx-auto">
+            <span className="text-[var(--aura-chrome-mid)] text-xs uppercase tracking-[0.3em] font-semibold block mb-3">
+              AURA CAFE • SA ĐÉC, ĐỒNG THÁP
+            </span>
+            <h1 className="font-display text-4xl md:text-6xl text-white font-medium mb-4">
+              Liên Hệ &amp; Kết Nối
             </h1>
-          </div>
-          <div
-            className="absolute inset-0 pointer-events-none opacity-20 mix-blend-overlay"
-            aria-hidden="true"
-          >
-            <div
-              className="w-full h-full bg-cover bg-center"
-              role="img"
-              aria-label="A macro photograph of brushed dark steel with subtle metallic grains and industrial textures. The lighting is moody and directional, catching the micro-ridges of the metal surface in a deep nocturnal navy palette."
-              style={{
-                backgroundImage:
-                  "url('/photos/IMG_6696.webp')",
-              }}
-            />
+            <p className="font-body text-base text-[var(--aura-chrome-soft)] font-light">
+              Chúng tôi luôn sẵn sàng lắng nghe mọi ý kiến đóng góp, phản hồi hoặc yêu cầu đặt tiệc, sự kiện từ quý khách.
+            </p>
           </div>
         </section>
 
         {/* Content Grid */}
-        <div className="px-6 pb-20 max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="px-6 pb-20 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8">
           {/* Contact Info */}
-          <div className="md:col-span-5 glass-panel p-6 flex flex-col gap-6">
-            <div>
-              <h3 className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">ADDRESS</h3>
-              <p className="font-body-lg text-on-surface">
-                39 Nguyễn Tất Thành, Sa Đéc, <br />
-                Đồng Tháp, Vietnam
-              </p>
+          <div className="md:col-span-5 bg-white/5 backdrop-blur-[12px] border border-white/10 rounded-[32px] p-8 flex flex-col justify-between gap-6 border-t border-[var(--aura-chrome-mid)]/40 shadow-xl">
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--aura-chrome-mid)]/10 flex items-center justify-center shrink-0 border border-[var(--aura-chrome-mid)]/30">
+                  <MapPin className="w-5 h-5 text-[var(--aura-chrome-bright)]" />
+                </div>
+                <div>
+                  <h3 className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-1">ĐỊA CHỈ</h3>
+                  <p className="font-body text-sm text-[var(--aura-chrome-bright)] leading-relaxed">
+                    39 Nguyễn Tất Thành, Phường 1,<br />
+                    TP. Sa Đéc, Đồng Tháp
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-white/10" />
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--aura-chrome-mid)]/10 flex items-center justify-center shrink-0 border border-[var(--aura-chrome-mid)]/30">
+                  <Phone className="w-5 h-5 text-[var(--aura-chrome-bright)]" />
+                </div>
+                <div>
+                  <h3 className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-1">HOTLINE ĐẶT BÀN &amp; GIAO HÀNG</h3>
+                  <a href="tel:+84946013633" className="font-body text-base font-semibold text-[var(--aura-chrome-bright)] hover:underline">
+                    +84 946 013 633
+                  </a>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-white/10" />
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--aura-chrome-mid)]/10 flex items-center justify-center shrink-0 border border-[var(--aura-chrome-mid)]/30">
+                  <Clock className="w-5 h-5 text-[var(--aura-chrome-bright)]" />
+                </div>
+                <div>
+                  <h3 className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-1">GIỜ PHỤC VỤ</h3>
+                  <p className="font-body text-sm text-[var(--aura-chrome-bright)]">
+                    06:00 — 23:00 (Mỗi ngày)
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-white/10" />
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--aura-chrome-mid)]/10 flex items-center justify-center shrink-0 border border-[var(--aura-chrome-mid)]/30">
+                  <Mail className="w-5 h-5 text-[var(--aura-chrome-bright)]" />
+                </div>
+                <div>
+                  <h3 className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-1">HỘP THƯ ĐIỆN TỬ</h3>
+                  <a href="mailto:lienhe@auracafe.vn" className="font-body text-sm text-[var(--aura-chrome-bright)] hover:underline">
+                    lienhe@auracafe.vn
+                  </a>
+                </div>
+              </div>
             </div>
-            <div className="w-full h-px bg-white/10" />
-            <div>
-              <h3 className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">DIRECT LINE</h3>
-              <p className="font-body-lg text-on-surface">(000) 000-0000</p>
-            </div>
-            <div className="w-full h-px bg-white/10" />
-            <div>
-              <h3 className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">ELECTRONIC MAIL</h3>
-              <p className="font-body-lg text-on-surface">contact@auracafe.vn</p>
-            </div>
-            <div className="mt-auto pt-6 flex gap-4">
-              <a href="#" className="w-10 h-10 border border-secondary/20 flex items-center justify-center hover:bg-[var(--aura-tertiary)] hover:text-[var(--aura-noir-deep)] transition-all" aria-label="Share">
-                <span className="material-symbols-outlined text-[20px]">share</span>
-              </a>
-              <a href="#" className="w-10 h-10 border border-secondary/20 flex items-center justify-center hover:bg-[var(--aura-tertiary)] hover:text-[var(--aura-noir-deep)] transition-all" aria-label="Nod">
-                <span className="material-symbols-outlined text-[20px]">face_nod</span>
-              </a>
-              <a href="#" className="w-10 h-10 border border-secondary/20 flex items-center justify-center hover:bg-[var(--aura-tertiary)] hover:text-[var(--aura-noir-deep)] transition-all" aria-label="Camera">
-                <span className="material-symbols-outlined text-[20px]">photo_camera</span>
+
+            <div className="pt-4">
+              <a
+                href="https://maps.app.goo.gl/KMKbeDY4gM2FBBpw9"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border border-[var(--aura-chrome-mid)]/40 text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-bright)] hover:bg-[var(--aura-chrome-mid)]/10 transition-all"
+              >
+                <MapPin className="w-4 h-4" /> Mở Google Maps Chỉ Đường
               </a>
             </div>
           </div>
 
           {/* Form */}
-          <div className="md:col-span-7 glass-panel p-6">
-            <h2 className="font-headline-md text-headline-md mb-6 text-on-surface">Send a Message</h2>
-            <form ref={formRef} className="flex flex-col gap-6" onSubmit={handleSubmit}>
-              <div>
-                <label className="font-label-caps text-label-caps text-on-surface-variant block mb-1" htmlFor="name">NAME</label>
-                <input
-                  id="name"
-                  className="w-full bg-transparent border-0 border-b border-secondary/30 focus:border-b-[var(--aura-tertiary)] focus:ring-0 text-on-surface py-2 transition-colors"
-                  placeholder="John Doe"
-                  type="text"
-                />
-              </div>
-              <div>
-                <label className="font-label-caps text-label-caps text-on-surface-variant block mb-1" htmlFor="email">EMAIL</label>
-                <input
-                  id="email"
-                  className="w-full bg-transparent border-0 border-b border-secondary/30 focus:border-b-[var(--aura-tertiary)] focus:ring-0 text-on-surface py-2 transition-colors"
-                  placeholder="john@example.com"
-                  type="email"
-                />
-              </div>
-              <div>
-                <label className="font-label-caps text-label-caps text-on-surface-variant block mb-1" htmlFor="message">MESSAGE</label>
-                <textarea
-                  id="message"
-                  className="w-full bg-transparent border-0 border-b border-secondary/30 focus:border-b-[var(--aura-tertiary)] focus:ring-0 text-on-surface py-2 transition-colors resize-none"
-                  placeholder="Your enquiry here..."
-                  rows={4}
-                />
-              </div>
-              <button
-                type="submit"
-                className="mt-4 bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] py-4 px-8 font-label-caps text-label-caps tracking-widest hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
-              >
-                DISPATCH MESSAGE
-                <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </button>
-            </form>
-          </div>
+          <div className="md:col-span-7 bg-white/5 backdrop-blur-[12px] border border-white/10 rounded-[32px] p-8 border-t border-[var(--aura-chrome-mid)]/40 shadow-xl flex flex-col justify-between">
+            <div>
+              <h2 className="font-display text-2xl text-white mb-2">Gửi Tin Nhắn Cho Chúng Tôi</h2>
+              <p className="font-body text-xs text-[var(--aura-chrome-mid)] mb-6">
+                Đội ngũ AURA CAFE sẽ phản hồi quý khách trong thời gian sớm nhất.
+              </p>
 
-          {/* Map */}
-          <div className="md:col-span-12 h-64 md:h-96 relative overflow-hidden glass-panel">
-            <div className="absolute top-4 left-4 z-10 bg-[var(--aura-noir-deep)]/80 p-4 border border-[var(--aura-tertiary)]/30 backdrop-blur-md">
-              <p className="font-label-caps text-label-caps text-[var(--aura-tertiary)]">LIVE MAP NAVIGATION</p>
-              <p className="font-body-sm text-on-surface">Sa Đéc Industrial Park Hub</p>
+              {submitted ? (
+                <div className="py-12 flex flex-col items-center text-center space-y-4">
+                  <CheckCircle2 className="w-16 h-16 text-[#4A7C59]" />
+                  <h3 className="font-display text-xl text-white">Gửi Thành Công!</h3>
+                  <p className="font-body text-sm text-[var(--aura-chrome-mid)] max-w-sm">
+                    Cảm ơn quý khách đã gửi tin nhắn. Đội ngũ AURA CAFE sẽ liên hệ lại với quý khách sớm nhất.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setSubmitted(false); setFormData({ name: '', contact: '', message: '' }); }}
+                    className="mt-4 px-6 py-2 rounded-full border border-[var(--aura-chrome-mid)] text-xs uppercase tracking-wider"
+                  >
+                    Gửi tin nhắn khác
+                  </button>
+                </div>
+              ) : (
+                <form className="space-y-5" onSubmit={handleSubmit}>
+                  <div>
+                    <label className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1" htmlFor="name">
+                      HỌ VÀ TÊN *
+                    </label>
+                    <input
+                      id="name"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all"
+                      placeholder="Ví dụ: Nguyễn Văn A"
+                      type="text"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1" htmlFor="contact">
+                      SỐ ĐIỆN THOẠI HOẶC EMAIL *
+                    </label>
+                    <input
+                      id="contact"
+                      required
+                      value={formData.contact}
+                      onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all"
+                      placeholder="Ví dụ: 0946 013 633 hoặc email@example.com"
+                      type="text"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)] block mb-1" htmlFor="message">
+                      NỘI DUNG TIN NHẮN / GÓP Ý *
+                    </label>
+                    <textarea
+                      id="message"
+                      required
+                      value={formData.message}
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[var(--aura-chrome-mid)]/50 focus:border-[var(--aura-chrome-bright)] focus:outline-none transition-all resize-none"
+                      placeholder="Nhập nội dung chia sẻ hoặc thắc mắc của bạn..."
+                      rows={4}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] py-3.5 px-6 rounded-xl font-body text-xs font-bold uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 group cursor-pointer shadow-lg active:scale-[0.99]"
+                  >
+                    <span>Gửi Tin Nhắn</span>
+                    <Send className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </form>
+              )}
             </div>
-            <div
-              className="w-full h-full grayscale contrast-125 brightness-75 transition-all hover:grayscale-0 duration-700"
-              role="img"
-              aria-label="A sophisticated industrial-styled map interface of Sa Đéc, Vietnam, rendered in a dark nocturnal navy and charcoal palette. The map features high-contrast line work for streets in a metallic chrome finish, with the Aura Cafe location highlighted by a soft bronze glowing pulse."
-              style={{
-                backgroundImage:
-                  "url('/photos/IMG_6554-frame.webp')",
-              }}
-            />
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Footer */}
-<PageFooter
-  brand="{'©'} 2024 AURA CAFE. ALL RIGHTS RESERVED."
-  socialLinks={["IG", "FB", "TT"].map(s => ({ label: s }))}
-  socialSize="sm"
-  />
-    </StitchShell>
+      <LandingFooter />
+    </div>
   );
 }

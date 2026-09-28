@@ -1,31 +1,105 @@
-# Audit Plan — Select Audits (Stage 2/3)
+# Audit Stage 2: Select Audits (Select-Audits) — AURA CAFE Post-Rearchitecture
 
-**Goal:** Select high-ROI audits to bridge FnB-Container-Caffe to rustic Sa Đéc container café standard (mộc mạc, not overly luxurious/modern).
-**Method:** `select-audits --budget-constrained` (recipe: audit-plan DAG group 2)
-**Input:** 01-risk-rank.md (R1–R6 ranked areas + subagent inventories)
+**Pipeline Stage:** Stage 2 / Select Audits (`--budget-constrained`)
+**Date:** 2026-09-28
+**Source Ranking:** `reports/audit/plan/01-risk-rank.md`
+**Output Directory:** `reports/audit/plan/`
 
-## Selected Audits (Scope & Deliverables)
+---
 
-| Audit ID | Area | Specific target | Proposed action | ROI / Priority |
-|---|---|---|---|---|
-| **A1** | Font hardcode cleanup | 46 stitch files with `EB Garamond` inline `fontFamily` | Replace inline font-family with `var(--aura-font-display)` or remove inline style (inherit from tokens). Update `TypographyShowcase.tsx` + `typography-showcase.test.tsx` to showcase Quicksand / Be Vietnam Pro. | **High** — solves #1 visual gap (R1, score 9.0) across 46 files; keeps 389/389 stitch tests green |
-| **A2** | Locale copy rusticization | `luxuryTax` keys (vi.json:276, en.json:276+447, `checkout.luxuryTax` en.json:1790), `landing.pageAriaLabel` "sang trọng", heroTaglines, `containerNew2.heroTag` "Cao Cấp", `feature1Desc` "xa xỉ hiện đại" | Replace with rustic tone: "Thuế cao cấp (5%)" → "Phí dịch vụ (5%)", "Luxury Tax (5%)" → "Service Fee (5%)". Update fallback strings (`StitchCheckoutNew-order-summary.tsx` `?? t('stitch.tax', 'Luxury Tax (5%)')`), `index.html:6` meta "industrial-luxury" → rustic wording, `hero-section.tsx` + `hero-section.test.tsx` / `StitchCheckoutNew.test.tsx` assertions. | **High** — solves customer-facing tone contradiction (R2, score 7.5); fixes 3 test files pinning luxury strings (R4) |
-| **A3** | Extreme glass/blur reduction | 279 blur usages, ~95% exceed 8px token (24px×44, 12px×40, 20px×29, max 100px) | Clamp blur > 16px → max 8px per brand tokens v6 (`--aura-glass-blur`). Target worst offenders first: StitchAccountNew / StitchStoryNew-footer / checkin-new (100px), referral-rewards-1 (80px), skeleton components (StitchReferralNew2-skeleton, StitchAccountNew-skeleton), loyalty/rewards cluster. | **Medium** — reduces luxury "glass" aesthetic (R3, score 7.0) + improves mobile/GPU render perf |
-| **A4** | Hardcoded hex & gradient tokenization | 431 hardcoded hex (368 components + 63 pages), gradient hotspots (StitchAdminLoginNew-styles ×5, StitchMenuNew-styles ×4), 51 shadows | Remap to semantic tokens: `#050D1A`→`var(--aura-bg-page)`, `#4A7C59`→`var(--aura-primary)`, `#C9D6DF`→`var(--aura-border-chrome)` etc. Splits via workstream by file ownership. | **Medium** — single source of truth for rustic palette; enables future theme shifts (R3-adjacent) |
+## 1. Audit Selection Criteria
 
-## Deselected (Budget-Conscious Exclusions)
+Under the resource and capacity constraints of the pre-deployment phase, candidate audits are filtered using 4 criteria:
+1. **Direct Impact on Real-Money Dining**: Must protect revenue, prevent price tampering, or prevent transaction loss.
+2. **PII & Data Protection**: Must prevent customer identity leakage, order snooping (IDOR), and unauthorized admin mutations.
+3. **Staff Shift Operational Continuity**: Must ensure kitchen tickets, table turns, and payment link receipts never drop during peak rushes.
+4. **Mobile Ergonomics for Sa Đéc Diners**: Must guarantee seamless QR scanning, ordering, and payment on real mobile devices (iOS Safari & Android Chrome).
 
-| Excluded item | Rationale |
+---
+
+## 2. Selected Audits (Approved for Execution)
+
+### Audit A1: Security, IDOR Boundary & Webhook Cryptography
+- **Risk Addressed:** **R1** (Rank 1, Score 7.22)
+- **Target Files / Boundaries:**
+  - `worker/src/routes/openapi-orders-handlers/order-read-handlers.ts`
+  - `worker/src/routes/openapi-orders-handlers/order-mutation-handlers.ts`
+  - `worker/src/middleware/cors.ts`
+  - `packages/domain/payment/commands/payos-create-link.ts`
+  - `packages/domain/payment/commands/process-web-payment.ts`
+  - `packages/domain/reservation/src/routes/reservations.ts`
+- **Audit Objectives:**
+  - Verify that `resolveCustomerScope()` fails closed (`AND 1=0`) for unauthorized actors on all read endpoints.
+  - Prove that order mutation handlers (`PATCH /orders/:id`, `POST /orders/:id/cancel`) prevent cross-customer and cross-table unauthorized modification.
+  - Verify that CORS origin matching uses strict host matching, preventing regex subdomain spoofing.
+  - Audit webhook verification handlers for timing-safe signature comparison (`crypto.subtle.timingSafeEqual`).
+- **Success Criteria:** 0 IDOR vulnerabilities, 0 unauthenticated admin routes, 100% timing-safe webhook verifications.
+
+---
+
+### Audit A2: Server-Authoritative Pricing & Checkout Idempotency
+- **Risk Addressed:** **R2** (Rank 2, Score 5.67)
+- **Target Files / Boundaries:**
+  - `packages/domain/order/commands/create-order.ts`
+  - `packages/domain/order/services/order-price-calculator.ts`
+  - `packages/domain/payment/schemas/payos.ts`
+  - `src/stores/cart-store.ts` & `src/stores/payment-store.ts`
+- **Audit Objectives:**
+  - Adversarially verify that malicious request payloads with manipulated `price`, `subtotal`, or `discountAmount` are stripped by `OrderCreateSchema` and re-evaluated by `calculateOrderSnapshot()`.
+  - Validate voucher and discount redemption rules (usage caps, minimum order value, validity windows).
+  - Verify that double-submitting a checkout request with identical `Idempotency-Key` returns cached HTTP 200 with `X-Cache: HIT` within the 120s TTL window.
+- **Success Criteria:** 0 price tampering exploits possible, 100% idempotency replay accuracy.
+
+---
+
+### Audit A3: Real-Time KDS Stream, Event Replay & D1 Concurrency
+- **Risk Addressed:** **R3** (Rank 3, Score 4.34) & **R5** (Rank 5, Score 2.25)
+- **Target Files / Boundaries:**
+  - `worker/src/routes/order-stream.ts`
+  - `worker/src/routes/orders-hono-handlers/query-handlers.ts`
+  - `src/pages/KDS.tsx` & `src/hooks/use-kds.ts`
+  - `src/pages/TableOrder.tsx` & `src/pages/TVMenu.tsx`
+- **Audit Objectives:**
+  - Simulate network drops on kitchen display tablets and verify that reconnecting with `Last-Event-ID` replays all missed order lifecycle events.
+  - Verify SQLite D1 batch statement atomicity during concurrent table checkout operations.
+  - Audit audio alert handling on Safari/iOS KDS tablets (ensuring audio context resume on user gesture).
+- **Success Criteria:** 0 dropped tickets on reconnect, zero SQLite primary key / order number collision under concurrent simulated load.
+
+---
+
+### Audit A4: Mobile PWA Ergonomics, Accessibility (WCAG 2.1 AA) & Shell Isolation
+- **Risk Addressed:** **R4** (Rank 4, Score 2.94) & **R6** (Rank 6, Score 1.00)
+- **Target Files / Boundaries:**
+  - `src/components/md3/md3-app-shell.tsx` (`CustomerShell`, `OpsShell`, `AdminShell`)
+  - `src/components/cart/cart-bottom-bar.tsx`
+  - `src/components/md3/md3-navigation-bar.tsx`
+  - `src/styles/aura-tokens.css`
+  - `src/locales/vi.json`
+- **Audit Objectives:**
+  - Verify that `CartBottomBar` renders exclusively on `CustomerShell` and is 100% absent on `OpsShell` (KDS/TV/POS) and `AdminShell`.
+  - Audit all interactive buttons and modifier selection chips for compliance with the 44×44px Apple HIG / MD3 touch-target standard.
+  - Measure color contrast ratio across dark mode surfaces (ensuring ≥ 4.5:1 for normal text and ≥ 3:1 for large text / icons).
+  - Verify natural Vietnamese translations and Master Logo asset rendering across all viewport breakpoints.
+- **Success Criteria:** 0 shell boundary leaks, 0 touch targets < 44px on mobile paths, 100% WCAG 2.1 AA contrast compliance.
+
+---
+
+## 3. Deselected Audits (Deferred)
+
+| Audit Topic | Justification for Deferral |
 |---|---|
-| Route rename `/stitch/luxury-landing` etc. | Internal preview paths only; out of scope per rebrand plan P2 decision; high link-breakage risk, zero customer ROI |
-| Deleting 5 luxury stitch preview pages | Harmless preview routes consumed by screen-showcase; deletion breaks gallery links + tests |
-| Wood/kraft/terracotta texture asset pipeline | No existing assets to remap; copy + tokens + colors convey "Container Bản Địa" sufficiently without binary asset changes |
-| Duplicate stitch↔public route pairs (21) | R5 score 4.0 — bycatch; deferred to route-consolidation epic, not rustic refactor |
-| SEO meta overhaul beyond index.html:6 | Only one meta string contains "industrial-luxury"; fix folded into A2 |
+| **D1 Cold Start Latency Micro-benchmarking** | Cloudflare Workers edge cold starts are already sub-10ms; load testing deferred to Phase 2 scale-out. |
+| **Legacy Python Script Static Analysis** | All Python legacy migration scripts in `src/components/stitch/` were already purged in Phase 1 cleanup. |
+| **Multi-Language Deep Localization (FR/JA/KO)** | AURA CAFE Sa Đéc initial go-live prioritizes Vietnamese (`vi-VN`) and English (`en-US`). |
 
-## Budget Constraint Assessment
+---
 
-- Selected: **4 audits** (A1–A4), est. ~3 credits / ~1–2 focused hours, matching recipe estimate.
-- Execution order: **A1 (Fonts) → A2 (Copy/Meta/Tests) → A3 (Blur clamp) → A4 (Hex tokenization)**.
-- A1+A2 are the critical path (customer-visible rustic tone); A3+A4 are polish passes.
-- All 4 audits keep the 3115-test suite green by updating the 3 pinned test files in A1/A2.
+## 4. Execution Selection Summary
+
+```
+Selected Audits:
+├── A1: Security & IDOR Cryptography Audit (Critical P0)
+├── A2: Server-Authoritative Pricing & Idempotency Audit (Critical P0)
+├── A3: Real-Time KDS SSE & D1 Resilience Audit (High P1)
+└── A4: Mobile PWA Ergonomics, WCAG & Shell Governance Audit (High P1)
+```

@@ -14,7 +14,8 @@ export async function getKdsMobile(
   context: Context<{ Bindings: Env }>
 ) {
   try {
-    const role = (context.get('user')?.role as string) || '';
+    const user = context.get('user') as { role?: string } | undefined;
+    const role = user?.role || '';
     if (!VIEW_ROLES.includes(role)) {
       return errorResponse('Không có quyền', 403);
     }
@@ -55,7 +56,8 @@ export async function updateKdsStatus(
   context: Context<{ Bindings: Env }>
 ) {
   try {
-    const role = (context.get('user')?.role as string) || '';
+    const user = context.get('user') as { role?: string } | undefined;
+    const role = user?.role || '';
     if (!UPDATE_ROLES.includes(role)) {
       return errorResponse('Không có quyền cập nhật', 403);
     }

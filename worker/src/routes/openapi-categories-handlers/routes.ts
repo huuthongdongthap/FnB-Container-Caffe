@@ -6,8 +6,8 @@ import { registerCategoryMutationHandlers } from './mutation-handlers';
 
 export const openApiCategoriesRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Apply auth middleware to all routes
-openApiCategoriesRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
+// Apply auth middleware to this domain's routes only (sub-router is mounted at root)
+openApiCategoriesRouter.use('/api/categories/*', requireAuth(['owner', 'manager', 'staff']));
 
 registerCategoryReadHandlers(openApiCategoriesRouter);
 registerCategoryMutationHandlers(openApiCategoriesRouter);

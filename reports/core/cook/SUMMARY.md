@@ -1,47 +1,41 @@
-# /cook Recipe Execution Summary — Plan M4-B
+# /cook Execution Summary
 
-- **Recipe ID:** `core:cook`
-- **Target Plan:** `plans/2026-09-18-m4b-final-audit-verdict/`
-- **Executed Date:** 2026-09-18
-- **Status:** SUCCESS (All 4 Phases Complete)
-
----
-
-## 1. Pipeline Execution
-
+## Invocation
 ```
-SEQUENTIAL:
-  ├── recipe-load        → plans/2026-09-18-m4b-final-audit-verdict/plan.md (4 phases)
-  ├── phase-01-execute   → Core API & Domain Security (Audits #01 - #06) [DONE]
-  ├── phase-02-execute   → Contract, Test & UI Isolation (Audits #07 - #12) [DONE]
-  ├── phase-03-execute   → System Health & State (Audits #13 - #18) [DONE]
-  ├── phase-04-execute   → Final Acceptance Matrix & M4-C Readiness [DONE]
-  └── on_complete        → Compiled SUMMARY.md + Verification Logs
+/cook next /plan
 ```
 
----
+## Resolved State
+- **UI Re-Architecture (M3 / 2026 Standards)**: All 6 phases completed & reconciled.
+  - Phase 0: Forensic Audit & Baseline
+  - Phase 1: Shell Authority & Viewport Isolation
+  - Phase 2: Design Token Foundation & Adapters
+  - Phase 3: Component Core & Deep-Import Shim Conversion
+  - Phase 4/5: Shell Governance, Route Hygiene & Matrix Reconciliation
+  - Phase 6: Legacy Migration & Dead Code Pruning
+- **UI Localization & Brand Rebuild (`2026-09-21-ui-rebuild-localization`)**: All 5 phases completed.
+  - Phase 1: Master Logo asset distribution
+  - Phase 2: /about authentic Sa Đéc story & real team
+  - Phase 3: /contact & /gallery Sa Đéc 5-zone rebuild
+  - Phase 4: Clean vi.json natural Vietnamese & Top Navbar alignment
+  - Phase 5: Comprehensive verification
+- **Backend Architecture & Stabilization (`plans/concurrent-dancing-stallman.md`)**:
+  - CORS header resolution for credentialed requests
+  - Guest checkout for PayOS payment link creation
+  - Unified D1 database binding accessor (`AURA_DB ?? DB`)
+  - Web payments endpoint (`POST /api/payments/payment-request`)
+  - Secured reservations endpoints (`requireAuth(['owner', 'staff', 'manager'])`)
+  - Sanitized SQL `ORDER BY` with column whitelist
+  - Event replay buffer with `Last-Event-ID` on order status SSE stream
+  - Idempotency key caching with KV storage
 
-## 2. Phase Artifacts Generated
+## Verification Evidence
+| Gate | Result | Status |
+|---|---|---|
+| `npx tsc --noEmit` | **0 errors** | 🟢 GREEN |
+| `npx vitest run` | **382 test files / 3,519 tests PASS** | 🟢 GREEN |
+| `npm run build` | **Vite build clean** | 🟢 GREEN |
+| **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 
-1. `plans/2026-09-18-m4b-final-audit-verdict/phase-01-core-api-and-security.md` (Audits #01 - #06: Canonical API, Domain Boundary, Customer DTO, Product Visibility, Price, Availability)
-2. `plans/2026-09-18-m4b-final-audit-verdict/phase-02-contracts-tests-and-shells.md` (Audits #07 - #12: Localization, OpenAPI, Test Coverage, E2E Journey, UI/API Source of Truth, Three-Shell Isolation)
-3. `plans/2026-09-18-m4b-final-audit-verdict/phase-03-system-health-and-state.md` (Audits #13 - #18: Design System, Legacy Safety, Build/Lint, Runtime Health, Git Hygiene, Project State)
-4. `plans/2026-09-18-m4b-final-audit-verdict/phase-04-final-verdict-and-m4c.md` (Acceptance Matrix, Non-Blocking Gaps Y-01/02/03, M4-C Foundation Reuse Contract)
-5. `plans/2026-09-18-m4b-final-audit-verdict/m4b-final-audit-report.md` (Formal 11-section Audit Report per §24)
-
----
-
-## 3. Automated Verification Checks
-
-- **TypeScript (`npx tsc --noEmit`):** 0 errors (`EXIT=0`)
-- **Unit & Integration Tests (`npx vitest run`):** 371 test files, 3,395 tests PASS (`EXIT=0`)
-- **M4-B Contract & Security Tests:** 1 file, 15 tests PASS (`EXIT=0`)
-- **M4-B Targeted ESLint (`worker/src/lib/openapi.ts`, `packages/domain/catalog/*`, `src/pages/menu.tsx`, etc.):** 0 errors
-- **Project State Sync:** `.ai/state/{current,progress,decisions,blockers}.md` updated
-
----
-
-## 4. Final Verdict
-
-**`M4-B VERIFIED WITH NON-BLOCKING GAPS`**
-- Ready for M4-C commencement.
+## Next Step
+- Ready for deployment or staging validation (`/deploy`).

@@ -1,166 +1,209 @@
-import { useState, useEffect } from 'react';
-import { StitchShell } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
+import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
+import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
+import { HelmetHead } from '@/components/seo/HelmetHead';
+import { Check, Sparkles, Coffee, Briefcase, Crown } from 'lucide-react';
 
-const PLANS = [
+interface Plan {
+  readonly id: string;
+  readonly tier: string;
+  readonly price: string;
+  readonly period: string;
+  readonly desc: string;
+  readonly icon: typeof Coffee;
+  readonly features: readonly string[];
+  readonly cta: string;
+  readonly highlighted: boolean;
+}
+
+const PLANS: readonly Plan[] = [
   {
-    tier: 'BASIC',
-    price: 9,
-    period: '/ MONTH',
-    features: ['Daily Brew', 'Standard Seating', 'Mobile Ordering'],
-    cta: 'SELECT PLAN',
+    id: 'morning',
+    tier: 'CÀ PHÊ SÁNG',
+    price: '199.000₫',
+    period: '/ THÁNG',
+    desc: 'Dành cho khách hàng khởi đầu ngày mới đầy năng lượng cùng hương vị cà phê mộc Sa Đéc.',
+    icon: Coffee,
+    features: [
+      '1 ly cà phê phin hoặc espresso mỗi ngày',
+      'Tặng 1 voucher giảm 20% đồ uống đặc biệt/tháng',
+      'Tích lũy x1.5 điểm AURA Points',
+      'Đặt món nhanh qua mã QR tại bàn',
+    ],
+    cta: 'ĐĂNG KÝ GÓI SÁNG',
     highlighted: false,
   },
   {
-    tier: 'PREMIUM',
-    price: 19,
-    period: '/ MONTH',
-    features: ['All Basic features', 'Specialty Roasts', 'Priority Lounge Access', 'Monthly Cupping'],
-    cta: 'SELECT PLAN',
+    id: 'coworking',
+    tier: 'CO-WORKING & CABIN',
+    price: '499.000₫',
+    period: '/ THÁNG',
+    desc: 'Không gian làm việc tĩnh lặng lý tưởng cho freelancer, người làm việc từ xa và sáng tạo.',
+    icon: Briefcase,
+    features: [
+      'Chỗ ngồi ưu tiên tại Cabin Yên Tĩnh & Lounge Thủy Mộc',
+      '1 ly đồ uống bất kỳ trong menu mỗi ngày',
+      'Wifi cáp quang tốc độ cao & ổ điện công suất lớn',
+      'Giảm 15% toàn bộ bánh ngọt & đồ ăn nhẹ',
+      'Tích lũy x2 điểm thưởng AURA Points',
+    ],
+    cta: 'CHỌN GÓI PHỔ BIẾN',
     highlighted: true,
   },
   {
-    tier: 'ENTERPRISE',
-    price: 49,
-    period: '/ MONTH',
-    features: ['All Premium features', 'Private Event Hosting', 'Personal Concierge', 'Unlimited Global Access'],
-    cta: 'SELECT PLAN',
+    id: 'corporate',
+    tier: 'DOANH NHÂN & VIP',
+    price: '1.490.000₫',
+    period: '/ THÁNG',
+    desc: 'Đặc quyền tiếp đón đối tác và tổ chức workshop, gặp mặt cao cấp giữa lòng Sa Đéc.',
+    icon: Crown,
+    features: [
+      'Toàn bộ quyền lợi của gói Co-working',
+      '30 ly đồ uống cao cấp mỗi tháng cho đối tác',
+      'Ưu tiên đặt bàn Sân Thượng Rooftop hoặc Cabin riêng',
+      'Hỗ trợ in ấn tài liệu họp miễn phí',
+      'Bãi đỗ xe ô tô dành riêng & phục vụ tận bàn',
+    ],
+    cta: 'LIÊN HỆ GÓI VIP',
     highlighted: false,
   },
 ] as const;
 
-const FOUNDRY_IMAGE =
-  '/photos/IMG_6631.webp';
-
 export default function SubscriptionsNew() {
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLBodyElement>) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-  };
-
-  useEffect(() => {
-    document.body.style.backgroundImage = `radial-gradient(circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 165, 116, 0.03) 0%, transparent 50%)`;
-    return () => {
-      document.body.style.backgroundImage = '';
-    };
-  }, [mousePos]);
-
   return (
-    <StitchShell>
-      {/* TopAppBar */}
-<PageHeader brand="AURA CAFE" scrollEffect />
+    <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] flex flex-col justify-between">
+      <HelmetHead
+        title="Gói Hội Viên &amp; Đặc Quyền Tháng — AURA CAFE"
+        description="Đăng ký gói cà phê tháng và gói co-working tại AURA CAFE Sa Đéc. Thưởng thức đồ uống mỗi ngày và tận hưởng không gian làm việc container sang trọng."
+        canonical="/subscriptions"
+      />
+      <LandingNav />
 
-      <main className="pt-24 pb-20 px-5" onMouseMove={handleMouseMove}>
+      <div role="region" aria-label="Gói Hội Viên Đặc Quyền" className="subscriptions-container pt-28 pb-24 px-5 sm:px-8 lg:px-16 max-w-7xl mx-auto w-full flex-1">
         {/* Hero */}
-        <section className="mb-12 text-center">
-          <span className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-4 block">
-            MEMBERSHIP PROGRAMS
-          </span>
-          <h2 className="font-h1-mobile text-h1-mobile md:font-h1 md:text-h1 mb-6 text-on-surface">
-            Precision Craft. <br /> Exclusive Access.
-          </h2>
-          <p className="text-secondary font-body-lg max-w-xl mx-auto opacity-70">
-            Experience the intersection of industrial grit and luxury hospitality with our curated subscription tiers.
-          </p>
+        <section className="mb-16 text-center max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--aura-chrome-mid)]/10 border border-[var(--aura-chrome-mid)]/20 mb-4">
+            <Sparkles className="w-3.5 h-3.5 text-[var(--aura-chrome-bright)]" />
+            <span className="text-[var(--aura-chrome-mid)] text-xs uppercase tracking-widest font-semibold font-body">
+              Gói Hội Viên Đặc Quyền
+            </span>
+          </div>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl text-white font-medium mb-6 leading-tight">
+            Nâng Tầm Trải Nghiệm Mỗi Ngày
+          </h1>
+          <div className="font-body text-base sm:text-lg text-[var(--aura-chrome-soft)] font-light leading-relaxed">
+            Tiết kiệm chi phí, chủ động thời gian và tận hưởng không gian cà phê container độc bản tại Sa Đéc với các gói thành viên linh hoạt.
+          </div>
         </section>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-container-max mx-auto">
-          {PLANS.map(plan => (
-            <div
-              key={plan.tier}
-              className={`border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300 group ${
-                plan.highlighted
-                  ? 'border-[var(--aura-tertiary)] bg-[var(--aura-surface-container-high)] transform md:-translate-y-4 shadow-2xl'
-                  : 'border-secondary/20 bg-[var(--aura-surface-container)] hover:bg-[var(--aura-surface-container-high)]'
-              }`}
-            >
-              {plan.highlighted && (
-                <div className="absolute top-0 right-0 p-4">
-                  <span className="bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] font-label-caps text-[10px] px-3 py-1 tracking-widest">
-                    MOST POPULAR
-                  </span>
-                </div>
-              )}
-              <div className="mb-12">
-                <h3 className={`font-h3 text-h3 mb-2 ${plan.highlighted ? 'text-[var(--aura-tertiary)]' : 'text-secondary group-hover:text-on-surface transition-colors'}`}>
-                  {plan.tier}
-                </h3>
-                <div className="flex items-baseline gap-1 mb-6">
-                  <span className={`font-h2 text-h2 ${plan.highlighted ? 'text-[var(--aura-tertiary)]' : 'text-on-surface'}`}>
-                    ${plan.price}
-                  </span>
-                  <span className={`font-label-caps text-label-caps ${plan.highlighted ? 'text-[var(--aura-tertiary)]/70' : 'text-secondary'}`}>
-                    {plan.period}
-                  </span>
-                </div>
-                <div className="metallic-divider mb-8" aria-hidden="true" />
-                <ul className="space-y-4">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-[var(--aura-tertiary)] text-sm">check</span>
-                      <span className={`font-body-md ${plan.highlighted ? 'text-on-surface' : 'text-secondary'}`}>
-                        {f}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                type="button"
-                className={`w-full py-4 font-label-caps text-label-caps uppercase tracking-widest transition-all active:scale-[0.98] ${
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+          {PLANS.map((plan) => {
+            const Icon = plan.icon;
+            return (
+              <div
+                key={plan.id}
+                className={`rounded-[36px] p-8 sm:p-10 flex flex-col justify-between relative transition-all duration-500 group ${
                   plan.highlighted
-                    ? 'bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)] hover:brightness-110'
-                    : 'bg-transparent border border-secondary text-secondary hover:bg-secondary hover:text-[var(--aura-noir-deep)]'
+                    ? 'bg-gradient-to-b from-white/10 to-white/5 border-2 border-[var(--aura-chrome-bright)] shadow-[0_0_30px_rgba(201,214,223,0.15)] md:-translate-y-2'
+                    : 'bg-white/5 backdrop-blur-[8px] border border-white/10 hover:border-[var(--aura-chrome-mid)]/40 shadow-xl'
                 }`}
               >
-                {plan.cta}
-              </button>
-            </div>
-          ))}
+                {plan.highlighted && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] font-body text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-widest shadow-md">
+                    LỰA CHỌN PHỔ BIẾN
+                  </div>
+                )}
+
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--aura-chrome-mid)]/15 border border-[var(--aura-chrome-mid)]/30 flex items-center justify-center text-[var(--aura-chrome-bright)] mb-6">
+                    <Icon className="w-6 h-6" />
+                  </div>
+
+                  <h3 className="font-display text-xl font-bold text-white mb-2 tracking-wide">
+                    {plan.tier}
+                  </h3>
+                  <p className="font-body text-xs text-[var(--aura-chrome-mid)] mb-6 leading-relaxed font-light">
+                    {plan.desc}
+                  </p>
+
+                  <div className="flex items-baseline gap-1.5 pb-6 mb-6 border-b border-white/10">
+                    <span className="font-display text-3xl sm:text-4xl font-bold text-white">
+                      {plan.price}
+                    </span>
+                    <span className="font-body text-xs text-[var(--aura-chrome-mid)] tracking-wider">
+                      {plan.period}
+                    </span>
+                  </div>
+
+                  <ul className="space-y-3.5 mb-8">
+                    {plan.features.map((f, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-[var(--aura-chrome-bright)]/10 flex items-center justify-center shrink-0 mt-0.5 text-[var(--aura-chrome-bright)]">
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </div>
+                        <span className="font-body text-xs sm:text-sm text-[var(--aura-chrome-soft)] font-light leading-snug">
+                          {f}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <a
+                  href="/contact"
+                  className={`w-full py-4 rounded-2xl font-body text-xs font-bold uppercase tracking-widest text-center transition-all duration-300 active:scale-[0.98] ${
+                    plan.highlighted
+                      ? 'bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] shadow-lg'
+                      : 'bg-white/5 hover:bg-white/10 border border-white/15 text-white'
+                  }`}
+                >
+                  {plan.cta}
+                </a>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Visual Element */}
-        <div className="mt-20 relative w-full h-80 chrome-border overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" aria-hidden="true" />
-          <img
-            className="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-700"
-            alt="A high-contrast, professional architectural photograph of a luxury industrial cafe interior. Deep navy and charcoal shadows contrast with warm bronze lighting. The scene features raw concrete pillars, brushed chrome espresso machines, and minimalist high-end seating."
-            src={FOUNDRY_IMAGE}
-          />
-          <div className="absolute bottom-8 left-8 z-20">
-            <p className="font-label-caps text-label-caps text-[var(--aura-tertiary)] mb-2">FOUNDRY LOCATION</p>
-            <p className="font-h3 text-h3 text-on-surface">The Central Hub.</p>
+        {/* Location Highlight Banner */}
+        <div className="mt-20 relative rounded-[32px] overflow-hidden border border-white/10 bg-white/5">
+          <div className="grid grid-cols-1 md:grid-cols-12 items-center">
+            <div className="md:col-span-7 p-8 sm:p-12">
+              <span className="text-[var(--aura-chrome-mid)] text-xs uppercase tracking-[0.25em] font-semibold block mb-2">
+                ĐIỂM HẸN TẠI SA ĐÉC
+              </span>
+              <h2 className="font-display text-2xl sm:text-3xl text-white font-medium mb-4">
+                29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp
+              </h2>
+              <p className="font-body text-sm text-[var(--aura-chrome-soft)] font-light leading-relaxed mb-6">
+                Không gian mở với 3 khối container hàng hải, 5 phân khu thư giãn và làm việc, sân thượng ngắm view thành phố hoa Sa Đéc. Sẵn sàng chào đón quý khách từ 06:30 đến 22:30 mỗi ngày.
+              </p>
+              <div className="flex gap-4">
+                <a
+                  href="/table-reservation"
+                  className="bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider font-body hover:bg-white transition-colors"
+                >
+                  Đặt Chỗ Trước
+                </a>
+                <a
+                  href="/gallery"
+                  className="border border-white/20 text-white px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider font-body hover:border-white transition-colors"
+                >
+                  Xem Hình Ảnh
+                </a>
+              </div>
+            </div>
+            <div className="md:col-span-5 h-64 md:h-full min-h-[260px] relative overflow-hidden">
+              <img
+                src="/photos/IMG_6631.webp"
+                alt="AURA CAFE lung linh về đêm tại Sa Đéc"
+                className="w-full h-full object-cover grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-700"
+              />
+            </div>
           </div>
         </div>
-      </main>
+      </div>
 
-      {/* Footer */}
-<PageFooter
-  brand="AURA CAFE"
-  socialLinks={["IG", "FB", "TT"].map(s => ({ label: s }))}
-  socialSize="sm"
-  />
-
-      <style>{`
-        .metallic-divider {
-          height: 1px;
-          width: 100%;
-          background: linear-gradient(90deg, transparent 0%, #c6c6c7 50%, transparent 100%);
-          opacity: 0.2;
-        }
-        .chrome-border {
-          border: 1px solid rgba(198, 198, 199, 0.2);
-        }
-        .bronze-border {
-          border: 1px solid var(--aura-primary);
-          box-shadow: 0 0 15px color-mix(in srgb, var(--aura-primary) 10%, transparent);
-        }
-        .bronze-glow {
-          text-shadow: 0 0 8px color-mix(in srgb, var(--aura-primary) 40%, transparent);
-        }
-      `}</style>
-    </StitchShell>
+      <LandingFooter />
+    </div>
   );
 }

@@ -70,8 +70,9 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
             )}
           </p>
           <div className="flex flex-col sm:flex-row gap-6">
-            <button type="button"
-              className="px-10 py-5 transition-all duration-500 uppercase flex items-center gap-3"
+            <a
+              href="/menu"
+              className="px-10 py-5 transition-all duration-500 uppercase flex items-center justify-center gap-3 cursor-pointer shadow-[0_0_20px_rgba(201,214,223,0.2)]"
               style={{
                 background: 'linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-primary) 100%)',
                 color: 'var(--aura-noir-deep)',
@@ -90,9 +91,10 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
             >
               {t('landing.exploreNow', 'Khám phá ngay')}
               <ArrowRight className="w-[18px] h-[18px]" aria-hidden="true" />
-            </button>
-            <button type="button"
-              className="bg-transparent border px-10 py-5 uppercase transition-all flex items-center gap-3"
+            </a>
+            <a
+              href="/table-reservation"
+              className="bg-transparent border px-10 py-5 uppercase transition-all flex items-center justify-center gap-3 cursor-pointer"
               style={{
                 borderColor: 'var(--aura-chrome-dim)',
                 color: 'var(--aura-chrome-bright)',
@@ -109,8 +111,8 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              {t('landing.viewMenu', 'Thực đơn')}
-            </button>
+              {t('landing.reservation', 'Đặt bàn trước')}
+            </a>
           </div>
         </div>
       </div>

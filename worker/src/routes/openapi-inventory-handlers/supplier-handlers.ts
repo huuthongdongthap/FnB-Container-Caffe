@@ -6,7 +6,7 @@ import { InventoryRoutes } from '../../schemas/inventory';
 export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers - List suppliers
   app.openapi(InventoryRoutes.suppliers.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -42,7 +42,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/inventory/suppliers/{id} - Get supplier by ID
   app.openapi(InventoryRoutes.suppliers.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
@@ -56,7 +56,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/inventory/suppliers - Create supplier
   app.openapi(InventoryRoutes.suppliers.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -90,7 +90,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PATCH /api/inventory/suppliers/{id} - Update supplier
   app.openapi(InventoryRoutes.suppliers.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');

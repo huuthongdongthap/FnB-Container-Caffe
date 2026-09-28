@@ -39,11 +39,7 @@ export function OrderSuccessNewFooter() {
         </a>
       </nav>
       <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-soft)] opacity-40">
-        {t('footer.copyright', {
-          defaultValue:
-            '© {{year}} AURA CAFE. ALL RIGHTS RESERVED.',
-          year: 2024,
-        })}
+        {`© ${new Date().getFullYear()} AURA CAFE SA ĐÉC. ĐÃ ĐĂNG KÝ BẢN QUYỀN.`}
       </p>
     </footer>
   );

@@ -21,12 +21,20 @@ export interface StitchMenuNewProps {
   onCartClick?: () => void;
   /** Number of items currently in the cart */
   cartItemCount?: number;
+  /** Extra sections placed before the footer (e.g. Recommendations) */
+  children?: React.ReactNode;
 }
 
 export const CATEGORIES = [
-  { key: 'all', label: 'All' },
-  { key: 'coffee', label: 'Coffee' },
-  { key: 'tea', label: 'Tea' },
-  { key: 'cold-brew', label: 'Cold Brew' },
-  { key: 'signature', label: 'Signature' },
+  { key: 'all', label: 'Tất cả' },
+  { key: 'traditional-coffee', label: '☕ Cà phê truyền thống' },
+  { key: 'hot-coffee', label: '🔥 Cà phê nóng' },
+  { key: 'frappuccino', label: '🧊 Đá xay' },
+  { key: 'soda', label: '🫧 Soda Ý' },
+  { key: 'tea', label: '🍵 Trà' },
+  { key: 'smoothies', label: '🥤 Sinh tố' },
+  { key: 'yogurt', label: '🥛 Yaourt' },
+  { key: 'juice', label: '🍊 Nước ép' },
+  { key: 'other-drinks', label: '🥤 Giải khát' },
+  { key: 'bottled', label: '🧴 Đóng chai' },
 ] as const;

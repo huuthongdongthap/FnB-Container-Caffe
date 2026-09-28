@@ -37,7 +37,7 @@ export function AuditTable({ entries, loading, error, t, onRetry, onReset }: Aud
   return (
     <Card>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-border bg-muted/5">
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">

@@ -15,7 +15,7 @@ export function Header({ onNavigate }: HeaderProps) {
         <MenuIcon />
       </button>
       <div className="absolute left-1/2 -translate-x-1/2">
-        <h1 className="font-['EB_Garamond'] text-[40px] leading-none tracking-tighter text-[var(--aura-chrome-bright)]">
+        <h1 className="font-display text-[40px] leading-none tracking-tighter text-[var(--aura-chrome-bright)]">
           AURA CAFE
         </h1>
       </div>

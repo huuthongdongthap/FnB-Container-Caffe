@@ -77,7 +77,7 @@ export function StitchCheckinNew({
           <div className="space-y-2">
             <label
               htmlFor="checkin-phone"
-              className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)] block ml-1"
+              className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)] block ml-1"
             >
               {t('checkin.phoneLabel', 'PHONE NUMBER')}
             </label>
@@ -101,7 +101,7 @@ export function StitchCheckinNew({
             onClick={handleSubmit}
             disabled={isLoading || phone.replace(/\D/g, '').length < 10}
             className={cn(
-              'w-full py-5 bg-[var(--aura-bronze-shimmer)] text-white font-[\'Space_Grotesk\'] text-[18px] font-bold leading-tight rounded-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed',
+              'w-full py-5 bg-[var(--aura-bronze-shimmer)] text-white font-body text-[18px] font-bold leading-tight rounded-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed',
             )}
             style={{ boxShadow: '0px 0px 15px rgba(212, 165, 116, 0.3)' }}
           >

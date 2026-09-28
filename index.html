@@ -1,22 +1,28 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="AURA CAFE — Cà phê container Sa Đéc mộc mạc, bản địa. 5 không gian độc đáo: Jade Counter, Sky Deck, Noir Cabin, Aura Lounge, VIP Steel Nest." />
+    <meta name="description" content="AURA CAFE — Cà phê container Sa Đéc mộc mạc, bản địa. 3 khối container với 5 phân khu không gian độc đáo: Quầy Bar Container, Lounge Thủy Mộc, Sân Thượng Rooftop, Cabin Yên Tĩnh, Khu Sofa / Sân Vườn." />
     <title>AURA CAFE — Container Caffe Sa Đéc</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="AURA CAFE" />
+    <meta name="application-name" content="AURA CAFE" />
+    <meta name="robots" content="noarchive" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="mask-icon" href="/icons/mask-icon.svg" color="#0A1A2E" />
+    <!-- Prevent Safari from auto-activating Reader Mode on this SPA -->
+    <meta name="supported-color-schemes" content="dark" />
+    <meta name="color-scheme" content="dark" />
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@100..900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   </head>
-  <body class="bg-background text-foreground font-body antialiased">
-    <div id="root"></div>
+  <body class="bg-[#0A1A2E] text-[#F5F5F5] font-body antialiased min-h-screen selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E]">
+    <div id="root" role="application" aria-label="AURA CAFE Web Application" class="web-application"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

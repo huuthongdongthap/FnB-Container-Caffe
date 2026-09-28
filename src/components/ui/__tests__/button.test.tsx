@@ -8,18 +8,15 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument();
   });
 
-  it('applies variant classes', () => {
-    const { rerender } = render(<Button variant="primary">Primary</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-accent');
-
-    rerender(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button')).toHaveClass('border');
-
-    rerender(<Button variant="ghost">Ghost</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-transparent');
-
-    rerender(<Button variant="destructive">Delete</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-destructive');
+  // Variants render MD3 token surfaces, not the legacy raw-Tailwind palette.
+  it.each([
+    ['primary', 'bg-md-primary'],
+    ['secondary', 'border-md-outline'],
+    ['ghost', 'text-md-primary'],
+    ['destructive', 'var(--md-sys-color-error)'],
+  ] as const)('renders the %s variant with MD3 tokens', (variant, marker) => {
+    render(<Button variant={variant}>Label</Button>);
+    expect(screen.getByRole('button').className).toContain(marker);
   });
 
   it('shows spinner when loading', () => {

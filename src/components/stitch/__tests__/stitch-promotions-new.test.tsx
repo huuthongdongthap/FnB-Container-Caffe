@@ -71,6 +71,6 @@ describe('StitchPromotionsNew', () => {
 
   it('renders Claim Offer button for hero', () => {
     renderWithProviders(<StitchPromotionsNew countdownSeconds={3600} offers={MOCK_OFFERS} />);
-    expect(screen.getByText('Claim Offer')).toBeTruthy();
+    expect(screen.getByText('Nhận Ưu Đãi')).toBeTruthy();
   });
 });

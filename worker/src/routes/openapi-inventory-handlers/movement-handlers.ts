@@ -6,7 +6,7 @@ import { InventoryRoutes } from '../../schemas/inventory';
 export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/movements - List stock movements
   app.openapi(InventoryRoutes.movements.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -52,7 +52,7 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/inventory/movements - Create stock movement (adjustment)
   app.openapi(InventoryRoutes.movements.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.DB;
+    const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();

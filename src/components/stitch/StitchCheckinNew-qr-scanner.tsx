@@ -18,7 +18,7 @@ export function QrScanner() {
       {/* QR divider */}
       <div className="flex items-center gap-4 mb-12">
         <div className="h-px flex-1 bg-white/10" />
-        <span className="font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)]/50">
+        <span className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)]/50">
           {t('checkin.orScan', 'OR SCAN CODE')}
         </span>
         <div className="h-px flex-1 bg-white/10" />
@@ -51,7 +51,7 @@ export function QrScanner() {
             />
             {/* Laser scan line */}
             <div
-              className="absolute left-0 w-full h-[2px] bg-[var(--aura-bronze-shimmer)]"
+              className="absolute top-0 left-0 w-full h-[2px] bg-[var(--aura-bronze-shimmer)] will-change-transform"
               style={{
                 boxShadow: '0px 0px 10px var(--aura-bronze-shimmer)',
                 animation: 'aura-scan 3s ease-in-out infinite',
@@ -64,7 +64,7 @@ export function QrScanner() {
             <Scan className="w-9 h-9 text-[var(--aura-bronze-shimmer)]" />
           </div>
         </div>
-        <p className="mt-6 font-['Space_Grotesk'] text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)] text-center tracking-widest">
+        <p className="mt-6 font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-bright)] text-center tracking-widest">
           {t('checkin.qrHint', 'POSITION QR CODE IN FRAME')}
         </p>
       </section>

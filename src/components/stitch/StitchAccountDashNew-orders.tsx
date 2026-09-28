@@ -51,15 +51,10 @@ function useReorder() {
   const navigate = useNavigate();
 
   return (order: DashOrderItem) => {
-    if (!order.rawItems) return;
-    let items: { name?: string; product_name?: string; price?: number; quantity?: number }[];
-    try {
-      items = JSON.parse(order.rawItems);
-    } catch {
-      // error swallowed — rawItems is non-critical for reorder flow
-      return;
-    }
-    if (!Array.isArray(items) || items.length === 0) return;
+    // Canonical order lines carry no menu id; resolve by name when the cart is
+    // pushed to checkout, which re-prices against the live server menu anyway.
+    const items = order.items ?? [];
+    if (items.length === 0) return;
 
     const { clearCart, addItem } = useCartStore.getState();
     const currentItems = useCartStore.getState().items;
@@ -74,12 +69,11 @@ function useReorder() {
 
     clearCart();
     for (const item of items) {
-      const qty = (item as { quantity?: number }).quantity ?? 1;
-      for (let i = 0; i < qty; i++) {
+      for (let i = 0; i < item.quantity; i++) {
         addItem({
           id: crypto.randomUUID(),
-          name: item.name || item.product_name || 'Item',
-          price: item.price ?? 0,
+          name: item.name || 'Item',
+          price: item.unitPriceCents / 100,
         });
       }
     }

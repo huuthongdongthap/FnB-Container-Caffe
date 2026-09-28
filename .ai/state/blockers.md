@@ -17,8 +17,6 @@ None.
 **Assessment:** M4-B Automated Verification = GREEN. Production Verification = NOT PERFORMED.
 **Action:** Deferred to deployment window; requires `wrangler deploy` + staging D1 seed.
 
-### Y-03: Channel Pricing Not Implemented
+### Y-03: Channel Pricing (RESOLVED in M4-C)
 **Area:** AUDIT #05 — Price
-**Detail:** Per audit instruction: "If channel pricing exists, reuse it. If it does not, do not build a pricing engine during this audit."
-**Assessment:** No channel pricing engine exists. Single canonical `priceCents` served for all channels.
-**Action:** Documented as M4-C/M5 extension point.
+**Resolution:** Implemented via `resolveItemPrice()` in `@aura/domain-catalog/policies/pricing.ts` supporting `dine_in`, `takeaway`, and `delivery` sales channels with integer VND cents arithmetic. Tested in `pricing.test.ts`. Closed during M4-C Phase 01.

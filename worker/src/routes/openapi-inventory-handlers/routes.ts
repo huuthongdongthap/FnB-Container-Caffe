@@ -9,7 +9,7 @@ import { registerPurchaseOrderHandlers } from './purchase-order-handlers';
 export const openApiInventoryRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Auth middleware for all inventory routes
-openApiInventoryRouter.use('*', requireAuth);
+openApiInventoryRouter.use('/api/inventory/*', requireAuth);
 
 // Register all inventory sub-handlers
 registerIngredientHandlers(openApiInventoryRouter);

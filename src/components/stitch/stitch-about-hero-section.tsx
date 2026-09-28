@@ -55,7 +55,7 @@ export function HeroSection({
           className="font-label-sm uppercase tracking-widest opacity-60"
           style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
         >
-          Scroll to Explore
+          {t('about.scrollToExplore', 'Cuộn để khám phá')}
         </span>
         <ChevronDown
           className="h-5 w-5 animate-bounce"

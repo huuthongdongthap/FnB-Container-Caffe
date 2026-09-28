@@ -51,19 +51,19 @@ export default function TrackOrderPage() {
     [navigate]
   );
 
-  const trackOrderItems = currentOrder?.items?.map((item) => ({
-    id: String(item.id),
+  const trackOrderItems = currentOrder?.items?.map((item, index) => ({
+    id: `${currentOrder.id}-${index}`,
     name: item.name,
     quantity: item.quantity,
-    price: item.price,
+    price: item.unitPriceCents / 100,
   })) ?? [];
 
   return (
     <StitchTrackOrderNew
-      orderId={currentOrder?.id || orderId || undefined}
+      orderId={currentOrder?.orderNumber || currentOrder?.id || orderId || undefined}
       estimatedMinutes={currentOrder ? 8 : undefined}
       items={trackOrderItems.length ? trackOrderItems : undefined}
-      total={currentOrder?.total}
+      total={currentOrder ? currentOrder.totalAmount / 100 : undefined}
       status={currentOrder?.status}
       onTrackMap={handleTrackMap}
       onBack={handleBack}

@@ -53,6 +53,10 @@ vi.mock('lucide-react', () => ({
   MapPin: () => null,
   Clock: () => null,
   Phone: () => null,
+  Menu: () => null,
+  X: () => null,
+  Lock: () => null,
+  Navigation: () => null,
 }));
 
 describe('StitchLandingNew', () => {

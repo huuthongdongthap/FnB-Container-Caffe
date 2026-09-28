@@ -1,7 +1,7 @@
 import React from 'react';
 import { Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import AdminLayout from '@/pages/admin/AdminLayout';
+import AdminShell from '@/components/stitch/AdminShell';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 function guarded(element: React.ReactNode): React.ReactNode {
@@ -40,7 +40,7 @@ const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManageme
 export const adminRoutes = [
   <Route key="/admin/login" path="/admin/login" element={guarded(<AdminLoginPage />)} />,
   <Route key="/admin" element={<ProtectedRoute />}>
-    <Route element={<AdminLayout />}>
+    <Route element={<AdminShell />}>
       <Route path="/admin" element={guarded(<AdminDashboardPage />)} />
       <Route path="/admin/audit-logs" element={guarded(<AuditLogViewerPage />)} />
       <Route path="/admin/birthday-config" element={guarded(<AdminBirthdayConfigPage />)} />
