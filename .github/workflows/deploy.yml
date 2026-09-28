@@ -42,6 +42,9 @@ jobs:
       with:
         node-version: '22.x'
 
+    - name: Install root dependencies
+      run: npm ci --silent
+
     - name: Install worker dependencies
       run: cd worker && npm ci --silent
 
@@ -51,4 +54,4 @@ jobs:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: b69fee03bdd94234eea8e4114cfc36ab
         workingDirectory: worker
-        command: deploy
+        command: deploy --var GIT_COMMIT_SHA:${{ github.sha }}
