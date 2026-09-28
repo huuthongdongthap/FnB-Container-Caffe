@@ -36,6 +36,8 @@
       "@aura/domain-shift/*": ["../packages/domain/shift/*"],
       "@aura/domain-inventory": ["../packages/domain/inventory/index.ts"],
       "@aura/domain-inventory/*": ["../packages/domain/inventory/*"],
+      "@aura/domain-reservation": ["../packages/domain/reservation/index.ts"],
+      "@aura/domain-reservation/*": ["../packages/domain/reservation/*"],
       "worker/*": ["./*"],
       "worker/src/*": ["./src/*"],
       "hono": ["./node_modules/hono"],

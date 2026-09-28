@@ -4,6 +4,7 @@ import {
   SuccessResponseSchema,
   ErrorResponseSchema,
   IdParamsSchema,
+  SlugSchema,
 } from '../common';
 import {
   PromotionListResponseSchema,
@@ -16,7 +17,6 @@ import {
   PromotionUsageListResponseSchema,
   PromotionSummarySchema,
   PromotionUseRequestSchema,
-  SlugSchema,
 } from './models';
 
 const PromotionRoutes = {
