@@ -45,33 +45,6 @@ jobs:
     - name: Install worker dependencies
       run: cd worker && npm ci --silent
 
-    - name: Apply D1 migrations
-      working-directory: worker
-      env:
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
-      run: |
-        if [[ -d "db/migrations" ]] && [[ -n "$(ls db/migrations/*.sql 2>/dev/null)" ]]; then
-          for migration in db/migrations/*.sql; do
-            # Skip rollback / down migrations
-            if [[ "$migration" == *.down.sql ]]; then
-              continue
-            fi
-            echo "Applying: $(basename "$migration")"
-            output=$(npx wrangler d1 execute fnb-caffe-db --file="$migration" --remote 2>&1)
-            exit_code=$?
-            # D1 lacks ALTER TABLE ADD COLUMN IF NOT EXISTS, so migrations with bare
-            # ADD COLUMN error with "duplicate column name" when re-applied. Treat that
-            # as success — the schema state is already what the migration intended.
-            if [[ $exit_code -ne 0 ]] && ! echo "$output" | grep -qiE "duplicate column name|already exists"; then
-              echo "$output" | tail -10
-              exit 1
-            fi
-          done
-        else
-          echo "No migration files found — skipping."
-        fi
-
     - name: Deploy Worker
       uses: cloudflare/wrangler-action@v3
       with:
