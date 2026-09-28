@@ -31,9 +31,9 @@ interface OrderEvent {
 
 // Event log entry stored in KV for replay
 interface EventLogEntry {
-  eventId: string;    // monotonically increasing ID (timestamp)
+  eventId: string; // monotonically increasing ID (timestamp)
   orderId: string;
-  type: string;       // 'update_order', etc.
+  type: string; // 'update_order', etc.
   data: unknown;
   timestamp: string;
 }

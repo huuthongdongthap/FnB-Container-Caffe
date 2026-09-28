@@ -36,7 +36,7 @@ export function corsHeaders(origin: string, withCredentials = false) {
   };
   if (withCredentials) {
     headers['Access-Control-Allow-Credentials'] = 'true';
-    headers['Vary'] = 'Origin';
+    headers.Vary = 'Origin';
   }
   return headers;
 }

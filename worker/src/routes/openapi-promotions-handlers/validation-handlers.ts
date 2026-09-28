@@ -10,7 +10,7 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const body = c.req.valid('json');
 
     const promotion = await db.prepare(
-      `SELECT * FROM promotions WHERE code = ? AND is_active = 1`
+      'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
     ).bind(body.code.toUpperCase()).first();
 
     if (!promotion) {
