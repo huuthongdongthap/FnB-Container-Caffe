@@ -2,7 +2,7 @@
 
 ## Overview
 - **Goal:** Retire the unauthenticated legacy `GET /api/orders/:id` and phone-based `GET /api/orders/my-orders` from `orders-hono-handlers/query-handlers.ts`, allowing all customer-facing order reads to resolve through the OpenAPI router and `resolveCustomerScope()`.
-- **Status:** PENDING
+- **Status:** COMPLETED (2026-09-29)
 - **Dependency:** Phases 02 and 03 (all frontend consumers migrated).
 
 ## Current Issue & Threat Model

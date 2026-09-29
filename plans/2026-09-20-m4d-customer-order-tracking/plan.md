@@ -12,11 +12,11 @@
 - **Baseline:** 374 test files / 3,464 tests PASS | `tsc --noEmit` 0 errors
 
 ## Phases
-1. [Phase 01: Frontend DTO Alignment](./phase-01-frontend-dto-alignment.md) — Define new `CustomerOrder`/`CustomerOrderItem` interfaces matching canonical camelCase projection; create mappers from canonical DTO → UI shape
-2. [Phase 02: Hook Migration — Single Order (TrackOrder / OrderSuccess)](./phase-02-hook-migration-single-order.md) — Migrate `use-order-store.ts` `fetchOrder`/`subscribeToOrder` to canonical endpoint + camelCase DTO; retire legacy snake_case mapping
-3. [Phase 03: Hook Migration — Order History (Account)](./phase-03-hook-migration-order-history.md) — Migrate `use-account.ts` to canonical `GET /api/orders` list endpoint; remove `JSON.parse(items)` workaround
-4. [Phase 04: Legacy Endpoint Retirement & Cleanup](./phase-04-legacy-retirement.md) — Remove legacy `my-orders` handler and unauthenticated `GET /api/orders/:id` from `orders-hono-handlers/query-handlers.ts`; verify no remaining consumers
-5. [Phase 05: Verification & Acceptance Tests](./phase-05-verification.md) — Full vitest + tsc green; E2E smoke of TrackOrder, Account dashboard, OrderSuccess with canonical data
+1. [x] [Phase 01: Frontend DTO Alignment](./phase-01-frontend-dto-alignment.md) — Define new `CustomerOrder`/`CustomerOrderItem` interfaces matching canonical camelCase projection; create mappers from canonical DTO → UI shape (COMPLETED)
+2. [x] [Phase 02: Hook Migration — Single Order (TrackOrder / OrderSuccess)](./phase-02-hook-migration-single-order.md) — Migrate `use-order-store.ts` `fetchOrder`/`subscribeToOrder` to canonical endpoint + camelCase DTO; retire legacy snake_case mapping (COMPLETED)
+3. [x] [Phase 03: Hook Migration — Order History (Account)](./phase-03-hook-migration-order-history.md) — Migrate `use-account.ts` to canonical `GET /api/orders` list endpoint; remove `JSON.parse(items)` workaround (COMPLETED)
+4. [x] [Phase 04: Legacy Endpoint Retirement & Cleanup](./phase-04-legacy-retirement.md) — Remove legacy `my-orders` handler and unauthenticated `GET /api/orders/:id` from `orders-hono-handlers/query-handlers.ts`; verify no remaining consumers (COMPLETED)
+5. [x] [Phase 05: Verification & Acceptance Tests](./phase-05-verification.md) — Full vitest + tsc green; E2E smoke of TrackOrder, Account dashboard, OrderSuccess with canonical data (COMPLETED)
 
 ## Key Invariants
 - **No client-side price/total calculation** — all monetary fields come from server-authoritative projection

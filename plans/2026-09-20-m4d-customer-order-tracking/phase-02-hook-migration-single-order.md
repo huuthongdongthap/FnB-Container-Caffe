@@ -2,7 +2,7 @@
 
 ## Overview
 - **Goal:** Migrate single-order fetch and polling in `useOrderStore` and `useOrder` to the canonical `GET /api/orders/:id` endpoint returning `CustomerOrderResponse`.
-- **Status:** PENDING
+- **Status:** COMPLETED (2026-09-29)
 - **Dependency:** Phase 01 (canonical DTOs defined).
 
 ## Current State
