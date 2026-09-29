@@ -74,11 +74,11 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Get or create referral code + status for a customer.
    * Auth: owner, staff, or self.
    */
-  router.get('/customers/:id/referral', requireAuth, async (c) => {
+  router.get('/customers/:id/referral', requireAuth(['customer', 'staff', 'owner']), async (c) => {
     const customerId = c.req.param('id');
-    const auth = c.get('auth');
+    const auth = c.get('user');
 
-    if (auth?.role === 'customer' && auth.customerId !== customerId) {
+    if (auth?.role === 'customer' && auth.id !== customerId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
 
@@ -94,11 +94,11 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Body: { code } — redeem a referral code for the current customer.
    * Auth: self only.
    */
-  router.post('/customers/:id/referral/redeem', requireAuth, async (c) => {
+  router.post('/customers/:id/referral/redeem', requireAuth(['customer', 'staff', 'owner']), async (c) => {
     const customerId = c.req.param('id');
-    const auth = c.get('auth');
+    const auth = c.get('user');
 
-    if (auth?.role !== 'customer' || auth.customerId !== customerId) {
+    if (auth?.role !== 'customer' || auth.id !== customerId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
 

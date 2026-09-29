@@ -12,6 +12,9 @@
   "scripts": {
     "lint": "eslint worker/src/ --ext .ts",
     "lint:fix": "eslint worker/src/ --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc --project worker/tsconfig.json --noEmit",
+    "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

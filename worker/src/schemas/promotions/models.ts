@@ -63,7 +63,7 @@ export const PromotionCreateSchema = z.object({
   priority: z.number().int().default(0),
   locationIds: z.array(z.string().uuid()).optional(),
   translations: z.array(PromotionTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('PromotionCreate');
 
 export const PromotionUpdateSchema = z.object({
@@ -81,7 +81,7 @@ export const PromotionUpdateSchema = z.object({
   priority: z.number().int().optional(),
   locationIds: z.array(z.string().uuid()).optional(),
   translations: z.array(PromotionTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('PromotionUpdate');
 
 export const PromotionResponseSchema = z.object({
@@ -102,7 +102,7 @@ export const PromotionResponseSchema = z.object({
   locationIds: z.array(z.string().uuid()),
   locations: z.array(ReferenceSchema).optional(),
   translations: z.array(PromotionTranslationSchema),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
 }).openapi('Promotion');

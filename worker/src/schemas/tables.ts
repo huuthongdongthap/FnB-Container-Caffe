@@ -43,7 +43,7 @@ export const TableCreateSchema = z.object({
   height: z.number().int().positive().default(80),
   rotation: z.number().int().min(0).max(360).default(0),
   translations: z.array(TableTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableCreate');
 
 export const TableUpdateSchema = z.object({
@@ -58,7 +58,7 @@ export const TableUpdateSchema = z.object({
   height: z.number().int().positive().optional(),
   rotation: z.number().int().min(0).max(360).optional(),
   translations: z.array(TableTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableUpdate');
 
 export const TableResponseSchema = z.object({
@@ -77,7 +77,7 @@ export const TableResponseSchema = z.object({
   translations: z.array(TableTranslationSchema),
   currentSessionId: z.string().uuid().nullable().optional(),
   currentOrderId: z.string().uuid().nullable().optional(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
 }).openapi('Table');

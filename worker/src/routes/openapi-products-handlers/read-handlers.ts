@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { ProductRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { formatProduct, type ProductRow } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // GET /api/products - List products with pagination, filtering, and search
-  router.openapi(ProductRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       page?: number;
       limit?: number;
@@ -52,24 +52,24 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     }
 
     // Get total count
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM products p ${whereClause}`
-    ).bind(...params).first<{ total: number }>();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     // Get products with translations
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
        FROM products p
        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(locale, ...params, limit, offset).all<ProductRow>();
+    ).bind(locale, ...params, limit, offset).all()) as { results: ProductRow[] };
 
-    const products = rows.results.map((row) => formatProduct(row, locale));
+    const products = (rows.results || []).map((row) => formatProduct(row, locale));
 
     return c.json({
       success: true,
@@ -78,17 +78,17 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
   });
 
   // GET /api/products/:id - Get product by ID
-  router.openapi(ProductRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 
-    const row = await db.prepare(
+    const row = (await db.prepare(
       `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
        FROM products p
        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
        WHERE p.id = ?`
-    ).bind(locale, id).first<ProductRow>();
+    ).bind(locale, id).first()) as ProductRow | null;
 
     if (!row) {
       return c.json({ success: false, error: 'Product not found' }, 404);
@@ -101,17 +101,17 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
   });
 
   // GET /api/products/slug/:slug - Get product by slug
-  router.openapi(ProductRoutes.getBySlug, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.getBySlug as any, async (c: any) => {
+    const db = getDatabase(c);
     const { slug } = c.req.valid('param' as never) as { slug: string };
     const locale = c.req.query('locale') || 'vi';
 
-    const row = await db.prepare(
+    const row = (await db.prepare(
       `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
        FROM products p
        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
        WHERE p.slug = ?`
-    ).bind(locale, slug).first<ProductRow>();
+    ).bind(locale, slug).first()) as ProductRow | null;
 
     if (!row) {
       return c.json({ success: false, error: 'Product not found' }, 404);

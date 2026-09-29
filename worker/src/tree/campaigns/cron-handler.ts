@@ -75,9 +75,10 @@ async function processTrigger(
           continue;
         }
 
-        const template = renderTemplate(trigger, customer.name, {
-          ...customer,
-          customer_id: customer.id
+        const template = renderTemplate(trigger, {
+          name: customer.name,
+          amount: customer.total_spent,
+          days_left: 7,
         });
 
         const message = {

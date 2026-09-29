@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { CategoryRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
+import { getDatabase } from '../../lib/db';
 
 export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/categories - Create category
-  router.openapi(CategoryRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json' as never) as {
       name: string;
       slug?: string;
@@ -68,8 +68,8 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   });
 
   // PATCH /api/categories/:id - Update category
-  router.openapi(CategoryRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       name?: string;
@@ -140,25 +140,25 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   });
 
   // DELETE /api/categories/:id - Delete category
-  router.openapi(CategoryRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<{ name: string }>();
+    const existing = (await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first()) as { name: string } | null;
     if (!existing) {
       return c.json({ success: false, error: 'Category not found' }, 404);
     }
 
     // Check for children
-    const children = await db.prepare('SELECT COUNT(*) as count FROM categories WHERE parent_id = ?').bind(id).first<{ count: number }>();
+    const children = (await db.prepare('SELECT COUNT(*) as count FROM categories WHERE parent_id = ?').bind(id).first()) as { count: number } | null;
     if (children && children.count > 0) {
       return c.json({ success: false, error: 'Cannot delete category with children' }, 409);
     }
 
     // Check for products
-    const products = await db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').bind(id).first<{ count: number }>();
+    const products = (await db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').bind(id).first()) as { count: number } | null;
     if (products && products.count > 0) {
       return c.json({ success: false, error: 'Cannot delete category with products' }, 409);
     }
@@ -176,7 +176,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   });
 
   // POST /api/categories/reorder - Reorder categories
-  router.openapi(CategoryRoutes.reorder, async (c: Context<{ Bindings: Env }>) => {
+  router.openapi(CategoryRoutes.reorder as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json' as never) as {
       items: Array<{ id: string; sortOrder: number; parentId?: string | null }>;

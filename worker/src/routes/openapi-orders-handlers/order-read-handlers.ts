@@ -32,20 +32,20 @@ function resolveCustomerScope(c: Context<{ Bindings: Env }>): { allowAll: boolea
  * Guest-facing payloads go through the allowlist projection so staff and
  * procurement columns never leave the worker. Staff keep the full row.
  */
-function projectForActor<T, U>(
+function projectForActor(
   scope: { allowAll: boolean },
-  order: T,
-  items: T[],
-  full: (_o: T, _i: T[], _p: T[]) => U,
-  guest: (_o: T, _i: T[]) => U,
-  payments: T[],
-): U {
+  order: any,
+  items: any[],
+  full: (_o: any, _i: any[], _p: any[]) => any,
+  guest: (_o: any, _i: any[]) => any,
+  payments: any[],
+): any {
   return scope.allowAll ? full(order, items, payments) : guest(order, items);
 }
 
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/orders - List orders with pagination and filtering
-  app.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(OrderRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', tableId, locationId, status, paymentStatus, dateFrom, dateTo, customerId } = query;
@@ -92,24 +92,26 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Get total count
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM orders o ${whereClause}`
-    ).bind(...params).first();
-    const total = countResult?.total || 0;
+    ).bind(...params).first()) as { total?: number } | null;
+    const total = Number(countResult?.total || 0);
+    const pageNum = Number(page || 1);
+    const limitNum = Number(limit || 20);
 
     // Get orders with items and payments
-    const offset = (page - 1) * limit;
+    const offset = (pageNum - 1) * limitNum;
     const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';
     const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
     const orderClause = `${safeSort} ${safeDirection}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT o.*, t.name as table_name
        FROM orders o
        LEFT JOIN tables t ON o.table_id = t.id
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limitNum, offset).all()) as { results: any[] };
 
     // For each order, fetch items and payments
     const orders = await Promise.all(rows.results.map(async (_order) => {
@@ -119,12 +121,12 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     return c.json({
       success: true,
-      data: { orders, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { orders, meta: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) } },
     });
   });
 
   // GET /api/orders/:id - Get order by ID
-  app.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(OrderRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const scope = resolveCustomerScope(c);
@@ -161,7 +163,7 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/orders/summary - Get order summary statistics
-  app.openapi(OrderRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(OrderRoutes.summary as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
@@ -189,18 +191,23 @@ export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       db.prepare(`SELECT source, COUNT(*) as count FROM orders ${whereClause} GROUP BY source`).bind(...params).all(),
     ]);
 
+    const totalRow = totalResult as any;
+    const revRow = revenueResult as any;
+    const statRows = (statusResult as any)?.results || [];
+    const payRows = (paymentResult as any)?.results || [];
+
     const statusCounts: Record<string, number> = {};
-    statusResult.results.forEach(row => { statusCounts[row.status] = row.count; });
+    statRows.forEach((row: any) => { statusCounts[row.status] = row.count; });
 
     const paymentCounts: Record<string, number> = {};
-    paymentResult.results.forEach(row => { paymentCounts[row.source] = row.count; });
+    payRows.forEach((row: any) => { paymentCounts[row.source] = row.count; });
 
     return c.json({
       success: true,
       data: {
-        totalOrders: totalResult?.total || 0,
-        totalRevenue: revenueResult?.revenue || 0,
-        averageOrderValue: totalResult?.total ? Math.round((revenueResult?.revenue || 0) / totalResult.total) : 0,
+        totalOrders: totalRow?.total || 0,
+        totalRevenue: revRow?.revenue || 0,
+        averageOrderValue: totalRow?.total ? Math.round((revRow?.revenue || 0) / totalRow.total) : 0,
         ordersByStatus: statusCounts,
         ordersByPaymentMethod: paymentCounts,
       },

@@ -1,7 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
+import { getDatabase } from '../../lib/db';
 
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -13,8 +13,8 @@ export async function hashPassword(password: string): Promise<string> {
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
-  app.openapi(StaffRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
 
@@ -34,21 +34,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM users ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
        FROM users ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const staff = rows.results.map(s => ({
+    const staff = (rows.results || []).map((s: any) => ({
       ...s,
       role: s.role,
       locale: s.locale,
@@ -65,28 +65,28 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/staff/:id - Get staff by ID
-  app.openapi(StaffRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const staff = await db.prepare(
+    const staff = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
        FROM users WHERE id = ? AND role != 'customer'`
-    ).bind(id).first();
+    ).bind(id).first()) as any;
 
     if (!staff) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
     // Get shifts for this staff
-    const shifts = await db.prepare(
+    const shifts = (await db.prepare(
       'SELECT * FROM staff_shifts WHERE staff_id = ? ORDER BY date DESC, start_time DESC LIMIT 10'
-    ).bind(id).all();
+    ).bind(id).all()) as { results: any[] };
 
     // Get attendance for this staff
-    const attendance = await db.prepare(
+    const attendance = (await db.prepare(
       'SELECT * FROM staff_attendance WHERE staff_id = ? ORDER BY date DESC LIMIT 10'
-    ).bind(id).all();
+    ).bind(id).all()) as { results: any[] };
 
     return c.json({
       success: true,
@@ -98,15 +98,15 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         hireDate: staff.hire_date,
         createdAt: staff.created_at,
         updatedAt: staff.updated_at,
-        recentShifts: shifts.results,
-        recentAttendance: attendance.results,
+        recentShifts: shifts.results || [],
+        recentAttendance: attendance.results || [],
       },
     });
   });
 
   // POST /api/staff - Create staff
-  app.openapi(StaffRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -144,10 +144,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'staff_create', 'user', id, JSON.stringify(body), now).run();
 
-    const created = await db.prepare(
+    const created = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
        FROM users WHERE id = ?`
-    ).bind(id).first();
+    ).bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -164,8 +164,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/staff/:id - Update staff
-  app.openapi(StaffRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -208,10 +208,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'staff_update', 'user', id, JSON.stringify(body), now).run();
 
-    const updated = await db.prepare(
+    const updated = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
        FROM users WHERE id = ?`
-    ).bind(id).first();
+    ).bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -228,21 +228,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/staff/:id - Delete staff (soft delete)
-  app.openapi(StaffRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
     // Check for related records
-    const shifts = await db.prepare('SELECT COUNT(*) as count FROM staff_shifts WHERE staff_id = ?').bind(id).first();
-    const attendance = await db.prepare('SELECT COUNT(*) as count FROM staff_attendance WHERE staff_id = ?').bind(id).first();
-    const orders = await db.prepare('SELECT COUNT(*) as count FROM orders WHERE created_by = ?').bind(id).first();
+    const shifts = (await db.prepare('SELECT COUNT(*) as count FROM staff_shifts WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
+    const attendance = (await db.prepare('SELECT COUNT(*) as count FROM staff_attendance WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
+    const orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE created_by = ?').bind(id).first()) as { count: number } | null;
 
     if ((shifts?.count || 0) > 0 || (attendance?.count || 0) > 0 || (orders?.count || 0) > 0) {
       // Soft delete
@@ -261,3 +261,4 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({ success: true, data: { success: true } });
   });
 }
+

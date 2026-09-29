@@ -1,17 +1,17 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
+import { getDatabase } from '../../lib/db';
 
 export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions/use - Record promotion usage
-  app.openapi(PromotionRoutes.use, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.use as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first();
+    const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first()) as any;
 
     if (!promotion) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
@@ -51,7 +51,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'promotion_use', 'promotion', body.promotionId, JSON.stringify({ discountAmount: body.discountAmount, orderId: body.orderId }), now).run();
 
-    const updatedPromotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first();
+    const updatedPromotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first()) as any;
 
     return c.json({
       success: true,
@@ -80,7 +80,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/promotions/summary - Get promotion summary
-  app.openapi(PromotionRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.summary as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
 
@@ -90,23 +90,23 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Total promotions
-    const totalPromotions = await db.prepare('SELECT COUNT(*) as total FROM promotions').first();
+    const totalPromotions = (await db.prepare('SELECT COUNT(*) as total FROM promotions').first()) as { total: number } | null;
 
     // Active promotions
-    const activePromotions = await db.prepare('SELECT COUNT(*) as total FROM promotions WHERE is_active = 1').first();
+    const activePromotions = (await db.prepare('SELECT COUNT(*) as total FROM promotions WHERE is_active = 1').first()) as { total: number } | null;
 
     // By type
-    const byType = await db.prepare(
+    const byType = (await db.prepare(
       'SELECT type, COUNT(*) as count FROM promotions GROUP BY type'
-    ).all();
+    ).all()) as { results: Array<{ type: string; count: number }> };
 
     // By discount type
-    const byDiscountType = await db.prepare(
+    const byDiscountType = (await db.prepare(
       'SELECT discount_type, COUNT(*) as count FROM promotions GROUP BY discount_type'
-    ).all();
+    ).all()) as { results: Array<{ discount_type: string; count: number }> };
 
     // Top promotions by usage
-    const topPromotions = await db.prepare(
+    const topPromotions = (await db.prepare(
       `SELECT p.*,
         COALESCE(SUM(pu.discount_amount), 0) as total_discount,
         COUNT(pu.id) as usage_count
@@ -115,19 +115,19 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        GROUP BY p.id
        ORDER BY usage_count DESC
        LIMIT 10`
-    ).all();
+    ).all()) as { results: any[] };
 
     // Total discount given
-    const totalDiscount = await db.prepare(
+    const totalDiscount = (await db.prepare(
       'SELECT COALESCE(SUM(discount_amount), 0) as total FROM promotion_usages'
-    ).first();
+    ).first()) as { total: number } | null;
 
     // Usage this month
-    const thisMonthUsage = await db.prepare(
+    const thisMonthUsage = (await db.prepare(
       `SELECT COUNT(*) as count, COALESCE(SUM(discount_amount), 0) as total_discount
        FROM promotion_usages
        WHERE created_at >= datetime('now', 'start of month')`
-    ).first();
+    ).first()) as { count: number; total_discount: number } | null;
 
     return c.json({
       success: true,
@@ -135,15 +135,15 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         totalPromotions: totalPromotions?.total || 0,
         activePromotions: activePromotions?.total || 0,
         totalDiscountGiven: totalDiscount?.total || 0,
-        byType: byType.results.reduce((acc, row) => {
+        byType: (byType.results || []).reduce((acc: Record<string, number>, row: { type: string; count: number }) => {
           acc[row.type] = row.count;
           return acc;
-        }, {} as Record<string, number>),
-        byDiscountType: byDiscountType.results.reduce((acc, row) => {
+        }, {}),
+        byDiscountType: (byDiscountType.results || []).reduce((acc: Record<string, number>, row: { discount_type: string; count: number }) => {
           acc[row.discount_type] = row.count;
           return acc;
-        }, {} as Record<string, number>),
-        topPromotions: topPromotions.results.map(p => ({
+        }, {}),
+        topPromotions: (topPromotions.results || []).map((p: any) => ({
           ...p,
           discountValue: p.discount_value,
           discountType: p.discount_type,

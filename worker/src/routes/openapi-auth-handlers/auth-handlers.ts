@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword, generateToken } from './helpers';
 
 export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/register - Register new customer
-  app.openapi(AuthRoutes.register, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.register as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -70,7 +70,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/auth/login - Login
-  app.openapi(AuthRoutes.login, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.login as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -132,7 +132,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/auth/logout - Logout
-  app.openapi(AuthRoutes.logout, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.logout as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -153,7 +153,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/auth/me - Get current user profile
-  app.openapi(AuthRoutes.me, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.me as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 

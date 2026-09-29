@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
+import { getDatabase } from '../../lib/db';
 
 export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/staff/attendance/check-in - Check in
-  app.openapi(StaffRoutes.attendance.checkIn, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.attendance.checkIn as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -30,9 +30,9 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
     // Determine status (on_time, late) based on scheduled shift
     let status = 'on_time';
-    const shift = await db.prepare(
+    const shift = (await db.prepare(
       'SELECT * FROM staff_shifts WHERE staff_id = ? AND date = ?'
-    ).bind(body.staffId, today).first();
+    ).bind(body.staffId, today).first()) as any;
 
     if (shift && typeof shift.start_time === 'string') {
       const shiftStart = shift.start_time;
@@ -70,8 +70,8 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // POST /api/staff/attendance/check-out - Check out
-  app.openapi(StaffRoutes.attendance.checkOut, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.attendance.checkOut as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -79,9 +79,9 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const currentTime = now.slice(11, 19);
 
     // Find active check-in
-    const active = await db.prepare(
+    const active = (await db.prepare(
       'SELECT * FROM staff_attendance WHERE staff_id = ? AND date = ? AND check_out IS NULL'
-    ).bind(body.staffId, today).first();
+    ).bind(body.staffId, today).first()) as any;
 
     if (!active) {
       return c.json({ success: false, error: 'No active check-in found' }, 404);
@@ -89,11 +89,11 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
     // Calculate total hours
     const checkInTime = active.check_in as string;
-    const [inHours, inMinutes, inSeconds = '0'] = checkInTime.split(':').map(Number);
-    const [outHours, outMinutes, outSeconds = '0'] = currentTime.split(':').map(Number);
+    const [inHours = 0, inMinutes = 0, inSeconds = 0] = checkInTime.split(':').map(Number);
+    const [outHours = 0, outMinutes = 0, outSeconds = 0] = currentTime.split(':').map(Number);
 
-    const inTotalSeconds = inHours * 3600 + inMinutes * 60 + inSeconds;
-    const outTotalSeconds = outHours * 3600 + outMinutes * 60 + outSeconds;
+    const inTotalSeconds = (inHours || 0) * 3600 + (inMinutes || 0) * 60 + (inSeconds || 0);
+    const outTotalSeconds = (outHours || 0) * 3600 + (outMinutes || 0) * 60 + (outSeconds || 0);
     const totalHours = Math.max(0, (outTotalSeconds - inTotalSeconds) / 3600);
 
     const notes = body.notes ? (active.notes ? `${active.notes}; ${body.notes}` : body.notes) : active.notes;
@@ -116,8 +116,8 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // GET /api/staff/attendance - List attendance
-  app.openapi(StaffRoutes.attendance.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.attendance.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'date', order = 'desc', staffId, dateFrom, dateTo, status } = query;
 
@@ -141,14 +141,14 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       params.push(status);
     }
 
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM staff_attendance sa ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT sa.*, u.name as staff_name, ss.start_time as scheduled_start, ss.end_time as scheduled_end
        FROM staff_attendance sa
        LEFT JOIN users u ON sa.staff_id = u.id
@@ -156,11 +156,12 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: { attendance: rows.results, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { attendance: rows.results || [], meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
     });
   });
 }
+

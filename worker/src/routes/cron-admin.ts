@@ -32,6 +32,7 @@ function checkCronSecret(c: {
 async function sendTelegram(
   env: Env,
   msg: string,
+  sev?: string,
 ): Promise<void> {
   const tgToken = env.TELEGRAM_BOT_TOKEN;
   const tgChatId = env.TELEGRAM_CHAT_ID;

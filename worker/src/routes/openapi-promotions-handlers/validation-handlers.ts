@@ -1,17 +1,17 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
+import { getDatabase } from '../../lib/db';
 
 export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions/validate - Validate promotion code
-  app.openapi(PromotionRoutes.validate, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.validate as any, async (c: any) => {
     const db = getDatabase(c);
     const body = c.req.valid('json');
 
-    const promotion = await db.prepare(
+    const promotion = (await db.prepare(
       'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
-    ).bind(body.code.toUpperCase()).first();
+    ).bind(body.code.toUpperCase()).first()) as any;
 
     if (!promotion) {
       return c.json({ success: false, error: 'Invalid or expired promotion code' }, 404);

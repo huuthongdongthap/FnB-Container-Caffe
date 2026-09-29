@@ -68,7 +68,7 @@ export const LoyaltyTransactionSchema = z.object({
   balanceAfter: z.number().int().nonnegative(),
   orderId: z.string().uuid().nullable(),
   description: z.string().max(200),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
 }).openapi('LoyaltyTransaction');
 

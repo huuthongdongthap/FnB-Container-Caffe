@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { CategoryRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { formatCategory, type CategoryRow } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // GET /api/categories - List categories with pagination and tree support
-  router.openapi(CategoryRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       page?: number;
       limit?: number;
@@ -39,22 +39,22 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
     }
 
     // Get total count
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM categories c ${whereClause}`
-    ).bind(...params).first<{ total: number }>();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     // Get categories with translations
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT c.*, ct.name as translation_name, ct.description as translation_description
        FROM categories c
        LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.locale = ?
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(locale, ...params, limit, offset).all<CategoryRow>();
+    ).bind(locale, ...params, limit, offset).all()) as { results: CategoryRow[] };
 
     const categories = rows.results.map((row) => formatCategory(row, locale));
 
@@ -65,8 +65,8 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
   });
 
   // GET /api/categories/tree - Get category tree
-  router.openapi(CategoryRoutes.tree, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.tree as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       locale?: string;
       locationId?: string;
@@ -85,13 +85,13 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
       whereClause += ' AND c.is_active = 1';
     }
 
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT c.*, ct.name as translation_name, ct.description as translation_description
        FROM categories c
        LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.locale = ?
        ${whereClause}
        ORDER BY c.sort_order ASC, c.name ASC`
-    ).bind(...params).all<CategoryRow>();
+    ).bind(...params).all()) as { results: CategoryRow[] };
 
     // Build tree
     const categoryMap = new Map<string, ReturnType<typeof formatCategory>>();
@@ -117,17 +117,17 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
   });
 
   // GET /api/categories/:id - Get category by ID
-  router.openapi(CategoryRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(CategoryRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 
-    const row = await db.prepare(
+    const row = (await db.prepare(
       `SELECT c.*, ct.name as translation_name, ct.description as translation_description
        FROM categories c
        LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.locale = ?
        WHERE c.id = ?`
-    ).bind(locale, id).first<CategoryRow>();
+    ).bind(locale, id).first()) as CategoryRow | null;
 
     if (!row) {
       return c.json({ success: false, error: 'Category not found' }, 404);

@@ -107,3 +107,5 @@ export interface Env {
   // Dynamic access for legacy patterns
   [key: string]: unknown;
 }
+
+export type { MixpostEnv } from '../tree/mixpost/types';

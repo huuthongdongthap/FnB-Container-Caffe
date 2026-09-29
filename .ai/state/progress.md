@@ -47,7 +47,7 @@
 - [x] `src/styles/aura-tokens.css` confirmed as canonical source; `brand-tokens.css` already reduced to utility classes + keyframes (no duplicate declarations).
 - [x] Spec: `plans/ui-rearchitecture/phase-02-tokens.md` (color roles, shape, elevation, typescale, migration order).
 - [x] Adapter adoption: `src/components/ui/adapters/*` → MD3 primitives (incremental, per-component).
-- [ ] Delete 4 zero-consumer legacy primitives: `ui/navbar.tsx`, `ui/footer.tsx`, `ui/glass-card.tsx`, `ui/bottom-nav.tsx`.
+- [x] Delete 4 zero-consumer legacy primitives: `ui/navbar.tsx`, `ui/footer.tsx`, `ui/glass-card.tsx`, `ui/bottom-nav.tsx` (confirmed absent from disk).
 
 ## Phase 3 — Component Core: Deep-Import Shim Conversion (COMPLETED)
 - [x] Root cause identified: 212 deep-import matches across 115 files bypass `src/components/ui/index.ts` and the adapters by importing `@/components/ui/{button,card,badge,input,modal,skeleton,toast}` directly.

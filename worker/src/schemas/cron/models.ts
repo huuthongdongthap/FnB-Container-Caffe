@@ -25,7 +25,7 @@ export const CronJobPayloadSchema = z.object({
     'backup_database',
     'custom',
   ]),
-  payload: z.record(z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
   retries: z.number().int().min(0).max(10).default(3),
   timeoutSeconds: z.number().int().positive().max(3600).default(300),
@@ -38,7 +38,7 @@ export const CronJobCreateSchema = z.object({
   payload: CronJobPayloadSchema,
   isActive: z.boolean().default(true),
   locationIds: z.array(z.string().uuid()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CronJobCreate');
 
 export const CronJobUpdateSchema = z.object({
@@ -48,7 +48,7 @@ export const CronJobUpdateSchema = z.object({
   payload: CronJobPayloadSchema.optional(),
   isActive: z.boolean().optional(),
   locationIds: z.array(z.string().uuid()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CronJobUpdate');
 
 export const CronJobResponseSchema = z.object({
@@ -60,7 +60,7 @@ export const CronJobResponseSchema = z.object({
   isActive: z.boolean(),
   locationIds: z.array(z.string().uuid()),
   locations: z.array(ReferenceSchema).optional(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   lastRunAt: DateTimeSchema.nullable(),
   nextRunAt: DateTimeSchema.nullable(),
   runCount: z.number().int().nonnegative().default(0),
@@ -89,7 +89,7 @@ export const CronJobRunSchema = z.object({
   error: z.string().nullable(),
   retryCount: z.number().int().nonnegative().default(0),
   payload: CronJobPayloadSchema,
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
 }).openapi('CronJobRun');
 
 export const CronJobRunListResponseSchema = z.object({
@@ -98,7 +98,7 @@ export const CronJobRunListResponseSchema = z.object({
 }).openapi('CronJobRunListResponse');
 
 export const CronJobTriggerSchema = z.object({
-  payload: z.record(z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().uuid().optional(),
 }).openapi('CronJobTrigger');
 

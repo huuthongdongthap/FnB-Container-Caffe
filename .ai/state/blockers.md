@@ -5,11 +5,10 @@ None.
 
 ## Non-Blocking Gaps (YELLOW)
 
-### Y-01: ESLint Pre-existing Errors
+### Y-01: ESLint Pre-existing Errors (RESOLVED)
 **Area:** AUDIT #15 — Build / Typecheck / Lint
-**Detail:** `npx eslint worker/src/ --ext .ts` reports 133 problems (53 errors, 80 warnings).
-**Assessment:** Pre-existing technical debt unrelated to M4-B. Sampled errors are `no-unused-vars` and legacy tree handlers (`worker/src/tree/*`). No M4-B file (menu projection, customer projection, openapi) appears in the error set.
-**Action:** Deferred — not a defect blocking M4-B verification. Recommend dedicated lint-sweep milestone.
+**Detail:** `npm run lint` reports 0 errors (91 warnings, primarily unused parameters/vars with allowed underscore exceptions). All syntax, duplicate blocks, and TS compile errors eliminated.
+**Status:** RESOLVED — 0 errors.
 
 ### Y-02: No Live Production E2E
 **Area:** AUDIT #10 / #16 — E2E / Runtime

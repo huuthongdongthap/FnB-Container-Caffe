@@ -29,8 +29,8 @@ export const createOrderSchema = z.object({
   table_id: z.string().optional(),
   /** Customer id (from POS lookup). Optional — guest orders leave it unset. */
   customer_id: z.string().optional(),
-  /** No default: omitted order_type skips per-type validation (legacy QR flows);
-   *  create-order falls back to 'dine_in' at insert time. */
+  /** Order type: 'dine_in', 'takeaway', or 'delivery'.
+   *  Dine-in strictly requires a valid table_id. Omitted order_type keeps legacy behavior. */
   order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
   tip_amount: z.number().nonnegative().optional().default(0),
   service_fee: z.number().nonnegative().optional().default(0),

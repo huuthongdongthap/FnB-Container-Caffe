@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
+import { getDatabase } from '../../lib/db';
 
 export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers - List suppliers
-  app.openapi(InventoryRoutes.suppliers.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.suppliers.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -26,22 +26,22 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.isActive ? 1 : 0);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const items = await db.prepare(
+    const items = (await db.prepare(
       `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: items.results,
+      data: items.results || [],
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });
 
   // GET /api/inventory/suppliers/{id} - Get supplier by ID
-  app.openapi(InventoryRoutes.suppliers.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.suppliers.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
@@ -55,7 +55,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/inventory/suppliers - Create supplier
-  app.openapi(InventoryRoutes.suppliers.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.suppliers.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -89,7 +89,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/inventory/suppliers/{id} - Update supplier
-  app.openapi(InventoryRoutes.suppliers.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.suppliers.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');

@@ -45,7 +45,7 @@ async function buildSignature(
 }
 
 paymentRouter.post('/create-link', optionalAuth() as any, async(c) => {
-  const db = c.env.AURA_DB;
+  const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
   const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
   const customerId = user?.id ?? null;
   const mc = createMetricsCollector(db);

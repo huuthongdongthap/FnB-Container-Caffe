@@ -54,7 +54,8 @@ describe('createOrder', () => {
         total: 70000,
         customer_name: 'Test User',
         customer_phone: '0912345678',
-        payment_method: 'cod'
+        payment_method: 'cod',
+        order_type: 'takeaway'
       })
     });
     const res = await createOrder(req, env);

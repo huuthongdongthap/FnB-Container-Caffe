@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
 import { formatRun } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/cron/jobs/:id/trigger - Manually trigger cron job
-  app.openapi(CronRoutes.trigger, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(CronRoutes.trigger as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -49,8 +49,8 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/cron/runs/:id/retry - Retry failed cron run
-  app.openapi(CronRoutes.runs.retry, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(CronRoutes.runs.retry as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -96,8 +96,8 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/cron/jobs/:id/runs - List runs for a job
-  app.openapi(CronRoutes.runs.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(CronRoutes.runs.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'started_at', order = 'desc', status } = query;
@@ -115,18 +115,18 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(status);
     }
 
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM cron_runs ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT * FROM cron_runs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const runs = rows.results.map(formatRun);
+    const runs = (rows.results || []).map(formatRun);
 
     return c.json({
       success: true,
@@ -135,8 +135,8 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/cron/runs/:id - Get cron run by ID
-  app.openapi(CronRoutes.runs.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(CronRoutes.runs.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first();

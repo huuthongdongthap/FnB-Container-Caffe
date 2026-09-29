@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
+import { getDatabase } from '../../lib/db';
 
 export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/movements - List stock movements
-  app.openapi(InventoryRoutes.movements.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.movements.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -36,28 +36,28 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.dateTo);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM stock_movements ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM stock_movements ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const items = await db.prepare(
+    const items = (await db.prepare(
       `SELECT * FROM stock_movements ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: items.results,
+      data: items.results || [],
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });
 
   // POST /api/inventory/movements - Create stock movement (adjustment)
-  app.openapi(InventoryRoutes.movements.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.movements.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(body.ingredientId).first();
+    const ingredient = (await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(body.ingredientId).first()) as any;
     if (!ingredient) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }

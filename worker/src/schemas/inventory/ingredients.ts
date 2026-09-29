@@ -28,7 +28,7 @@ export const IngredientCreateSchema = z.object({
   locationId: z.string().uuid().optional(),
   supplierId: z.string().uuid().nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientCreate');
 
 export const IngredientUpdateSchema = z.object({
@@ -42,7 +42,7 @@ export const IngredientUpdateSchema = z.object({
   locationId: z.string().uuid().optional(),
   supplierId: z.string().uuid().nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientUpdate');
 
 export const IngredientResponseSchema = z.object({
@@ -59,7 +59,7 @@ export const IngredientResponseSchema = z.object({
   supplierId: z.string().uuid().nullable(),
   supplier: ReferenceSchema.nullable().optional(),
   translations: z.array(IngredientTranslationSchema),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
 }).openapi('Ingredient');

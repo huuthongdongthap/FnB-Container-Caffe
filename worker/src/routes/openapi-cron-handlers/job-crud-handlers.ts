@@ -6,7 +6,7 @@ import { formatJob } from './helpers';
 
 export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/cron/jobs - List cron jobs
-  app.openapi(CronRoutes.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(CronRoutes.list as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', status, locationId, isActive } = query;
@@ -47,7 +47,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/cron/jobs/:id - Get cron job by ID
-  app.openapi(CronRoutes.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(CronRoutes.get as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const { id } = c.req.valid('param');
 
@@ -64,7 +64,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/cron/jobs - Create cron job
-  app.openapi(CronRoutes.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(CronRoutes.create as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -117,7 +117,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PUT /api/cron/jobs/:id - Update cron job
-  app.openapi(CronRoutes.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(CronRoutes.update as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -140,16 +140,16 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
 
-    const fields = [
+    const fields: Array<{ key: string; db: string; transform?: (v: any) => any }> = [
       { key: 'name', db: 'name' },
       { key: 'description', db: 'description' },
       { key: 'cronExpression', db: 'cron_expression' },
       { key: 'handler', db: 'handler' },
-      { key: 'payload', db: 'payload', transform: (v: object) => JSON.stringify(v) },
+      { key: 'payload', db: 'payload', transform: (v: any) => JSON.stringify(v) },
       { key: 'timeoutSeconds', db: 'timeout_seconds' },
       { key: 'maxRetries', db: 'max_retries' },
       { key: 'retryDelaySeconds', db: 'retry_delay_seconds' },
-      { key: 'isActive', db: 'is_active', transform: (v: boolean) => v ? 1 : 0 },
+      { key: 'isActive', db: 'is_active', transform: (v: any) => v ? 1 : 0 },
       { key: 'status', db: 'status' },
       { key: 'locationId', db: 'location_id' },
     ];
@@ -183,7 +183,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/cron/jobs/:id - Delete cron job
-  app.openapi(CronRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(CronRoutes.delete as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const { id } = c.req.valid('param');
     const user = c.get('user');

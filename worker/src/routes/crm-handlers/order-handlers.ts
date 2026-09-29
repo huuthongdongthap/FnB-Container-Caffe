@@ -59,6 +59,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     });
 
     if (!result.ok) {
+      const err = result as { ok: false; error: string; code: string };
       const statusByCode: Record<string, number> = {
         empty_items: 400,
         invalid_item: 400,
@@ -66,7 +67,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
         invalid_channel: 400,
         d1_error: 500,
       };
-      return c.json({ success: false, error: result.error }, statusByCode[result.code] ?? 400);
+      return c.json({ success: false, error: err.error }, (statusByCode[err.code] ?? 400) as any);
     }
 
     return c.json({
@@ -117,8 +118,9 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     const result = await getFulfillment(db, orderId, customerScope, kv);
 
     if (!result.ok) {
+      const err = result as { ok: false; error: string; code: 'not_found' | 'forbidden' | 'd1_error' };
       const statusByCode = { not_found: 404, forbidden: 403, d1_error: 500 } as const;
-      return c.json({ success: false, error: result.error }, statusByCode[result.code]);
+      return c.json({ success: false, error: err.error }, statusByCode[err.code]);
     }
 
     return c.json({ success: true, data: result.fulfillment });

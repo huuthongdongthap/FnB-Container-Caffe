@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
 import { calculateOrderSnapshot, canTransition, canActorTransition, toActorRole } from '@aura/domain-order';
+import { getDatabase } from '../../lib/db';
 
 const STAFF_ROLES = ['owner', 'manager', 'staff'];
 
-function resolveCustomerId(c: Context<{ Bindings: Env }>, bodyCustomerId: string | null | undefined): string | null {
+function resolveCustomerId(c: any, bodyCustomerId: string | null | undefined): string | null {
   const user = c.get('user');
   if (user && STAFF_ROLES.includes(user.role)) {
     return bodyCustomerId || null; // staff can specify customer_id or create anonymous
@@ -20,8 +20,8 @@ function resolveCustomerId(c: Context<{ Bindings: Env }>, bodyCustomerId: string
 
 export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/orders - Create new order (OpenAPI contract: client sends intent only, server evaluates prices)
-  app.openapi(OrderRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(OrderRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -32,16 +32,16 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     // Server-authoritative price evaluation via domain policy
     // Client sends intent (menuItemId, quantity, modifier choice IDs) - NO prices
     const snapshotInput = {
-      items: body.items.map((item) => ({
+      items: body.items.map((item: any) => ({
         productId: item.menuItemId,
         quantity: item.quantity,
         modifiers: item.modifiers || [],
       })),
-      orderType: body.channel,
-      shippingFee: 0,
+      order_type: body.channel,
+      shipping_fee: 0,
       discount: 0,
-      serviceFee: 0,
-      tipAmount: 0,
+      service_fee: 0,
+      tip_amount: 0,
       now: new Date(),
     };
 
@@ -69,7 +69,7 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       JSON.stringify(snapshot.itemsJson),
       snapshot.subtotal,
       snapshot.discount,
-      snapshot.serviceFee, // using service_fee column for tax
+      snapshot.service_fee, // using service_fee column for tax
       snapshot.total,
       'pending',
       'unpaid',
@@ -96,7 +96,7 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         item.subtotalCents,
         JSON.stringify(item.modifiers || []),
         item.notes || null,
-        item.status || 'pending',
+        (item as any).status || 'pending',
         now,
         now
       ).run();
@@ -120,14 +120,14 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // PATCH /api/orders/:id - Update order
-  app.openapi(OrderRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(OrderRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<{ status: string; customer_id?: string | null }>();
+    const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { status: string; customer_id?: string | null } | null;
     if (!existing) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
@@ -201,14 +201,14 @@ export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // POST /api/orders/:id/cancel - Cancel order
-  app.openapi(OrderRoutes.cancel, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(OrderRoutes.cancel as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<{ status: string; customer_id?: string | null }>();
+    const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { status: string; customer_id?: string | null } | null;
     if (!existing) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }

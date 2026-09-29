@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
+import { getDatabase } from '../../lib/db';
 
 export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/loyalty/admin/adjust-points - Adjust customer points (admin)
-  app.openapi(LoyaltyRoutes.admin.adjustPoints, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.admin.adjustPoints as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -23,8 +23,8 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Duplicate adjustment request' }, 409);
     }
 
-    const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-      .bind(body.customerId).first();
+    const account = (await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
+      .bind(body.customerId).first()) as any;
 
     if (!account) {
       return c.json({ success: false, error: 'Loyalty account not found for customer' }, 404);
@@ -51,22 +51,22 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'loyalty_points_adjust', 'loyalty_account', account.id, JSON.stringify({ points: body.points, reason: body.reason }), now).run();
 
-    const transaction = await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first();
+    const transaction = (await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first()) as any;
 
     return c.json({
       success: true,
       data: {
-        ...transaction!,
-        accountId: transaction!.account_id,
-        rewardId: transaction!.reward_id,
-        idempotencyKey: transaction!.idempotency_key,
-        createdAt: transaction!.created_at,
+        ...transaction,
+        accountId: transaction.account_id,
+        rewardId: transaction.reward_id,
+        idempotencyKey: transaction.idempotency_key,
+        createdAt: transaction.created_at,
       },
     });
   });
 
   // GET /api/loyalty/admin/accounts - List all loyalty accounts (admin)
-  app.openapi(LoyaltyRoutes.admin.accounts, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.admin.accounts as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const query = c.req.valid('query');
@@ -94,13 +94,13 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(searchParam, searchParam, searchParam);
     }
 
-    const accounts = await db.prepare(
+    const accounts = (await db.prepare(
       `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: accounts.results.map(a => ({
+      data: (accounts.results || []).map((a: any) => ({
         ...a,
         currentPoints: a.current_points,
         lifetimePoints: a.lifetime_points,
@@ -120,7 +120,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/loyalty/admin/summary - Get loyalty program summary (admin)
-  app.openapi(LoyaltyRoutes.admin.summary, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.admin.summary as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
 
@@ -130,29 +130,29 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Get total members
-    const totalMembers = await db.prepare('SELECT COUNT(*) as total FROM loyalty_accounts').first();
+    const totalMembers = (await db.prepare('SELECT COUNT(*) as total FROM loyalty_accounts').first()) as any;
 
     // Get active members (had activity in last 30 days)
-    const activeMembers = await db.prepare(
+    const activeMembers = (await db.prepare(
       'SELECT COUNT(*) as total FROM loyalty_accounts WHERE last_activity_at >= datetime(\'now\', \'-30 days\')'
-    ).first();
+    ).first()) as any;
 
     // Get total points issued/redeemed/expired
-    const pointsStats = await db.prepare(
+    const pointsStats = (await db.prepare(
       `SELECT
         SUM(CASE WHEN points > 0 THEN points ELSE 0 END) as total_issued,
         SUM(CASE WHEN points < 0 THEN -points ELSE 0 END) as total_redeemed,
         SUM(CASE WHEN type = 'expire' THEN -points ELSE 0 END) as total_expired
        FROM loyalty_transactions`
-    ).first();
+    ).first()) as any;
 
     // Get by tier breakdown
-    const byTier = await db.prepare(
+    const byTier = (await db.prepare(
       'SELECT tier, COUNT(*) as count, AVG(current_points) as avg_points FROM loyalty_accounts GROUP BY tier'
-    ).all();
+    ).all()) as any;
 
     const byTierRecord: Record<string, { count: number; avgPoints: number }> = {};
-    byTier.results.forEach(row => {
+    (byTier.results || []).forEach((row: any) => {
       byTierRecord[row.tier] = {
         count: row.count,
         avgPoints: row.avg_points || 0,
@@ -160,12 +160,12 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
 
     // Calculate redemption rate
-    const totalIssued = pointsStats.total_issued || 0;
-    const totalRedeemed = pointsStats.total_redeemed || 0;
+    const totalIssued = pointsStats?.total_issued || 0;
+    const totalRedeemed = pointsStats?.total_redeemed || 0;
     const redemptionRate = totalIssued > 0 ? (totalRedeemed / totalIssued) * 100 : 0;
 
     // Average points per member
-    const avgPointsPerMember = totalMembers?.total > 0 ? totalIssued / totalMembers.total : 0;
+    const avgPointsPerMember = (totalMembers?.total || 0) > 0 ? totalIssued / totalMembers.total : 0;
 
     return c.json({
       success: true,
@@ -174,7 +174,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         activeMembers: activeMembers?.total || 0,
         totalPointsIssued: totalIssued,
         totalPointsRedeemed: totalRedeemed,
-        totalPointsExpired: pointsStats.total_expired || 0,
+        totalPointsExpired: pointsStats?.total_expired || 0,
         byTier: byTierRecord,
         redemptionRate,
         avgPointsPerMember,
@@ -182,3 +182,4 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 }
+

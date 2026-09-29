@@ -1,23 +1,23 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
+import { getDatabase } from '../../lib/db';
 
 export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/tiers - List all loyalty tier configurations
-  app.openapi(LoyaltyRoutes.tiers.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.tiers.list as any, async (c: any) => {
     const db = getDatabase(c);
 
-    const tiers = await db.prepare('SELECT * FROM loyalty_tier_configs ORDER BY min_points ASC').all();
+    const tiers = (await db.prepare('SELECT * FROM loyalty_tier_configs ORDER BY min_points ASC').all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: tiers.results,
+      data: tiers.results || [],
     });
   });
 
   // GET /api/loyalty/tiers/{tier} - Get loyalty tier config by tier
-  app.openapi(LoyaltyRoutes.tiers.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.tiers.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { tier } = c.req.valid('param');
 
@@ -31,7 +31,7 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/loyalty/tiers/{tier} - Update loyalty tier config
-  app.openapi(LoyaltyRoutes.tiers.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.tiers.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { tier } = c.req.valid('param');

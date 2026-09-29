@@ -90,9 +90,15 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     let resolvedTableId: string | null = null;
     if (data.table_id) {
-      const tableRow = await db.prepare(
+      const tableNum = data.table_id.trim();
+      let tableRow = await db.prepare(
         'SELECT id FROM cafe_tables WHERE table_number = ?'
-      ).bind(data.table_id).first<{ id: string }>();
+      ).bind(tableNum).first<{ id: string }>();
+      if (!tableRow && tableNum !== tableNum.toUpperCase()) {
+        tableRow = await db.prepare(
+          'SELECT id FROM cafe_tables WHERE table_number = ?'
+        ).bind(tableNum.toUpperCase()).first<{ id: string }>();
+      }
       if (tableRow) {
         resolvedTableId = tableRow.id;
         // Auto-occupy the table

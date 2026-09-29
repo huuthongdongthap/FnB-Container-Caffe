@@ -1,4 +1,4 @@
-import { z } from '@hono/zod-openapi';
+import { z, createRoute } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
   PaginationMetaSchema,
@@ -50,7 +50,7 @@ export const OrderPaymentSchema = z.object({
   transactionId: z.string().optional(),
   payosOrderCode: z.number().optional(),
   paidAt: DateTimeSchema.nullable(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('OrderPayment');
 
 export const OrderCustomerSchema = z.object({
@@ -217,7 +217,7 @@ export type OrderSummary = z.infer<typeof OrderSummarySchema>;
 
 // OpenAPI route definitions
 export const OrderRoutes = {
-  list: {
+  list: createRoute({
     method: 'get',
     path: '/api/orders',
     summary: 'List orders with pagination and filtering',
@@ -237,8 +237,8 @@ export const OrderRoutes = {
       200: { description: 'Order list', content: { 'application/json': { schema: SuccessResponseSchema(OrderListResponseSchema) } } },
       400: { description: 'Invalid query', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
-  },
-  get: {
+  }),
+  get: createRoute({
     method: 'get',
     path: '/api/orders/{id}',
     summary: 'Get order by ID',
@@ -256,8 +256,8 @@ export const OrderRoutes = {
       },
       404: { description: 'Not found, or not owned by the calling customer', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
-  },
-  create: {
+  }),
+  create: createRoute({
     method: 'post',
     path: '/api/orders',
     summary: 'Create new order',
@@ -267,8 +267,8 @@ export const OrderRoutes = {
       201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
       400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
-  },
-  update: {
+  }),
+  update: createRoute({
     method: 'patch',
     path: '/api/orders/{id}',
     summary: 'Update order (status, notes, customer)',
@@ -281,8 +281,8 @@ export const OrderRoutes = {
       403: { description: 'Role unauthorized for this transition', content: { 'application/json': { schema: ErrorResponseSchema } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
-  },
-  cancel: {
+  }),
+  cancel: createRoute({
     method: 'post',
     path: '/api/orders/{id}/cancel',
     summary: 'Cancel order',
@@ -293,8 +293,8 @@ export const OrderRoutes = {
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       409: { description: 'Cannot cancel (already served/completed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
-  },
-  summary: {
+  }),
+  summary: createRoute({
     method: 'get',
     path: '/api/orders/summary',
     summary: 'Get order summary statistics',
@@ -309,5 +309,5 @@ export const OrderRoutes = {
     responses: {
       200: { description: 'Order summary', content: { 'application/json': { schema: SuccessResponseSchema(OrderSummarySchema) } } },
     },
-  },
+  }),
 };

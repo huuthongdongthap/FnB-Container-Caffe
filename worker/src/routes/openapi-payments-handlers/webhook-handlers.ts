@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
+import { getDatabase } from '../../lib/db';
 
 export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments/webhook/payos - PayOS webhook
-  router.openapi(PaymentRoutes.webhook.payos, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(PaymentRoutes.webhook.payos as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json' as never) as {
       data: {
         orderCode: string | number;
@@ -32,14 +32,14 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
     }
 
     // Find payment by order code
-    const payment = await db.prepare(
+    const payment = (await db.prepare(
       'SELECT * FROM order_payments WHERE provider_reference = ?'
-    ).bind(body.data.orderCode).first<{
+    ).bind(body.data.orderCode).first()) as {
       id: string;
       order_id: string;
       metadata: string | null;
       [key: string]: unknown;
-    }>();
+    } | null;
 
     if (!payment) {
       return c.json({ success: false, error: 'Payment not found' }, 404);
@@ -59,11 +59,11 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
 
     // Update order payment status
     if (newStatus === 'completed') {
-      const totalPaid = await db.prepare(
+      const totalPaid = (await db.prepare(
         'SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = \'completed\' AND amount > 0'
-      ).bind(payment.order_id).first<{ total: number }>();
+      ).bind(payment.order_id).first()) as { total: number } | null;
 
-      const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first<{ total_amount: number }>();
+      const order = (await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first()) as { total_amount: number } | null;
       let orderPaymentStatus = 'unpaid';
       if (totalPaid && totalPaid.total >= (order?.total_amount || 0)) {
         orderPaymentStatus = 'paid';
