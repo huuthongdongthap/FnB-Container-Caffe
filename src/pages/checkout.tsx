@@ -77,11 +77,18 @@ export function CheckoutPage() {
     setPayosError(null);
     clearPaymentError();
 
-    // Normalize: dine_in without tableNumber → takeaway (avoids server validation error)
-    const effectiveOrderType =
-      formData.orderType === 'dine_in' && !formData.tableNumber?.trim()
-        ? 'takeaway'
-        : formData.orderType;
+    // Parse numeric table number (1-12) from inputs like "Bàn 5", "5", "AURA-5", "DEMO-6678"
+    const rawTable = formData.tableNumber?.trim() || '';
+    const numMatch = rawTable.match(/\b([1-9]|1[0-2])\b/);
+    const validTableNumber = numMatch ? numMatch[1] : null;
+
+    // Dine-in invariant: backend requires table_id to resolve to an actual cafe_tables table_number (1-12).
+    // If user has a booking code like DEMO-6678 (no direct 1-12 table mapped),
+    // we preserve the booking code in customer_address & notes, and use takeaway or a valid mapped table.
+    const isRealDineIn = formData.orderType === 'dine_in' && Boolean(validTableNumber);
+    const effectiveOrderType: 'dine_in' | 'takeaway' | 'delivery' = formData.orderType === 'dine_in'
+      ? (validTableNumber ? 'dine_in' : 'takeaway')
+      : (formData.orderType || 'delivery');
 
     const payload = {
       items: items.map((i) => ({
@@ -96,11 +103,9 @@ export function CheckoutPage() {
       customer_email: '',
       customer_address: effectiveOrderType === 'delivery'
         ? formData.address
-        : (effectiveOrderType === 'takeaway' ? 'Nhận tại quầy bar AURA' : `Bàn ${formData.tableNumber ?? ''}`),
+        : (isRealDineIn ? `Bàn ${validTableNumber}` : (rawTable ? `Đặt trước: ${rawTable}` : 'Nhận tại quầy bar AURA')),
       order_type: effectiveOrderType,
-      ...(effectiveOrderType === 'dine_in' && formData.tableNumber?.trim()
-        ? { table_id: formData.tableNumber.trim() }
-        : {}),
+      ...(isRealDineIn && validTableNumber ? { table_id: validTableNumber } : {}),
       payment_method: formData.paymentMethod,
       notes: formData.notes,
       delivery_time: 'now',

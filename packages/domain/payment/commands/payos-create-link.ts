@@ -44,7 +44,7 @@ async function buildSignature(
     .join('');
 }
 
-paymentRouter.post('/create-link', optionalAuth() as any, async(c) => {
+const handleCreateLink = async(c: any) => {
   const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
   const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
   const customerId = user?.id ?? null;
@@ -263,6 +263,7 @@ paymentRouter.post('/create-link', optionalAuth() as any, async(c) => {
     return c.json({
       success: true,
       checkoutUrl: payosData.data?.checkoutUrl,
+      checkout_url: payosData.data?.checkoutUrl,
       orderCode,
       paymentLinkId: payosData.data?.paymentLinkId
     });
@@ -273,7 +274,10 @@ paymentRouter.post('/create-link', optionalAuth() as any, async(c) => {
     } catch { /* executionCtx unavailable */ };
     return c.json({ success: false, error: errMsg.internal_error[locale] }, 500);
   }
-});
+};
+
+paymentRouter.post('/create-link', optionalAuth() as any, handleCreateLink);
+paymentRouter.post('/payos/create', optionalAuth() as any, handleCreateLink);
 
 // MoMo route
 momoCreate(paymentRouter);

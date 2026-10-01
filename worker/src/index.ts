@@ -175,7 +175,7 @@ app.use('*', requestMetrics());
 // ── Global error handler ──
 app.onError(errorHandler);
 
-// ── Menu (M4-B canonical customer projection) ──
+// ── Menu (M4-B canonical customer projection + frontend dual-support) ──
 app.get('/api/menu', async (c) => {
   const db = c.env.AURA_DB;
   const category = c.req.query('category');
@@ -183,9 +183,28 @@ app.get('/api/menu', async (c) => {
   const locale = c.req.query('locale') || 'vi-VN';
 
   const menu = await getCustomerMenu(db, { category, includeUnavailable, locale });
+  const allItems = menu.categories.flatMap((cat) => cat.items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description ?? '',
+    price: item.priceCents,
+    priceCents: item.priceCents,
+    category: item.category,
+    image_url: item.imageUrl ?? '',
+    imageUrl: item.imageUrl ?? '',
+    available: item.available,
+    tags: item.tags,
+  })));
+
   return c.json({
     success: true,
     data: menu,
+    items: allItems,
+    pagination: {
+      total: menu.totalItems,
+      limit: Number(c.req.query('limit')) || menu.totalItems,
+      offset: Number(c.req.query('offset')) || 0,
+    },
     meta: { locale: locale === 'en-US' ? 'en-US' : 'vi-VN' },
   });
 });
@@ -198,7 +217,19 @@ app.get('/api/menu/:id', async (c) => {
   if (!item) {
     return c.json({ success: false, error: 'Menu item not found' }, 404);
   }
-  return c.json({ success: true, data: item });
+  const normalizedItem = {
+    id: item.id,
+    name: item.name,
+    description: item.description ?? '',
+    price: item.priceCents,
+    priceCents: item.priceCents,
+    category: item.category,
+    image_url: item.imageUrl ?? '',
+    imageUrl: item.imageUrl ?? '',
+    available: item.available,
+    tags: item.tags,
+  };
+  return c.json({ success: true, data: item, item: normalizedItem });
 });
 
 // ── Orders (checkout flow) ──
@@ -297,6 +328,7 @@ app.route('/api/staff-tips', staffTipsRouter);
 app.route('/api/qr', qrRouter);
 app.route('/api/admin/qr', adminQRRouter);
 app.route('/api/reservations', reservationsRouter);
+app.route('/api/admin/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
 app.route('/api/crm', crmRouter);
 app.route('/api/pos/customer', posCustomerRouter);
@@ -370,6 +402,10 @@ app.route('/api/admin/sales', adminSalesRouter);
 // ── Admin Metrics (staff-only observability) ──
 import adminMetrics from './routes/admin-metrics';
 app.route('/api/admin/metrics', adminMetrics);
+
+// ── Admin Audit Logs (staff/owner) ──
+import { registerAuditLogRoutes } from './routes/admin-audit-logs';
+registerAuditLogRoutes(app);
 
 // ── Cron + admin debug routes (extracted to routes/cron-admin) ──
 registerCronAdminRoutes(app);

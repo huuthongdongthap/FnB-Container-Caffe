@@ -109,9 +109,26 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
     // Online: normal fetch
     try {
-      const body = await apiFetch<{ items?: MenuItem[] }>('/api/menu?available=true');
+      const body = await apiFetch<any>('/api/menu?available=true');
 
-      const items: MenuItem[] = (body as { items?: MenuItem[] }).items ?? [];
+      let rawList: any[] = [];
+      if (Array.isArray(body?.items) && body.items.length > 0) {
+        rawList = body.items;
+      } else if (Array.isArray(body?.data?.categories)) {
+        rawList = body.data.categories.flatMap((cat: any) => cat.items || []);
+      }
+
+      const items: MenuItem[] = rawList.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description ?? '',
+        price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
+        category: item.category,
+        image_url: item.imageUrl ?? item.image_url ?? '',
+        available: Boolean(item.available),
+        tags: Array.isArray(item.tags) ? item.tags : [],
+      }));
+
       const categories = extractCategories(items);
       set({ items, categories, loading: false, error: null, searchResults: null });
 
@@ -133,8 +150,19 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
   fetchMenuItem: async (id: string) => {
     try {
-      const body = await apiFetch<{ item?: MenuItem }>(`/api/menu/${id}`);
-      return (body as { item?: MenuItem }).item ?? null;
+      const body = await apiFetch<any>(`/api/menu/${id}`);
+      const raw = body?.item ?? body?.data;
+      if (!raw) return null;
+      return {
+        id: raw.id,
+        name: raw.name,
+        description: raw.description ?? '',
+        price: raw.priceCents ?? (typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price) ?? 0,
+        category: raw.category,
+        image_url: raw.imageUrl ?? raw.image_url ?? '',
+        available: Boolean(raw.available),
+        tags: Array.isArray(raw.tags) ? raw.tags : [],
+      } as MenuItem;
     } catch {
       return null;
     }

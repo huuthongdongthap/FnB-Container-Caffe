@@ -61,16 +61,24 @@ interface PayOSRequest {
 interface PayOSResponse {
   success: boolean;
   checkout_url?: string;
+  checkoutUrl?: string;
   payment?: { checkoutUrl?: string };
   order_id?: string;
 }
 
 export function useProcessPayOS() {
   return useMutation<PayOSResponse, Error, PayOSRequest>({
-    mutationFn: (payload) =>
-      apiFetch<PayOSResponse>('/api/payment/payos/create', {
+    mutationFn: async (payload) => {
+      const res = await apiFetch<PayOSResponse>('/api/payment/create-link', {
         method: 'POST',
         body: JSON.stringify(payload),
-      }),
+      });
+      const checkoutUrl = res.checkout_url || res.checkoutUrl || res.payment?.checkoutUrl;
+      return {
+        ...res,
+        checkout_url: checkoutUrl,
+        checkoutUrl,
+      };
+    },
   });
 }
