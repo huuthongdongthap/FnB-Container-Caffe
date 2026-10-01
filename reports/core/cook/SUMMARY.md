@@ -52,6 +52,10 @@
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
 | `npm test` (`vitest run`) | **388 test files / 3,557 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
+| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/health`, `/api/version`, `/api/menu`, `/api/payment`, CORS | 🟢 VERIFIED |
 
 ## Next Step
-- Ready for staging deploy / production deployment verification (`/deploy` or `deploy-cloudflare.sh`).
+- Complete Phase 1 Pillar Integrations (12 Pillars ecosystem: ERPNext, TastyIgniter, Home Assistant, Frigate).
+- System ready for continuous operations.
