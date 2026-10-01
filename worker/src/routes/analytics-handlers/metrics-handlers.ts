@@ -5,7 +5,7 @@ import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
 import { getZoneStats } from '../../tree/analytics/zone-analytics';
-import { topProductsSchema, peakHoursSchema, zoneSchema, CACHE_TTL, buildCacheKey, getCached, setCache } from './helpers';
+import { topProductsSchema, peakHoursSchema, zoneSchema, buildCacheKey, getCached, setCache } from './helpers';
 
 export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/top-products

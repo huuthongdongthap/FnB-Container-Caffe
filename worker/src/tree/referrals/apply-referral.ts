@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import type { ReferralCode, Referral, Customer, CashbackWallet } from '../../types/models';
+import type { ReferralCode } from '../../types/models';
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

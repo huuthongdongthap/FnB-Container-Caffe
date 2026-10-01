@@ -39,7 +39,17 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Get tables
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      table_number: 't.table_number',
+      capacity: 't.capacity',
+      status: 't.status',
+      sort_order: 't.sort_order',
+      created_at: 't.created_at',
+      updated_at: 't.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 't.table_number';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
       `SELECT t.*, z.name as zone_name
        FROM tables t

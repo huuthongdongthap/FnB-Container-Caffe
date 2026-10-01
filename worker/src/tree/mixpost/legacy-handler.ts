@@ -98,7 +98,7 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
 
           const content = await resolveTemplate(template.content_template, env);
 
-          const result = await client.createPost({
+          const _result = await client.createPost({
             content,
             accounts: template.accounts ? JSON.parse(template.accounts) : []
           });

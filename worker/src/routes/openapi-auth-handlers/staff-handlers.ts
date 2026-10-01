@@ -1,5 +1,4 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, generateToken } from './helpers';
@@ -83,7 +82,16 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const total = (countResult as { total?: number })?.total || 0;
 
     const offset = (Number(page) - 1) * Number(limit);
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      name: 'name',
+      email: 'email',
+      role: 'role',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'name';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at
        FROM users ${whereClause}

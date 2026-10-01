@@ -66,7 +66,16 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      created_at: 'op.created_at',
+      amount: 'op.amount',
+      status: 'op.status',
+      payment_method: 'op.payment_method',
+      updated_at: 'op.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'op.created_at';
+    const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
       `SELECT op.*, o.order_number FROM order_payments op
        LEFT JOIN orders o ON op.order_id = o.id

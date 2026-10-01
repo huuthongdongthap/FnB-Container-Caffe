@@ -5,7 +5,6 @@ import {
   SuccessResponseSchema,
   ErrorResponseSchema,
   IdParamsSchema,
-  TableIdParamsSchema,
   LocaleEnum,
   DateTimeSchema,
   MoneySchema,

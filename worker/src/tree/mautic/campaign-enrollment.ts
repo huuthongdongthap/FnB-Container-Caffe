@@ -3,12 +3,9 @@
  * Extracted from routes/mautic-bridge.ts to tree/mautic/.
  */
 
-import { createLogger } from '../../utils/logger.js';
 import { getMauticClient } from './client-factory';
 import { syncStatus } from './sync-state';
 import type { MauticBridgeEnv, MauticClientDuck } from './types';
-
-const log = createLogger({ route: 'mautic-bridge' });
 
 export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: boolean; enrolled: number; errors: string[] }> {
   const client = getMauticClient(env) as MauticClientDuck | null;

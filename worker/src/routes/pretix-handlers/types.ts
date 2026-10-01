@@ -1,4 +1,4 @@
-import type { PretixItemsResponse, PretixEventResponse, PretixItem, PretixEnv } from '../../tree/pretix/types';
+import type { PretixEnv } from '../../tree/pretix/types';
 
 export { type PretixItemsResponse, type PretixEventResponse, type PretixItem, type PretixEnv } from '../../tree/pretix/types';
 

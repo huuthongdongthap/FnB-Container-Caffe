@@ -19,7 +19,7 @@
   - Phase 3: /contact & /gallery Sa Đéc 5-zone rebuild
   - Phase 4: Clean vi.json natural Vietnamese & Top Navbar alignment
   - Phase 5: Comprehensive verification
-- **Backend Architecture & Stabilization (`plans/concurrent-dancing-stallman.md`)**:
+- **Backend Architecture & Stabilization (`plans/2026-09-28-backend-stabilization/`)**: All 3 phases completed.
   - CORS header resolution for credentialed requests
   - Guest checkout for PayOS payment link creation
   - Unified D1 database binding accessor (`AURA_DB ?? DB`)
@@ -28,14 +28,30 @@
   - Sanitized SQL `ORDER BY` with column whitelist
   - Event replay buffer with `Last-Event-ID` on order status SSE stream
   - Idempotency key caching with KV storage
+- **FE ↔ BE Integration & Assembly (`plans/2026-10-01-fe-be-integration/`)**: All 4 phases completed.
+  - Phase 1: Dual projection on `/api/menu` (`data` + `items`)
+  - Phase 2: PayOS payment route aliasing (`/api/payment/create-link` & `/payos/create`)
+  - Phase 3: Admin reservation & audit logs routing mounted with role authorization
+  - Phase 4: Full verification across FE stores & worker routers
+- **Monorepo Refactoring & Rule Compliance (< 200 LOC & 0 Lint Warnings)**:
+  - `worker/src/index.ts` modularized from 610 LOC down to 124 LOC.
+  - Extracted sub-routers: `features-router.ts` (150 LOC), `integrations-router.ts` (49 LOC), `scheduled.ts` (44 LOC), `staff-mobile.ts` (67 LOC).
+  - `packages/domain/payment/commands/payos-create-link.ts` refactored from 283 LOC down to 180 LOC.
+  - Cleaned all 92 ESLint warnings down to 0 warnings.
+- **Security Audit & Hardening (`reports/audit/comprehensive-audit-2026.md`)**:
+  - `SEC-01`: Sanitized dynamic SQL `ORDER BY` parameters with strict column whitelisting across `openapi-categories`, `openapi-products`, `openapi-tables`, `openapi-payments`, and `openapi-staff`.
+  - `SEC-02`: Added production domain `auracafe.vn` and its subdomains to the worker CORS allowlist.
 
 ## Verification Evidence
 | Gate | Result | Status |
 |---|---|---|
-| `npx tsc --noEmit` | **0 errors** | 🟢 GREEN |
-| `npx vitest run` | **382 test files / 3,519 tests PASS** | 🟢 GREEN |
-| `npm run build` | **Vite build clean** | 🟢 GREEN |
+| `npm run typecheck` (`tsc --noEmit`) | **0 errors** | 🟢 GREEN |
+| `npm run typecheck:worker` | **0 errors** | 🟢 GREEN |
+| `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
+| `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
+| `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
+| `npm test` (`vitest run`) | **388 test files / 3,557 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 
 ## Next Step
-- Ready for deployment or staging validation (`/deploy`).
+- Ready for staging deploy / production deployment verification (`/deploy` or `deploy-cloudflare.sh`).

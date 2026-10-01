@@ -6,12 +6,28 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { errorHandler } from './middleware/error-handler';
-import type { Env } from './types/env';
-import type { MiddlewareHandler } from 'hono';
+import { correlationId } from './middleware/correlation-id';
+import { requestMetrics } from './middleware/request-metrics';
+import { requireAuth } from './middleware/auth';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
+import { handleScheduled } from './scheduled';
+import type { Env } from './types/env';
+
+// ── Sub-Routers ──
+import { customerMenuRouter } from './routes/customer-menu';
+import { ordersCoreRouter } from './routes/orders-core';
+import { authEndpointsRouter } from './routes/auth-endpoints';
+import { staffMobileRouter } from './routes/staff-mobile';
+import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
+import { realtimeOrdersRouter } from './routes/realtime-orders';
+import { orderStreamRouter } from './routes/order-stream';
+import { kdsStreamRouter } from '@aura/domain-kitchen';
+import { registerFeatureRoutes } from './routes/features-router';
+import { registerIntegrationRoutes } from './routes/integrations-router';
+import { subscriptionsRouter } from './routes/subscriptions';
+
+// ── OpenAPI & Docs ──
 import { openApiApp } from './lib/openapi';
-// OpenAPI domain routers — these declare full '/api/...' paths and are mounted
-// on openApiApp at '/', so they register their declared paths verbatim.
 import { openApiCategoriesRouter } from './routes/openapi-categories';
 import { openApiProductsRouter } from './routes/openapi-products';
 import { openApiOrdersRouter } from './routes/openapi-orders';
@@ -24,119 +40,6 @@ import { openApiLoyaltyRouter } from './routes/openapi-loyalty';
 import { openApiPromotionsRouter } from './routes/openapi-promotions';
 import { openApiCronRouter } from './routes/openapi-cron';
 
-
-// Route modules — pre-existing TS
-import { getCustomerMenu, getCustomerMenuItem } from '@aura/domain-catalog';
-import {
-  createOrder, updateOrder, getAdminOrders, getStats,
-  getLatestOrderTimestamp, splitOrders
-} from '@aura/domain-order';
-import {
-  loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
-  bootstrapOwner, resetPassword, changePassword
-} from './routes/auth';
-import { requireAuth } from './middleware/auth';
-import { audit } from './middleware/audit-log';
-import { tenantMiddleware } from './middleware/tenant';
-import { registerWithVerification } from './routes/auth-register';
-import { getAuthSession } from './routes/auth-session';
-import { verifyEmail } from './routes/auth-verify';
-import { paymentRouter } from '@aura/domain-payment';
-import { createHARouter } from './routes/homeassistant';
-import { createTIRoutes } from './routes/integrations/tastyigniter';
-import { createFrigateRoutes } from './routes/integrations/frigate';
-import { webhookRouter } from './routes/webhooks';
-import { reservationsRouter } from '@aura/domain-reservation';
-import { loyaltyRouter } from './routes/loyalty';
-import { referralRouter } from './routes/referrals';
-import { contactRouter } from './routes/contact';
-
-// ── Converted route modules (was .js, now .ts) ──
-import { tablesRouter, qrRouter } from '@aura/domain-table';
-import { tableSessionsRouter } from './routes/table-sessions';
-import { menuModifiersRouter } from '@aura/domain-catalog';
-import { kitchenStationsRouter } from '@aura/domain-kitchen';
-import { floorPlanRouter } from './routes/floor-plan';
-import { clientErrorsRouter } from './routes/client-errors';
-import { staffTipsRouter } from '@aura/domain-staff';
-import { adminQRRouter } from './routes/admin-qr';
-import { reviewsRouter } from './routes/reviews';
-import { categoriesRouter, productsRouter } from '@aura/domain-catalog';
-import { catalogRouter } from './routes/openapi-catalog';
-import { customersRouter } from './routes/customers';
-import { posCustomerRouter } from './routes/pos-customer';
-import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
-import { realtimeOrdersRouter } from './routes/realtime-orders';
-import { kdsStreamRouter } from '@aura/domain-kitchen';
-import { orderStreamRouter } from './routes/order-stream';
-import { promotionsRouter } from './routes/promotions';
-import { shiftsRouter } from '@aura/domain-shift';
-import { subscriptionsRouter } from './routes/subscriptions';
-import { adminLoyaltyRouter } from './routes/admin-loyalty';
-import { birthdayRouter } from './routes/birthday';
-import { checkinRouter } from './routes/checkin';
-import { reportsRouter } from './routes/reports';
-import { signageRouter } from './routes/signage';
-import { pretixRouter } from './routes/pretix';
-import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
-import { crmRouter } from './routes/crm';
-import { nowPaymentsIPN } from '@aura/domain-payment';
-import { getInvoiceReceipt } from './routes/subscription-receipt';
-// ── SaaS (Phase 4–5) ──
-import { getPricing } from './routes/saas-pricing';
-import { createTenantRoutes } from './routes/saas-tenants';
-// ── Cron + Notifications ──
-import {
-  checkOverdueOrders,
-  processErpnextRetryQueue, processErpnextProductSync,
-  syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates,
-  runCampaignTriggers
-} from './routes/cron';
-import { sendShiftReminders } from './routes/reminders/shifts/route';
-import { registerCronAdminRoutes } from './routes/cron-admin';
-import { getAdminCustomers, getStuckPayments } from './routes/admin-handlers';
-
-// ── ERPNext Integration (plain handlers → new unified handlers) ──
-import { handleErpnextRequest } from './routes/erpnext';
-import { handleErpnextPosRequest } from './routes/erpnext-pos';
-import { handleErpnextInvoicesRequest } from './routes/erpnext-invoices';
-import { erpnextSyncRoutes } from './routes/erpnext-sync';
-import { customerRoutes } from './routes/erpnext/customers';
-import { vendorRoutes } from './routes/erpnext/vendors';
-import { expenseRoutes } from './routes/erpnext/expenses';
-
-// ── Mautic Bridge ──
-import { handleMauticBridgeRequest } from './routes/mautic-bridge';
-
-// ── Mixpost (was router + cron exports) ──
-import { handleMixpostRequest, autoPostDailySpecials, autoPostNewPromotions, autoPostWeeklyHighlights } from './routes/mixpost';
-
-// ── Version ──
-import { getVersion } from './routes/version';
-import { campaignsRouter } from './routes/campaigns';
-import { pushRouter } from './routes/push';
-import { broadcastRouter } from './routes/broadcast';
-import { chatRouter } from './routes/chat';
-import { analyticsRouter } from './routes/analytics-hono';
-import { refundRouter } from './routes/refunds';
-import { registerVitalsRoute } from './routes/vitals';
-import { inventoryCRUD, inventorySnapshots, inventoryTransactions } from '@aura/domain-inventory';
-
-// ── Staff Mobile Auth ──
-import {
-  staffMobileLogin,
-  staffTokenRefresh,
-  registerStaffDevice,
-  revokeStaffDevice,
-  listStaffDevices,
-} from '@aura/domain-staff';
-import { requireStaff } from './middleware/staff-auth';
-
-// ── Staff Mobile Routes (KDS, Tables, Orders) ──
-import { getKdsMobile, updateKdsStatus } from '@aura/domain-kitchen';
-import { getTablesMobile, updateTableStatus } from './routes/tables-mobile';
-import { getOrdersMobile, createOrderMobile, getOrderDetail } from './routes/orders-mobile';
-
 const app = new Hono<{ Bindings: Env }>();
 
 // ── CORS allowlist ──
@@ -144,15 +47,15 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/(www\.)?auraspace\.cafe$/,
+  /^https:\/\/(www\.)?auracafe\.vn$/,
+  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
 app.use('/*', cors({
   origin: (origin: string) => {
-    if (!origin) {
-      return '';
-    }
+    if (!origin) return '';
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -162,273 +65,34 @@ app.use('/*', cors({
   maxAge: 86400
 } as Parameters<typeof cors>[0]));
 
-// ── Correlation ID (all routes; echoes X-Request-ID response header) ──
-import { correlationId } from './middleware/correlation-id';
+// ── Global Middleware ──
 app.use('*', correlationId());
-
-import { pruneOldMetrics } from './lib/metrics-collector';
-
-// ── Request metrics (all routes, non-blocking) ──
-import { requestMetrics } from './middleware/request-metrics';
 app.use('*', requestMetrics());
-
-// ── Global error handler ──
 app.onError(errorHandler);
 
-// ── Menu (M4-B canonical customer projection + frontend dual-support) ──
-app.get('/api/menu', async (c) => {
-  const db = c.env.AURA_DB;
-  const category = c.req.query('category');
-  const includeUnavailable = c.req.query('include_unavailable') === 'true';
-  const locale = c.req.query('locale') || 'vi-VN';
+// ── Menu & Orders Core ──
+app.route('/api/menu', customerMenuRouter);
+app.route('/api/orders', ordersCoreRouter);
+app.route('/api/orders', ordersHonoRouter);
+app.route('/api/orders', orderStreamRouter);
 
-  const menu = await getCustomerMenu(db, { category, includeUnavailable, locale });
-  const allItems = menu.categories.flatMap((cat) => cat.items.map((item) => ({
-    id: item.id,
-    name: item.name,
-    description: item.description ?? '',
-    price: item.priceCents,
-    priceCents: item.priceCents,
-    category: item.category,
-    image_url: item.imageUrl ?? '',
-    imageUrl: item.imageUrl ?? '',
-    available: item.available,
-    tags: item.tags,
-  })));
-
-  return c.json({
-    success: true,
-    data: menu,
-    items: allItems,
-    pagination: {
-      total: menu.totalItems,
-      limit: Number(c.req.query('limit')) || menu.totalItems,
-      offset: Number(c.req.query('offset')) || 0,
-    },
-    meta: { locale: locale === 'en-US' ? 'en-US' : 'vi-VN' },
-  });
-});
-
-app.get('/api/menu/:id', async (c) => {
-  const db = c.env.AURA_DB;
-  const id = c.req.param('id');
-  const item = await getCustomerMenuItem(db, id);
-
-  if (!item) {
-    return c.json({ success: false, error: 'Menu item not found' }, 404);
-  }
-  const normalizedItem = {
-    id: item.id,
-    name: item.name,
-    description: item.description ?? '',
-    price: item.priceCents,
-    priceCents: item.priceCents,
-    category: item.category,
-    image_url: item.imageUrl ?? '',
-    imageUrl: item.imageUrl ?? '',
-    available: item.available,
-    tags: item.tags,
-  };
-  return c.json({ success: true, data: item, item: normalizedItem });
-});
-
-// ── Orders (checkout flow) ──
-const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
-  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost') {
-    return next();
-  }
-  const key = `rate:order:${ip}`;
-  const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 5) {
-    return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
-  }
-  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 600 });
-  await next();
-};
-
-app.post('/api/orders', orderRateLimit, (c) => createOrder(c.req.raw, c.env, c.executionCtx));
-app.post('/api/orders/split', (c) => splitOrders(c.req.raw, c.env));
-app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
-// GET /api/orders and GET /api/orders/:id are intentionally NOT registered here.
-// Both are served by openApiApp (mounted last) so every read passes through
-// resolveCustomerScope() and the guest allowlist projection.
-app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => {
-  const user = c.get('user');
-  return updateOrder(c.req.raw, c.env, c.req.param('id'), user?.role);
-});
-
-// ── Orders KDS ──
+// ── Orders KDS & Realtime ──
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
 app.route('/api/kds/orders', kdsStreamRouter);
-
-// ── SSE Stream — per-order status updates (client EventSource, order-store subscribeToOrder) ──
-app.route('/api/orders', orderStreamRouter);
-
-// ── Realtime WebSocket (DO-backed, public) ──
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
-// ── Orders Checkout + Guest Check-in (public + protected) ──
-// ordersHonoRouter provides POST /checkout, POST /guest-checkin, PATCH /:id/status.
-// Order reads are handled by openApiApp (mounted last), never here — see
-// routes/orders-hono-handlers/query-handlers.ts.
-app.route('/api/orders', ordersHonoRouter);
 
-// ── Admin (protected) ──
-app.use('/api/admin/*', requireAuth(['owner', 'staff']));
-app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
+// ── Auth & Mobile ──
+app.route('/api/auth', authEndpointsRouter);
+app.route('/mobile', staffMobileRouter);
+app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
 
-// Admin customers list + stuck-payment dashboard (extracted to routes/admin)
-app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
-app.get('/api/admin/payments/stuck', requireAuth(['owner']), (c) => getStuckPayments(c.req.raw, c.env));
-
-app.use('/api/stats', requireAuth(['owner', 'staff']));
-app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
-
-// ── Auth ──
-const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
-  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  const key = `rate:auth:${ip}`;
-  const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 20) {
-    return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
-  }
-  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
-  await next();
-};
-
-app.post('/api/auth/register', authRateLimit, (c) => registerWithVerification(c.req.raw, c.env));
-app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env, c.executionCtx));
-app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
-app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
-app.get('/api/auth/session', (c) => getAuthSession(c.req.raw, c.env));
-app.post('/api/auth/verify-email', authRateLimit, (c) => verifyEmail(c.req.raw, c.env));
-app.post('/api/auth/register-staff', requireAuth(['owner']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
-app.get('/api/auth/staff', requireAuth(['owner']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
-app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
-app.post('/api/auth/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
-app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req.raw, c.env));
-
-// ── Sub-routers ──
-app.route('/api/payment', paymentRouter);
-app.route('/api/payments', refundRouter);
-app.route('/api/push', pushRouter);
-app.route('/api/webhook', webhookRouter);
-app.route('/api/categories', categoriesRouter);
-app.route('/api/products', productsRouter);
-app.route('/api/catalog', catalogRouter);
-app.route('/api/tables', tablesRouter);
-app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']));
-app.route('/api/table-sessions', tableSessionsRouter);
-app.route('/api/menu-modifiers', menuModifiersRouter);
-app.route('/api/kitchen-stations', kitchenStationsRouter);
-app.route('/api/floor-plan', floorPlanRouter);
-app.route('/api/client-error', clientErrorsRouter);
-app.route('/api/staff-tips', staffTipsRouter);
-app.route('/api/qr', qrRouter);
-app.route('/api/admin/qr', adminQRRouter);
-app.route('/api/reservations', reservationsRouter);
-app.route('/api/admin/reservations', reservationsRouter);
-app.route('/api/customers', customersRouter);
-app.route('/api/crm', crmRouter);
-app.route('/api/pos/customer', posCustomerRouter);
-app.route('/api/promotions', promotionsRouter);
-app.route('/api/signage', signageRouter);
-app.route('/api/pretix', pretixRouter);
-app.route('/api/shifts', shiftsRouter);
+// ── Domain Features & External Integrations ──
 app.route('/api/subscriptions', subscriptionsRouter);
-app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'customer']), (c) => getInvoiceReceipt(c));
-app.route('/api/campaigns', campaignsRouter);
-app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
-app.route('/api/broadcast', broadcastRouter);
-app.route('/api/chat', chatRouter);
+registerFeatureRoutes(app);
+registerIntegrationRoutes(app);
 
-// ── Analytics Dashboard (owner/staff) ──
-app.use('/api/analytics/*', requireAuth(['owner', 'staff']));
-app.route('/api/analytics', analyticsRouter);
-
-// ── Web Vitals (public, sendBeacon) ──
-registerVitalsRoute(app);
-
-// ── Reviews (Hono router wrapper) ──
-app.all('/api/reviews/*', (c) => reviewsRouter.fetch(
-  new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx
-));
-
-// ── Contact (Hono router wrapper) ──
-app.all('/api/contact/*', (c) => contactRouter.fetch(
-  new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env
-));
-
-// ── Cal.com booking webhook ──
-app.all('/api/webhooks/cal-booking/*', (c) => calBookingWebhookRouter.fetch(
-  new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), c.req.raw), c.env, c.executionCtx
-));
-
-app.route('/api/loyalty/referral', referralRouter);
-app.route('/api/loyalty/birthday', birthdayRouter);
-app.route('/api/loyalty/checkin', checkinRouter);
-app.route('/api/loyalty', loyaltyRouter);
-app.route('/api/admin/loyalty', adminLoyaltyRouter);
-app.use('/api/reports/*', requireAuth(['owner', 'staff']));
-app.route('/api/reports', reportsRouter);
-
-// ── Inventory (protected: read for owner/staff/customer, write for owner/staff) ──
-app.use('/api/inventory/*', requireAuth(['owner', 'staff', 'customer']));
-inventoryCRUD(app as any);
-inventoryTransactions(app as any);
-inventorySnapshots(app as any);
-
-// ── Health check ──
-import { getHealth } from './routes/health';
-app.get('/api/health', async(c) => {
-  const checkDb = c.req.query('db') === '1';
-  const result = await getHealth(c.env, checkDb);
-  const statusCode = result.status === 'degraded' ? 503 : 200;
-  return c.json(result, statusCode as 200 | 503);
-});
-
-// ── Version (deploy SHA verification) ──
-app.get('/api/version', (c) => c.json(getVersion(c.env)));
-
-// ── DinDin (AURA CAFE Menu Ordering) ──
-import { dindinRouter } from './routes/dindin';
-app.route('/api/admin/dindin', dindinRouter);
-
-// ── Admin Sales CSV Export ──
-import { adminSalesRouter } from './routes/admin-sales';
-app.route('/api/admin/sales', adminSalesRouter);
-
-// ── Admin Metrics (staff-only observability) ──
-import adminMetrics from './routes/admin-metrics';
-app.route('/api/admin/metrics', adminMetrics);
-
-// ── Admin Audit Logs (staff/owner) ──
-import { registerAuditLogRoutes } from './routes/admin-audit-logs';
-registerAuditLogRoutes(app);
-
-// ── Cron + admin debug routes (extracted to routes/cron-admin) ──
-registerCronAdminRoutes(app);
-
-// ── ERPNext Integration (owner only) ──
-// All ERPNext routes use unified handlers, forwarding to their respective handlers
-app.use('/api/erpnext/*', requireAuth(['owner']));
-
-app.all('/api/erpnext/*', (c) => {
-  return handleErpnextRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
-});
-
-app.all('/api/erpnext-pos/*', (c) =>
-  handleErpnextPosRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
-);
-
-app.all('/api/erpnext-invoices/*', (c) =>
-  handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
-);
-
-// ── OpenAPI Documentation ──
-// ── OpenAPI Sub-Routers ──
-// Sub-routers declare full '/api/...' paths so mounting them at root matches exactly.
+// ── OpenAPI Sub-Routers & Docs ──
 app.route('/', openApiCategoriesRouter);
 app.route('/', openApiProductsRouter);
 app.route('/', openApiOrdersRouter);
@@ -440,171 +104,21 @@ app.route('/', openApiInventoryRouter);
 app.route('/', openApiLoyaltyRouter);
 app.route('/', openApiPromotionsRouter);
 app.route('/', openApiCronRouter);
-
-// ── OpenAPI Documentation & Schema Endpoints ──
 app.route('/', openApiApp);
 
-// ── ERPNext Sync (owner + staff) ──
-erpnextSyncRoutes(app);
-
-// ── ERPNext CRM sub-routes ──
-customerRoutes(app);
-vendorRoutes(app);
-expenseRoutes(app);
-
-// ── Public: product availability ──
-app.get('/api/public/products/:productId/availability', (c) =>
-  handleErpnextPosRequest(
-    new Request(`https://internal/api/erpnext-pos/products/${c.req.param('productId')}/availability`, c.req.raw),
-    c.env as unknown as Record<string, unknown>
-  )
-);
-
-// ── Cal.com booking webhook (public) ──
-app.post('/api/webhooks/nowpayments', (c) => nowPaymentsIPN(c.req.raw, c.env));
-app.post('/api/webhooks/cal-booking', (c) =>
-  calBookingWebhookRouter.fetch(
-    new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), {
-      method: c.req.raw.method,
-      headers: c.req.raw.headers,
-      body: c.req.raw.body
-    }),
-    c.env,
-    c.executionCtx
-  )
-);
-
-// ── Mixpost (admin only) ──
-app.use('/api/mixpost/*', requireAuth(['owner', 'staff']));
-app.all('/api/mixpost/*', (c) =>
-  handleMixpostRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
-);
-
-// ── Mautic Bridge (cron/admin) ──
-app.use('/api/mautic-bridge/*', requireAuth(['owner']));
-app.all('/api/mautic-bridge/*', (c) =>
-  handleMauticBridgeRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
-);
-
-// ── Zalo (admin only) ──
-app.all('/api/zalo/*', requireAuth(['owner']), async(c) => {
-  const { handleZaloRequest } = await import('./routes/zalo');
-  return handleZaloRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
-});
-
-// ── Home Assistant ──
-app.route('/api/ha', createHARouter());
-
-// ── TastyIgniter Integration (owner+staff) ──
-app.use('/api/integrations/tastyigniter/*', requireAuth(['owner', 'staff']));
-app.route('/api/integrations/tastyigniter', createTIRoutes());
-
-// ── Frigate NVR Integration (owner+staff) ──
-app.use('/api/integrations/frigate/*', requireAuth(['owner', 'staff']));
-app.route('/api/integrations/frigate', createFrigateRoutes());
-
-// ── Staff Mobile Auth (/mobile/*) ──
-// Public: device login + token refresh
-const mobilePublic = new Hono<{ Bindings: Env }>();
-mobilePublic.post('/login', staffMobileLogin);
-mobilePublic.post('/refresh', staffTokenRefresh);
-mobilePublic.get('/me', (c) => getCurrentUser(c.req.raw, c.env));
-app.route('/mobile', mobilePublic);
-
-// Protected: device management (owner|manager only)
-app.use('/mobile/devices/*', requireStaff(['owner', 'manager']));
-const mobileDevices = new Hono<{ Bindings: Env }>();
-mobileDevices.post('/register', registerStaffDevice);
-mobileDevices.delete('/:device_id', revokeStaffDevice);
-mobileDevices.get('/', listStaffDevices);
-app.route('/mobile/devices', mobileDevices);
-
-// KDS
-app.use('/mobile/kds/orders/:id/status', requireStaff(['owner', 'manager', 'staff']));
-const mobileKds = new Hono<{ Bindings: Env }>();
-mobileKds.get('/orders', getKdsMobile);
-mobileKds.patch('/orders/:id/status', updateKdsStatus);
-app.route('/mobile/kds', mobileKds);
-
-// Phase 4 — Notifications (mobile PWA)
-import { getNotifications, markNotificationRead, subscribePush } from './routes/notifications-mobile';
-app.use('/mobile/notifications/:id/read', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-const mobileNotifs = new Hono<{ Bindings: Env }>();
-mobileNotifs.get('/', getNotifications);
-mobileNotifs.post('/subscribe', subscribePush);
-mobileNotifs.post('/:id/read', markNotificationRead);
-app.route('/mobile/notifications', mobileNotifs);
-
-// Tables
-app.use('/mobile/tables/:id', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-const mobileTables = new Hono<{ Bindings: Env }>();
-mobileTables.get('/', getTablesMobile);
-mobileTables.patch('/:id', updateTableStatus);
-app.route('/mobile/tables', mobileTables);
-
-// Orders
-app.use('/mobile/orders', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-const mobileOrders = new Hono<{ Bindings: Env }>();
-mobileOrders.get('/', getOrdersMobile);
-mobileOrders.post('/', createOrderMobile);
-mobileOrders.get('/:id', getOrderDetail);
-app.route('/mobile/orders', mobileOrders);
-
-// Mount SW endpoint for mobile PWA
-app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
-
-// ── SaaS Pricing (Phase 4 — public, no auth) ──
-app.get('/api/saas/pricing', getPricing);
-
-// ── SaaS Tenants (Phase 5 — requires auth + tenant context) ──
-const tenantRoutes = createTenantRoutes();
-app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
-app.route('/api/saas/tenants', tenantRoutes);
-
-// Cloudflare resolves fetch/scheduled handlers from the DEFAULT export when
-// one exists — a bare `export default app` makes workerd read the Hono app
-// object, which has .fetch but no .scheduled, so the cron trigger dies with
-// "Handler does not export a scheduled() function". Expose both handlers on
-// the default export object instead.
-export default {
-  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
-  scheduled,
-};
-export { app };
-
-// ── API v1 alias ──────────────────────────────────────────────────
-// Every route registered on `app` is also reachable under `/api/v1/...`.
-// Legacy `/api/...` paths remain functional (back-compat) and emit an
-// `X-API-Deprecation` header so client migration can be measured.
+// ── API v1 alias ──
 const v1 = new Hono<{ Bindings: Env }>();
 v1.use('/*', async (c) => {
-  // Rewrite /api/v1/... → /api/... and dispatch on the root app so the
-  // versioned prefix is served by the exact same route handlers.
   const url = new URL(c.req.raw.url);
   url.pathname = url.pathname.replace(/^\/api\/v1/, '/api');
   return app.fetch(new Request(url.toString(), c.req.raw), c.env, c.executionCtx);
 });
 app.route('/api/v1', v1);
 
-export async function scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-  ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
-  // Retention: metrics are operational telemetry (7-day window per approved
-  // SLO policy); admin audit rows live 90 days and orders indefinitely.
-  ctx.waitUntil(pruneOldMetrics(env.AURA_DB, 7));
-  ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
-  ctx.waitUntil((async() => {
-    await syncMauticContacts(env as unknown as Record<string, unknown>);
-    await Promise.all([
-      detectWinbackCandidates(env as unknown as Record<string, unknown>),
-      detectBirthdayCandidates(env as unknown as Record<string, unknown>)
-    ]);
-  })());
-  ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
-}
-
+export default {
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  scheduled: handleScheduled,
+};
+export { app };
+export { handleScheduled as scheduled };
 export { OrderBroadcaster };

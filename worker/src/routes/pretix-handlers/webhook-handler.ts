@@ -1,10 +1,8 @@
 import type { Hono } from 'hono';
-import { createLogger } from '../../middleware/logger';
 import { pretixWebhookBodySchema, zodErrorResponse } from '../../lib/validators';
 import { validateWebhookSignature } from '../../tree/pretix/hmac-validator';
 import type { PretixEnv } from './types';
 
-const log = createLogger({ route: 'pretix:webhook' });
 
 export function registerWebhookHandler(router: Hono): void {
   // POST /webhook — receive pretix webhook

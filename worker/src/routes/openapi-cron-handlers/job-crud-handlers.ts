@@ -1,5 +1,4 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
 import { formatJob } from './helpers';

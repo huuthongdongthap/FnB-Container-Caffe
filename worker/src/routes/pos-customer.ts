@@ -7,9 +7,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { requireStaff } from '../middleware/staff-auth';
-import { createLogger } from '../middleware/logger';
 
-const log = createLogger({ route: 'pos-customer' });
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/pos/customer?phone=09xxxxxxxx

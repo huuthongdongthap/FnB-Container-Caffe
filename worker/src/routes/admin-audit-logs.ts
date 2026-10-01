@@ -9,7 +9,7 @@
  * - index.ts: Barrel export
  */
 
-import { adminAuditLogsRouter, registerAuditLogRoutes } from './admin-audit-logs-handlers';
+import { adminAuditLogsRouter } from './admin-audit-logs-handlers';
 
 export { adminAuditLogsRouter, registerAuditLogRoutes } from './admin-audit-logs-handlers';
 export { registerQueryHandler } from './admin-audit-logs-handlers';

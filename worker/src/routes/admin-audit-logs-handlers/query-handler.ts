@@ -1,9 +1,8 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
-import { requireAuth } from '../../middleware/auth';
 import { AuditLogger } from '../../lib/audit-logger';
 import { createLogger } from '../../middleware/logger';
-import { type PaginatedResponse, type AuditLogQueryParams } from './types';
+import { type PaginatedResponse } from './types';
 
 const log = createLogger({ route: 'admin-audit-logs:query' });
 

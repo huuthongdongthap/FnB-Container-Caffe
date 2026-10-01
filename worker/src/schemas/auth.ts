@@ -9,7 +9,6 @@ import {
   DateTimeSchema,
   StaffRoleEnum,
   LoyaltyTierEnum,
-  ReferenceSchema,
   DeviceFingerprintSchema,
   IdempotencyKeySchema,
 } from './common';

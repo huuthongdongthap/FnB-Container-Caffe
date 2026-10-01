@@ -8,7 +8,6 @@ import {
   LocaleEnum,
   DateTimeSchema,
   TableStatusEnum,
-  ReferenceSchema,
   SlugSchema,
 } from './common';
 

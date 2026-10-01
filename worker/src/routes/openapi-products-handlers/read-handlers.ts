@@ -59,7 +59,16 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
 
     // Get products with translations
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      sort_order: 'p.sort_order',
+      name: 'p.name',
+      base_price: 'p.base_price',
+      created_at: 'p.created_at',
+      updated_at: 'p.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'p.sort_order';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
       `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
        FROM products p

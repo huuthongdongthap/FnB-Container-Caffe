@@ -1,5 +1,4 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword, generateToken } from './helpers';

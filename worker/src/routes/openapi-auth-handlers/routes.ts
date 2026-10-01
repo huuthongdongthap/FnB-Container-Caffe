@@ -1,5 +1,4 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { requireAuth } from '../../middleware/auth';
 import type { Env } from '../../types/env';
 import { registerAuthHandlers } from './auth-handlers';

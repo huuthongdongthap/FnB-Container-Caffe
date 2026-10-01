@@ -1,5 +1,4 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { createLogger } from '../../middleware/logger';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';

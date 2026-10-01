@@ -1,5 +1,4 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';

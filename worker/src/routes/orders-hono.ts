@@ -8,7 +8,7 @@
  * - types.ts: Shared order interfaces and ID generator
  */
 
-import { ordersRouter, ALLOWED_KDS_STATUSES, makeOrderId } from './orders-hono-handlers';
+import { ordersRouter } from './orders-hono-handlers';
 
 export { ordersRouter, ALLOWED_KDS_STATUSES, makeOrderId } from './orders-hono-handlers';
 export type { OrderItem, OrderRecord, KdsOrder } from './orders-hono-handlers';

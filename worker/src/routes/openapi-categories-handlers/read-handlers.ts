@@ -46,7 +46,15 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
 
     // Get categories with translations
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      sort_order: 'c.sort_order',
+      name: 'c.name',
+      created_at: 'c.created_at',
+      updated_at: 'c.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'c.sort_order';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
       `SELECT c.*, ct.name as translation_name, ct.description as translation_description
        FROM categories c
