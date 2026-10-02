@@ -51,6 +51,7 @@
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
 | `npm test` (`vitest run`) | **388 test files / 3,557 tests PASS (0 failures)** | 🟢 GREEN |
+| **GitHub Actions CI (PR #62)** | **Run 36946217774 / lint-and-test: PASS in 5m47s** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
 | **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
