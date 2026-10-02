@@ -7,6 +7,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { z } from 'zod';
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
@@ -37,7 +38,7 @@ async function checkRateLimit(env: Env, key: string, max: number, windowSec: num
 
 // ── Handlers ──
 
-async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown> } }) {
+async function sendMessage(c: Context<{ Bindings: Env }>) {
   try {
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = sendMessageSchema.safeParse(body);
@@ -71,7 +72,7 @@ async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown> } 
   }
 }
 
-async function getConversations(c: { env: Env }) {
+async function getConversations(c: Context<{ Bindings: Env }>) {
   try {
     const db = c.env.AURA_DB;
     const { results } = await db.prepare(
@@ -107,7 +108,7 @@ async function getConversations(c: { env: Env }) {
   }
 }
 
-async function getMessageHistory(c: { env: Env; req: { param: () => string } }) {
+async function getMessageHistory(c: Context<{ Bindings: Env }>) {
   try {
     const phone = c.req.param('phone');
     if (!phone || phone.length < 8) {

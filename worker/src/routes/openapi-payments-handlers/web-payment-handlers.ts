@@ -4,14 +4,13 @@
  */
 
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
 
 export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments/payment-request — Apple Pay / Google Pay
-  router.openapi(PaymentRoutes.paymentRequest, async (c: Context<{ Bindings: Env }>) => {
+  router.openapi(PaymentRoutes.paymentRequest as any, async (c: any) => {
     const db = getDatabase(c);
     const body = c.req.valid('json' as never) as {
       order_id: string;
@@ -32,9 +31,9 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
       }
 
       // Fetch order
-      const orderRow = await db.prepare(
+      const orderRow = (await db.prepare(
         'SELECT id, total, payment_status FROM orders WHERE id = ?'
-      ).bind(order_id).first<{ id: string; total: number; payment_status: string }>();
+      ).bind(order_id).first()) as { id: string; total: number; payment_status: string } | null;
 
       if (!orderRow) {
         return c.json({ success: false, error: 'Order not found' }, 404);

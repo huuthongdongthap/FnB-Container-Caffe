@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { TableZoneRoutes } from '../../schemas/tables';
 import { formatZone } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/table-zones - List table zones
-  app.openapi(TableZoneRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableZoneRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'sort_order', order = 'asc', locationId, isActive, search } = query;
 
@@ -28,19 +28,19 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Get total count
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM table_zones ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     // Get zones
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const zones = rows.results.map(formatZone);
+    const zones = (rows.results || []).map(formatZone);
 
     return c.json({
       success: true,
@@ -49,21 +49,21 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/table-zones/:id - Get table zone by ID
-  app.openapi(TableZoneRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableZoneRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const row = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    const row = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
 
     if (!row) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
     }
 
     // Get tables in this zone
-    const tables = await db.prepare(
+    const tables = (await db.prepare(
       `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
        FROM tables WHERE zone_id = ? ORDER BY name`
-    ).bind(id).all();
+    ).bind(id).all()) as { results: any[] };
 
     return c.json({
       success: true,
@@ -71,7 +71,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ...row,
         location: row.location_id ? { id: row.location_id } : null,
         isActive: Boolean(row.is_active),
-        tables: tables.results.map(t => ({
+        tables: (tables.results || []).map((t: any) => ({
           ...t,
           position: { x: t.position_x, y: t.position_y },
           dimensions: { width: t.width, height: t.height, rotation: t.rotation },
@@ -82,8 +82,8 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/table-zones - Create table zone
-  app.openapi(TableZoneRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableZoneRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -118,7 +118,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now).run();
 
-    const created = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    const created = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -131,8 +131,8 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/table-zones/:id - Update table zone
-  app.openapi(TableZoneRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableZoneRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -175,7 +175,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now).run();
 
-    const updated = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    const updated = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -188,19 +188,19 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/table-zones/:id - Delete table zone
-  app.openapi(TableZoneRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableZoneRoutes.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
     }
 
     // Check for tables in zone
-    const tables = await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first();
+    const tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
     if (tables && tables.count > 0) {
       return c.json({ success: false, error: 'Cannot delete zone with tables' }, 409);
     }

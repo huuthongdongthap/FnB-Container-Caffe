@@ -2,7 +2,7 @@
  * Alert dispatch — reads undelivered alerts from _alerts and sends via Telegram.
  */
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database as _D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { createLogger } from '../../middleware/logger';
 import { sendTelegramMessage } from './telegram';

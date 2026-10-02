@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
+import { getDatabase } from '../../lib/db';
 
 export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/rewards - List available rewards
-  app.openapi(LoyaltyRoutes.rewards.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.rewards.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -26,17 +26,17 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.type);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const rewards = await db.prepare(
+    const rewards = (await db.prepare(
       `SELECT * FROM loyalty_rewards ${whereClause} ORDER BY points_cost ASC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
       data: {
-        rewards: rewards.results.map(r => ({
+        rewards: (rewards.results || []).map((r: any) => ({
           ...r,
           pointsCost: r.points_cost,
           maxRedemptions: r.max_redemptions,
@@ -53,11 +53,11 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/loyalty/rewards/{id} - Get reward by ID
-  app.openapi(LoyaltyRoutes.rewards.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.rewards.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
 
     if (!reward) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
@@ -80,7 +80,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/loyalty/rewards - Create reward
-  app.openapi(LoyaltyRoutes.rewards.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.rewards.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -114,33 +114,33 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'loyalty_reward_create', 'loyalty_reward', id, JSON.stringify(body), now).run();
 
-    const reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
       data: {
-        ...reward!,
-        pointsCost: reward!.points_cost,
-        maxRedemptions: reward!.max_redemptions,
-        currentRedemptions: reward!.current_redemptions,
-        validFrom: reward!.valid_from,
-        validTo: reward!.valid_to,
-        isActive: reward!.is_active,
-        createdAt: reward!.created_at,
-        updatedAt: reward!.updated_at,
+        ...reward,
+        pointsCost: reward.points_cost,
+        maxRedemptions: reward.max_redemptions,
+        currentRedemptions: reward.current_redemptions,
+        validFrom: reward.valid_from,
+        validTo: reward.valid_to,
+        isActive: reward.is_active,
+        createdAt: reward.created_at,
+        updatedAt: reward.updated_at,
       },
     }, 201);
   });
 
   // PATCH /api/loyalty/rewards/{id} - Update reward
-  app.openapi(LoyaltyRoutes.rewards.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.rewards.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
@@ -175,33 +175,33 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'loyalty_reward_update', 'loyalty_reward', id, JSON.stringify(body), now).run();
 
-    const reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
       data: {
-        ...reward!,
-        pointsCost: reward!.points_cost,
-        maxRedemptions: reward!.max_redemptions,
-        currentRedemptions: reward!.current_redemptions,
-        validFrom: reward!.valid_from,
-        validTo: reward!.valid_to,
-        isActive: reward!.is_active,
-        createdAt: reward!.created_at,
-        updatedAt: reward!.updated_at,
+        ...reward,
+        pointsCost: reward.points_cost,
+        maxRedemptions: reward.max_redemptions,
+        currentRedemptions: reward.current_redemptions,
+        validFrom: reward.valid_from,
+        validTo: reward.valid_to,
+        isActive: reward.is_active,
+        createdAt: reward.created_at,
+        updatedAt: reward.updated_at,
       },
     });
   });
 
   // POST /api/loyalty/rewards/{id}/redeem - Redeem reward
-  app.openapi(LoyaltyRoutes.rewards.redeem, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.rewards.redeem as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
     if (!reward) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
@@ -210,16 +210,16 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Reward is not active' }, 400);
     }
 
-    const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-      .bind(user.customerId || user.id).first();
+    const account = (await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
+      .bind(user.customerId || user.id).first()) as any;
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
     }
 
     // Check tier requirement
-    const tierConfig = await db.prepare('SELECT min_points FROM loyalty_tier_configs WHERE tier = ?')
-      .bind(account.tier).first();
+    const tierConfig = (await db.prepare('SELECT min_points FROM loyalty_tier_configs WHERE tier = ?')
+      .bind(account.tier).first()) as any;
     if (tierConfig && account.current_points < reward.points_cost) {
       return c.json({ success: false, error: 'Insufficient points' }, 400);
     }
@@ -285,3 +285,4 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 }
+

@@ -1,5 +1,3 @@
-import type { Context } from 'hono';
-import type { Env } from '../../types/env';
 
 export function formatTable(row: Record<string, any>) {
   return {

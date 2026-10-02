@@ -113,7 +113,8 @@ describe('createOrderSchema', () => {
     total: 70000,
     customer_name: 'Test User',
     customer_phone: '0912345678',
-    payment_method: 'cod'
+    payment_method: 'cod',
+    table_id: '5',
   };
 
   it('accepts valid order', () => {
@@ -136,26 +137,27 @@ describe('createOrderSchema', () => {
   });
 
   it('requires customer_address for delivery orders', () => {
-    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'delivery' })).toThrow(/customer_address/);
-    const ok = createOrderSchema.parse({ ...validOrder, order_type: 'delivery', customer_address: '39 Nguyễn Tất Thành' });
+    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'delivery', table_id: undefined })).toThrow(/customer_address/);
+    const ok = createOrderSchema.parse({ ...validOrder, order_type: 'delivery', customer_address: '39 Nguyễn Tất Thành', table_id: undefined });
     expect(ok.order_type).toBe('delivery');
   });
 
   it('requires table_id for dine_in orders', () => {
-    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'dine_in' })).toThrow(/table_id/);
+    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'dine_in', table_id: undefined })).toThrow(/table_id/);
     const ok = createOrderSchema.parse({ ...validOrder, order_type: 'dine_in', table_id: '5' });
     expect(ok.order_type).toBe('dine_in');
   });
 
   it('omitted order_type skips per-type validation (legacy QR flow)', () => {
-    const data = createOrderSchema.parse(validOrder);
+    const data = createOrderSchema.parse({ ...validOrder, order_type: undefined, table_id: undefined });
     expect(data.order_type).toBeUndefined();
-    expect(data.customer_address).toBeUndefined();
+    expect(data.table_id).toBeUndefined();
   });
 
   it('takeaway requires neither address nor table', () => {
-    const data = createOrderSchema.parse({ ...validOrder, order_type: 'takeaway' });
+    const data = createOrderSchema.parse({ ...validOrder, order_type: 'takeaway', table_id: undefined });
     expect(data.order_type).toBe('takeaway');
+    expect(data.table_id).toBeUndefined();
   });
 });
 

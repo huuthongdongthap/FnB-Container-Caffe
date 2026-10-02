@@ -58,6 +58,13 @@ export function StitchCheckoutNew({
     orderType: 'delivery',
     tableNumber: '',
   });
+  const [activeBooking, setActiveBooking] = useState<{
+    fullName?: string;
+    phone?: string;
+    tableNumber?: string;
+    zone?: string;
+    time?: string;
+  } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
@@ -91,6 +98,52 @@ export function StitchCheckoutNew({
       if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
     };
   }, [form.phone, lookupLoyalty]);
+
+  useEffect(() => {
+    // Auto-populate from active booking or saved customer profile
+    try {
+      const activeBookingRaw = localStorage.getItem('aura_active_booking');
+      if (activeBookingRaw) {
+        const booking = JSON.parse(activeBookingRaw) as {
+          fullName?: string;
+          phone?: string;
+          tableNumber?: string;
+          zone?: string;
+        };
+        setActiveBooking(booking);
+        const table = booking.tableNumber || '';
+        setOrderType('dine_in');
+        setForm((prev) => ({
+          ...prev,
+          orderType: 'dine_in',
+          fullName: prev.fullName || booking.fullName || '',
+          phone: prev.phone || booking.phone || '',
+          tableNumber: prev.tableNumber || table || '',
+          notes: prev.notes || (booking.zone ? `[Đặt trước bàn: ${table} - ${booking.zone}]` : ''),
+        }));
+        return;
+      }
+
+      // Fallback: check saved customer profile or table param in URL
+      const savedProfileRaw = localStorage.getItem('aura_saved_customer');
+      const params = new URLSearchParams(window.location.search);
+      const urlTable = params.get('table');
+
+      if (savedProfileRaw || urlTable) {
+        const profile = savedProfileRaw ? JSON.parse(savedProfileRaw) : {};
+        if (urlTable) setOrderType('dine_in');
+        setForm((prev) => ({
+          ...prev,
+          orderType: urlTable ? 'dine_in' : prev.orderType,
+          fullName: prev.fullName || profile.fullName || '',
+          phone: prev.phone || profile.phone || '',
+          tableNumber: prev.tableNumber || urlTable || '',
+        }));
+      }
+    } catch {
+      /* ignore parse error */
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -219,10 +272,17 @@ export function StitchCheckoutNew({
             </section>
 
             <section>
-              <h2 className="font-display text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
-                <User className="w-8 h-8" aria-hidden="true" />
-                {t('stitch.customerInfo', 'Thông Tin Khách Hàng')}
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <h2 className="font-display text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] flex items-center gap-3">
+                  <User className="w-8 h-8" aria-hidden="true" />
+                  {t('stitch.customerInfo', 'Thông Tin Khách Hàng')}
+                </h2>
+                {activeBooking && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#4A7C59]/20 border border-[#4A7C59]/40 text-[#4A7C59] text-xs font-semibold self-start sm:self-auto">
+                    <span>✨</span> Đang đặt món cho {activeBooking.tableNumber ? `Bàn ${activeBooking.tableNumber}` : 'Bàn đã đặt'}
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
                   label={locale?.startsWith('vi') ? 'Họ và Tên' : t('stitch.fullName', 'Full Name')}
@@ -303,6 +363,11 @@ export function StitchCheckoutNew({
                       value={form.tableNumber || ''}
                       onChange={(v) => updateField('tableNumber', v)}
                     />
+                    {activeBooking && form.tableNumber && (
+                      <p className="mt-1 text-xs text-[#4A7C59] flex items-center gap-1">
+                        <span>✓</span> Đã tự động điền mã bàn từ yêu cầu đặt bàn của quý khách
+                      </p>
+                    )}
                     {isTableMissing && (
                       <p className="mt-1 text-xs text-red-400" data-testid="table-error">
                         {t('stitch.tableRequired', 'Vui lòng nhập số bàn')}

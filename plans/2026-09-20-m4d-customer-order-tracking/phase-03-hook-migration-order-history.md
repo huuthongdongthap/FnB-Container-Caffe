@@ -2,7 +2,7 @@
 
 ## Overview
 - **Goal:** Migrate customer order history in `src/hooks/use-account.ts` to the canonical `GET /api/orders` list endpoint returning `CustomerOrderResponse[]`.
-- **Status:** PENDING
+- **Status:** COMPLETED (2026-09-29)
 - **Dependency:** Phase 01 (canonical DTOs defined).
 
 ## Current State

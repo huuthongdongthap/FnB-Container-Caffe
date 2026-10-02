@@ -1,10 +1,8 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
 import { mixpostGenerateSchema, zodErrorResponse } from '../../lib/validators';
-import { createLogger } from '../../utils/logger.js';
 import type { PromotionRow, ProductRow } from '../../tree/mixpost/types';
 
-const log = createLogger({ route: 'mixpost:generate' });
 
 export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /generate — generate social content from source

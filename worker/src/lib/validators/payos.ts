@@ -11,7 +11,7 @@ export const payOSCreateLinkSchema = z.preprocess((val: unknown) => {
       order_id: obj.order_id ?? obj.orderId,
       description: obj.description,
       customer_name: obj.customer_name ?? obj.customerName,
-      amount: obj.amount,
+      amount: obj.amount ?? obj.total,
       return_url: obj.return_url ?? obj.returnUrl,
       cancel_url: obj.cancel_url ?? obj.cancelUrl,
     };

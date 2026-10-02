@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { createReviewSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
-interface ReviewInput {
+interface _ReviewInput {
   order_id: string;
   rating: number;
   comment?: string;

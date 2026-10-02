@@ -53,6 +53,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
         customer_email: 'test@example.com',
         customer_address: '123 Le Loi, Sa Dec',
         payment_method: 'cod',
+        order_type: 'delivery',
         shipping_fee: 5000,
         discount: 0,
         notes: 'Less sugar',
@@ -141,7 +142,8 @@ describe('Phase 0: Response Shape Snapshot', () => {
         total: 15000,
         customer_name: 'Test',
         customer_phone: '0900000000',
-        payment_method: 'cod'
+        payment_method: 'cod',
+        order_type: 'takeaway'
         // no email, address, shipping_fee, discount, notes, delivery_time, table_id
       })
     });

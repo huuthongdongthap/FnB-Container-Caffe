@@ -1,7 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
+import { getDatabase } from '../../lib/db';
 
 interface PaymentRow {
   id: string;
@@ -21,8 +21,8 @@ interface PaymentRow {
 
 export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // GET /api/payments - List payments
-  router.openapi(PaymentRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(PaymentRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       page?: number;
       limit?: number;
@@ -60,22 +60,31 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       params.push(dateTo);
     }
 
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM order_payments ${whereClause}`
-    ).bind(...params).first<{ total: number }>();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const allowedSorts: Record<string, string> = {
+      created_at: 'op.created_at',
+      amount: 'op.amount',
+      status: 'op.status',
+      payment_method: 'op.payment_method',
+      updated_at: 'op.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'op.created_at';
+    const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+    const orderClause = `${safeSort} ${safeDirection}`;
+    const rows = (await db.prepare(
       `SELECT op.*, o.order_number FROM order_payments op
        LEFT JOIN orders o ON op.order_id = o.id
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all<PaymentRow>();
+    ).bind(...params, limit, offset).all()) as { results: PaymentRow[] };
 
-    const payments = rows.results.map((p) => ({
+    const payments = (rows.results || []).map((p) => ({
       ...p,
       metadata: p.metadata ? JSON.parse(p.metadata) : {},
       order: { id: p.order_id, orderNumber: p.order_number },
@@ -90,15 +99,15 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
   });
 
   // GET /api/payments/:id - Get payment by ID
-  router.openapi(PaymentRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(PaymentRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
 
-    const payment = await db.prepare(
+    const payment = (await db.prepare(
       `SELECT op.*, o.order_number FROM order_payments op
        LEFT JOIN orders o ON op.order_id = o.id
        WHERE op.id = ?`
-    ).bind(id).first<PaymentRow>();
+    ).bind(id).first()) as PaymentRow | null;
 
     if (!payment) {
       return c.json({ success: false, error: 'Payment not found' }, 404);

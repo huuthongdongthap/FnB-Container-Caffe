@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
+import { getDatabase } from '../../lib/db';
 
 export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions - List promotions
-  app.openapi(PromotionRoutes.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -32,17 +32,17 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(searchParam, searchParam, searchParam);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const promotions = await db.prepare(
+    const promotions = (await db.prepare(
       `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
       data: {
-        promotions: promotions.results.map(p => ({
+        promotions: (promotions.results || []).map((p: any) => ({
           ...p,
           discountValue: p.discount_value,
           discountType: p.discount_type,
@@ -64,11 +64,11 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/promotions/{id} - Get promotion by ID
-  app.openapi(PromotionRoutes.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
+    const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
     if (!promotion) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
@@ -96,7 +96,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/promotions - Create promotion
-  app.openapi(PromotionRoutes.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -133,7 +133,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'promotion_create', 'promotion', id, JSON.stringify(body), now).run();
 
-    const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
+    const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -157,14 +157,14 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/promotions/{id} - Update promotion
-  app.openapi(PromotionRoutes.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
@@ -220,7 +220,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'promotion_update', 'promotion', id, JSON.stringify(body), now).run();
 
-    const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
+    const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
@@ -244,12 +244,12 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/promotions/{id} - Delete promotion
-  app.openapi(PromotionRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(PromotionRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existing = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
@@ -264,3 +264,4 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({ success: true, message: 'Promotion deleted successfully' });
   });
 }
+

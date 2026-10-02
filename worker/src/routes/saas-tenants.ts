@@ -63,7 +63,7 @@ export function createTenantRoutes() {
         return c.json({ ok: false, error: 'not_found' } as const, 404);
       }
       return c.json({ ok: true, data: mapRow(row) } as const);
-    } catch (err) {
+    } catch (_err) {
       return c.json({ ok: false, error: 'server_error' } as const, 500);
     }
   });
@@ -119,7 +119,7 @@ router.use('/create', requireAuth(['owner', 'customer']));
 
       const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
       return c.json({ ok: true, data: row ? mapRow(row) : null } as const, 201);
-    } catch (err) {
+    } catch (_err) {
       return c.json({ ok: false, error: 'server_error' } as const, 500);
     }
   });

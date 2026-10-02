@@ -28,7 +28,7 @@ interface MenuCacheRow {
   cached_at: string;
 }
 
-interface TIBridgeRow {
+interface _TIBridgeRow {
   id: string;
   local_order_id: string;
   ti_order_id: string | null;

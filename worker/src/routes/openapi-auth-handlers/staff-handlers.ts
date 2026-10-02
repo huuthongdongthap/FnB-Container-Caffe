@@ -1,12 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, generateToken } from './helpers';
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/register-staff - Register staff (owner only)
-  app.openapi(AuthRoutes.registerStaff, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.registerStaff as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -55,7 +54,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/auth/staff - List staff (owner only)
-  app.openapi(AuthRoutes.listStaff, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.listStaff as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
     const query = c.req.valid('query');
@@ -80,10 +79,19 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const countResult = await db.prepare(
       `SELECT COUNT(*) as total FROM users ${whereClause}`
     ).bind(...params).first();
-    const total = countResult?.total || 0;
+    const total = (countResult as { total?: number })?.total || 0;
 
-    const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const offset = (Number(page) - 1) * Number(limit);
+    const allowedSorts: Record<string, string> = {
+      name: 'name',
+      email: 'email',
+      role: 'role',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 'name';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
     const rows = await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at
        FROM users ${whereClause}
@@ -102,12 +110,12 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     return c.json({
       success: true,
-      data: { staff, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { staff, meta: { page: Number(page), limit: Number(limit), total: Number(total), totalPages: Math.ceil(Number(total) / Number(limit)) } },
     });
   });
 
   // POST /api/auth/bootstrap-owner - Bootstrap first owner
-  app.openapi(AuthRoutes.bootstrapOwner, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(AuthRoutes.bootstrapOwner as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();

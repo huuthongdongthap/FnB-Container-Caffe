@@ -3,13 +3,10 @@
  * Extracted from routes/mautic-bridge.ts to tree/mautic/.
  */
 
-import { createLogger } from '../../utils/logger.js';
 import { getMauticClient } from './client-factory';
 import { syncStatus } from './sync-state';
-import type { MauticContactInput, MauticBatchResult } from '../../lib/mautic-client';
+import type { MauticContactInput } from '../../lib/mautic-client';
 import type { CustomerContact, SyncContactsResponse, MauticBridgeEnv, MauticClientDuck } from './types';
-
-const log = createLogger({ route: 'mautic-bridge' });
 
 export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boolean; synced: number; errors: string[] }> {
   const client = getMauticClient(env) as MauticClientDuck | null;

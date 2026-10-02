@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
+import { getDatabase } from '../../lib/db';
 
 export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff/shifts - List shifts
-  app.openapi(StaffRoutes.shifts.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.shifts.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'date', order = 'desc', staffId, zoneId, dateFrom, dateTo, status } = query;
 
@@ -34,14 +34,14 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(status);
     }
 
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM staff_shifts ss ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
     const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const rows = (await db.prepare(
       `SELECT ss.*, u.name as staff_name, z.name as zone_name
        FROM staff_shifts ss
        LEFT JOIN users u ON ss.staff_id = u.id
@@ -49,17 +49,17 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: { shifts: rows.results, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { shifts: rows.results || [], meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
     });
   });
 
   // POST /api/staff/shifts - Create shift
-  app.openapi(StaffRoutes.shifts.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.shifts.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -108,8 +108,8 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/staff/shifts/:id - Update shift
-  app.openapi(StaffRoutes.shifts.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.shifts.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -161,8 +161,8 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/staff/shifts/:id - Delete shift
-  app.openapi(StaffRoutes.shifts.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(StaffRoutes.shifts.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -183,3 +183,4 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({ success: true, data: { success: true } });
   });
 }
+

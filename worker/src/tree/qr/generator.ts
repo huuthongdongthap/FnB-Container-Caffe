@@ -6,7 +6,6 @@
 
 import QRCode from 'qrcode';
 import type { CafeTable } from '@aura/domain-table';
-import type { Env } from '../../types/env';
 
 /**
  * Generate a URL-safe slug from table number + zone.

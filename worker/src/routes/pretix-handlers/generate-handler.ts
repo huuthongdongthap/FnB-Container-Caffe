@@ -30,10 +30,10 @@ export function registerGenerateHandler(router: Hono): void {
     try {
       const event = (await client.getEvent(organizer, body.slug)) as PretixEventResponse;
 
-      let items: PretixItem[] = [];
+      let _items: PretixItem[] = [];
       try {
         const itemsResult = (await client.listItems(organizer, body.slug)) as PretixItemsResponse;
-        items = itemsResult.results || [];
+        _items = itemsResult.results || [];
       } catch {
         // items optional
       }

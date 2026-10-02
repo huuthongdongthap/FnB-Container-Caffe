@@ -3,15 +3,11 @@
  * Extracted from routes/mautic-bridge.ts to tree/mautic/.
  */
 
-import { createLogger } from '../../utils/logger.js';
 import { createMauticClient } from '../../lib/mautic-client';
 import type { MauticBatchResult } from '../../lib/mautic-client';
 import type { KVNamespace, D1Database } from '@cloudflare/workers-types';
-import type { MauticBridgeEnv } from './types';
 import { toMauticContact } from './contact-mapper';
 import { syncSegments } from './segment-sync';
-
-const log = createLogger({ route: 'mautic-bridge' });
 
 export async function syncMauticContacts(env: Record<string, unknown>): Promise<{ synced: number; skipped?: boolean }> {
   const client = createMauticClient({

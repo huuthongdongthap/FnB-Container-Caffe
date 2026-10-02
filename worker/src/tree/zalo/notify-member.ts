@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import type { ZnsData, ZnsResult, ZnsNotifyInput } from './types';
+import type { ZnsResult, ZnsNotifyInput } from './types';
 import { sendZNS } from './zns-sender';
 
 interface CustomerRecord {

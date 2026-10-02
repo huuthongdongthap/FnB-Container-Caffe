@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
+import { getDatabase } from '../../lib/db';
 
 export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/cron/summary - Get cron summary
-  app.openapi(CronRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(CronRoutes.summary as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
 
@@ -77,21 +77,27 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        LIMIT 10`
     ).bind(...runParams).all();
 
+    const tJobs = totalJobs as any;
+    const aJobs = activeJobs as any;
+    const tRuns = totalRuns as any;
+    const statResults = (jobsByStatus as any)?.results || [];
+    const failResults = (recentFailures as any)?.results || [];
+
     return c.json({
       success: true,
       data: {
-        totalJobs: totalJobs?.total || 0,
-        activeJobs: activeJobs?.total || 0,
-        jobsByStatus: jobsByStatus.results.reduce((acc, row) => {
+        totalJobs: tJobs?.total || 0,
+        activeJobs: aJobs?.total || 0,
+        jobsByStatus: statResults.reduce((acc: Record<string, number>, row: any) => {
           acc[row.status] = row.count;
           return acc;
         }, {} as Record<string, number>),
-        totalRuns: totalRuns?.total || 0,
-        successfulRuns: totalRuns?.successful || 0,
-        failedRuns: totalRuns?.failed || 0,
-        timeoutRuns: totalRuns?.timeout || 0,
-        avgDurationMs: totalRuns?.avg_duration_ms || 0,
-        recentFailures: recentFailures.results.map(r => ({
+        totalRuns: tRuns?.total || 0,
+        successfulRuns: tRuns?.successful || 0,
+        failedRuns: tRuns?.failed || 0,
+        timeoutRuns: tRuns?.timeout || 0,
+        avgDurationMs: tRuns?.avg_duration_ms || 0,
+        recentFailures: failResults.map((r: any) => ({
           id: r.id,
           jobId: r.job_id,
           jobName: r.job_name,

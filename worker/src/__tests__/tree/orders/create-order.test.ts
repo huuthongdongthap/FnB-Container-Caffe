@@ -68,6 +68,8 @@ type OrderBase = {
   discount: number;
   notes: string;
   delivery_time: string;
+  order_type?: 'dine_in' | 'takeaway' | 'delivery';
+  table_id?: string;
 };
 
 const ORDER_BASE: OrderBase = {
@@ -81,7 +83,8 @@ const ORDER_BASE: OrderBase = {
   shipping_fee: 0,
   discount: 0,
   notes: '',
-  delivery_time: 'now'
+  delivery_time: 'now',
+  order_type: 'takeaway',
 };
 
 function makeBody(overrides: Partial<OrderBase> = {}): OrderBase {

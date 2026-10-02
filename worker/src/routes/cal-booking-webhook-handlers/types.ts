@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { Env } from '../../types/env';
 
 export interface CalBookingPayload {
   triggerEvent: string;

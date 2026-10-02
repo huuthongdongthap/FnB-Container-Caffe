@@ -12,7 +12,6 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import type { ZnsData } from '../tree/zalo/types';
 import { sendZNS } from '../tree/zalo/zns-sender';
 import { notifyMember } from '../tree/zalo/notify-member';
 import { zaloSendSchema } from '../lib/validators';

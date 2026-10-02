@@ -1,8 +1,7 @@
 // subscription-receipt.ts — GET /api/subscriptions/invoices/:id/receipt
 
-import { jsonResponse, errorResponse } from '../middleware/cors';
+import { errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
-import { requireAuth } from '../middleware/auth';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 

@@ -110,7 +110,7 @@ const routes = [
 // The live handlers are registered by each domain sub-router, which declares
 // the full '/api/...' path and is mounted on the root app (see src/index.ts).
 // openApiApp is mounted last there and therefore never shadows a live handler.
-routes.forEach((route, idx) => {
+routes.forEach((route: any, idx) => {
   if (!route || !route.method || !route.path) {
     console.error(`[DEBUG] Malformed route at index ${idx}:`, JSON.stringify(route, null, 2));
     console.error('[DEBUG] Route keys:', route ? Object.keys(route) : 'null/undefined');
@@ -120,8 +120,8 @@ routes.forEach((route, idx) => {
 
 // Route definitions still have to be visited so OpenAPIHono knows about them
 // when it renders the spec document; the handlers below are unreachable.
-routes.forEach((route) => {
-  openApiApp.openapi(route, async (c) => {
+routes.forEach((route: any) => {
+  openApiApp.openapi(route as any, async (c) => {
     return c.json({ success: false, error: 'Route not bound' }, 501);
   });
 });
@@ -164,16 +164,16 @@ const healthRoute = createRoute({
   },
 });
 
-openApiApp.openapi(healthRoute, (c) => {
+openApiApp.openapi(healthRoute as any, (c: any) => {
   return c.json({
     success: true,
     data: {
-      status: 'ok',
+      status: 'ok' as const,
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
-      uptime: process.uptime(),
+      uptime: process.uptime ? process.uptime() : 0,
     },
-  });
+  }, 200);
 });
 
 // OpenAPI JSON endpoint
@@ -238,7 +238,7 @@ openApiApp.doc('/api/json', {
   security: [
     { BearerAuth: [] },
   ],
-});
+} as any);
 
 // Scalar UI documentation
 openApiApp.get('/api/docs', Scalar({ url: '/api/json', theme: 'kepler' }));

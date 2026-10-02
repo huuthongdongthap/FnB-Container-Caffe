@@ -1,13 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { TableRoutes } from '../../schemas/tables';
 import { formatTable } from './helpers';
+import { getDatabase } from '../../lib/db';
 
 export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/tables - List tables with pagination and filtering
-  app.openapi(TableRoutes.list, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.list as any, async (c: any) => {
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', zoneId, status, locationId, search } = query;
 
@@ -32,24 +32,34 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Get total count
-    const countResult = await db.prepare(
+    const countResult = (await db.prepare(
       `SELECT COUNT(*) as total FROM tables t ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     // Get tables
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
-    const rows = await db.prepare(
+    const allowedSorts: Record<string, string> = {
+      table_number: 't.table_number',
+      capacity: 't.capacity',
+      status: 't.status',
+      sort_order: 't.sort_order',
+      created_at: 't.created_at',
+      updated_at: 't.updated_at',
+    };
+    const safeSort = allowedSorts[sort] || 't.table_number';
+    const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+    const orderClause = `${safeSort} ${safeDirection}`;
+    const rows = (await db.prepare(
       `SELECT t.*, z.name as zone_name
        FROM tables t
        LEFT JOIN table_zones z ON t.zone_id = z.id
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const tables = rows.results.map(formatTable);
+    const tables = (rows.results || []).map(formatTable);
 
     return c.json({
       success: true,
@@ -58,8 +68,8 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/tables/:id - Get table by ID
-  app.openapi(TableRoutes.get, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.get as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
     const row = await db.prepare(
@@ -80,8 +90,8 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/tables - Create table
-  app.openapi(TableRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -136,14 +146,14 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // PATCH /api/tables/:id - Update table
-  app.openapi(TableRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Table not found' }, 404);
     }
@@ -201,25 +211,25 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // DELETE /api/tables/:id - Delete table
-  app.openapi(TableRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Table not found' }, 404);
     }
 
     // Check for active sessions
-    const sessions = await db.prepare('SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN (\'active\', \'occupied\')').bind(id).first();
+    const sessions = (await db.prepare('SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN (\'active\', \'occupied\')').bind(id).first()) as { count: number } | null;
     if (sessions && sessions.count > 0) {
       return c.json({ success: false, error: 'Cannot delete table with active sessions' }, 409);
     }
 
     // Check for orders
-    const orders = await db.prepare('SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN (\'completed\', \'cancelled\')').bind(id).first();
+    const orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN (\'completed\', \'cancelled\')').bind(id).first()) as { count: number } | null;
     if (orders && orders.count > 0) {
       return c.json({ success: false, error: 'Cannot delete table with active orders' }, 409);
     }
@@ -236,8 +246,8 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/tables/bulk-status - Bulk update table status
-  app.openapi(TableRoutes.bulkStatus, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  app.openapi(TableRoutes.bulkStatus as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();

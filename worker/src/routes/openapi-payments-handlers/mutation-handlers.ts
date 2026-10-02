@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
+import { getDatabase } from '../../lib/db';
 
 export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments - Create payment
-  router.openapi(PaymentRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(PaymentRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json' as never) as {
       orderId: string;
       method: string;
@@ -57,33 +57,33 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'payment_create', 'payment', id, JSON.stringify(body), now).run();
 
-    const payment = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first<{
+    const payment = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first()) as {
       metadata: string | null;
       created_at: string;
       updated_at: string;
       [key: string]: unknown;
-    }>();
+    } | null;
 
     return c.json({
       success: true,
       data: {
         ...payment!,
-        metadata: payment!.metadata ? JSON.parse(payment!.metadata) : {},
-        createdAt: payment!.created_at,
-        updatedAt: payment!.updated_at,
+        metadata: payment?.metadata ? JSON.parse(payment.metadata) : {},
+        createdAt: payment?.created_at,
+        updatedAt: payment?.updated_at,
       },
     }, 201);
   });
 
   // POST /api/payments/:id/refund - Refund payment
-  router.openapi(PaymentRoutes.refund, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(PaymentRoutes.refund as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as { amount?: number; reason?: string; providerReference?: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const payment = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first<{
+    const payment = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first()) as {
       id: string;
       order_id: string;
       amount: number;
@@ -91,7 +91,7 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
       method: string;
       provider: string | null;
       metadata: string | null;
-    }>();
+    } | null;
     if (!payment) {
       return c.json({ success: false, error: 'Payment not found' }, 404);
     }
@@ -127,11 +127,11 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
     await db.prepare('UPDATE order_payments SET status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, id).run();
 
     // Update order payment status
-    const remainingPaid = await db.prepare(
+    const remainingPaid = (await db.prepare(
       'SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = \'completed\' AND amount > 0'
-    ).bind(payment.order_id).first<{ total: number }>();
+    ).bind(payment.order_id).first()) as { total: number } | null;
 
-    const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first<{ total_amount: number }>();
+    const order = (await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first()) as { total_amount: number } | null;
     let newPaymentStatus = 'unpaid';
     if (remainingPaid && remainingPaid.total >= (order?.total_amount || 0)) {
       newPaymentStatus = 'paid';
@@ -147,21 +147,22 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: id, reason: body.reason }), now).run();
 
-    const refund = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(refundId).first<{
+    const refund = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(refundId).first()) as {
       metadata: string | null;
       created_at: string;
       updated_at: string;
       [key: string]: unknown;
-    }>();
+    } | null;
 
     return c.json({
       success: true,
       data: {
         ...refund!,
-        metadata: refund!.metadata ? JSON.parse(refund!.metadata) : {},
-        createdAt: refund!.created_at,
-        updatedAt: refund!.updated_at,
+        metadata: refund?.metadata ? JSON.parse(refund.metadata) : {},
+        createdAt: refund?.created_at,
+        updatedAt: refund?.updated_at,
       },
     });
   });
 }
+

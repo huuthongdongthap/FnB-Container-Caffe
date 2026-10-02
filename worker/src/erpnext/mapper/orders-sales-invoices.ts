@@ -11,8 +11,7 @@ import type {
   SalesInvoice,
   InvoiceLineItem,
   TaxLineItem,
-  VatInvoicePayload,
-  MappingResult
+  VatInvoicePayload
 } from './types';
 import { getDefaultAccountConfig } from './customers-crm';
 import { mapInvoiceLine, mapTaxLine } from './items-menu';

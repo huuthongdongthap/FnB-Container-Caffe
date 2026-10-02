@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
+import { getDatabase } from '../../lib/db';
 
 export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/purchase-orders - List purchase orders
-  app.openapi(InventoryRoutes.purchaseOrders.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.purchaseOrders.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -36,39 +36,39 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       params.push(query.dateTo);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const items = await db.prepare(
+    const items = (await db.prepare(
       `SELECT * FROM purchase_orders ${whereClause} ORDER BY order_date DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
-      data: items.results,
+      data: items.results || [],
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });
 
   // GET /api/inventory/purchase-orders/{id} - Get purchase order by ID
-  app.openapi(InventoryRoutes.purchaseOrders.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.purchaseOrders.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
+    const po = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
 
     if (!po) {
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
 
-    const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+    const items = (await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all()) as { results: any[] };
     po.items = items.results;
 
     return c.json({ success: true, data: po });
   });
 
   // POST /api/inventory/purchase-orders - Create purchase order
-  app.openapi(InventoryRoutes.purchaseOrders.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.purchaseOrders.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -97,7 +97,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     ).run();
 
     for (const item of body.items) {
-      const ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
+      const ingredient = (await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first()) as any;
       if (!ingredient) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
       }
@@ -120,22 +120,22 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'purchase_order_create', 'purchase_order', id, JSON.stringify(body), now).run();
 
-    const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
-    const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+    const po = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
+    const items = (await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all()) as { results: any[] };
     if (po) po.items = items.results;
 
     return c.json({ success: true, data: po }, 201);
   });
 
   // PATCH /api/inventory/purchase-orders/{id} - Update purchase order
-  app.openapi(InventoryRoutes.purchaseOrders.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.purchaseOrders.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
@@ -171,7 +171,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       await db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).run();
 
       for (const item of body.items) {
-        const ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
+        const ingredient = (await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first()) as any;
         if (!ingredient) {
           return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
         }
@@ -195,22 +195,22 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'purchase_order_update', 'purchase_order', id, JSON.stringify(body), now).run();
 
-    const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
-    const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+    const po = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
+    const items = (await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all()) as { results: any[] };
     if (po) po.items = items.results;
 
     return c.json({ success: true, data: po });
   });
 
   // POST /api/inventory/purchase-orders/{id}/receive - Receive purchase order items
-  app.openapi(InventoryRoutes.purchaseOrders.receive, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.purchaseOrders.receive as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
@@ -220,7 +220,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     }
 
     for (const item of body.items) {
-      const ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
+      const ingredient = (await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first()) as any;
       if (!ingredient) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
       }
@@ -253,10 +253,11 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'purchase_order_receive', 'purchase_order', id, JSON.stringify(body), now).run();
 
-    const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
-    const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+    const po = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
+    const items = (await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all()) as { results: any[] };
     if (po) po.items = items.results;
 
     return c.json({ success: true, data: po });
   });
 }
+

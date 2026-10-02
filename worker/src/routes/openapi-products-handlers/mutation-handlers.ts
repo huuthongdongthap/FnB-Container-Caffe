@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { ProductRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
+import { getDatabase } from '../../lib/db';
 
 export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/products - Create product
-  router.openapi(ProductRoutes.create, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.create as any, async (c: any) => {
+    const db = getDatabase(c);
     const body = c.req.valid('json' as never) as {
       slug: string;
       categoryId: string;
@@ -87,8 +87,8 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   });
 
   // PATCH /api/products/:id - Update product
-  router.openapi(ProductRoutes.update, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.update as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       slug?: string;
@@ -179,19 +179,19 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   });
 
   // DELETE /api/products/:id - Delete product (soft delete)
-  router.openapi(ProductRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
-    const db = c.env.AURA_DB;
+  router.openapi(ProductRoutes.delete as any, async (c: any) => {
+    const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<{ slug: string }>();
+    const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { slug: string } | null;
     if (!existing) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 
     // Check for order items referencing this product
-    const orderItems = await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first<{ count: number }>();
+    const orderItems = (await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first()) as { count: number } | null;
     if (orderItems && orderItems.count > 0) {
       // Soft delete - just mark as deleted
       await db.prepare('UPDATE products SET status = \'deleted\', updated_at = ? WHERE id = ?').bind(now, id).run();

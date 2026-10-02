@@ -12,6 +12,9 @@
   "scripts": {
     "lint": "eslint worker/src/ --ext .ts",
     "lint:fix": "eslint worker/src/ --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc --project worker/tsconfig.json --noEmit",
+    "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -36,6 +39,7 @@
   "license": "MIT",
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@google/stitch-sdk": "^0.3.5",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.2",

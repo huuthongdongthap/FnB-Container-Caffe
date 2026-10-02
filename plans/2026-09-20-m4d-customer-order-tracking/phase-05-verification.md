@@ -2,7 +2,7 @@
 
 ## Overview
 - **Goal:** Verify the entire M4-D milestone against real endpoints, tests, and type checking.
-- **Status:** PENDING
+- **Status:** COMPLETED (2026-09-29)
 - **Dependency:** Phases 01-04.
 
 ## Tasks

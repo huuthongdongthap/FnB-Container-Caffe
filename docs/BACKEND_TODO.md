@@ -8,18 +8,18 @@
 
 ## Task Summary Table
 
-| Task ID | Priority | Module | Summary |
-| :--- | :--- | :--- | :--- |
-| **TASK-1** | **P0** | Order Domain | Enforce `table_id` validation when `order_type` is omitted or `dine_in` |
-| **TASK-2** | **P0** | CORS Middleware | Fix wildcard `*` origin on error responses with credentials |
-| **TASK-3** | **P0** | Payment Domain | Allow guest checkout on `POST /api/payment/create-link` |
-| **TASK-4** | **P0** | D1 Binding | Rename `c.env.DB` -> `c.env.AURA_DB` in loyalty, inventory, and promotions |
-| **TASK-5** | **P0** | Reservation Domain | Secure `GET /api/reservations` and status mutations with `requireAuth` |
-| **TASK-6** | **P0** | Payment API | Implement `POST /api/payments/payment-request` for Apple/Google Pay |
-| **TASK-7** | **P1** | Order Handlers | Sanitize SQL `ORDER BY` clause against column injection |
-| **TASK-8** | **P1** | Payment Schema | Align `payOSCreateLinkSchema` with `usePaymentStore` request payload |
-| **TASK-9** | **P2** | SSE Handlers | Add event replay buffer to `GET /api/orders/:id/events` |
-| **TASK-10**| **P2** | Order Domain | Implement idempotency key caching with 120s TTL |
+| Task ID | Priority | Module | Summary | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **TASK-1** | **P0** | Order Domain | Enforce `table_id` validation when `order_type` is omitted or `dine_in` | ✅ **DONE** (2026-09-29) |
+| **TASK-2** | **P0** | CORS Middleware | Fix wildcard `*` origin on error responses with credentials | ✅ **DONE** (2026-09-29) |
+| **TASK-3** | **P0** | Payment Domain | Allow guest checkout on `POST /api/payment/create-link` | ✅ **DONE** (2026-09-29) |
+| **TASK-4** | **P0** | D1 Binding | Rename `c.env.DB` -> `c.env.AURA_DB` in loyalty, inventory, and promotions | ✅ **DONE** (2026-09-29) |
+| **TASK-5** | **P0** | Reservation Domain | Secure `GET /api/reservations` and status mutations with `requireAuth` | ✅ **DONE** (2026-09-29) |
+| **TASK-6** | **P0** | Payment API | Implement `POST /api/payments/payment-request` for Apple/Google Pay | ✅ **DONE** (2026-09-29) |
+| **TASK-7** | **P1** | Order Handlers | Sanitize SQL `ORDER BY` clause against column injection | ✅ **DONE** (2026-09-29) |
+| **TASK-8** | **P1** | Payment Schema | Align `payOSCreateLinkSchema` with `usePaymentStore` request payload | ✅ **DONE** (2026-09-29) |
+| **TASK-9** | **P2** | SSE Handlers | Add event replay buffer to `GET /api/orders/:id/events` | ✅ **DONE** (2026-09-29) |
+| **TASK-10**| **P2** | Order Domain | Implement idempotency key caching with 120s TTL | ✅ **DONE** (2026-09-29) |
 
 ---
 

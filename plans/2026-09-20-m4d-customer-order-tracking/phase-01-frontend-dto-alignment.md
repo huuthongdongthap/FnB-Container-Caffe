@@ -2,7 +2,7 @@
 
 ## Overview
 - **Goal:** Align frontend order type definitions with the canonical `formatCustomerOrder()` / `formatCustomerOrderItem()` projections.
-- **Status:** PENDING
+- **Status:** COMPLETED (2026-09-29)
 - **Dependency:** None (pure type/mapper definitions).
 
 ## Context

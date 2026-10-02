@@ -77,6 +77,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
       /* ignore */
     } finally {
       localStorage.removeItem('pendingOrder');
+      localStorage.removeItem('aura_active_booking');
     }
     // Ensure cart is cleared after completed order checkout
     useCartStore.getState().clearCart();

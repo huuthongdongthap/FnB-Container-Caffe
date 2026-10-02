@@ -1,16 +1,16 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
+import { getDatabase } from '../../lib/db';
 
 export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/account - Get current user's loyalty account
-  app.openapi(LoyaltyRoutes.account.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.account.get as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
 
-    const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-      .bind(user.customerId || user.id).first();
+    const account = (await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
+      .bind(user.customerId || user.id).first()) as any;
 
     if (!account) {
       return c.json({ success: false, error: 'Account not found' }, 404);
@@ -31,13 +31,13 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/loyalty/account/transactions - Get loyalty transactions for current user
-  app.openapi(LoyaltyRoutes.account.transactions, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.account.transactions as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-      .bind(user.customerId || user.id).first();
+    const account = (await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
+      .bind(user.customerId || user.id).first()) as any;
 
     if (!account) {
       return c.json({ success: false, error: 'Account not found' }, 404);
@@ -55,32 +55,32 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.type);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM loyalty_transactions ${whereClause}`).bind(...params).first();
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_transactions ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const transactions = await db.prepare(
+    const transactions = (await db.prepare(
       `SELECT * FROM loyalty_transactions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    ).bind(...params, limit, offset).all()) as { results: any[] };
 
     return c.json({
       success: true,
       data: {
-        transactions: transactions.results,
+        transactions: transactions.results || [],
         meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
       },
     });
   });
 
   // POST /api/loyalty/account/birthday-bonus - Claim birthday bonus points
-  app.openapi(LoyaltyRoutes.account.claimBirthdayBonus, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(LoyaltyRoutes.account.claimBirthdayBonus as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
     const currentMonth = new Date().getMonth() + 1;
 
-    const account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-      .bind(user.customerId || user.id).first();
+    const account = (await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
+      .bind(user.customerId || user.id).first()) as any;
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
@@ -97,8 +97,8 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Birthday bonus: configurable via tier config
-    const tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ?')
-      .bind(account.tier).first();
+    const tierConfig = (await db.prepare('SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ?')
+      .bind(account.tier).first()) as any;
     const birthdayPoints = tierConfig?.birthday_bonus || 500;
 
     const transactionId = crypto.randomUUID();
@@ -127,3 +127,4 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 }
+

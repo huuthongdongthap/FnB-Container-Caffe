@@ -24,6 +24,12 @@ jobs:
     - name: Run ESLint
       run: npm run lint
 
+    - name: Type check (frontend & root)
+      run: npm run typecheck
+
+    - name: Type check (worker)
+      run: npm run typecheck:worker
+
     - name: Run tests
       run: npm run test:ci
 

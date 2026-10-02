@@ -85,10 +85,10 @@ export default function ReservationNew() {
         time: selectedTime,
       });
       setBookingCode(matchedTable.table_number
-        ? `AURA-${matchedTable.table_number}`
+        ? `AURA-${String(matchedTable.table_number).padStart(4, '0')}`
         : `AURA-${matchedTable.id.slice(-4).toUpperCase()}`);
     } else {
-      // No tables from API (offline / no availability) — graceful fallback
+      // Graceful fallback: offline / no availability — generate demo booking code
       setApiOffline(true);
       setBookingCode(`DEMO-${Math.floor(1000 + Math.random() * 9000)}`);
     }
@@ -173,12 +173,30 @@ export default function ReservationNew() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="/menu"
+              <button
+                type="button"
+                onClick={() => {
+                  const bookingData = {
+                    fullName,
+                    phone,
+                    tableNumber: bookingCode,
+                    zone: currentZoneObj.name,
+                    time: `${selectedTime} • ${selectedDate}`,
+                    guestCount: selectedParty,
+                    timestamp: Date.now(),
+                  };
+                  try {
+                    localStorage.setItem('aura_active_booking', JSON.stringify(bookingData));
+                    localStorage.setItem('aura_saved_customer', JSON.stringify({ fullName, phone }));
+                  } catch {
+                    /* ignore storage errors */
+                  }
+                  window.location.href = `/menu?table=${encodeURIComponent(bookingCode)}`;
+                }}
                 className="px-6 py-3.5 min-h-[44px] rounded-full bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
               >
                 <Utensils className="w-4 h-4" /> Xem Thực Đơn & Đặt Món Trước
-              </a>
+              </button>
               <button
                 type="button"
                 onClick={handleReset}

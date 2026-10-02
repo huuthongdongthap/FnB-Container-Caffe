@@ -6,7 +6,6 @@ import {
   ErrorResponseSchema,
   IdParamsSchema,
   DateTimeSchema,
-  ReferenceSchema,
 } from '../common';
 
 export const SupplierSchema = z.object({

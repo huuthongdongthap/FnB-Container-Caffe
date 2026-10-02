@@ -1,16 +1,16 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
+import { getDatabase } from '../../lib/db';
 
 export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/ingredients - List ingredients
-  app.openapi(InventoryRoutes.ingredients.list, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.ingredients.list as any, async (c: any) => {
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
-    const page = query.page || 1;
-    const limit = query.limit || 20;
+    const page = Number(query.page || 1);
+    const limit = Number(query.limit || 20);
     const offset = (page - 1) * limit;
 
     let whereClause = '';
@@ -31,8 +31,8 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       params.push(query.isActive ? 1 : 0);
     }
 
-    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM ingredients ${whereClause}`).bind(...params).first();
-    const total = countResult?.total || 0;
+    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM ingredients ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+    const total = Number(countResult?.total || 0);
 
     const items = await db.prepare(
       `SELECT * FROM ingredients ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
@@ -46,7 +46,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // GET /api/inventory/ingredients/{id} - Get ingredient by ID
-  app.openapi(InventoryRoutes.ingredients.get, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.ingredients.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
@@ -60,7 +60,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // POST /api/inventory/ingredients - Create ingredient
-  app.openapi(InventoryRoutes.ingredients.create, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.ingredients.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const body = c.req.valid('json');
@@ -102,7 +102,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // PATCH /api/inventory/ingredients/{id} - Update ingredient
-  app.openapi(InventoryRoutes.ingredients.update, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.ingredients.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
@@ -155,7 +155,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   });
 
   // DELETE /api/inventory/ingredients/{id} - Delete ingredient
-  app.openapi(InventoryRoutes.ingredients.delete, async (c: Context<{ Bindings: Env }>) => {
+  app.openapi(InventoryRoutes.ingredients.delete as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');

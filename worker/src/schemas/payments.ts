@@ -94,7 +94,7 @@ export const PaymentResponseSchema = z.object({
   failureReason: z.string().nullable(),
   refundedAmount: MoneySchema.default(0),
   refundedAt: DateTimeSchema.nullable(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
 }).openapi('Payment');

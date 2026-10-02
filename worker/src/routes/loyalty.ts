@@ -4,7 +4,6 @@
  */
 
 import { Hono } from 'hono';
-import { createLogger } from '../middleware/logger';
 import { redeemRewardSchema, zodErrorResponse } from '../lib/validators';
 import type { Env } from '../types/env';
 import type { Customer } from '../types/models';

@@ -59,8 +59,9 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
     });
 
     if (!result.ok) {
-      const status = result.code === 'invalid_purpose' ? 400 : 403;
-      return c.json({ success: false, error: result.error }, status);
+      const err = result as { ok: false; error: string; code: string };
+      const status = (err.code === 'invalid_purpose' ? 400 : 403) as 400 | 403;
+      return c.json({ success: false, error: err.error }, status);
     }
 
     return c.json({ success: true, data: result.consent });

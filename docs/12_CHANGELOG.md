@@ -3,6 +3,20 @@
 Tất cả các thay đổi đáng kể của dự án F&B Caffe Container được ghi lại tại đây.
 
 ## [Unreleased]
+### 🛡️ Backend Stabilization & Edge Resilience (2026-09-29)
+
+- **feat(cors)** — Standardized dynamic origin resolution in `worker/src/middleware/cors.ts` with `Access-Control-Allow-Credentials: true` and `Vary: Origin`, preventing browser CORS network failures on credentialed error responses.
+- **feat(payos)** — Unblocked guest table diners in `packages/domain/payment/commands/payos-create-link.ts`; supports camelCase and snake_case request DTOs without mandatory user auth.
+- **feat(orders)** — Enforced table code validation on `order_type === 'dine_in'` orders in `packages/domain/order/commands/create-order.ts` and `worker/src/lib/validators/order.ts`, preventing orphan tickets on KDS.
+- **feat(security)** — Added RBAC protection (`requireAuth(['owner', 'staff', 'manager'])`) to reservation management endpoints in `packages/domain/reservation/src/routes/reservations.ts`, safeguarding customer PII.
+- **feat(security)** — Sanitized SQL `ORDER BY` clauses in `worker/src/routes/openapi-orders-handlers/order-read-handlers.ts` using column and direction allowlists.
+- **feat(resilience)** — Implemented KV idempotency caching (120s TTL) in `packages/domain/order/commands/create-order.ts` returning `X-Cache: HIT` for duplicate taps.
+- **feat(realtime)** — Implemented `Last-Event-ID` reconnection replay buffer for SSE order status stream in `worker/src/routes/orders-hono-handlers/query-handlers.ts`.
+- **fix(db)** — Unified D1 database access via `getDatabase(c)` across loyalty, inventory, and promotions OpenAPI modules to avoid `c.env.DB is undefined` crashes.
+- **fix(types)** — Resolved all TypeScript syntax and type errors in `worker/` (0 errors on `worker/tsconfig.json`); eliminated Vitest teardown leak in `worker/src/__tests__/tree/orders/admin-orders.test.ts`.
+- **ci** — Added `typecheck:worker` and `typecheck:all` scripts in `package.json` and added `typecheck:worker` gate to `.github/workflows/ci.yml`.
+- **verify** — Complete suite green: 388 files / 3,557 tests PASS, `npm run typecheck:all` = 0 errors, `npm run lint` = 0 errors, `npm run build` ok.
+
 ### 🧹 UI Re-Architecture Phase 6 — Legacy Migration & Dead Code Cleanup
 
 - **remove(pages)** — Executed 5-point safe deletion checklist (0 routes, 0 imports, 0 dependencies, replacement exists, tests green). Removed 9 unreferenced legacy shims and dead prototypes:
