@@ -66,21 +66,23 @@ export async function getCustomerMenu(
 
     query += ' ORDER BY category ASC, name ASC';
 
+    interface RawMenuRow {
+      id: string;
+      name: string;
+      description: string | null;
+      price: number | string;
+      category: string;
+      image_url: string | null;
+      tags: string | null;
+      available: number | boolean;
+    }
+
     const { results } = await db
       .prepare(query)
       .bind(...params)
-      .all<{
-        id: string;
-        name: string;
-        description: string | null;
-        price: number | string;
-        category: string;
-        image_url: string | null;
-        tags: string | null;
-        available: number | boolean;
-      }>();
+      .all<RawMenuRow>();
 
-    const items: CustomerMenuItem[] = results.map((item) => ({
+    const items: CustomerMenuItem[] = (results ?? []).map((item: RawMenuRow) => ({
       id: item.id,
       name: item.name,
       description: item.description,

@@ -37,7 +37,7 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
     query += ' ORDER BY category, name LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
     const { results } = await db.prepare(query).bind(...params).all<MenuItem>();
-    const items = results.map(item => ({
+    const items = (results ?? []).map((item: MenuItem) => ({
       ...item,
       tags: item.tags ? JSON.parse(item.tags as string) : [],
       price: parseInt(item.price as unknown as string),
