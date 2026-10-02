@@ -51,11 +51,13 @@
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
 | `npm test` (`vitest run`) | **388 test files / 3,557 tests PASS (0 failures)** | 🟢 GREEN |
-| **GitHub Actions CI (PR #62)** | **Run 36946217774 / lint-and-test: PASS in 5m47s** | 🟢 GREEN |
+| **GitHub Actions CI (main)** | **Run 37019205212: PASS (3m58s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (main)** | **Run 37019205433: PASS (1m49s)** | 🟢 GREEN |
+| **PR #62 Merge Status** | **Squash-merged into `main` (`b3180b5`)** | 🟢 MERGED |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
-| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `2ac8dac9`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/health`, `/api/version`, `/api/menu`, `/api/payment`, CORS | 🟢 VERIFIED |
+| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `b3180b5c`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/health`, `/api/version` (`b3180b5c`), `/api/menu`, `/api/payment`, CORS | 🟢 VERIFIED |
 
 ## Next Step
 - Complete Phase 1 Pillar Integrations (12 Pillars ecosystem: ERPNext, TastyIgniter, Home Assistant, Frigate).
