@@ -16,6 +16,7 @@ import { handleMixpostRequest } from './mixpost';
 import { createHARouter } from './homeassistant';
 import { createTIRoutes } from './integrations/tastyigniter';
 import { createFrigateRoutes } from './integrations/frigate';
+import { createWifiRoutes } from './wifi';
 import type { Env } from '../types/env';
 
 export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
@@ -42,8 +43,8 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
     return handleZaloRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
   });
   app.route('/api/ha', createHARouter());
-  app.use('/api/integrations/tastyigniter/*', requireAuth(['owner', 'staff']));
   app.route('/api/integrations/tastyigniter', createTIRoutes());
   app.use('/api/integrations/frigate/*', requireAuth(['owner', 'staff']));
   app.route('/api/integrations/frigate', createFrigateRoutes());
+  app.route('/api/wifi', createWifiRoutes());
 }

@@ -3,6 +3,17 @@
 Tất cả các thay đổi đáng kể của dự án F&B Caffe Container được ghi lại tại đây.
 
 ## [Unreleased]
+### 🌐 Phase 1: 12 Pillars Ecosystem Integration (2026-10-03)
+
+- **feat(db)** — Created DDL migration `worker/db/migrations/20261003_01_pillar_tables.sql` (and `.down.sql`) formalizing schema tables for `ti_order_bridge`, `ti_menu_cache`, `frigate_events`, and `wifi_sessions`.
+- **feat(wifi)** — Implemented OpenWISP captive portal engine in `worker/src/tree/wifi/session.ts` and router `worker/src/routes/wifi.ts` (`GET /api/wifi/status`, `POST /api/wifi/login`, `POST /api/wifi/authorize`); captures guest phone numbers, sets 3600s TTL session, and tags customer CRM record with `source = 'wifi_portal'`.
+- **feat(tastyigniter)** — Implemented bidirectional inbound webhook receiver `POST /api/integrations/tastyigniter/webhook` in `worker/src/tree/integrations/tastyigniter/webhook.ts` and `worker/src/routes/integrations/tastyigniter.ts`; maps TastyIgniter order status transitions to local order states.
+- **feat(ha)** — Implemented Home Assistant IoT dining presence triggers (`customer_arrived`, `table_occupied`) in `worker/src/tree/homeassistant/presence.ts` and inbound webhook handler `POST /api/ha/webhook`.
+- **feat(frigate)** — Implemented CCTV occupancy analytics endpoint `GET /api/integrations/frigate/occupancy` in `worker/src/tree/integrations/frigate/occupancy.ts` and `worker/src/routes/integrations/frigate.ts` with sliding 5-minute window person detection and hourly peak histograms.
+- **feat(db-access)** — Standardized fallback binding accessor `(env.AURA_DB ?? env.DB)` across `tastyigniter/sync.ts`, `frigate/sync.ts`, `homeassistant/automations.ts`, and `homeassistant/devices.ts`.
+- **test(e2e)** — Added comprehensive 12 Pillars integration test suite `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 passing tests covering ERPNext, Cal.com, OpenWISP, pretix, TastyIgniter, Xibo, Mautic, Home Assistant, Frigate, PayOS, Mixpost, and SMTP).
+- **verify** — Complete test suite: 389 files / 3,579 tests PASS (0 failures); `npm run typecheck:all` = 0 errors; `npm run lint` = 0 errors.
+
 ### 🛡️ Backend Stabilization & Edge Resilience (2026-09-29)
 
 - **feat(cors)** — Standardized dynamic origin resolution in `worker/src/middleware/cors.ts` with `Access-Control-Allow-Credentials: true` and `Vary: Origin`, preventing browser CORS network failures on credentialed error responses.

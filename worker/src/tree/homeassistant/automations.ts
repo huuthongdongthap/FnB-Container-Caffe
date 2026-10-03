@@ -23,7 +23,7 @@ id: number;
 export async function triggerAutomation(env: Record<string, unknown>, automationId: string, payload: unknown): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
 
     const triggerEntity = (typeof payload === 'object' && payload !== null && 'trigger_entity' in payload)
       ? (payload as Record<string, unknown>).trigger_entity as string | undefined
@@ -61,7 +61,7 @@ export async function triggerAutomation(env: Record<string, unknown>, automation
 export async function getAutomationLog(env: Record<string, unknown>, limit = 50): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
     const clamped = Math.min(limit, 200);
 
     if (mockMode) {
@@ -99,7 +99,7 @@ export async function getAutomationLog(env: Record<string, unknown>, limit = 50)
 
 export async function logAutomationResult(env: Record<string, unknown>, logEntry: AutomationResult): Promise<void> {
   try {
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
     await db
       .prepare(
         'INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, ?)'

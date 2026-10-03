@@ -19,6 +19,7 @@ import {
   bridgeOrderToTI,
   getTiMenuCache
 } from '../../tree/integrations/tastyigniter/sync';
+import { processTIWebhook, type TIWebhookPayload } from '../../tree/integrations/tastyigniter/webhook';
 import { requireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
 
@@ -85,6 +86,31 @@ export function createTIRoutes() {
     } catch (err) {
       log.error('ti_get_menu_cache_error', { error: (err as Error).message });
       return c.json({ error: 'Failed to fetch menu cache', mock: false }, 500);
+    }
+  });
+
+  // POST /api/integrations/tastyigniter/webhook
+  // Inbound webhook from TastyIgniter (order status updates).
+  app.post('/webhook', async(c) => {
+    try {
+      const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
+      if (secret) {
+        const sig = c.req.header('x-tastyigniter-signature') ?? c.req.query('secret') ?? c.req.query('token');
+        if (sig !== secret) {
+          return c.json({ error: 'Unauthorized webhook signature' }, 401);
+        }
+      }
+
+      const body = await c.req.json<TIWebhookPayload>();
+      if (!body || typeof body !== 'object') {
+        return c.json({ error: 'Invalid JSON payload' }, 400);
+      }
+
+      const result = await processTIWebhook(c.env as Record<string, unknown>, body);
+      return c.json({ success: true, ...result });
+    } catch (err) {
+      log.error('ti_webhook_error', { error: (err as Error).message });
+      return c.json({ success: false, error: (err as Error).message }, 500);
     }
   });
 

@@ -25,7 +25,7 @@ attributes: Record<string, unknown> | null;
 export async function getDeviceState(env: Record<string, unknown>, entityId: string): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
 
     if (mockMode) {
       return jsonResponse({
@@ -67,7 +67,7 @@ export async function getDeviceState(env: Record<string, unknown>, entityId: str
 export async function toggleDevice(env: Record<string, unknown>, entityId: string, on: boolean): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
     const newState = on ? 'on' : 'off';
 
     if (mockMode) {
@@ -111,7 +111,7 @@ export async function toggleDevice(env: Record<string, unknown>, entityId: strin
 export async function getZoneDevices(env: Record<string, unknown>, zone: string): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
 
     if (mockMode) {
       return jsonResponse({ mock: true, zone, devices: [] });
@@ -141,7 +141,7 @@ export async function getZoneDevices(env: Record<string, unknown>, zone: string)
 
 export async function cacheDeviceState(env: Record<string, unknown>, device: DeviceState): Promise<void> {
   try {
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
     await db
       .prepare(
         'INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime("now"))'
