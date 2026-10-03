@@ -83,6 +83,13 @@
   - Implemented edge demand & sales forecasting (`/api/admin/metrics/forecast`, `/api/admin/metrics/forecast/hourly`) with day-of-week seasonality, weekend tourism surge uplift, and peak rush windows.
   - Implemented AI Barista Concierge (`/api/ai/barista/recommend`, `/api/ai/barista/specials`) with dual-engine execution (Workers AI Llama-3-8b + deterministic Sa Đéc barista fallback) and interaction logging.
   - Added dedicated integration test suite `worker/src/__tests__/integrations/ai-automation.test.ts` (14/14 PASS).
+- **Phase 5: Autonomous Edge Operations & Regional Scaling (Q4 2027)**:
+  - Applied D1 migration `20261004_03_autonomous_edge_ops.sql` to remote `fnb-caffe-db` (78 tables active).
+  - Implemented Dynamic Pricing & Happy Hour Edge Automation (`/api/pricing/dynamic/active`, `/api/pricing/dynamic/calculate`, `/api/pricing/dynamic/rules`) with Vietnam timezone awareness and gross margin floor protection ($P_{\text{final}} \ge C_{\text{unit}} \times (1 + M_{\text{min}})$).
+  - Implemented AI Customer Support Assistant (`/api/chat/assistant`) answering order status, table bills, WiFi credentials, loyalty points, and menu recommendations via dual-engine concierge.
+  - Implemented Zalo OA Webhook Bridge (`/api/webhooks/zalo`, `/api/webhooks/zalo/simulate`) for webhook verification challenge and automated inbound message dispatching.
+  - Implemented Container Edge IoT Telemetry & Autonomous Watchdog (`/api/edge/telemetry/heartbeat`, `/api/edge/containers/status`, `/api/edge/containers/:id/history`) with thermal/power anomaly detection and Telegram incident escalation.
+  - Added dedicated integration test suite `worker/src/__tests__/integrations/autonomous-edge-ops.test.ts` (15/15 PASS).
 
 ## Verification Evidence
 | Gate | Result | Status |
@@ -92,7 +99,7 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **394 test files / 3,616 tests PASS (0 failures)** | 🟢 GREEN |
+| `npm test` (`vitest run`) | **395 test files / 3,631 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
 | **Multi-Tenant & Franchise E2E** | `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS) | 🟢 GREEN |
@@ -102,11 +109,11 @@
 | **PR #65 Merge Status** | **Squash-merged into `main` (`4b326e1`)** | 🟢 MERGED |
 | **PR #66 Merge Status** | **Squash-merged into `main` (`fd5ffe2`)** | 🟢 MERGED |
 | **PR #67 Merge Status** | **Squash-merged into `main` (`746a365`)** | 🟢 MERGED |
-| **GitHub Actions CI (PR #67 main)** | **Run 37128838729: PASS (lint-and-test 5m43s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (PR #67 main)** | **Run 37128838746: PASS (pages 45s, worker 43s)** | 🟢 GREEN |
-| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `746a365`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/recommendations` (200), `/api/ai/barista/recommend` (200), `/api/version` (`746a365`), auth guards (401 active) | 🟢 VERIFIED |
+| **PR #68 Merge Status** | **Squash-merged into `main` (`db3c3dd`)** | 🟢 MERGED |
+| **Autonomous Edge Operations E2E** | `worker/src/__tests__/integrations/autonomous-edge-ops.test.ts` (15/15 PASS) | 🟢 GREEN |
+| **Cloudflare D1 Production Migration** | `20261004_03_autonomous_edge_ops.sql` (78 synchronized tables) | 🟢 LIVE |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (Version `5421eecb-f144-480a-b570-101f4ae2dfd1`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/pricing/dynamic/calculate` (200 - Happy Hour 15%), `/api/chat/assistant` (200 - WiFi), `/api/edge/telemetry/heartbeat` (200 - Normal), `/api/webhooks/zalo` (200 - Challenge) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 5: Autonomous Edge Operations & Regional Scaling (Q4 2027)
+- Complete Strategic Roadmap (Phases 1-5) fully executed & deployed live on Cloudflare edge. Ready for EOD retrospective and production monitoring.
