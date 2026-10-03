@@ -4,7 +4,7 @@
  */
 
 export async function getAdminCustomers(request: Request, env: Record<string, unknown>) {
-  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+  const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get('page') || '1', 10);
   const limit = parseInt(url.searchParams.get('limit') || '50', 10);

@@ -82,7 +82,7 @@ adminSalesRouter.get('/csv', async(c) => {
     endDate = rawEnd || formatDate(new Date());
   }
 
-  const db = c.env.AURA_DB;
+  const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
 
   const { results } = await db.prepare(`
     SELECT id, customer_name, items, total, payment_method, status, created_at
