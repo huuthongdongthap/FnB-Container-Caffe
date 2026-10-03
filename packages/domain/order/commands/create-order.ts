@@ -123,8 +123,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
         id, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
         shipping_fee, discount, notes, delivery_time, table_id,
-        order_type, tip_amount, service_fee, customer_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        order_type, tip_amount, service_fee, customer_id, tenant_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       orderId, itemsJson,
       snapshot.total, 'pending',
@@ -138,7 +138,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       data.order_type || 'dine_in',
       snapshot.tip_amount,
       snapshot.service_fee,
-      data.customer_id || null
+      data.customer_id || null,
+      data.tenant_id || 'default'
     ).run();
 
     // Skip payment record for PayOS — create-link endpoint handles it with PayOS transaction data.

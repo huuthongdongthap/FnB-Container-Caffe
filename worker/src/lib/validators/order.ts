@@ -34,6 +34,8 @@ export const createOrderSchema = z.object({
   order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
   tip_amount: z.number().nonnegative().optional().default(0),
   service_fee: z.number().nonnegative().optional().default(0),
+  /** Multi-tenant identifier. Defaults to 'default' for single-store / flagship container. */
+  tenant_id: z.string().optional().default('default'),
 }).superRefine((data, ctx) => {
   if (data.order_type === 'delivery' && !(data.customer_address ?? '').trim()) {
     ctx.addIssue({
@@ -55,6 +57,7 @@ export const createOrderSchema = z.object({
 export const adminOrdersQuerySchema = z.object({
   status: z.string().optional(),
   payment_status: z.string().optional(),
+  tenant_id: z.string().optional(),
   limit: z.string().optional(),
   offset: z.string().optional(),
   sort: z.string().optional(),

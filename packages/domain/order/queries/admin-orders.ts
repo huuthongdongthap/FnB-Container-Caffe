@@ -9,11 +9,13 @@ import { buildOrderFilterClause, buildOrderTail, OrderSortColumn } from './share
 
 const log = createLogger({ route: 'orders' });
 
-export async function getAdminOrders(request: Request, env: Record<string, unknown>) {
+export async function getAdminOrders(request: Request, env: Record<string, unknown>, tenantId?: string) {
   try {
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
     const paymentStatus = url.searchParams.get('payment_status');
+    const queryTenant = url.searchParams.get('tenant_id');
+    const resolvedTenant = tenantId || (queryTenant ?? undefined);
     const limit = url.searchParams.get('limit') || '50';
     const offset = url.searchParams.get('offset') || '0';
     const sortParam = (url.searchParams.get('sort') || 'created_at') as OrderSortColumn;
@@ -22,6 +24,9 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
     const filters: Array<[string, string]> = [];
+    if (resolvedTenant && resolvedTenant !== '*') {
+      filters.push(['o.tenant_id', resolvedTenant]);
+    }
     if (status) filters.push(['o.status', status]);
     if (paymentStatus) filters.push(['o.payment_status', paymentStatus]);
 
