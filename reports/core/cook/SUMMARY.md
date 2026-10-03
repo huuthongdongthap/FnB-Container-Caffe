@@ -46,6 +46,13 @@
   - Extracted sub-routers: `features-router.ts` (150 LOC), `integrations-router.ts` (49 LOC), `scheduled.ts` (44 LOC), `staff-mobile.ts` (67 LOC).
   - `packages/domain/payment/commands/payos-create-link.ts` refactored from 283 LOC down to 180 LOC.
   - Cleaned all 92 ESLint warnings down to 0 warnings.
+- **Admin DB, Revenue & Inventory Isolation (PR #64)**:
+  - Scoped domain inventory routes strictly under `/api/inventory/items` to eliminate root `/` route hijacking.
+  - Selected `o.items`, `o.shipping_fee`, `o.discount` in `getAdminOrders` SQL query.
+  - Enforced revenue accounting invariant by excluding cancelled orders (`status != 'cancelled'`) from `orders_today` and `revenue_today`.
+  - Enforced Sales CSV UTF-8 BOM (`0xEF, 0xBB, 0xBF`) and bilingual headers in `/api/admin/sales/csv`.
+  - Applied consolidated DDL migration `20261003_02_admin_metrics_and_inventory.sql` to remote D1 `AURA_DB` (71 tables synchronized).
+  - Added dedicated integration test suite `admin-revenue-inventory.test.ts` (6/6 passing tests).
 - **Security Audit & Hardening (`reports/audit/comprehensive-audit-2026.md`)**:
   - `SEC-01`: Sanitized dynamic SQL `ORDER BY` parameters with strict column whitelisting across `openapi-categories`, `openapi-products`, `openapi-tables`, `openapi-payments`, and `openapi-staff`.
   - `SEC-02`: Added production domain `auracafe.vn` and its subdomains to the worker CORS allowlist.
@@ -64,10 +71,14 @@
 | **GitHub Actions CI (main)** | **Run 37092655966: PASS (5m46s)** | 🟢 GREEN |
 | **GitHub Actions Deploy (main)** | **Run 37092656123: PASS (pages 50s, worker 50s)** | 🟢 GREEN |
 | **PR #63 Merge Status** | **Squash-merged into `main` (`2f466f5`)** | 🟢 MERGED |
-| **D1 Remote Migration** | `20261003_01_pillar_tables.sql` applied to `AURA_DB` (13 queries, success) | 🟢 APPLIED |
+| **PR #64 Merge Status** | **Squash-merged into `main` (`34204b1`)** | 🟢 MERGED |
+| **GitHub Actions CI (PR #64 main)** | **Run 37099915885: PASS (5m12s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (PR #64 main)** | **Run 37099915901: PASS (pages 56s, worker 41s)** | 🟢 GREEN |
+| **D1 Remote Migration** | `20261003_02_admin_metrics_and_inventory.sql` applied to `AURA_DB` (71 tables synchronized) | 🟢 APPLIED |
 | **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `2f466f57`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/wifi/login` (authorized), `/api/wifi/status` (3600s TTL), `/api/ha/webhook` (200), `/api/integrations/tastyigniter/webhook` (200) | 🟢 VERIFIED |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `34204b1`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/menu` (200), `/` (404 unhijacked clean router), `/api/wifi/login` (authorized) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 2: Mobile App / PWA Enhancements (Q1 2027) & Continuous Monitoring.
+- Phase 2: Mobile App / PWA Enhancements & Offline Cart Sync (Q1 2027)
+- Multi-Tenant & Franchise Preparation (Q2 2027)
