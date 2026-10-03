@@ -4,13 +4,14 @@ No Dexie (YAGNI). Uses auradb / 'offlineOrders' object store
 with keyPath 'localId' and a plain object for serialized order data.
 ═══════════════════════════════════════════════════════════════════ */
 
-interface OfflineOrderRecord {
+export interface OfflineOrderRecord {
   localId: string;
   orderData: object;
   createdAt: number;
   synced: boolean;
   attemptCount?: number;
   lastAttemptAt?: number;
+  [key: string]: unknown;
 }
 
 const DB_NAME = 'auradb';
@@ -53,12 +54,24 @@ export class OfflineDB {
   }
 
   /* Return every queued (not yet synced) order. */
-  async getPendingOrders(): Promise<object[]> {
+  async getPendingOrders(): Promise<OfflineOrderRecord[]> {
     const db = await openDB();
-    return new Promise<object[]>((resolve, reject) => {
+    const preservedKeys = new Set(['menu', '_meta_categories']);
+    return new Promise<OfflineOrderRecord[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).getAll();
-      req.onsuccess = () => resolve(req.result.map((r: { orderData: object }) => r.orderData));
+      req.onsuccess = () => {
+        const records = (req.result as OfflineOrderRecord[])
+          .filter(r => !preservedKeys.has(r.localId) && !r.localId?.startsWith('_') && !r.synced)
+          .map(r => ({
+            ...(typeof r.orderData === 'object' && r.orderData !== null ? r.orderData : {}),
+            localId: r.localId,
+            orderData: r.orderData,
+            createdAt: r.createdAt,
+            synced: r.synced,
+          }));
+        resolve(records);
+      };
       req.onerror = () => reject(req.error);
     });
   }

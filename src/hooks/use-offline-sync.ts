@@ -5,19 +5,13 @@ Conflict resolution: last-write-wins (server timestamp wins).
 ═══════════════════════════════════════════════════════════════════ */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { offlineDb } from '@/lib/offline-db';
+import { offlineDb, type OfflineOrderRecord } from '@/lib/offline-db';
+import { API_BASE } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 const SYNC_INTERVAL_MS = 10_000; // poll every 10s when online
 
-interface QueuedItem {
-  localId: string;
-  orderData: object;
-  createdAt: number;
-  synced: boolean;
-  attemptCount?: number;
-}
+type QueuedItem = OfflineOrderRecord;
 
 interface SyncState {
   isOnline: boolean;

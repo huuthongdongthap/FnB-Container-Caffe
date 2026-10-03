@@ -105,9 +105,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const pending = await offlineDb.getPendingOrders();
     if (pending.length === 0) { set({ queuedOffline: false }); return null; }
     let lastOrder: CustomerOrder | null = null;
-    for (const payload of pending as CreateOrderPayload[]) {
+    for (const payload of pending as unknown as CreateOrderPayload[]) {
       try {
-        const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
+        const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(payload) });
         lastOrder = body.data as CustomerOrder; set({ currentOrder: lastOrder, error: null });
       } catch { set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false }); break; }
     }
