@@ -33,6 +33,14 @@
   - Phase 2: PayOS payment route aliasing (`/api/payment/create-link` & `/payos/create`)
   - Phase 3: Admin reservation & audit logs routing mounted with role authorization
   - Phase 4: Full verification across FE stores & worker routers
+- **12 Pillars Ecosystem Integration (Phase 1 — Q3-Q4 2026)**: All 7 phases completed & reconciled.
+  - Phase 1: Formal DDL migration `20261003_01_pillar_tables.sql` (`ti_order_bridge`, `ti_menu_cache`, `frigate_events`, `wifi_sessions`).
+  - Phase 2: D1 database binding accessor unification (`(env.AURA_DB ?? env.DB)`) across all integration modules.
+  - Phase 3: TastyIgniter bidirectional webhook bridge (`POST /api/integrations/tastyigniter/webhook`).
+  - Phase 4: Home Assistant IoT dining presence triggers (`customer_arrived`, `table_occupied`) & inbound webhook (`POST /api/ha/webhook`).
+  - Phase 5: Frigate CCTV occupancy analytics endpoint (`GET /api/integrations/frigate/occupancy`).
+  - Phase 6: OpenWISP captive portal WiFi session manager (`/api/wifi/status`, `/api/wifi/login`, `/api/wifi/authorize`, CRM `wifi_user` tagging).
+  - Phase 7: Unified 12 Pillars E2E test suite (`worker/src/__tests__/integrations/pillars-e2e.test.ts` — 22/22 passing tests).
 - **Monorepo Refactoring & Rule Compliance (< 200 LOC & 0 Lint Warnings)**:
   - `worker/src/index.ts` modularized from 610 LOC down to 124 LOC.
   - Extracted sub-routers: `features-router.ts` (150 LOC), `integrations-router.ts` (49 LOC), `scheduled.ts` (44 LOC), `staff-mobile.ts` (67 LOC).
@@ -50,15 +58,10 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **388 test files / 3,557 tests PASS (0 failures)** | 🟢 GREEN |
-| **GitHub Actions CI (main)** | **Run 37019205212: PASS (3m58s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (main)** | **Run 37019205433: PASS (1m49s)** | 🟢 GREEN |
-| **PR #62 Merge Status** | **Squash-merged into `main` (`b3180b5`)** | 🟢 MERGED |
+| `npm test` (`vitest run`) | **389 test files / 3,579 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
-| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `b3180b5c`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/health`, `/api/version` (`b3180b5c`), `/api/menu`, `/api/payment`, CORS | 🟢 VERIFIED |
+| **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
 
 ## Next Step
-- Complete Phase 1 Pillar Integrations (12 Pillars ecosystem: ERPNext, TastyIgniter, Home Assistant, Frigate).
-- System ready for continuous operations.
+- Phase 2: Mobile App / PWA Enhancements (Q1 2027) & Production Monitoring Operations.
+- Stage, commit, and create pull request for Phase 1: 12 Pillars Ecosystem Integration.

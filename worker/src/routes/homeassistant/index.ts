@@ -15,6 +15,11 @@ import {
   triggerAutomation,
   getAutomationLog
 } from '../../tree/homeassistant/automations';
+import {
+  dispatchDiningPresence,
+  handleHAWebhook,
+  type DiningPresenceEvent
+} from '../../tree/homeassistant/presence';
 import { createLogger } from '../../middleware/logger';
 import { z } from 'zod';
 
@@ -48,6 +53,11 @@ const TriggerAutomationSchema = z.object({
   payload: z.unknown().optional()
 });
 
+const DispatchPresenceSchema = z.object({
+  event: z.enum(['customer_arrived', 'table_occupied', 'table_cleared']),
+  payload: z.record(z.string(), z.unknown()).optional()
+});
+
 export function createHARouter() {
   const auth = requireAuth(['owner', 'staff']);
   const app = new Hono<{ Bindings: Env }>();
@@ -57,7 +67,7 @@ export function createHARouter() {
   // GET /api/ha/devices — list all cached device states
   app.get('/devices', auth, async(c) => {
     try {
-      const db = c.env.AURA_DB;
+      const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
       const mockMode = c.env.HA_MOCK === 'true';
 
       const { results } = await db
@@ -132,6 +142,55 @@ export function createHARouter() {
   app.get('/automations/log', auth, async(c) => {
     const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
     return getAutomationLog(c.env, limit);
+  });
+
+  // ── Dining Presence ──
+
+  // POST /api/ha/presence/dispatch — trigger presence event (customer_arrived, table_occupied, etc.)
+  app.post('/presence/dispatch', auth, async(c) => {
+    try {
+      const body = await c.req.json<Record<string, unknown>>();
+      const parsed = DispatchPresenceSchema.safeParse(body);
+      if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        return c.json({ error: `${first.path.join('.')}: ${first.message}` }, 400);
+      }
+      const result = await dispatchDiningPresence(
+        c.env as Record<string, unknown>,
+        parsed.data.event as DiningPresenceEvent,
+        parsed.data.payload ?? {}
+      );
+      return c.json({ success: true, ...result });
+    } catch (err) {
+      log.error('dispatch_presence_error', { error: (err as Error).message });
+      return c.json({ success: false, error: (err as Error).message }, 500);
+    }
+  });
+
+  // ── Inbound Webhook ──
+
+  // POST /api/ha/webhook — receive state updates or automation logs from HA
+  app.post('/webhook', async(c) => {
+    try {
+      const secret = (c.env.HA_WEBHOOK_SECRET ?? c.env.HA_TOKEN ?? '') as string;
+      if (secret) {
+        const token = c.req.header('x-ha-token') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? c.req.query('token');
+        if (token && token !== secret) {
+          return c.json({ error: 'Unauthorized HA token' }, 401);
+        }
+      }
+
+      const body = await c.req.json<Record<string, unknown>>();
+      if (!body || typeof body !== 'object') {
+        return c.json({ error: 'Invalid JSON payload' }, 400);
+      }
+
+      const result = await handleHAWebhook(c.env as Record<string, unknown>, body);
+      return c.json({ success: true, ...result });
+    } catch (err) {
+      log.error('ha_webhook_error', { error: (err as Error).message });
+      return c.json({ success: false, error: (err as Error).message }, 500);
+    }
   });
 
   return app;

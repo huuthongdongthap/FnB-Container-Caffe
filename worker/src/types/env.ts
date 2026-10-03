@@ -89,11 +89,13 @@ export interface Env {
   HA_URL?: string;
   HA_TOKEN?: string;
   HA_MOCK?: string;
+  HA_WEBHOOK_SECRET?: string;
 
   // TastyIgniter (POS/Order sync)
   TASTYIGNITER_URL?: string;
   TASTYIGNITER_API_KEY?: string;
   TASTYIGNITER_SYNC_ENABLED?: string;
+  TASTYIGNITER_WEBHOOK_SECRET?: string;
 
   // Frigate (NVR/camera events)
   FRIGATE_URL?: string;

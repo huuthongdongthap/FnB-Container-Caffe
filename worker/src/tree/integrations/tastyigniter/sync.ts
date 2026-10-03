@@ -17,6 +17,7 @@ export interface TISyncEnv {
   TASTYIGNITER_API_KEY?: string;
   TASTYIGNITER_SYNC_ENABLED?: string;
   AURA_DB?: import('@cloudflare/workers-types').D1Database;
+  DB?: import('@cloudflare/workers-types').D1Database;
 }
 
 interface MenuCacheRow {
@@ -53,7 +54,7 @@ export async function syncTIToLocalMenu(
   const promise = (async() => {
     try {
       const { menu } = await client.getMenu();
-      const db = env.AURA_DB;
+      const db = env.AURA_DB ?? env.DB;
       if (!db) {
         return { ok: false, mock: false, reason: 'no-db' };
       }
@@ -112,9 +113,9 @@ export async function bridgeOrderToTI(
   },
   ctx?: ExecutionContext
 ): Promise<{ ok: string; reason?: string; mocked?: boolean }> {
-  const { AURA_DB, TASTYIGNITER_SYNC_ENABLED, TASTYIGNITER_URL, TASTYIGNITER_API_KEY } = env as Record<string, unknown>;
+  const { AURA_DB, DB, TASTYIGNITER_SYNC_ENABLED, TASTYIGNITER_URL, TASTYIGNITER_API_KEY } = env as Record<string, unknown>;
   const enabled = (TASTYIGNITER_SYNC_ENABLED as string | undefined) === 'true';
-  const db = AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  const db = (AURA_DB ?? DB) as import('@cloudflare/workers-types').D1Database | undefined;
 
   if (!enabled || !TASTYIGNITER_URL || !TASTYIGNITER_API_KEY) {
     if (db) {
@@ -199,7 +200,7 @@ export async function bridgeOrderToTI(
  * Fetch local menu cache, falling back to live TI pull if too stale (> 6h).
  */
 export async function getTiMenuCache(env: TISyncEnv): Promise<{ items: MenuCacheRow[] }> {
-  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
 
   if (db) {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();

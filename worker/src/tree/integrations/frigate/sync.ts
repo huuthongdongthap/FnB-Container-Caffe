@@ -18,6 +18,7 @@ export interface FrigateSyncEnv {
   FRIGATE_API_KEY?: string;
   FRIGATE_SYNC_ENABLED?: string;
   AURA_DB?: import('@cloudflare/workers-types').D1Database;
+  DB?: import('@cloudflare/workers-types').D1Database;
 }
 
 interface FrigateEventRow {
@@ -47,7 +48,7 @@ export async function syncFrigateEvents(
 
   const limit = Math.min(opts?.limit ?? 50, 500);
   const camera = opts?.camera;
-  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
 
   const promise = (async() => {
     try {
@@ -99,7 +100,7 @@ export async function getFrigateEvents(
   env: FrigateSyncEnv,
   opts?: { camera?: string; since?: string; limit?: number }
 ): Promise<{ events: FrigateEventRow[] }> {
-  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
 
   if (!db) {
     return { events: [] };

@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { createFrigateClient } from '../../clients/frigate-client';
 import { syncFrigateEvents, getFrigateEvents } from '../../tree/integrations/frigate/sync';
+import { getOccupancyAnalytics } from '../../tree/integrations/frigate/occupancy';
 import { requireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
 
@@ -85,6 +86,18 @@ export function createFrigateRoutes() {
     } catch (err) {
       log.error('frigate_snapshot_error', { error: (err as Error).message });
       return c.json({ error: 'Failed to fetch snapshot', mock: false }, 500);
+    }
+  });
+
+  // GET /api/integrations/frigate/occupancy
+  // Aggregated real-time customer occupancy and peak hour analytics.
+  app.get('/occupancy', allow, async(c) => {
+    try {
+      const report = await getOccupancyAnalytics(c.env as Record<string, unknown>);
+      return c.json(report);
+    } catch (err) {
+      log.error('frigate_occupancy_error', { error: (err as Error).message });
+      return c.json({ error: 'Failed to compute occupancy analytics', mock: false }, 500);
     }
   });
 
