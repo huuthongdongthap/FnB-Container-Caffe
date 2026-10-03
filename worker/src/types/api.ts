@@ -184,3 +184,60 @@ export interface FranchiseLocationMetrics {
   royalty_amount: number;
   net_franchisee_payout: number;
 }
+
+/**
+ * AI & Forecasting Types
+ */
+export interface RecommendationItem {
+  id: string;
+  name: string;
+  reason: string;
+  score?: number;
+  orders_count?: number;
+}
+
+export interface InventoryForecastItem {
+  item_id: string;
+  item_sku: string;
+  item_name: string;
+  current_stock: number;
+  daily_run_rate: number;
+  days_of_supply: number;
+  risk_level: 'CRITICAL' | 'WARNING' | 'HEALTHY';
+  suggested_reorder_qty: number;
+  unit: string;
+  lead_time_days: number;
+}
+
+export interface DailyDemandProjection {
+  date: string;
+  day_of_week: string;
+  projected_orders: number;
+  projected_revenue: number;
+  seasonality_index: number;
+  is_weekend: boolean;
+}
+
+export interface DemandForecastResponse {
+  tenant_id: string;
+  forecast_horizon_days: number;
+  projected_total_orders: number;
+  projected_total_revenue: number;
+  historical_sample_orders: number;
+  daily_projections: DailyDemandProjection[];
+  peak_windows: {
+    morning_rush: { hours: string; share_percentage: number; suggested_prep: string };
+    evening_social: { hours: string; share_percentage: number; suggested_prep: string };
+  };
+  staffing_advice: string;
+}
+
+export interface BaristaRecommendationResponse {
+  product_id: string;
+  name: string;
+  reason: string;
+  temperature: string;
+  pairing_suggestion: string;
+  barista_note: string;
+  engine: string;
+}
