@@ -38,7 +38,7 @@ ALTER TABLE cafe_tables ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_cafe_tables_tenant_num ON cafe_tables(tenant_id, table_number);
 
 ALTER TABLE inventory_items ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
-CREATE INDEX IF NOT EXISTS idx_inventory_items_tenant ON inventory_items(tenant_id, item_code);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_tenant ON inventory_items(tenant_id, sku);
 
 ALTER TABLE reservations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
-CREATE INDEX IF NOT EXISTS idx_reservations_tenant_date ON reservations(tenant_id, reservation_date);
+CREATE INDEX IF NOT EXISTS idx_reservations_tenant_date ON reservations(tenant_id, date);
