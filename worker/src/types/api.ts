@@ -241,3 +241,54 @@ export interface BaristaRecommendationResponse {
   barista_note: string;
   engine: string;
 }
+
+export interface DynamicPricingRule {
+  id: string;
+  tenant_id: string;
+  name: string;
+  rule_type: string;
+  discount_percent: number;
+  target_category?: string | null;
+  target_product_id?: string | null;
+  min_margin_percent: number;
+  days_of_week: string;
+  start_time: string;
+  end_time: string;
+  is_active: number;
+}
+
+export interface DynamicPricingCalculationItem {
+  product_id: string;
+  quantity: number;
+  original_price: number;
+  final_price: number;
+  discount_applied: number;
+  discount_percent: number;
+  rule_name: string | null;
+}
+
+export interface CalculatePricingResponse {
+  original_total: number;
+  discounted_total: number;
+  total_savings: number;
+  items: DynamicPricingCalculationItem[];
+}
+
+export interface CustomerAssistantResponse {
+  intent: string;
+  reply: string;
+  engine: string;
+}
+
+export interface ContainerTelemetryStatus {
+  container_id: string;
+  operational_status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'OFFLINE';
+  power_source: string;
+  battery_percentage: number | null;
+  ambient_temp_celsius: number;
+  kds_online: boolean;
+  alert_message: string | null;
+  last_heartbeat: string;
+  minutes_since_heartbeat: number;
+}
+
