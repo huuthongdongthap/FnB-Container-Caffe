@@ -61,7 +61,13 @@
 | `npm test` (`vitest run`) | **389 test files / 3,579 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
+| **GitHub Actions CI (main)** | **Run 37092655966: PASS (5m46s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (main)** | **Run 37092656123: PASS (pages 50s, worker 50s)** | 🟢 GREEN |
+| **PR #63 Merge Status** | **Squash-merged into `main` (`2f466f5`)** | 🟢 MERGED |
+| **D1 Remote Migration** | `20261003_01_pillar_tables.sql` applied to `AURA_DB` (13 queries, success) | 🟢 APPLIED |
+| **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `2f466f57`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/wifi/login` (authorized), `/api/wifi/status` (3600s TTL), `/api/ha/webhook` (200), `/api/integrations/tastyigniter/webhook` (200) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 2: Mobile App / PWA Enhancements (Q1 2027) & Production Monitoring Operations.
-- Stage, commit, and create pull request for Phase 1: 12 Pillars Ecosystem Integration.
+- Phase 2: Mobile App / PWA Enhancements (Q1 2027) & Continuous Monitoring.
