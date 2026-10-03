@@ -17,9 +17,15 @@ export function requestMetrics(): MiddlewareHandler<{ Bindings: Env }> {
     } finally {
       const duration = Date.now() - start;
       const status = c.res?.status ?? 500;
-      if (c.executionCtx) {
+      let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+      try {
+        ctx = c.executionCtx;
+      } catch {
+        // No execution context in testing
+      }
+      if (ctx) {
         const mc = createMetricsCollector(c.env.AURA_DB);
-        c.executionCtx.waitUntil(mc.recordMetric('request', 1, {
+        ctx.waitUntil(mc.recordMetric('request', 1, {
           method: c.req.method,
           path: c.req.path,
           status,

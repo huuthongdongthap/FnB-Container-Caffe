@@ -32,7 +32,7 @@ adminMetrics.get('/', async(c) => {
   }
 
   const hours = getRangeHours(range as Range);
-  const db = c.env.AURA_DB;
+  const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
   const since = new Date(Date.now() - hours * 3600000).toISOString();
 
   // If filter param is provided, query by metric name prefix using getMetricSummary

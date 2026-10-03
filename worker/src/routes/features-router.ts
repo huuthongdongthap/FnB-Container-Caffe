@@ -129,11 +129,13 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.use('/api/reports/*', requireAuth(['owner', 'staff']));
   app.route('/api/reports', reportsRouter);
 
-  // Inventory
-  app.use('/api/inventory/*', requireAuth(['owner', 'staff', 'customer']));
-  inventoryCRUD(app as any);
-  inventoryTransactions(app as any);
-  inventorySnapshots(app as any);
+  // Inventory Items (domain-inventory)
+  const inventoryItemsApp = new Hono<{ Bindings: Env }>();
+  inventoryItemsApp.use('/*', requireAuth(['owner', 'staff', 'customer']));
+  inventoryCRUD(inventoryItemsApp as any);
+  inventoryTransactions(inventoryItemsApp as any);
+  inventorySnapshots(inventoryItemsApp as any);
+  app.route('/api/inventory/items', inventoryItemsApp);
 
   // Health & System
   app.get('/api/health', async (c) => {

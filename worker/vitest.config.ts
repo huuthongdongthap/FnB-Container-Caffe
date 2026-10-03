@@ -25,6 +25,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      'worker': fileURLToPath(new URL('.', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@/middleware': fileURLToPath(new URL('./src/middleware', import.meta.url)),
       '@/lib': fileURLToPath(new URL('./src/lib', import.meta.url)),

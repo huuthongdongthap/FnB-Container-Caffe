@@ -131,11 +131,17 @@ export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }>
       const status = c.res?.status ?? 500;
 
       // Guard: only record if executionCtx is available
-      if (!c.executionCtx) {
+      let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+      try {
+        ctx = c.executionCtx;
+      } catch {
+        return;
+      }
+      if (!ctx) {
         return;
       }
 
-      c.executionCtx.waitUntil(
+      ctx.waitUntil(
         (async() => {
           try {
             recordMetric(c.env.AURA_DB, 'request_duration_ms', duration);

@@ -19,13 +19,14 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const sortParam = (url.searchParams.get('sort') || 'created_at') as OrderSortColumn;
     const order = url.searchParams.get('order') === 'asc' ? 'ASC' as const : 'DESC' as const;
 
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
     const filters: Array<[string, string]> = [];
     if (status) filters.push(['o.status', status]);
     if (paymentStatus) filters.push(['o.payment_status', paymentStatus]);
 
     let query = `SELECT o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+       o.items, o.shipping_fee, o.discount,
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
      FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
     const { clause, params } = buildOrderFilterClause({ filters });

@@ -10,14 +10,14 @@ const log = createLogger({ route: 'orders' });
 
 export async function getStats(request: Request, env: Record<string, unknown>) {
   try {
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
     const { results: ordersTodayResult } = await db.prepare(`
       SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
       FROM orders
-      WHERE created_at >= ?
+      WHERE created_at >= ? AND status != 'cancelled'
     `).bind(todayStart.toISOString()).all<{ total: number; revenue: number }>();
 
     const { results: statusResult } = await db.prepare(`
