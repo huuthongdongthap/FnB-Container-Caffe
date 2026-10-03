@@ -63,6 +63,19 @@
 - **Security Audit & Hardening (`reports/audit/comprehensive-audit-2026.md`)**:
   - `SEC-01`: Sanitized dynamic SQL `ORDER BY` parameters with strict column whitelisting across `openapi-categories`, `openapi-products`, `openapi-tables`, `openapi-payments`, and `openapi-staff`.
   - `SEC-02`: Added production domain `auracafe.vn` and its subdomains to the worker CORS allowlist.
+- **Phase 3: Multi-Tenant & Franchise Preparation (PR #66)**:
+  - Applied DDL migration `20261004_01_multi_tenant_franchise.sql` to production D1 `AURA_DB` (72 tables total).
+  - Added row-level tenant partitioning (`tenant_id TEXT NOT NULL DEFAULT 'default'`) across core domain tables (`orders`, `cafe_tables`, `inventory_items`, `reservations`).
+  - Added composite indexes: `(tenant_id, created_at)`, `(tenant_id, status)`, `(tenant_id, table_number)`, `(tenant_id, sku)`, and `(tenant_id, date)`.
+  - Seeded flagship container `loc_sadec_flagship` (`SD-01`).
+  - Centralized tenant scoping in `shared-listing.ts` (`buildOrderFilterClause`) and `admin-orders.ts` with zero breaking changes for existing queries.
+  - Enhanced `tenantMiddleware` for HQ Super-Admin scope derivation (`isHQSuperAdmin`) and cross-tenant IDOR protection.
+  - Built franchise container management router `worker/src/routes/franchise-locations.ts` (< 200 LOC):
+    - `GET /api/franchise/locations` (HQ all-locations view vs franchisee scoped view).
+    - `POST /api/franchise/locations` (HQ-authenticated container onboarding).
+    - `GET /api/franchise/locations/:id` (secured location profile).
+    - `GET /api/franchise/locations/:id/metrics` (gross sales, royalty fee calculation, and net franchisee payout).
+  - Added dedicated integration test suite `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS).
 
 ## Verification Evidence
 | Gate | Result | Status |
@@ -72,17 +85,19 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **392 test files / 3,594 tests PASS (0 failures)** | 🟢 GREEN |
+| `npm test` (`vitest run`) | **393 test files / 3,602 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
+| **Multi-Tenant & Franchise E2E** | `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS) | 🟢 GREEN |
 | **PR #63 Merge Status** | **Squash-merged into `main` (`2f466f5`)** | 🟢 MERGED |
 | **PR #64 Merge Status** | **Squash-merged into `main` (`34204b1`)** | 🟢 MERGED |
 | **PR #65 Merge Status** | **Squash-merged into `main` (`4b326e1`)** | 🟢 MERGED |
-| **GitHub Actions CI (PR #65 main)** | **Run 37108663750: PASS (lint-and-test 4m41s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (PR #65 main)** | **Run 37108663753: PASS (pages 54s, worker 40s)** | 🟢 GREEN |
+| **PR #66 Merge Status** | **Squash-merged into `main` (`fd5ffe2`)** | 🟢 MERGED |
+| **GitHub Actions CI (PR #66 main)** | **Run 37115557281: PASS (lint-and-test 4m24s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (PR #66 main)** | **Run 37115557228: PASS (pages 52s, worker 41s)** | 🟢 GREEN |
 | **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `4b326e1`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/menu` (200), `/` (404 clean router), `/api/orders/sync` (active & validated) | 🟢 VERIFIED |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `821c7d8`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/menu` (200), `/api/version` (`821c7d8`), `/api/franchise/locations` (401 auth guard active) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 3: Multi-Tenant & Franchise Preparation (Q2 2027)
+- Phase 4: AI & Edge Optimization (Q3-Q4 2027)
