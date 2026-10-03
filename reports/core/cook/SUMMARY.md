@@ -53,6 +53,13 @@
   - Enforced Sales CSV UTF-8 BOM (`0xEF, 0xBB, 0xBF`) and bilingual headers in `/api/admin/sales/csv`.
   - Applied consolidated DDL migration `20261003_02_admin_metrics_and_inventory.sql` to remote D1 `AURA_DB` (71 tables synchronized).
   - Added dedicated integration test suite `admin-revenue-inventory.test.ts` (6/6 passing tests).
+- **Mobile App / PWA Enhancements & Offline Cart Sync (PR #65)**:
+  - Implemented backend offline order sync route `POST /api/orders/sync` in `worker/src/routes/orders-core.ts`.
+  - Supported dual payload formats: nested (`{ localId, orderData: { ... } }`) and flat (`{ localId, items: [...] }`).
+  - Added KV idempotency caching (`order:idempotency:offline:${localId}`) with 24h TTL.
+  - Enhanced client `OfflineDB` (`src/lib/offline-db.ts`) to preserve `localId` on queued orders and filter out metadata/menu caches (`menu`, `_meta_categories`).
+  - Reconciled `useOfflineSync` and `useOrderStore` with canonical `API_BASE` and automatic queue flushing upon network reconnection.
+  - Added dedicated test suites: `orders-sync.test.ts` (5/5 PASS) and `use-offline-sync.test.ts` (4/4 PASS).
 - **Security Audit & Hardening (`reports/audit/comprehensive-audit-2026.md`)**:
   - `SEC-01`: Sanitized dynamic SQL `ORDER BY` parameters with strict column whitelisting across `openapi-categories`, `openapi-products`, `openapi-tables`, `openapi-payments`, and `openapi-staff`.
   - `SEC-02`: Added production domain `auracafe.vn` and its subdomains to the worker CORS allowlist.
@@ -65,20 +72,17 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **389 test files / 3,579 tests PASS (0 failures)** | 🟢 GREEN |
+| `npm test` (`vitest run`) | **392 test files / 3,594 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
-| **GitHub Actions CI (main)** | **Run 37092655966: PASS (5m46s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (main)** | **Run 37092656123: PASS (pages 50s, worker 50s)** | 🟢 GREEN |
 | **PR #63 Merge Status** | **Squash-merged into `main` (`2f466f5`)** | 🟢 MERGED |
 | **PR #64 Merge Status** | **Squash-merged into `main` (`34204b1`)** | 🟢 MERGED |
-| **GitHub Actions CI (PR #64 main)** | **Run 37099915885: PASS (5m12s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (PR #64 main)** | **Run 37099915901: PASS (pages 56s, worker 41s)** | 🟢 GREEN |
-| **D1 Remote Migration** | `20261003_02_admin_metrics_and_inventory.sql` applied to `AURA_DB` (71 tables synchronized) | 🟢 APPLIED |
+| **PR #65 Merge Status** | **Squash-merged into `main` (`4b326e1`)** | 🟢 MERGED |
+| **GitHub Actions CI (PR #65 main)** | **Run 37108663750: PASS (lint-and-test 4m41s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (PR #65 main)** | **Run 37108663753: PASS (pages 54s, worker 40s)** | 🟢 GREEN |
 | **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `34204b1`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/menu` (200), `/` (404 unhijacked clean router), `/api/wifi/login` (authorized) | 🟢 VERIFIED |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `4b326e1`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/menu` (200), `/` (404 clean router), `/api/orders/sync` (active & validated) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 2: Mobile App / PWA Enhancements & Offline Cart Sync (Q1 2027)
-- Multi-Tenant & Franchise Preparation (Q2 2027)
+- Phase 3: Multi-Tenant & Franchise Preparation (Q2 2027)
