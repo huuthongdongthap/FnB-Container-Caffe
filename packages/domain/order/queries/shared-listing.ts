@@ -18,6 +18,10 @@ export interface OrderListOptions {
   order?: 'ASC' | 'DESC';
   limit?: number;
   offset?: number;
+  /** Optional tenant identifier for multi-tenant isolation. When provided and not '*', scopes o.tenant_id = ? */
+  tenantId?: string;
+  /** Custom table alias for tenant_id column (default 'o') */
+  tableAlias?: string;
 }
 
 const SORTABLE_COLUMNS: ReadonlySet<string> = new Set(['created_at', 'total', 'status']);
@@ -31,9 +35,16 @@ function safeSortColumn(raw: string): string {
   return SORTABLE_COLUMNS.has(bare) ? raw : 'created_at';
 }
 
-export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters'>): { clause: string; params: unknown[] } {
+export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters' | 'tenantId' | 'tableAlias'>): { clause: string; params: unknown[] } {
   const params: unknown[] = [];
   let clause = '';
+
+  const alias = opts.tableAlias ?? 'o';
+  if (opts.tenantId && opts.tenantId !== '*') {
+    clause += ` AND ${alias}.tenant_id = ?`;
+    params.push(opts.tenantId);
+  }
+
   // Filter columns are caller-side constants (never user input), so values go
   // through bind params and column names need no runtime validation here.
   for (const [column, value] of opts.filters ?? []) {

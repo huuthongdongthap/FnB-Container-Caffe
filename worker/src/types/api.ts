@@ -155,3 +155,32 @@ email?: string;
 category?: string;
 content: string;
 }
+
+/**
+ * Franchise Location types
+ */
+export interface FranchiseLocation {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  royalty_percentage: number;
+  status: 'active' | 'suspended' | 'closed';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FranchiseLocationMetrics {
+  location_id: string;
+  code: string;
+  name: string;
+  tenant_id: string;
+  order_count: number;
+  gross_sales: number;
+  royalty_percentage: number;
+  royalty_amount: number;
+  net_franchisee_payout: number;
+}

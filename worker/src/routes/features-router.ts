@@ -53,12 +53,18 @@ import { registerCronAdminRoutes } from './cron-admin';
 import { getAdminCustomers, getStuckPayments } from './admin-handlers';
 import { getPricing } from './saas-pricing';
 import { createTenantRoutes } from './saas-tenants';
+import { franchiseRouter } from './franchise-locations';
 import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Admin Protected
   app.use('/api/admin/*', requireAuth(['owner', 'staff']));
-  app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
+  app.get('/api/admin/orders', (c) => {
+    const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
+    const isHQ = user?.role === 'owner' && (!user?.tenantId || user?.tenantId === 'default' || user?.tenantId === 'hq');
+    const effectiveTenant = isHQ ? (c.req.query('tenant_id') || undefined) : user?.tenantId;
+    return getAdminOrders(c.req.raw, c.env, effectiveTenant);
+  });
   app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
   app.get('/api/admin/payments/stuck', requireAuth(['owner']), (c) => getStuckPayments(c.req.raw, c.env));
   app.route('/api/admin/dindin', dindinRouter);
@@ -145,8 +151,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   });
   app.get('/api/version', (c) => c.json(getVersion(c.env)));
 
-  // SaaS
+  // SaaS & Franchise
   app.get('/api/saas/pricing', getPricing);
   app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
   app.route('/api/saas/tenants', createTenantRoutes());
+  app.route('/api/franchise', franchiseRouter);
 }
