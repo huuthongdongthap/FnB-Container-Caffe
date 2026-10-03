@@ -76,6 +76,13 @@
     - `GET /api/franchise/locations/:id` (secured location profile).
     - `GET /api/franchise/locations/:id/metrics` (gross sales, royalty fee calculation, and net franchisee payout).
   - Added dedicated integration test suite `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS).
+- **Phase 4: AI & Edge Automation (Q3 2027)**:
+  - Applied D1 migration `20261004_02_ai_automation.sql` to remote `fnb-caffe-db` (75 tables active).
+  - Implemented server-side AI Menu Recommendations engine (`/api/recommendations/frequently-bought-together`, `/api/recommendations/trending`, `/api/recommendations/mine-affinities`) with basket co-occurrence mining and Sa Đéc staple fallbacks.
+  - Implemented predictive inventory Days-of-Supply (DOS) forecasting (`/api/inventory/forecasting/run-rate`, `/api/inventory/forecasting/snapshot`) calculating $v_{run}$, risk levels (`CRITICAL`, `WARNING`, `HEALTHY`), and automated reorder volumes.
+  - Implemented edge demand & sales forecasting (`/api/admin/metrics/forecast`, `/api/admin/metrics/forecast/hourly`) with day-of-week seasonality, weekend tourism surge uplift, and peak rush windows.
+  - Implemented AI Barista Concierge (`/api/ai/barista/recommend`, `/api/ai/barista/specials`) with dual-engine execution (Workers AI Llama-3-8b + deterministic Sa Đéc barista fallback) and interaction logging.
+  - Added dedicated integration test suite `worker/src/__tests__/integrations/ai-automation.test.ts` (14/14 PASS).
 
 ## Verification Evidence
 | Gate | Result | Status |
@@ -85,19 +92,21 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **393 test files / 3,602 tests PASS (0 failures)** | 🟢 GREEN |
+| `npm test` (`vitest run`) | **394 test files / 3,616 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
 | **Multi-Tenant & Franchise E2E** | `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS) | 🟢 GREEN |
+| **AI & Edge Automation E2E** | `worker/src/__tests__/integrations/ai-automation.test.ts` (14/14 PASS) | 🟢 GREEN |
 | **PR #63 Merge Status** | **Squash-merged into `main` (`2f466f5`)** | 🟢 MERGED |
 | **PR #64 Merge Status** | **Squash-merged into `main` (`34204b1`)** | 🟢 MERGED |
 | **PR #65 Merge Status** | **Squash-merged into `main` (`4b326e1`)** | 🟢 MERGED |
 | **PR #66 Merge Status** | **Squash-merged into `main` (`fd5ffe2`)** | 🟢 MERGED |
-| **GitHub Actions CI (PR #66 main)** | **Run 37115557281: PASS (lint-and-test 4m24s)** | 🟢 GREEN |
-| **GitHub Actions Deploy (PR #66 main)** | **Run 37115557228: PASS (pages 52s, worker 41s)** | 🟢 GREEN |
+| **PR #67 Merge Status** | **Squash-merged into `main` (`746a365`)** | 🟢 MERGED |
+| **GitHub Actions CI (PR #67 main)** | **Run 37128838729: PASS (lint-and-test 5m43s)** | 🟢 GREEN |
+| **GitHub Actions Deploy (PR #67 main)** | **Run 37128838746: PASS (pages 45s, worker 43s)** | 🟢 GREEN |
 | **Cloudflare Pages Deploy** | `https://fnb-caffe-container.pages.dev` (HTTP 200) | 🟢 LIVE |
-| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `821c7d8`) | 🟢 LIVE |
-| **Live Smoke Verification** | `/api/menu` (200), `/api/version` (`821c7d8`), `/api/franchise/locations` (401 auth guard active) | 🟢 VERIFIED |
+| **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (SHA: `746a365`) | 🟢 LIVE |
+| **Live Smoke Verification** | `/api/recommendations` (200), `/api/ai/barista/recommend` (200), `/api/version` (`746a365`), auth guards (401 active) | 🟢 VERIFIED |
 
 ## Next Step
-- Phase 4: AI & Edge Optimization (Q3-Q4 2027)
+- Phase 5: Autonomous Edge Operations & Regional Scaling (Q4 2027)
