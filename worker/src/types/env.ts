@@ -106,6 +106,9 @@ export interface Env {
   ENVIRONMENT?: string;
   AURA_KV?: import('@cloudflare/workers-types').KVNamespace;
 
+  // Cloudflare Workers AI
+  AI?: unknown;
+
   // Dynamic access for legacy patterns
   [key: string]: unknown;
 }

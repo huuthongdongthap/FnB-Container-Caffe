@@ -54,6 +54,10 @@ import { getAdminCustomers, getStuckPayments } from './admin-handlers';
 import { getPricing } from './saas-pricing';
 import { createTenantRoutes } from './saas-tenants';
 import { franchiseRouter } from './franchise-locations';
+import { recommendationsRouter } from './recommendations';
+import { inventoryForecastingRouter } from './inventory-forecasting';
+import { demandForecastRouter } from './demand-forecast';
+import { aiBaristaRouter } from './ai-barista';
 import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
@@ -156,4 +160,10 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
   app.route('/api/saas/tenants', createTenantRoutes());
   app.route('/api/franchise', franchiseRouter);
+
+  // AI & Edge Automation
+  app.route('/api/recommendations', recommendationsRouter);
+  app.route('/api/inventory/forecasting', inventoryForecastingRouter);
+  app.route('/api/admin/metrics', demandForecastRouter);
+  app.route('/api/ai/barista', aiBaristaRouter);
 }
