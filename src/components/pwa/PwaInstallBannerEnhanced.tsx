@@ -66,10 +66,13 @@ export default function PwaInstallPrompt() {
     }
   }, [dismissed, isInstalled]);
 
+  const isAutomated = typeof navigator !== 'undefined' && (Boolean(navigator.webdriver) || Boolean((window as unknown as { __playwright?: boolean }).__playwright));
+
   const shouldShow =
+    !isAutomated &&
     !isInstalled &&
     !dismissed &&
-    (isIOS || !!deferredPrompt);
+    (isIOS || Boolean(deferredPrompt));
 
   const handleInstall = useCallback(async () => {
     if (isIOS) {

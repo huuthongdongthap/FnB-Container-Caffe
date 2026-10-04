@@ -32,7 +32,7 @@ export function BrandGuideline() {
     description="AURA CAFE brand guidelines and design system. Huong dan thuong hieu va he thong thiet ke AURA CAFE."
    />
 
-   <main id="main-content" className="bg-[color:var(--aura-surface-container)] text-[color:var(--aura-chrome-bright)] mx-auto max-w-6xl px-4 py-8">
+   <main id="main-content" className="bg-[color:var(--aura-surface-container)] text-[color:var(--aura-chrome-bright)] mx-auto max-w-6xl px-4 py-8 overflow-x-hidden">
     <Breadcrumbs items={BREADCRUMBS} className="mb-8" />
 
     <section className="mb-16 text-center">

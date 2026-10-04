@@ -71,7 +71,7 @@ export function ZoneColors({ className }: ZoneColorsProps) {
               <h3 className="font-display text-base font-semibold text-foreground">
                 {zone.name}
               </h3>
-              <code className="mt-1 block text-xs text-muted">{zone.token}</code>
+              <code className="mt-1 block text-xs text-muted truncate">{zone.token}</code>
               <span className="mt-1 inline-block rounded bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
                 {zone.hex}
               </span>

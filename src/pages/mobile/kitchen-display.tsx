@@ -57,6 +57,7 @@ export default function KitchenDisplay() {
       setError(null);
       const body = (await apiFetch<{ success: boolean; orders: KitchenOrder[] }>('/mobile/kds/orders'));
       if (body.success) {
+        setError(null);
         setOrders(body.orders);
         setLoading(false);
       } else {
@@ -64,7 +65,7 @@ export default function KitchenDisplay() {
         setLoading(false);
       }
     } catch {
-      setError('Lỗi kết nối / Connection error');
+      setError('Không thể tải đơn hàng / Failed to load orders');
       setLoading(false);
     }
   }, []);

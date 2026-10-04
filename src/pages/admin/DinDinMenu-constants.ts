@@ -1,6 +1,6 @@
 import type { DinDinItem } from './DinDinMenu-types';
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
+export { API_BASE } from '@/lib/api-client';
 
 export const EMPTY_ITEM: DinDinItem = {
   name: '',

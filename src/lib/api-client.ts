@@ -32,45 +32,56 @@ export function setErrorInterceptor(handler: ErrorInterceptor | null): void {
   onError = handler;
 }
 
-function reportError(error: ApiClientError, path: string, method: string): void {
+function reportError(error: ApiClientError, path: string, method: string, silent = false): void {
   // Call external interceptor if configured
   onError?.(error, { path, method });
 
   // Log to console in development
-  if (import.meta.env.DEV) {
-    logger.error(`[API Error] ${method} ${path}`, { status: error.status, message: error.message });
+  if (import.meta.env.DEV && !silent) {
+    if (error.status === 0) {
+      logger.warn(`[API Warning] ${method} ${path}`, { status: error.status, message: error.message });
+    } else {
+      logger.error(`[API Error] ${method} ${path}`, { status: error.status, message: error.message });
+    }
   }
 
-  // Report to analytics endpoint (fire-and-forget)
-  try {
-    const body = JSON.stringify({
-      type: 'api_error',
-      status: error.status,
-      message: error.message,
-      path,
-      method,
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-    });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/errors', body);
-    } else {
-      fetch('/api/errors', { method: 'POST', body, keepalive: true }).catch(() => {});
+  // Report to analytics endpoint (fire-and-forget) only when network is reachable
+  if (error.status !== 0) {
+    try {
+      const body = JSON.stringify({
+        type: 'api_error',
+        status: error.status,
+        message: error.message,
+        path,
+        method,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+      });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/errors', body);
+      } else {
+        fetch('/api/errors', { method: 'POST', body, keepalive: true }).catch(() => {});
+      }
+    } catch {
+      // Silently fail
     }
-  } catch {
-    // Silently fail
   }
+}
+
+export interface ApiFetchOptions extends RequestInit {
+  silent?: boolean;
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions = {},
 ): Promise<T> {
+  const { silent = false, ...fetchOptions } = options;
   // Auth handled via httpOnly cookies — no Authorization header needed.
   // Backend reads the access_token cookie automatically.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> | undefined),
+    ...(fetchOptions.headers as Record<string, string> | undefined),
   };
 
   const url = `${API_BASE}${path}`;
@@ -79,11 +90,17 @@ export async function apiFetch<T = unknown>(
   let res: Response;
   try {
     res = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       credentials: 'include', // Send cookies cross-origin
       headers,
     });
   } catch (networkErr) {
+    if (
+      (networkErr instanceof DOMException && networkErr.name === 'AbortError') ||
+      (networkErr instanceof Error && networkErr.name === 'AbortError')
+    ) {
+      throw networkErr;
+    }
     // Translate browser-level network errors into readable Vietnamese messages
     const isNetworkError =
       networkErr instanceof TypeError &&
@@ -94,7 +111,7 @@ export async function apiFetch<T = unknown>(
       ? 'Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.'
       : (networkErr instanceof Error ? networkErr.message : 'Lỗi kết nối không xác định');
     const apiError = new ApiClientError({ status: 0, message: friendlyMessage });
-    reportError(apiError, path, options.method ?? 'GET');
+    reportError(apiError, path, fetchOptions.method ?? 'GET', silent);
     throw apiError;
   }
 
@@ -112,7 +129,7 @@ export async function apiFetch<T = unknown>(
       message,
       errors: body.errors,
     });
-    reportError(apiError, path, options.method ?? 'GET');
+    reportError(apiError, path, fetchOptions.method ?? 'GET', silent);
     throw apiError;
   }
 

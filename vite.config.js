@@ -11,6 +11,20 @@ export default defineConfig({
     tailwindcss(),
     react(),
     {
+      name: 'dev-api-beacons',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url === '/api/vitals' || req.url === '/api/errors') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+            return;
+          }
+          next();
+        });
+      },
+    },
+    {
       name: 'copy-cloudflare-config',
       closeBundle() {
         const dist = resolve(__rootDir, 'dist');

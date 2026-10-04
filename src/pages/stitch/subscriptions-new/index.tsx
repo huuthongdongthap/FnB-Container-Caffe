@@ -70,7 +70,7 @@ const PLANS: readonly Plan[] = [
 
 export default function SubscriptionsNew() {
   return (
-    <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] flex flex-col justify-between">
+    <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] flex flex-col justify-between overflow-x-hidden">
       <HelmetHead
         title="Gói Hội Viên &amp; Đặc Quyền Tháng — AURA CAFE"
         description="Đăng ký gói cà phê tháng và gói co-working tại AURA CAFE Sa Đéc. Thưởng thức đồ uống mỗi ngày và tận hưởng không gian làm việc container sang trọng."
@@ -96,15 +96,15 @@ export default function SubscriptionsNew() {
         </section>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {PLANS.map((plan) => {
             const Icon = plan.icon;
             return (
               <div
                 key={plan.id}
-                className={`rounded-[36px] p-8 sm:p-10 flex flex-col justify-between relative transition-all duration-500 group ${
+                className={`rounded-[36px] p-6 sm:p-8 lg:p-10 flex flex-col justify-between relative transition-all duration-500 group ${
                   plan.highlighted
-                    ? 'bg-gradient-to-b from-white/10 to-white/5 border-2 border-[var(--aura-chrome-bright)] shadow-[0_0_30px_rgba(201,214,223,0.15)] md:-translate-y-2'
+                    ? 'bg-gradient-to-b from-white/10 to-white/5 border-2 border-[var(--aura-chrome-bright)] shadow-[0_0_30px_rgba(201,214,223,0.15)] lg:-translate-y-2'
                     : 'bg-white/5 backdrop-blur-[8px] border border-white/10 hover:border-[var(--aura-chrome-mid)]/40 shadow-xl'
                 }`}
               >
@@ -127,7 +127,7 @@ export default function SubscriptionsNew() {
                   </p>
 
                   <div className="flex items-baseline gap-1.5 pb-6 mb-6 border-b border-white/10">
-                    <span className="font-display text-3xl sm:text-4xl font-bold text-white">
+                    <span className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold text-white whitespace-nowrap">
                       {plan.price}
                     </span>
                     <span className="font-body text-xs text-[var(--aura-chrome-mid)] tracking-wider">

@@ -9,6 +9,7 @@ export const openApiOrdersRouter = new OpenAPIHono<{ Bindings: Env }>();
 // Apply auth middleware to all routes
 // 'customer' is required here: guests authenticate with their own token and the
 // read handlers scope every query to the caller's own customer_id.
+openApiOrdersRouter.use('/api/orders', requireAuth(['owner', 'manager', 'staff', 'customer']));
 openApiOrdersRouter.use('/api/orders/*', requireAuth(['owner', 'manager', 'staff', 'customer']));
 
 registerOrderReadHandlers(openApiOrdersRouter);
