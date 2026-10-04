@@ -169,8 +169,7 @@ export default function MobileLogin() {
           ))}
         </div>
 
-        <button style={submitStyle(loading)} disabled={loading} onClick={handleSubmit}
-          onMouseDown={(e) => e.preventDefault()}>
+        <button type="button" style={submitStyle(loading)} disabled={loading} onClick={handleSubmit}>
           {loading ? (t('common.loading', 'Đang tải...') ?? '...') : (t('staffLogin.submit', 'Đăng nhập / Login'))}
         </button>
 

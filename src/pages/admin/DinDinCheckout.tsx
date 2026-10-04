@@ -23,8 +23,6 @@ export default function DinDinCheckout() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'printed' | 'qc_ok'>('all');
 
-  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
-
   const loadEntries = useCallback(async () => {
     setLoading(true);
     setError(null);

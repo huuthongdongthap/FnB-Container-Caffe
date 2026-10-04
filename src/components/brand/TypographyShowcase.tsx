@@ -36,7 +36,7 @@ export function TypographyShowcase({ fonts, className }: TypographyShowcaseProps
     <div className={cn('grid gap-6 sm:grid-cols-2 lg:grid-cols-3', className)}>
       {fonts.map((font) => (
         <div
-          key={font.name}
+          key={`${font.name}-${font.category}`}
           className="rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:border-accent/30"
         >
           <div className="mb-1 inline-block rounded-full bg-accent/10 px-3 py-1 font-utility text-xs font-medium text-accent">

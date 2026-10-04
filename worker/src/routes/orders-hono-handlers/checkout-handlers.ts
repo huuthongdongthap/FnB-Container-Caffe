@@ -23,6 +23,16 @@ export function registerCheckoutHandlers(app: Hono<{ Bindings: Env }>) {
     const id = makeOrderId();
     const now = new Date().toISOString();
 
+    let tableId: string | null = (body.table_id as string) || null;
+    if (tableId) {
+      const tableRow = await db.prepare(
+        'SELECT id FROM cafe_tables WHERE id = ? OR table_number = ?'
+      ).bind(tableId, tableId).first<{ id: string }>();
+      if (tableRow) {
+        tableId = tableRow.id;
+      }
+    }
+
     await db.prepare(
       `INSERT INTO orders (id, customer_name, customer_phone, table_id, items,
        total, status, payment_method, notes, created_at, updated_at)
@@ -31,7 +41,7 @@ export function registerCheckoutHandlers(app: Hono<{ Bindings: Env }>) {
       id,
       data.customer_name || 'Walk-in',
       data.customer_phone || '',
-      body.table_id || null,
+      tableId,
       JSON.stringify(data.items),
       parseInt(String(body.total || 0)),
       data.payment_method || 'cash',

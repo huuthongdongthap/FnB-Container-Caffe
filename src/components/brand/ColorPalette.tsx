@@ -46,7 +46,7 @@ export function ColorPalette({ colors, categories, className }: ColorPaletteProp
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {catColors.map((color) => (
                 <ColorSwatch
-                  key={color.hex}
+                  key={`${color.token || color.name}-${color.hex}`}
                   color={color}
                   copied={copied}
                   onCopy={handleCopy}
@@ -63,7 +63,7 @@ export function ColorPalette({ colors, categories, className }: ColorPaletteProp
     <div className={cn('grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5', className)}>
       {colors.map((color) => (
         <ColorSwatch
-          key={color.hex}
+          key={`${color.token || color.name}-${color.hex}`}
           color={color}
           copied={copied}
           onCopy={handleCopy}
@@ -94,8 +94,8 @@ function ColorSwatch({ color, copied, onCopy }: ColorSwatchProps) {
         style={{ backgroundColor: color.hex }}
       />
       <div className="rounded-b-xl border border-t-0 border-border bg-card p-3">
-        <p className="text-sm font-semibold text-foreground">{color.name}</p>
-        <code className="mt-0.5 block text-xs text-muted">{color.token}</code>
+        <p className="text-sm font-semibold text-foreground truncate">{color.name}</p>
+        <code className="mt-0.5 block text-xs text-muted truncate">{color.token}</code>
         <span className="mt-1 inline-block rounded bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
           {isCopied ? <> <Check size={14} className="inline" /> Copied</> : color.hex}
         </span>

@@ -17,13 +17,16 @@ const MOCK_LOGIN_FAIL = {
 };
 
 function mockLoginApi(page: typeof test.prototype.page, body: unknown, status = 200) {
-  page.route(`${BACKEND}/mobile/login`, (route) =>
-    route.fulfill({
-      status,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    }),
-  );
+  page.route('**/mobile/login', (route) => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      });
+    }
+    return route.continue();
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -36,7 +39,10 @@ test.describe('Mobile Login', () => {
   test.beforeEach(async ({ page }) => {
     // start from a clean state on the login page
     await page.goto('/mobile/login');
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem('aura-pwa-install-dismissed', 'true');
+    });
   });
 
   test.afterEach(async ({ page }) => {

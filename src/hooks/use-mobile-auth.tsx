@@ -4,6 +4,7 @@ Storage: localStorage keys `mobile_token`, `mobile_user`, `mobile_device`
 ═══════════════════════════════════════════════════════════════════ */
 
 import { useState, useCallback, useEffect, createContext, useContext } from 'react';
+import { API_BASE } from '@/lib/api-client';
 
 const STORAGE_KEYS = {
   token: 'mobile_token',
@@ -40,7 +41,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 function readStorage<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    if (raw === null || raw === undefined) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return raw as unknown as T;
+    }
   } catch {
     return fallback;
   }
@@ -48,7 +54,8 @@ function readStorage<T>(key: string, fallback: T): T {
 
 function writeStorage<T>(key: string, value: T) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    localStorage.setItem(key, serialized);
   } catch {
     // quota exceeded or private mode — silent fail
   }
@@ -56,15 +63,30 @@ function writeStorage<T>(key: string, value: T) {
 
 function clearStorage() {
   Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem('aura_auth_token');
+  localStorage.removeItem('aura_user_data');
+  localStorage.removeItem('aura_device_token');
+}
+
+function getStoredToken(): string | null {
+  return readStorage<string | null>(STORAGE_KEYS.token, null) || readStorage<string | null>('aura_auth_token', null);
+}
+
+function getStoredUser(): MobileUser | null {
+  return readStorage<MobileUser | null>(STORAGE_KEYS.user, null) || readStorage<MobileUser | null>('aura_user_data', null);
+}
+
+function getStoredDevice(): string | null {
+  return readStorage<string | null>(STORAGE_KEYS.device, null) || readStorage<string | null>('aura_device_token', null);
 }
 
 /* ── Context Provider ─────────────────────────────────────────────── */
 
 export function MobileAuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(() => ({
-    user: readStorage<MobileUser | null>(STORAGE_KEYS.user, null),
-    token: readStorage<string | null>(STORAGE_KEYS.token, null),
-    deviceToken: readStorage<string | null>(STORAGE_KEYS.device, null),
+    user: getStoredUser(),
+    token: getStoredToken(),
+    deviceToken: getStoredDevice(),
     loading: false,
     error: null,
   }));
@@ -76,7 +98,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     (async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev'}/mobile/refresh`,
+          `${API_BASE}/mobile/refresh`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -100,12 +122,12 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const refreshToken = useCallback(async (): Promise<boolean> => {
-    const deviceToken = state.deviceToken || readStorage(STORAGE_KEYS.device, null);
+    const deviceToken = state.deviceToken || getStoredDevice();
     if (!deviceToken) return false;
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev'}/mobile/refresh`,
+        `${API_BASE}/mobile/refresh`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -132,7 +154,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     setState(s => ({ ...s, loading: true, error: null }));
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev'}/mobile/login`,
+        `${API_BASE}/mobile/login`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -147,6 +169,9 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
       writeStorage(STORAGE_KEYS.token, data.token);
       writeStorage(STORAGE_KEYS.user, data.user);
       writeStorage(STORAGE_KEYS.device, deviceToken);
+      writeStorage('aura_auth_token', data.token);
+      writeStorage('aura_user_data', data.user);
+      writeStorage('aura_device_token', deviceToken);
       setState({
         user: data.user,
         token: data.token,
@@ -187,9 +212,9 @@ export function useMobileAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     // Standalone fallback: read from localStorage directly
-    const token = readStorage<string | null>(STORAGE_KEYS.token, null);
-    const user = readStorage<MobileUser | null>(STORAGE_KEYS.user, null);
-    const deviceToken = readStorage<string | null>(STORAGE_KEYS.device, null);
+    const token = getStoredToken();
+    const user = getStoredUser();
+    const deviceToken = getStoredDevice();
     return {
       user,
       token,
@@ -199,7 +224,7 @@ export function useMobileAuth(): AuthContextType {
       login: async () => false,
       logout: () => clearStorage(),
       refresh: async () => false,
-      isAuthenticated: false,
+      isAuthenticated: !!token && !!user,
     };
   }
   return ctx;

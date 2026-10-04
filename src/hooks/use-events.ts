@@ -60,7 +60,7 @@ export function useEvents() {
     queryKey: ['events'],
     queryFn: async () => {
       try {
-        const res = await apiFetch<PretixEventsResponse>('/api/pretix/events');
+        const res = await apiFetch<PretixEventsResponse>('/api/pretix/events', { silent: true });
         const items = Array.isArray(res?.data)
           ? res.data.map((e, i) => toEventItem(e, i)).filter((it) => it.title)
           : [];

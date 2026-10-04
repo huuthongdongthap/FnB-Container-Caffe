@@ -18,9 +18,14 @@ export function registerGuestHandlers(app: Hono<{ Bindings: Env }>) {
     }
     const data = parsed.data;
 
-    const tableRow = await db.prepare(
-      'SELECT id FROM cafe_tables WHERE table_number = ?'
-    ).bind(data.table_id).first<{ id: string }>();
+    let tableRow = await db.prepare(
+      'SELECT id, table_number FROM cafe_tables WHERE table_number = ?'
+    ).bind(data.table_id).first<{ id: string; table_number?: string | number }>();
+    if (!tableRow) {
+      tableRow = await db.prepare(
+        'SELECT id, table_number FROM cafe_tables WHERE id = ?'
+      ).bind(data.table_id).first<{ id: string; table_number?: string | number }>();
+    }
     if (!tableRow) {
       return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
     }
@@ -44,8 +49,9 @@ export function registerGuestHandlers(app: Hono<{ Bindings: Env }>) {
     ]);
 
     // Verify the UPDATE matched a row (table was Available, not already occupied)
-    const updateInfo = batchResult[0] as { success: boolean; changes?: number };
-    if (!updateInfo.success || (updateInfo.changes ?? 0) === 0) {
+    const updateInfo = batchResult[0] as { success: boolean; changes?: number; meta?: { changes?: number } };
+    const changes = updateInfo.meta?.changes ?? updateInfo.changes ?? 0;
+    if (!updateInfo.success || changes === 0) {
       return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
     }
 
@@ -67,7 +73,7 @@ export function registerGuestHandlers(app: Hono<{ Bindings: Env }>) {
     return c.json({
       success: true,
       data: {
-        id: orderId, table_id: tableRow.id, table_number: data.table_id,
+        id: orderId, table_id: tableRow.id, table_number: String(tableRow.table_number ?? data.table_id),
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         status: 'pending', total: 0, created_at: now
       }

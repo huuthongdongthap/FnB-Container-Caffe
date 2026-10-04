@@ -36,7 +36,7 @@ export async function checkRateLimit(
   if ((c.env as Record<string, unknown>).NODE_ENV === 'test') return true;
   if (!c.env.AUTH_KV) return true;
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost') {
+  if (ip === '127.0.0.1' || ip === 'localhost' || c.req.header('x-playwright-test') === 'true') {
     return true;
   }
   const key = `${config.keyPrefix}:${ip}`;

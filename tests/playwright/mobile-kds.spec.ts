@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-const BACKEND = 'https://aura-space-worker.agencyos-openclaw.workers.dev';
+const BACKEND =
+  process.env.WORKER_BASE_URL ||
+  'https://aura-space-worker.sadec-marketing-hub.workers.dev';
 
 /* ── Mock data ──────────────────────────────────────────────────────── */
 
@@ -62,7 +64,7 @@ function mockKDS(
   data: unknown,
   status = 200,
 ) {
-  page.route(`${BACKEND}/mobile/kds/orders`, (route) =>
+  page.route('**/mobile/kds/orders', (route) =>
     route.fulfill({
       status,
       contentType: 'application/json',

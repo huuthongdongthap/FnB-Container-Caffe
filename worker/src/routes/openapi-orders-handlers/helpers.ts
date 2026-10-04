@@ -62,10 +62,18 @@ export function formatCustomerOrderItem(item: Row): CustomerOrderItem {
  * Staff-facing order projection: full snapshot plus staff/audit metadata.
  */
 export function formatOrder(order: Row, items: Row[], payments: Row[]) {
+  let fallbackItems: any[] = [];
+  if (items.length === 0 && order.items) {
+    try {
+      fallbackItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+    } catch {
+      fallbackItems = [];
+    }
+  }
   return {
     ...order,
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
-    items: items.map(formatOrderItem),
+    items: items.length > 0 ? items.map(formatOrderItem) : fallbackItems,
     payments,
     channel: order.channel ?? 'dine_in',
     happyHourApplied: Boolean(order.happy_hour_applied),
@@ -89,11 +97,19 @@ export function formatOrder(order: Row, items: Row[], payments: Row[]) {
  * Callers must not spread the raw row into this object.
  */
 export function formatCustomerOrder(order: Row, items: Row[]) {
+  let fallbackItems: any[] = [];
+  if (items.length === 0 && order.items) {
+    try {
+      fallbackItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+    } catch {
+      fallbackItems = [];
+    }
+  }
   return {
     id: order.id,
     orderNumber: order.order_number,
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
-    items: items.map(formatCustomerOrderItem),
+    items: items.length > 0 ? items.map(formatCustomerOrderItem) : fallbackItems,
     channel: order.channel ?? 'dine_in',
     subtotal: order.subtotal,
     discountAmount: order.discount_amount,
@@ -108,22 +124,29 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
 }
 
 export async function fetchOrderItemsAndPayments(db: D1Database, orderId: string) {
-  const [items, payments] = await Promise.all([
-    db.prepare(
-      `SELECT oi.*, p.name as product_name, p.slug as product_slug
-       FROM order_items oi
-       LEFT JOIN products p ON oi.product_id = p.id
-       WHERE oi.order_id = ?`
-    ).bind(orderId).all(),
-    db.prepare(
-      'SELECT * FROM order_payments WHERE order_id = ?'
-    ).bind(orderId).all(),
-  ]);
+  try {
+    const [items, payments] = await Promise.all([
+      db.prepare(
+        `SELECT oi.*, p.name as product_name, p.slug as product_slug
+         FROM order_items oi
+         LEFT JOIN products p ON oi.product_id = p.id
+         WHERE oi.order_id = ?`
+      ).bind(orderId).all().catch(() => ({ results: [] })),
+      db.prepare(
+        'SELECT * FROM payments WHERE order_id = ?'
+      ).bind(orderId).all().catch(() => ({ results: [] })),
+    ]);
 
-  return {
-    items: items.results || [],
-    payments: payments.results || [],
-  };
+    return {
+      items: items.results || [],
+      payments: payments.results || [],
+    };
+  } catch {
+    return {
+      items: [],
+      payments: [],
+    };
+  }
 }
 
 export { TERMINAL_STATUSES };

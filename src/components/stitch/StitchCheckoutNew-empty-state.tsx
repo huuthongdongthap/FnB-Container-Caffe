@@ -27,7 +27,7 @@ export function EmptyCartState() {
         </div>
         <a
           href="/menu"
-          className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] font-body text-xs font-bold uppercase tracking-widest transition-all shadow-xl active:scale-95"
+          className="btn-primary inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] font-body text-xs font-bold uppercase tracking-widest transition-all shadow-xl active:scale-95"
         >
           <span>{t('stitch.exploreMenu', 'Khám Phá Thực Đơn')}</span>
           <ArrowRight className="w-4 h-4" />

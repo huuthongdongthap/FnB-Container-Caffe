@@ -34,11 +34,8 @@ export function useHandleViewCart({
 }: UseHandleViewCartArgs) {
   const navigate = useNavigate();
   const { t } = useTranslation('order');
-  const { createOrder, flushQueuedOrders } =
-    useOrderStoreWithOfflineFlush((s) => ({
-      createOrder: s.createOrder,
-      flushQueuedOrders: s.flushQueuedOrders,
-    }));
+  const createOrder = useOrderStoreWithOfflineFlush((s) => s.createOrder);
+  const flushQueuedOrders = useOrderStoreWithOfflineFlush((s) => s.flushQueuedOrders);
 
   return useCallback(
     async (cart: CartItem[]): Promise<void> => {
