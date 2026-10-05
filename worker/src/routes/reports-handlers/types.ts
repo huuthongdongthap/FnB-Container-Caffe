@@ -85,3 +85,23 @@ export interface DailyReconciliationReport {
     order_count: number;
   };
 }
+
+export interface GroupedSalesGroup {
+  label: string;
+  value: number;
+  count: number;
+}
+
+export interface GroupedSalesData {
+  groups: GroupedSalesGroup[];
+}
+
+export interface RevenueOverviewData {
+  todayRevenue: number;
+  yesterdayRevenue: number;
+  changePercent: number;
+  todayOrders: number;
+  yesterdayOrders: number;
+  avgOrderValue: number;
+}
+

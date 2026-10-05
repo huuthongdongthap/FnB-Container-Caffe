@@ -62,6 +62,7 @@ import { dynamicPricingRouter } from './dynamic-pricing';
 import { customerAssistantRouter } from './customer-assistant';
 import { zaloWebhookRouter } from './zalo-webhook';
 import { containerTelemetryRouter } from './container-telemetry';
+import { handleOverview } from './reports-handlers/grouped-sales-handlers';
 import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
@@ -81,9 +82,11 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   registerAuditLogRoutes(app);
   registerCronAdminRoutes(app);
 
-  // Stats
+  // Stats & Dashboard Overview
   app.use('/api/stats', requireAuth(['owner', 'staff']));
   app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
+  app.use('/api/dashboard/*', requireAuth(['owner', 'staff']));
+  app.get('/api/dashboard/overview', handleOverview);
 
   // Payment & Refunds
   app.route('/api/payment', paymentRouter);

@@ -97,6 +97,7 @@
   "admin": {
     "dashboard": "Dashboard",
     "orders": "Orders",
+    "inventory": "Inventory",
     "menu": "Menu",
     "customers": "Customers",
     "staff": "Staff",

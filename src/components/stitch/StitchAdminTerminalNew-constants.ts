@@ -21,6 +21,7 @@ import {
   Cake,
   TabletSmartphone,
   LayoutGrid,
+  Package,
 } from 'lucide-react';
 import type { NavSectionData } from './StitchAdminTerminalNew-types';
 
@@ -36,6 +37,7 @@ export const SECTIONS: NavSectionData[] = [
       { label: 'Đơn hàng', labelEn: 'Orders', to: '/admin/orders', icon: ShoppingCart },
       { label: 'POS', labelEn: 'POS', to: '/admin/pos', icon: CreditCard },
       { label: 'Thực đơn', labelEn: 'Menu', to: '/admin/manage-menu', icon: UtensilsCrossed },
+      { label: 'Tồn kho', labelEn: 'Inventory', to: '/admin/inventory', icon: Package },
       { label: 'Quản lý bàn', labelEn: 'Tables', to: '/admin/table-management', icon: LayoutGrid },
       { label: 'Thiết bị', labelEn: 'Devices', to: '/admin/devices', icon: TabletSmartphone },
       { label: 'Đặt bàn', labelEn: 'Reservations', to: '/admin/reservations', icon: CalendarCheck },
