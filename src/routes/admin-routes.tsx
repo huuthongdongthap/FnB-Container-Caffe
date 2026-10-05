@@ -35,6 +35,7 @@ const AdminDinDinCartPage = React.lazy(() => import('@/pages/admin/DinDinCart'))
 const AdminDinDinCheckoutPage = React.lazy(() => import('@/pages/admin/DinDinCheckout'));
 const AdminDinDinOrderSuccessPage = React.lazy(() => import('@/pages/admin/DinDinOrderSuccess'));
 const AdminDevicesPage = React.lazy(() => import('@/pages/admin/Devices'));
+const AdminInventoryPage = React.lazy(() => import('@/pages/admin/Inventory'));
 const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManagement'));
 
 export const adminRoutes = [
@@ -54,6 +55,7 @@ export const adminRoutes = [
       <Route path="/admin/table-management" element={guarded(<TableManagementPage />)} />
       <Route path="/admin/generate-qr" element={guarded(<GenerateQRPage />)} />
       <Route path="/admin/invoice-history" element={guarded(<AdminInvoiceHistoryPage />)} />
+      <Route path="/admin/inventory" element={guarded(<AdminInventoryPage />)} />
       <Route path="/admin/manage-menu" element={guarded(<ManageMenuPage />)} />
       <Route path="/admin/notification-settings" element={guarded(<AdminNotificationSettingsPage />)} />
       <Route path="/admin/metrics" element={guarded(<AdminMetricsPage />)} />

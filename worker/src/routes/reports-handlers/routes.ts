@@ -3,11 +3,14 @@ import type { Env } from '../../types/env';
 import { registerAnalyticsHandlers } from './analytics-handlers';
 import { registerReconciliationHandlers } from './reconciliation-handlers';
 import { registerExportHandlers } from './export-handlers';
+import { registerGroupedSalesHandlers } from './grouped-sales-handlers';
 
 export const reportsRouter = new Hono<{ Bindings: Env }>();
 
 registerAnalyticsHandlers(reportsRouter);
 registerReconciliationHandlers(reportsRouter);
 registerExportHandlers(reportsRouter);
+registerGroupedSalesHandlers(reportsRouter);
 
 export default reportsRouter;
+

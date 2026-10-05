@@ -97,6 +97,7 @@
   "admin": {
     "dashboard": "Bảng điều khiển",
     "orders": "Đơn hàng",
+    "inventory": "Kho hàng",
     "menu": "Thực đơn",
     "customers": "Khách hàng",
     "staff": "Nhân viên",
