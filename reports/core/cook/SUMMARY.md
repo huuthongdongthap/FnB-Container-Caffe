@@ -99,7 +99,7 @@
 | `npm run typecheck:all` | **0 errors** | 🟢 GREEN |
 | `npm run lint` (`eslint worker/src/ --ext .ts`) | **0 errors, 0 warnings** | 🟢 GREEN |
 | `npm run build` | **Vite build clean** (`vite: build ok`) | 🟢 GREEN |
-| `npm test` (`vitest run`) | **395 test files / 3,631 tests PASS (0 failures)** | 🟢 GREEN |
+| `npm test` (`vitest run`) | **397 test files / 3,640 tests PASS (0 failures)** | 🟢 GREEN |
 | **Invariants** | M4-B DTO, M4-C Server Pricing, M4-D IDOR ownership scope intact | 🟢 GREEN |
 | **12 Pillars Ecosystem E2E** | `worker/src/__tests__/integrations/pillars-e2e.test.ts` (22/22 PASS) | 🟢 GREEN |
 | **Multi-Tenant & Franchise E2E** | `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS) | 🟢 GREEN |
@@ -115,6 +115,7 @@
 | **Cloudflare Worker Deploy** | `https://aura-space-worker.sadec-marketing-hub.workers.dev` (Version `5421eecb-f144-480a-b570-101f4ae2dfd1`) | 🟢 LIVE |
 | **Live Smoke Verification** | `/api/pricing/dynamic/calculate` (200 - Happy Hour 15%), `/api/chat/assistant` (200 - WiFi), `/api/edge/telemetry/heartbeat` (200 - Normal), `/api/webhooks/zalo` (200 - Challenge) | 🟢 VERIFIED |
 | **PR #69 Browser E2E Remediation** | **Squash-merged into `main` (`e912960`)** — 0 browser errors, 0 infinite loops, 0 unhandled rejections, 100% Playwright & Vitest green | 🟢 MERGED |
+| **PR #70 Admin Revenue & Inventory** | **Squash-merged into `main` (`df7faa6`)** — Revenue analytics endpoints (`/api/dashboard/overview`, `/api/reports/sales-by-*`), Admin Inventory subsystem (`/admin/inventory`), Edge AI stock forecasting, 3,640 passing tests | 🟢 MERGED |
 
 ## Next Step
-- Complete Strategic Roadmap (Phases 1-5) and Browser E2E Remediation fully executed, verified, and deployed on `main`. Operational readiness: 100%. Ready for next mission.
+- Complete Strategic Roadmap (Phases 1-5), Browser E2E Remediation, and Fullstack Admin Operations (Revenue Analytics & Inventory Management) fully executed, verified, and merged on `main`. Operational readiness: 100%. Ready for next mission.
