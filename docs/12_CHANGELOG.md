@@ -3,6 +3,66 @@
 Tất cả các thay đổi đáng kể của dự án F&B Caffe Container được ghi lại tại đây.
 
 ## [Unreleased]
+
+### 📊 Fullstack Admin Operations — Revenue Analytics & Inventory Management (PR #70 — 2026-10-05)
+- **feat(reports)** — Implemented missing grouped sales analytics endpoints in `worker/src/routes/reports-handlers/grouped-sales-handlers.ts`:
+  - `GET /api/dashboard/overview?from=...&to=...`: Time-window aggregation with previous-period comparison (% change, AOV, order totals).
+  - `GET /api/reports/sales-by-hour`: Hourly revenue distribution with 24-slot zero-filling (`00:00` to `23:00`).
+  - `GET /api/reports/sales-by-day`: Grouped daily sales.
+  - `GET /api/reports/sales-by-category`: Category breakdown.
+  - `GET /api/reports/sales-by-payment`: Payment method breakdown (`payos`, `cash`, `sepay`, `card`).
+- **feat(inventory)** — Built complete frontend Admin Inventory Subsystem (`/admin/inventory`) adhering strictly to `< 200 LOC` per file:
+  - `inventory-types.ts`: TypeScript contracts for stock items, movements, suppliers, purchase orders, and AI forecast.
+  - `Inventory.tsx`: Tabbed shell coordinator with React Query caching.
+  - `Inventory-stats-cards.tsx`: 4 KPI metrics (total items, low stock, out of stock, estimated stock value).
+  - `Inventory-ingredients-tab.tsx`: Searchable ingredients catalog with health chips and manual adjustment trigger.
+  - `Inventory-movement-modal.tsx`: Stock adjustment dialog (In, Out, Adjust, Waste) hooked into D1 mutations.
+  - `Inventory-movements-tab.tsx`: Stock movement history audit log table.
+  - `Inventory-suppliers-tab.tsx`: Suppliers directory and purchase order management.
+  - `Inventory-forecast-tab.tsx`: AI Edge run-rate forecasting, Days of Supply, and recommended safety stock reorders.
+- **feat(navigation)** — Mounted route `/admin/inventory` in `src/routes/admin-routes.tsx` with role guard, added `Tồn kho` (`Inventory`) in `StitchAdminTerminalNew-constants.ts`, and updated bilingual localization in `vi.json` and `en.json`.
+- **test(coverage)** — Added integration tests `worker/src/__tests__/integrations/admin-reports-revenue.test.ts` (5/5 PASS) and component tests `src/pages/admin/__tests__/Inventory.test.tsx` (4/4 PASS). Full suite: 397 test files / 3,640 tests PASS.
+
+### 🌐 Zero-Defect Browser E2E Remediation & Runtime Stability (PR #69 — 2026-10-04)
+- **fix(runtime)** — Fixed uncached `getSnapshot` in `src/pages/TableOrder-hooks.ts`, eliminating React 19 / Zustand v5 infinite render loop crashes.
+- **fix(dev-server)** — Added Vite dev server mock handlers for `/api/vitals` and `/api/errors`, eliminating 404 beacon console errors.
+- **fix(api-base)** — Centralized `API_BASE` resolution across client callers, deprecating stale `localhost:8787` references.
+- **fix(resilience)** — Added `silent` fetch option and `AbortError` filter in `src/lib/api-client.ts` to suppress expected cancellation logs.
+- **test(playwright)** — Hardened E2E Playwright test assertions across mobile SPA routes.
+
+### ⚡ Phase 5: Autonomous Edge Operations & Dynamic Pricing (PR #68 — 2026-10-04)
+- **feat(db)** — Applied DDL migration `20261004_03_autonomous_edge_ops.sql` adding `dynamic_pricing_rules`, `edge_telemetry_events`, and `zalo_oa_sessions` (78 synchronized tables).
+- **feat(pricing)** — Implemented real-time dynamic pricing engine (`/api/pricing/dynamic/calculate` & `/rules`) supporting Happy Hour, weather surcharges, and inventory-clearance discounts.
+- **feat(telemetry)** — Implemented edge telemetry watchdog (`/api/edge/telemetry/heartbeat`, `/anomalies`, `/metrics`) with error rate and p95 latency tracking.
+- **feat(zalo)** — Implemented Zalo OA webhook challenge verification and barista concierge assistant endpoint (`/api/chat/assistant`).
+- **test(e2e)** — Added integration suite `worker/src/__tests__/integrations/autonomous-edge-ops.test.ts` (15/15 PASS).
+
+### 🤖 Phase 4: AI & Edge Automation (PR #67 — 2026-10-04)
+- **feat(db)** — Applied DDL migration `20261004_02_ai_automation.sql` adding `ai_recommendations`, `inventory_forecasting`, `demand_forecasts`, and `chat_interactions` (75 synchronized tables).
+- **feat(ai-recommendations)** — Implemented AI cross-sell recommendations engine (`/api/ai/recommendations`) with collaborative filtering and time-of-day affinity.
+- **feat(forecasting)** — Implemented Edge AI stock run-rate projection and safety stock calculation (`/api/inventory/forecasting/run-rate`, `/safety-stock`).
+- **feat(demand)** — Implemented 7-day sales and demand forecasting endpoint (`/api/analytics/demand-forecast`).
+- **test(e2e)** — Added integration suite `worker/src/__tests__/integrations/ai-automation.test.ts` (14/14 PASS).
+
+### 🏢 Phase 3: Multi-Tenant & Franchise Architecture (PR #66 — 2026-10-04)
+- **feat(db)** — Applied DDL migration `20261004_01_multi_tenant_franchise.sql` adding row-level `tenant_id` partitioning across core domain tables (`orders`, `cafe_tables`, `inventory_items`, `reservations`) and created `tenants`, `franchise_locations`, and `royalty_settlements` tables (72 synchronized tables).
+- **feat(franchise)** — Implemented franchise management endpoints (`/api/franchise/locations`, `/analytics`, `/royalty/calculate`).
+- **test(e2e)** — Added integration suite `worker/src/__tests__/integrations/multi-tenant-franchise.test.ts` (8/8 PASS).
+
+### 📱 Phase 2: Mobile App / PWA Enhancements & Offline Cart Sync (PR #65 — 2026-10-04)
+- **feat(orders)** — Implemented backend offline order sync route `POST /api/orders/sync` with KV idempotency caching (`order:idempotency:offline:${localId}`) with 24h TTL.
+- **feat(offline-db)** — Enhanced client `OfflineDB` (`src/lib/offline-db.ts`) to preserve `localId` on queued orders and filter out metadata/menu caches (`menu`, `_meta_categories`).
+- **feat(stores)** — Reconciled `useOfflineSync` and `useOrderStore` with canonical `API_BASE` and automatic queue flushing upon network reconnection.
+- **test(sync)** — Added dedicated test suites: `orders-sync.test.ts` (5/5 PASS) and `use-offline-sync.test.ts` (4/4 PASS).
+
+### 🔒 Admin DB, Revenue Accounting & Inventory Isolation (PR #64 — 2026-10-03)
+- **feat(inventory)** — Scoped domain inventory routes strictly under `/api/inventory/items` to eliminate root `/` route hijacking.
+- **feat(orders)** — Selected `o.items`, `o.shipping_fee`, `o.discount` in `getAdminOrders` SQL query.
+- **feat(revenue)** — Enforced revenue accounting invariant by excluding cancelled orders (`status != 'cancelled'`) from `orders_today` and `revenue_today`.
+- **feat(sales-csv)** — Enforced Sales CSV UTF-8 BOM (`0xEF, 0xBB, 0xBF`) and bilingual headers in `/api/admin/sales/csv`.
+- **feat(db)** — Applied consolidated DDL migration `20261003_02_admin_metrics_and_inventory.sql` to remote D1 `AURA_DB` (71 tables synchronized).
+- **test(admin)** — Added dedicated integration test suite `admin-revenue-inventory.test.ts` (6/6 PASS).
+
 ### 🌐 Phase 1: 12 Pillars Ecosystem Integration (2026-10-03)
 
 - **feat(db)** — Created DDL migration `worker/db/migrations/20261003_01_pillar_tables.sql` (and `.down.sql`) formalizing schema tables for `ti_order_bridge`, `ti_menu_cache`, `frigate_events`, and `wifi_sessions`.

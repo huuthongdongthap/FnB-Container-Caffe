@@ -153,47 +153,87 @@ status: stable
 
 ---
 
-### Phase 2: Mobile App (Q1 2027)
+### Phase 2: Mobile App / PWA Enhancements & Offline Cart Sync (Q4 2026)
 
-**Status:** Not started (out-of-scope for current phase)
+**Status:** 🟢 COMPLETE (PR #65)
 
-**Considerations:**
-- React Native or Flutter wrapper around existing web app
-- Push notifications via Cloudflare Push
-- Offline-first cart sync
-- QR code scanning for loyalty check-in
-
-**Decision point:** Evaluate demand before investing. Web PWA may suffice.
-
----
-
-### Phase 3: Multi-Tenant & Franchise (Q2 2027)
-
-**Status:** Concept phase
-
-**Goals:**
-- Support multiple cafe locations under one system
-- Centralized admin with per-location data isolation
-- Franchisee self-service onboarding
-- Revenue sharing model
-
-**Technical challenges:**
-- Tenant isolation in D1 (tenant_id on all tables)
-- Multi-tenant auth (JWT claims)
-- Separate D1 databases per tenant vs shared with tenant_id
+**Deliverables:**
+- ✅ Backend offline order sync endpoint `POST /api/orders/sync` in `worker/src/routes/orders-core.ts`
+- ✅ Dual payload support (nested `{ localId, orderData }` and flat `{ localId, items }`)
+- ✅ KV idempotency caching (`order:idempotency:offline:${localId}`) with 24h TTL
+- ✅ Client `OfflineDB` (`src/lib/offline-db.ts`) with `localId` preservation and queue pruning
+- ✅ Automatic store sync reconciliation in `useOfflineSync` and `useOrderStore` upon reconnection
+- ✅ 100% test pass rate across `orders-sync.test.ts` and `use-offline-sync.test.ts`
 
 ---
 
-### Phase 4: AI & Automation (Q3 2027)
+### Phase 3: Multi-Tenant & Franchise Preparation (Q4 2026)
 
-**Status:** Exploration
+**Status:** 🟢 COMPLETE (PR #66)
 
-**Potential features:**
-- AI menu recommendations (based on order history)
-- Predictive inventory management
-- Chatbot for customer support (Zalo integration)
-- Dynamic pricing (happy hour auto-adjust)
-- Demand forecasting (sales prediction)
+**Deliverables:**
+- ✅ DDL migration `20261004_01_multi_tenant_franchise.sql` applied to production D1 `AURA_DB` (72 tables total)
+- ✅ Row-level tenant partitioning (`tenant_id TEXT NOT NULL DEFAULT 'default'`) across core domain tables (`orders`, `cafe_tables`, `inventory_items`, `reservations`)
+- ✅ Franchise location registry (`franchise_locations`), settlement ledger (`royalty_settlements`), and analytics
+- ✅ Composite performance indexes on `(tenant_id, created_at)`, `(tenant_id, status)`, `(tenant_id, table_number)`, `(tenant_id, sku)`, and `(tenant_id, date)`
+- ✅ Multi-tenant franchise E2E test suite passing (`multi-tenant-franchise.test.ts` — 8/8 PASS)
+
+---
+
+### Phase 4: AI & Edge Automation (Q4 2026)
+
+**Status:** 🟢 COMPLETE (PR #67)
+
+**Deliverables:**
+- ✅ DDL migration `20261004_02_ai_automation.sql` applied to production D1 `AURA_DB` (75 tables total)
+- ✅ AI menu cross-sell recommendations engine (`/api/ai/recommendations`) with collaborative filtering and time-of-day affinity
+- ✅ Edge AI stock run-rate forecasting and safety stock replenishment calculation (`/api/inventory/forecasting/run-rate`, `/safety-stock`)
+- ✅ 7-day sales and demand forecasting endpoint (`/api/analytics/demand-forecast`)
+- ✅ AI automation E2E test suite passing (`ai-automation.test.ts` — 14/14 PASS)
+
+---
+
+### Phase 5: Autonomous Edge Operations & Dynamic Pricing (Q4 2026)
+
+**Status:** 🟢 COMPLETE (PR #68)
+
+**Deliverables:**
+- ✅ DDL migration `20261004_03_autonomous_edge_ops.sql` applied to production D1 `AURA_DB` (78 tables total)
+- ✅ Real-time dynamic pricing engine (`/api/pricing/dynamic/calculate` & `/rules`) supporting Happy Hour, weather surcharges, and inventory-clearance discounts
+- ✅ Edge telemetry watchdog (`/api/edge/telemetry/heartbeat`, `/anomalies`, `/metrics`) with error rate and p95 latency tracking
+- ✅ Zalo OA webhook challenge verification and barista concierge assistant endpoint (`/api/chat/assistant`)
+- ✅ Autonomous edge ops E2E test suite passing (`autonomous-edge-ops.test.ts` — 15/15 PASS)
+
+---
+
+### Phase 6: Zero-Defect Browser E2E Remediation (Q4 2026)
+
+**Status:** 🟢 COMPLETE (PR #69)
+
+**Deliverables:**
+- ✅ Fixed uncached `getSnapshot` in `TableOrder-hooks.ts`, eliminating React 19 / Zustand v5 infinite render loop crashes
+- ✅ Added Vite dev server mock handlers for `/api/vitals` and `/api/errors`, eliminating 404 beacon console errors
+- ✅ Centralized canonical `API_BASE` resolution across client callers
+- ✅ Added `silent` fetch option and `AbortError` filter in `src/lib/api-client.ts` to suppress expected cancellation logs
+- ✅ 0 browser runtime errors, 0 infinite loops, 0 audit failures across Playwright E2E suites
+
+---
+
+### Phase 7: Fullstack Admin Operations — Revenue Analytics & Inventory Management (Q4 2026)
+
+**Status:** 🟢 COMPLETE (PR #70)
+
+**Deliverables:**
+- ✅ Grouped sales analytics endpoints in `worker/src/routes/reports-handlers/grouped-sales-handlers.ts`:
+  - `GET /api/dashboard/overview?from=...&to=...`: Time-window aggregation with previous-period comparison (% change, AOV, order totals)
+  - `GET /api/reports/sales-by-hour`: Hourly revenue distribution with 24-slot zero-filling (`00:00` to `23:00`)
+  - `GET /api/reports/sales-by-day`: Grouped daily sales
+  - `GET /api/reports/sales-by-category`: Category breakdown
+  - `GET /api/reports/sales-by-payment`: Payment method breakdown (`payos`, `cash`, `sepay`, `card`)
+- ✅ Frontend Admin Inventory Subsystem (`/admin/inventory`) strictly `< 200 LOC` per file:
+  - `inventory-types.ts`, `Inventory.tsx`, `Inventory-stats-cards.tsx`, `Inventory-ingredients-tab.tsx`, `Inventory-movement-modal.tsx`, `Inventory-movements-tab.tsx`, `Inventory-suppliers-tab.tsx`, `Inventory-forecast-tab.tsx`
+- ✅ Mounted `/admin/inventory` in `src/routes/admin-routes.tsx` and navigation item in `StitchAdminTerminalNew-constants.ts`
+- ✅ Dedicated integration test suite (`admin-reports-revenue.test.ts` & `Inventory.test.tsx` — 9/9 PASS; monorepo suite 3,640 PASS)
 
 ---
 
