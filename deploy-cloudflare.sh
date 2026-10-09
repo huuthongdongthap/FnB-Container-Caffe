@@ -153,7 +153,7 @@ if [[ "${1:-}" != "--skip-verify" && "${2:-}" != "--skip-verify" && "${3:-}" != 
   for i in $(seq 1 $MAX_RETRIES); do
     echo "[Verify $i/$MAX_RETRIES] ..."
     PAGES_VERSION_JSON=$(curl -s --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo '{}')
-    PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
+    PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha"[^,]*' | cut -d'"' -f4 || echo "MISSING")
     PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo "000")
 
     if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
