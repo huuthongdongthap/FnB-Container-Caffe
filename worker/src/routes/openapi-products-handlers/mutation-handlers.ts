@@ -1,7 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import { ProductRoutes } from '@aura/domain-catalog';
+import {
+  ProductRoutes,
+  syncProductToMenuProjection,
+  syncProductAvailabilityProjection,
+  deleteProductProjection,
+} from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
+import { formatProduct, type ProductRow } from './helpers';
 
 export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/products - Create product
@@ -11,64 +17,50 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       slug: string;
       categoryId: string;
       basePrice: number;
+      price?: number;
       status?: string;
-      variants?: unknown[];
-      modifiers?: unknown[];
-      images?: unknown[];
-      preparationTimeMinutes?: number;
-      calories?: number | null;
-      nutritionInfo?: Record<string, unknown>;
+      images?: Array<{ url: string }>;
+      imageUrl?: string;
       tags?: string[];
-      metadata?: Record<string, unknown>;
-      translations?: Array<{
-        locale: string;
-        name: string;
-        description?: string;
-        ingredients?: string;
-        allergens?: string[];
-        story?: string;
-      }>;
+      translations?: Array<{ locale: string; name: string; description?: string }>;
     };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
+    const name = body.translations?.[0]?.name || body.slug;
+    const description = body.translations?.[0]?.description || null;
+    const price = body.basePrice ?? body.price ?? 0;
+    const imageUrl = body.images?.[0]?.url || body.imageUrl || null;
+    const tags = JSON.stringify(body.tags || []);
+    const isAvailable = body.status === 'inactive' ? 0 : 1;
 
     // Check slug uniqueness
-    const existing = await db.prepare('SELECT id FROM products WHERE slug = ?').bind(body.slug).first();
-    if (existing) {
-      return c.json({ success: false, error: 'Slug already exists' }, 409);
+    if (body.slug) {
+      const existing = await db.prepare('SELECT id FROM products WHERE slug = ?').bind(body.slug).first();
+      if (existing) {
+        return c.json({ success: false, error: 'Slug already exists' }, 409);
+      }
     }
 
     await db.prepare(
-      `INSERT INTO products (id, slug, category_id, base_price, status, variants, modifiers, images, preparation_time_minutes, calories, nutrition_info, tags, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO products (id, category_id, name, slug, price, compare_at_price, description, image_url, tags, is_available, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id,
-      body.slug,
       body.categoryId,
-      body.basePrice,
-      body.status || 'active',
-      JSON.stringify(body.variants || []),
-      JSON.stringify(body.modifiers || []),
-      JSON.stringify(body.images || []),
-      body.preparationTimeMinutes || 5,
-      body.calories || null,
-      JSON.stringify(body.nutritionInfo || {}),
-      JSON.stringify(body.tags || []),
-      JSON.stringify(body.metadata || {}),
+      name,
+      body.slug || id,
+      price,
+      null,
+      description,
+      imageUrl,
+      tags,
+      isAvailable,
+      0,
       now,
       now
     ).run();
-
-    // Insert translations
-    if (body.translations?.length) {
-      for (const t of body.translations) {
-        await db.prepare(
-          'INSERT INTO product_translations (product_id, locale, name, description, ingredients, allergens, story) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).bind(id, t.locale, t.name, t.description || '', t.ingredients || '', JSON.stringify(t.allergens || []), t.story || '').run();
-      }
-    }
 
     // Audit log
     await db.prepare(
@@ -76,14 +68,16 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'product_create', 'product', id, JSON.stringify(body), now).run();
 
-    const created = await db.prepare(
-      `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
-       FROM products p
-       LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
-       WHERE p.id = ?`
-    ).bind('vi', id).first();
+    await syncProductToMenuProjection(db, id);
 
-    return c.json({ success: true, data: created }, 201);
+    const created = (await db.prepare(
+      `SELECT p.*, c.name as category_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.id = ?`
+    ).bind(id).first()) as ProductRow | null;
+
+    return c.json({ success: true, data: created ? formatProduct(created) : null }, 201);
   });
 
   // PATCH /api/products/:id - Update product
@@ -94,23 +88,11 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       slug?: string;
       categoryId?: string;
       basePrice?: number;
+      price?: number;
       status?: string;
-      variants?: unknown[];
-      modifiers?: unknown[];
-      images?: unknown[];
-      preparationTimeMinutes?: number;
-      calories?: number | null;
-      nutritionInfo?: Record<string, unknown>;
+      images?: Array<{ url: string }>;
       tags?: string[];
-      metadata?: Record<string, unknown>;
-      translations?: Array<{
-        locale: string;
-        name: string;
-        description?: string;
-        ingredients?: string;
-        allergens?: string[];
-        story?: string;
-      }>;
+      translations?: Array<{ locale: string; name: string; description?: string }>;
     };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
@@ -132,16 +114,27 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       params.push(body.slug);
     }
     if (body.categoryId !== undefined) { updates.push('category_id = ?'); params.push(body.categoryId); }
-    if (body.basePrice !== undefined) { updates.push('base_price = ?'); params.push(body.basePrice); }
-    if (body.status !== undefined) { updates.push('status = ?'); params.push(body.status); }
-    if (body.variants !== undefined) { updates.push('variants = ?'); params.push(JSON.stringify(body.variants)); }
-    if (body.modifiers !== undefined) { updates.push('modifiers = ?'); params.push(JSON.stringify(body.modifiers)); }
-    if (body.images !== undefined) { updates.push('images = ?'); params.push(JSON.stringify(body.images)); }
-    if (body.preparationTimeMinutes !== undefined) { updates.push('preparation_time_minutes = ?'); params.push(body.preparationTimeMinutes); }
-    if (body.calories !== undefined) { updates.push('calories = ?'); params.push(body.calories); }
-    if (body.nutritionInfo !== undefined) { updates.push('nutrition_info = ?'); params.push(JSON.stringify(body.nutritionInfo)); }
+    if (body.basePrice !== undefined || body.price !== undefined) {
+      updates.push('price = ?');
+      params.push(body.basePrice ?? body.price ?? 0);
+    }
+    if (body.status !== undefined) {
+      updates.push('is_available = ?');
+      params.push(body.status === 'inactive' ? 0 : 1);
+    }
     if (body.tags !== undefined) { updates.push('tags = ?'); params.push(JSON.stringify(body.tags)); }
-    if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
+    if (body.images !== undefined && body.images.length) {
+      updates.push('image_url = ?');
+      params.push(body.images[0]?.url || null);
+    }
+    if (body.translations?.length && body.translations[0]?.name) {
+      updates.push('name = ?');
+      params.push(body.translations[0].name);
+      if (body.translations[0].description !== undefined) {
+        updates.push('description = ?');
+        params.push(body.translations[0].description);
+      }
+    }
 
     updates.push('updated_at = ?');
     params.push(now);
@@ -149,17 +142,7 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     if (updates.length > 1) {
       await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-    }
-
-    // Update translations
-    if (body.translations?.length) {
-      for (const t of body.translations) {
-        await db.prepare(
-          `INSERT INTO product_translations (product_id, locale, name, description, ingredients, allergens, story)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(product_id, locale) DO UPDATE SET name = ?, description = ?, ingredients = ?, allergens = ?, story = ?`
-        ).bind(id, t.locale, t.name, t.description || '', t.ingredients || '', JSON.stringify(t.allergens || []), t.story || '', t.name, t.description || '', t.ingredients || '', JSON.stringify(t.allergens || []), t.story || '').run();
-      }
+      await syncProductToMenuProjection(db, id);
     }
 
     // Audit log
@@ -168,24 +151,24 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user.id, 'product_update', 'product', id, JSON.stringify(body), now).run();
 
-    const updated = await db.prepare(
-      `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
+    const updated = (await db.prepare(
+      `SELECT p.*, c.name as category_name
        FROM products p
-       LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
+       LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.id = ?`
-    ).bind('vi', id).first();
+    ).bind(id).first()) as ProductRow | null;
 
-    return c.json({ success: true, data: updated });
+    return c.json({ success: true, data: updated ? formatProduct(updated) : null });
   });
 
-  // DELETE /api/products/:id - Delete product (soft delete)
+  // DELETE /api/products/:id - Delete product
   router.openapi(ProductRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { slug: string } | null;
+    const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { name?: string; slug?: string } | null;
     if (!existing) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
@@ -193,19 +176,19 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     // Check for order items referencing this product
     const orderItems = (await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first()) as { count: number } | null;
     if (orderItems && orderItems.count > 0) {
-      // Soft delete - just mark as deleted
-      await db.prepare('UPDATE products SET status = \'deleted\', updated_at = ? WHERE id = ?').bind(now, id).run();
+      // Soft delete by setting is_available = 0
+      await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+      await syncProductAvailabilityProjection(db, id, 0);
     } else {
-      // Hard delete if no order items
-      await db.prepare('DELETE FROM product_translations WHERE product_id = ?').bind(id).run();
       await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+      await deleteProductProjection(db, id);
     }
 
     // Audit log
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'product_delete', 'product', id, JSON.stringify({ name: existing.slug }), now).run();
+    ).bind(`audit_${Date.now()}`, user.id, 'product_delete', 'product', id, JSON.stringify({ name: existing.name || existing.slug }), now).run();
 
     return c.json({ success: true, data: { success: true } });
   });

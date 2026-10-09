@@ -9,7 +9,8 @@ import { TEST_JWT_SECRET } from '../test-utils';
 
 function makeDb(
   orders: any[] = [],
-  updateSuccess = true
+  updateSuccess = true,
+  currentStatus = 'confirmed'
 ): any {
   return {
     prepare: (_sql: string) => {
@@ -23,7 +24,13 @@ function makeDb(
         changes: 1,
         lastRowId: 1,
       });
-      stmt.first = async () => null;
+      stmt.first = async () => {
+        const sql = stmt._sql || '';
+        if (sql.includes('SELECT') && sql.includes('orders')) {
+          return { id: stmt._binds[0] || 'ORD_1', status: currentStatus };
+        }
+        return null;
+      };
       stmt.all = async () => {
         const sql = stmt._sql || '';
         if (sql.includes('SELECT') && sql.includes('orders') && sql.includes('JOIN')) {
@@ -174,7 +181,7 @@ describe('updateKdsStatus', () => {
   });
 
   it('200 on status = ready', async () => {
-    const db = makeDb();
+    const db = makeDb([], true, 'preparing');
     const ctx: any = makeCtx('staff', 'USR_KITCHEN', '/mobile/kds/orders/ORD_1/status', 'PATCH', { status: 'ready' }, db);
     ctx.req.param = (n: string) => (n === 'id' ? 'ORD_1' : '');
     const res = await updateKdsStatus(ctx);

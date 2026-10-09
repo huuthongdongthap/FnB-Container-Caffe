@@ -12,6 +12,8 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
 import { toAvailabilityFlag } from '../policies/availability';
+import { resolveItemPrice, type Channel, type ChannelDeltaConfig } from '../policies/pricing';
+import type { HappyHourWindow } from '../model/catalog-types';
 
 const log = createLogger({ route: 'customer.menu' });
 
@@ -40,6 +42,20 @@ export interface CustomerMenuOptions {
   includeUnavailable?: boolean;
   category?: string;
   locale?: string;
+  channel?: Channel | string;
+  now?: Date;
+  channelDeltas?: ChannelDeltaConfig;
+}
+
+interface RawMenuRow {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | string;
+  category: string;
+  image_url: string | null;
+  tags: string | null;
+  available: number | boolean;
 }
 
 export async function getCustomerMenu(
@@ -47,8 +63,6 @@ export async function getCustomerMenu(
   opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenu> {
   const includeUnavailable = opts.includeUnavailable ?? false;
-  // Locale defaults to vi-VN, fallback is deterministic vi-VN
-  const _locale = opts.locale === 'en-US' ? 'en-US' : 'vi-VN';
 
   try {
     let query = `SELECT id, name, description, price, category, image_url, tags, available
@@ -58,40 +72,49 @@ export async function getCustomerMenu(
     if (!includeUnavailable) {
       query += ' AND available = 1';
     }
-
     if (opts.category) {
       query += ' AND category = ?';
       params.push(opts.category);
     }
-
     query += ' ORDER BY category ASC, name ASC';
 
-    interface RawMenuRow {
-      id: string;
-      name: string;
-      description: string | null;
-      price: number | string;
-      category: string;
-      image_url: string | null;
-      tags: string | null;
-      available: number | boolean;
+    const { results } = await db.prepare(query).bind(...params).all<RawMenuRow>();
+
+    const hasPricingOverrides = Boolean(opts.channel || opts.now || opts.channelDeltas);
+    let happyHourWindows: HappyHourWindow[] = [];
+    if (hasPricingOverrides) {
+      try {
+        const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
+        happyHourWindows = (hhRes.results || hhRes || []) as HappyHourWindow[];
+      } catch {
+        happyHourWindows = [];
+      }
     }
 
-    const { results } = await db
-      .prepare(query)
-      .bind(...params)
-      .all<RawMenuRow>();
+    const items: CustomerMenuItem[] = (results ?? []).map((item: RawMenuRow) => {
+      const basePrice = typeof item.price === 'string' ? parseInt(item.price, 10) : item.price;
+      const priceCents = hasPricingOverrides
+        ? resolveItemPrice({
+            basePriceCents: basePrice,
+            channel: opts.channel || 'dine_in',
+            modifierChoices: [],
+            happyHourWindows,
+            now: opts.now || new Date(),
+            channelDeltas: opts.channelDeltas,
+          })
+        : basePrice;
 
-    const items: CustomerMenuItem[] = (results ?? []).map((item: RawMenuRow) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      priceCents: typeof item.price === 'string' ? parseInt(item.price, 10) : item.price,
-      category: item.category,
-      imageUrl: item.image_url,
-      tags: item.tags ? JSON.parse(item.tags) : [],
-      available: toAvailabilityFlag(item.available),
-    }));
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        priceCents,
+        category: item.category,
+        imageUrl: item.image_url,
+        tags: item.tags ? JSON.parse(item.tags) : [],
+        available: toAvailabilityFlag(item.available),
+      };
+    });
 
     const categoryMap = new Map<string, CustomerMenuItem[]>();
     for (const item of items) {
@@ -114,37 +137,47 @@ export async function getCustomerMenu(
 export async function getCustomerMenuItem(
   db: D1Database,
   id: string,
+  opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenuItem | null> {
   try {
     const { results } = await db
-      .prepare(
-        'SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?'
-      )
+      .prepare('SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?')
       .bind(id)
-      .all<{
-        id: string;
-        name: string;
-        description: string | null;
-        price: number | string;
-        category: string;
-        image_url: string | null;
-        tags: string | null;
-        available: number | boolean;
-      }>();
+      .all<RawMenuRow>();
 
-    if (!results || results.length === 0) {
+    if (!results || results.length === 0 || !results[0]) {
       return null;
     }
-
     const raw = results[0];
-    if (!raw) {
-      return null;
+    const basePrice = typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price;
+
+    const hasPricingOverrides = Boolean(opts.channel || opts.now || opts.channelDeltas);
+    let happyHourWindows: HappyHourWindow[] = [];
+    if (hasPricingOverrides) {
+      try {
+        const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
+        happyHourWindows = (hhRes.results || hhRes || []) as HappyHourWindow[];
+      } catch {
+        happyHourWindows = [];
+      }
     }
+
+    const priceCents = hasPricingOverrides
+      ? resolveItemPrice({
+          basePriceCents: basePrice,
+          channel: opts.channel || 'dine_in',
+          modifierChoices: [],
+          happyHourWindows,
+          now: opts.now || new Date(),
+          channelDeltas: opts.channelDeltas,
+        })
+      : basePrice;
+
     return {
       id: raw.id,
       name: raw.name,
       description: raw.description,
-      priceCents: typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price,
+      priceCents,
       category: raw.category,
       imageUrl: raw.image_url,
       tags: raw.tags ? JSON.parse(raw.tags) : [],

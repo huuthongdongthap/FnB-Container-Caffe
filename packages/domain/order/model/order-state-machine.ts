@@ -17,24 +17,33 @@ export const ORDER_STATUSES = [
   'delivered',
   'completed',
   'cancelled',
+  'failed',
+  'expired',
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /** from -> allowed next states. Terminal states map to an empty array. */
 export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
+  pending: ['confirmed', 'cancelled', 'failed', 'expired'],
+  confirmed: ['preparing', 'cancelled', 'failed'],
+  preparing: ['ready', 'cancelled', 'failed'],
   ready: ['served', 'delivered', 'cancelled'],
   served: ['completed'],
   delivered: ['completed'],
   completed: [],
   cancelled: [],
+  failed: [],
+  expired: [],
 };
 
 /** States that, once reached, block all further status changes. */
-export const TERMINAL_STATES: readonly OrderStatus[] = ['completed', 'cancelled'];
+export const TERMINAL_STATES: readonly OrderStatus[] = [
+  'completed',
+  'cancelled',
+  'failed',
+  'expired',
+];
 
 export interface TransitionResult {
   ok: boolean;

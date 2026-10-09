@@ -6,8 +6,22 @@ import { registerProductMutationHandlers } from './mutation-handlers';
 
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Apply auth middleware to all routes
-openApiProductsRouter.use('/api/products/*', requireAuth(['owner', 'manager', 'staff']));
+const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+
+// Apply auth middleware to mutations only (keeping public GET routes unauthenticated)
+openApiProductsRouter.use('/api/products', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    return staffAuth(c, next);
+  }
+  return next();
+});
+
+openApiProductsRouter.use('/api/products/*', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    return staffAuth(c, next);
+  }
+  return next();
+});
 
 registerProductReadHandlers(openApiProductsRouter);
 registerProductMutationHandlers(openApiProductsRouter);

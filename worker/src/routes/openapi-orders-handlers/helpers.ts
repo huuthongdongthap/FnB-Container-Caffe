@@ -23,16 +23,22 @@ function parseModifiers(raw: unknown): unknown[] {
  * this only renames them onto the snapshot contract.
  */
 export function formatOrderItem(item: Row): OrderItem {
+  const qty = Number(item.quantity) || 1;
+  const subtotal = Number(item.total_price ?? item.subtotal ?? 0);
+  const unitPrice = item.unit_price !== undefined && item.unit_price !== null
+    ? Number(item.unit_price)
+    : Math.round(subtotal / qty);
+
   return {
     id: item.id,
     menuItemId: item.product_id ?? item.menu_item_id,
     name: item.product_name ?? item.name ?? '',
-    quantity: item.quantity,
-    unitPriceCents: item.unit_price,
-    subtotalCents: item.total_price,
+    quantity: qty,
+    unitPriceCents: unitPrice,
+    subtotalCents: subtotal,
     modifiers: parseModifiers(item.modifiers) as OrderItem['modifiers'],
     notes: item.notes ?? null,
-    status: item.status,
+    status: item.status ?? 'pending',
   };
 }
 
@@ -41,20 +47,26 @@ export function formatOrderItem(item: Row): OrderItem {
  * option ids so a guest response never carries procurement-side references.
  */
 export function formatCustomerOrderItem(item: Row): CustomerOrderItem {
+  const qty = Number(item.quantity) || 1;
+  const subtotal = Number(item.total_price ?? item.subtotal ?? 0);
+  const unitPrice = item.unit_price !== undefined && item.unit_price !== null
+    ? Number(item.unit_price)
+    : Math.round(subtotal / qty);
   const modifiers = parseModifiers(item.modifiers) as Array<Row>;
+
   return {
     name: item.product_name ?? item.name ?? '',
-    quantity: item.quantity,
-    unitPriceCents: item.unit_price,
-    subtotalCents: item.total_price,
+    quantity: qty,
+    unitPriceCents: unitPrice,
+    subtotalCents: subtotal,
     modifiers: modifiers.length
       ? modifiers.map((m) => ({
           name: m.optionName ?? m.option_name ?? m.modifierName ?? m.name ?? '',
-          priceAdjustment: m.priceAdjustment ?? m.price_adjustment ?? 0,
+          priceAdjustment: m.priceAdjustment ?? m.price_adjustment ?? m.price_delta ?? 0,
         }))
       : undefined,
     notes: item.notes ?? null,
-    status: item.status,
+    status: item.status ?? 'pending',
   };
 }
 

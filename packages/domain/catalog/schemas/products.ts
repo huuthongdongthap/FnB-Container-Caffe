@@ -53,10 +53,13 @@ export const ProductModifierSchema = z.object({
 }).openapi('ProductModifier');
 
 export const ProductCreateSchema = z.object({
-  slug: SlugSchema,
-  categoryId: z.string().uuid(),
-  translations: z.array(ProductTranslationSchema).min(1),
-  basePrice: MoneySchema,
+  slug: SlugSchema.optional(),
+  name: z.string().min(1).optional(),
+  categoryId: z.string().min(1),
+  category_id: z.string().min(1).optional(),
+  translations: z.array(ProductTranslationSchema).min(1).optional(),
+  price: MoneySchema.optional(),
+  basePrice: MoneySchema.optional(),
   status: ProductStatusEnum.default('active'),
   variants: z.array(ProductVariantSchema).optional(),
   modifiers: z.array(ProductModifierSchema).optional(),
@@ -68,15 +71,17 @@ export const ProductCreateSchema = z.object({
   })).optional(),
   preparationTimeMinutes: z.number().int().positive().default(5),
   calories: z.number().int().nonnegative().optional(),
-  nutritionInfo: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductCreate');
 
 export const ProductUpdateSchema = z.object({
   slug: SlugSchema.optional(),
-  categoryId: z.string().uuid().optional(),
+  name: z.string().min(1).optional(),
+  categoryId: z.string().min(1).optional(),
+  category_id: z.string().min(1).optional(),
   translations: z.array(ProductTranslationSchema).min(1).optional(),
+  price: MoneySchema.optional(),
   basePrice: MoneySchema.optional(),
   status: ProductStatusEnum.optional(),
   variants: z.array(ProductVariantSchema).optional(),
@@ -89,18 +94,19 @@ export const ProductUpdateSchema = z.object({
   })).optional(),
   preparationTimeMinutes: z.number().int().positive().optional(),
   calories: z.number().int().nonnegative().optional(),
-  nutritionInfo: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductUpdate');
 
 export const ProductResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string(),
   slug: SlugSchema,
-  categoryId: z.string().uuid(),
+  categoryId: z.string().optional(),
+  category_id: z.string().optional(),
   category: ReferenceSchema.optional(),
-  translations: z.array(ProductTranslationSchema),
-  basePrice: MoneySchema,
+  translations: z.array(ProductTranslationSchema).optional(),
+  name: z.string().optional(),
+  price: MoneySchema,
   status: ProductStatusEnum,
   variants: z.array(ProductVariantSchema),
   modifiers: z.array(ProductModifierSchema),
@@ -110,13 +116,12 @@ export const ProductResponseSchema = z.object({
     isPrimary: z.boolean(),
     displayOrder: z.number().int().nonnegative(),
   })),
-  preparationTimeMinutes: z.number().int().positive(),
-  calories: z.number().int().nonnegative().nullable(),
-  nutritionInfo: z.record(z.string(), z.unknown()).nullable(),
+  preparationTimeMinutes: z.number().int().positive().optional(),
+  calories: z.number().int().nonnegative().nullable().optional(),
   tags: z.array(z.string()),
   metadata: z.record(z.string(), z.unknown()).nullable(),
-  createdAt: DateTimeSchema,
-  updatedAt: DateTimeSchema,
+  createdAt: DateTimeSchema.optional(),
+  updatedAt: DateTimeSchema.optional(),
 }).openapi('Product');
 
 export const ProductListResponseSchema = z.object({

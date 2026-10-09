@@ -3,32 +3,33 @@ export interface CategoryRow {
   name: string;
   slug: string;
   description?: string | null;
-  parent_id?: string | null;
   sort_order?: number;
   image_url?: string | null;
-  is_active?: number;
-  location_id?: string | null;
-  metadata?: string | null;
+  display_name_vi?: string | null;
+  display_name_en?: string | null;
   created_at?: string;
   updated_at?: string;
-  translation_name?: string | null;
-  translation_description?: string | null;
 }
 
 export function formatCategory(row: CategoryRow, locale: string = 'vi') {
+  const transName = locale === 'en'
+    ? (row.display_name_en || row.name)
+    : (row.display_name_vi || row.name);
+
   return {
     ...row,
-    translations: row.translation_name
-      ? [
-          {
-            locale,
-            name: row.translation_name,
-            description: row.translation_description,
-          },
-        ]
-      : [],
-    parent_id: row.parent_id,
+    displayOrder: row.sort_order ?? 0,
+    isActive: true,
+    parentId: null,
+    imageUrl: row.image_url ?? null,
+    translations: [
+      {
+        locale,
+        name: transName,
+        description: row.description ?? '',
+      },
+    ],
     children: [] as unknown[],
-    location: row.location_id ? { id: row.location_id } : null,
+    location: null,
   };
 }

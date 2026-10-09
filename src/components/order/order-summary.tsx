@@ -34,7 +34,11 @@ export function OrderSummary({
       {!qualifiesForFreeDelivery && subtotal > 0 && (
         <div className="rounded-lg bg-accent/10 p-3 text-center text-sm text-muted">
           <Truck size={14} className="inline" />{' '}
-          {t('order.freeDeliveryMessage', { amount: formatPrice(remainingForFreeDelivery) })}
+          {t('order.freeDeliveryMessage', {
+            amount: remainingForFreeDelivery <= 10
+              ? `${remainingForFreeDelivery} ly`
+              : formatPrice(remainingForFreeDelivery),
+          })}
         </div>
       )}
       {qualifiesForFreeDelivery && subtotal > 0 && (
@@ -49,10 +53,12 @@ export function OrderSummary({
             <span className="text-muted">{t('order.subtotal')}</span>
             <span className="text-foreground">{formatPrice(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">{t('order.serviceFee')}</span>
-            <span className="text-foreground">{formatPrice(serviceFee)}</span>
-          </div>
+          {serviceFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">{t('order.serviceFee')}</span>
+              <span className="text-foreground">{formatPrice(serviceFee)}</span>
+            </div>
+          )}
           {deliveryFee > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted">{t('order.deliveryFee')}</span>

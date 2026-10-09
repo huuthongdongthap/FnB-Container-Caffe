@@ -14,6 +14,7 @@ import { apiFetch } from '@/lib/api-client';
 import type {
   StitchCheckoutNewProps,
   CheckoutNewFormData,
+  CheckoutNewSummary,
   PaymentMethod,
   OrderType,
 } from './StitchCheckoutNew-types';
@@ -156,6 +157,21 @@ export function StitchCheckoutNew({
 
   const displayError = error || submitError;
 
+  const effectiveDeliveryFee = orderType === 'delivery' ? summary.deliveryFee : 0;
+  const effectiveDeliveryLabel = orderType === 'delivery'
+    ? summary.deliveryLabel
+    : (orderType === 'dine_in'
+      ? (locale?.startsWith('vi') ? 'Dùng tại quán (0₫)' : 'Dine-in ($0.00)')
+      : (locale?.startsWith('vi') ? 'Mang về (0₫)' : 'Takeaway ($0.00)'));
+  const effectiveTotal = summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee;
+
+  const activeSummary: CheckoutNewSummary = {
+    ...summary,
+    deliveryFee: effectiveDeliveryFee,
+    deliveryLabel: effectiveDeliveryLabel,
+    total: effectiveTotal,
+  };
+
   // VN mobile numbers: exactly 10 digits starting with 0
   const isPhoneValid = /^0\d{9}$/.test(form.phone.replace(/\s/g, ''));
   const isAddressMissing = orderType === 'delivery' && !form.address.trim();
@@ -236,7 +252,7 @@ export function StitchCheckoutNew({
                 >
                   <span className="text-2xl">🛵</span>
                   <span className="font-semibold">Giao tận nơi</span>
-                  <span className="text-[11px] opacity-70">TP. Sa Đéc</span>
+                  <span className="text-[11px] opacity-70">Freeship từ 2 ly (Sa Đéc)</span>
                 </button>
 
                 <button
@@ -347,6 +363,10 @@ export function StitchCheckoutNew({
                       value={form.address}
                       onChange={(v) => updateField('address', v)}
                     />
+                    <p className="mt-1.5 text-xs text-emerald-400/90 flex items-center gap-1.5">
+                      <span>🛵</span>
+                      <span>Miễn phí giao hàng nội ô Sa Đéc cho đơn từ 2 ly (Đơn 1 ly phí ship 15.000₫)</span>
+                    </p>
                     {isAddressMissing && (
                       <p className="mt-1 text-xs text-red-400" data-testid="address-error">
                         {t('stitch.addressRequired', 'Vui lòng nhập địa chỉ giao hàng')}
@@ -400,7 +420,7 @@ export function StitchCheckoutNew({
           </div>
 
           <OrderSummaryPanel
-            summary={summary}
+            summary={activeSummary}
             locale={locale}
             onUpdateQuantity={onUpdateQuantity}
             onRemoveItem={onRemoveItem}
@@ -409,7 +429,7 @@ export function StitchCheckoutNew({
         </div>
       </main>
 
-      <CheckoutFooter summary={summary} locale={locale} processing={processing} displayError={displayError} />
+      <CheckoutFooter summary={activeSummary} locale={locale} processing={processing} displayError={displayError} />
 
       <div className="fixed inset-0 -z-10 pointer-events-none opacity-40" aria-hidden="true" />
 

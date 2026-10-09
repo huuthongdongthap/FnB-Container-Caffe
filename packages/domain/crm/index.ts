@@ -121,3 +121,12 @@ export type {
   CampaignLogRow,
   CampaignConfig,
 } from './commands/campaign/types';
+
+export {
+  consumeCrmEvent,
+  replayCustomerEvents,
+} from './commands/consume-crm-event';
+export type {
+  ConsumeCrmEventInput,
+  CrmConsumeResult,
+} from './commands/consume-crm-event';

@@ -38,11 +38,14 @@ function stubDB(overrides: {
 },
       first: async() => {
         const q = stmt._sql || '';
-        if (q.includes('FROM cafe_tables WHERE table_number = ?')) {
+        if (q.includes('FROM cafe_tables WHERE table_number = ?') || q.includes('FROM cafe_tables WHERE id = ?')) {
           if (noTable) {
             return null;
           }
-          return { id: 'tbl_1', status: 'Available' };
+          return { id: 'tbl_1', table_number: '5', status: 'Available' };
+        }
+        if (q.includes('FROM products') || q.includes('FROM menu_items')) {
+          return { id: 'p1', name: 'Product 1', price: 25000, is_available: 1, available: 1 };
         }
         if (q.includes('SELECT * FROM orders WHERE id = ?')) {
           return {

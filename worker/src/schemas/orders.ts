@@ -66,7 +66,7 @@ export const OrderCustomerSchema = z.object({
  * Sales channel the order was priced against. Mirrors `Channel` from
  * `@aura/domain-catalog` pricing policy.
  */
-export const OrderChannelEnum = z.enum(['dine_in', 'takeaway', 'delivery']).openapi({
+export const OrderChannelEnum = z.enum(['dine_in', 'takeaway', 'online', 'delivery']).openapi({
   example: 'dine_in',
   description: 'Sales channel used for server-side price evaluation',
 });

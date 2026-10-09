@@ -15,6 +15,7 @@ export type {
 export { productsRouter } from './commands/products';
 export { categoriesRouter } from './commands/categories';
 export { menuModifiersRouter } from './commands/menu-modifiers';
+export { happyHourRouter } from './commands/happy-hour';
 
 // Queries (plain handlers)
 export { getMenu, getMenuItem } from './queries/menu';
@@ -24,9 +25,25 @@ export { getCustomerMenu, getCustomerMenuItem } from './commands/get-customer-me
 export type { CustomerMenu, CustomerMenuItem, CustomerMenuCategory, CustomerMenuOptions } from './commands/get-customer-menu';
 
 // Policies
-export { happyHourDiscountFor, resolveItemPrice } from './policies/pricing';
+export { happyHourDiscountFor, resolveItemPrice, normalizeChannel } from './policies/pricing';
 export type { Channel, ChannelDeltaConfig, ResolveItemPriceInput } from './policies/pricing';
+export { resolveServerProductPrice } from './policies/pricing-resolver';
+export type { ResolveServerPriceInput, ResolvedServerPrice } from './policies/pricing-resolver';
+export { validateProductModifiers } from './policies/modifier-validation';
+export type {
+  ModifierValidationRejection,
+  ModifierValidationResult,
+} from './policies/modifier-validation';
 export { parseAvailabilityFilter, toAvailabilityFlag } from './policies/availability';
+export {
+  mapProductToMenuProjection,
+  syncProductToMenuProjection,
+  syncProductAvailabilityProjection,
+  deleteProductProjection,
+  syncCategorySlugToMenuProjection,
+  reconcileAllMenuProjections,
+} from './policies/menu-projection';
+export type { MenuItemProjection } from './policies/menu-projection';
 
 // OpenAPI contracts
 export * from './schemas/products';

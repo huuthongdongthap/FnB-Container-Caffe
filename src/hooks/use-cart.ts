@@ -7,7 +7,9 @@ import { useCartStore, type CartItem } from '@/hooks/stores/use-cart-store';
    Free delivery threshold: 300,000 VND.
    ═══════════════════════════════════════════════════════════════════ */
 
-const FREE_DELIVERY_THRESHOLD = 300_000;
+// Policy: Miễn phí giao hàng nội ô Sa Đéc từ 2 ly trở lên
+const FREE_DELIVERY_MIN_ITEMS = 2;
+const STANDARD_DELIVERY_FEE = 15_000;
 
 export function useCart() {
   const items = useCartStore((s) => s.items);
@@ -26,15 +28,23 @@ export function useCart() {
     [items],
   );
 
-  const serviceFee = useMemo(() => Math.round(subtotal * 0.05), [subtotal]);
-  const total = useMemo(() => subtotal + serviceFee, [subtotal, serviceFee]);
-  const remainingForFreeDelivery = useMemo(
-    () => Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal),
-    [subtotal],
-  );
+  // Bỏ phí phục vụ (0đ)
+  const serviceFee = 0;
+  const total = subtotal;
+
   const qualifiesForFreeDelivery = useMemo(
-    () => subtotal >= FREE_DELIVERY_THRESHOLD,
-    [subtotal],
+    () => totalItems >= FREE_DELIVERY_MIN_ITEMS,
+    [totalItems],
+  );
+
+  const remainingForFreeDelivery = useMemo(
+    () => Math.max(0, FREE_DELIVERY_MIN_ITEMS - totalItems),
+    [totalItems],
+  );
+
+  const deliveryFee = useMemo(
+    () => (totalItems > 0 && !qualifiesForFreeDelivery ? STANDARD_DELIVERY_FEE : 0),
+    [totalItems, qualifiesForFreeDelivery],
   );
 
   return {
@@ -43,9 +53,11 @@ export function useCart() {
     subtotal,
     serviceFee,
     total,
+    deliveryFee,
     remainingForFreeDelivery,
     qualifiesForFreeDelivery,
-    FREE_DELIVERY_THRESHOLD,
+    FREE_DELIVERY_MIN_ITEMS,
+    FREE_DELIVERY_THRESHOLD: FREE_DELIVERY_MIN_ITEMS,
     addItem,
     removeItem,
     updateQuantity,

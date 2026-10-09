@@ -182,12 +182,14 @@ export function OrderSummaryPanel({
               {formatPrice(summary.subtotal, locale)}
             </span>
           </div>
-          <div className="flex justify-between text-[var(--aura-chrome-soft)] text-sm font-body">
-            <span>{summary.taxLabel ?? t('stitch.tax', 'Phí phục vụ (5%)')}</span>
-            <span className="font-mono text-white">
-              {formatPrice(summary.tax, locale)}
-            </span>
-          </div>
+          {summary.tax > 0 && (
+            <div className="flex justify-between text-[var(--aura-chrome-soft)] text-sm font-body">
+              <span>{summary.taxLabel ?? t('stitch.tax', 'Phí phục vụ')}</span>
+              <span className="font-mono text-white">
+                {formatPrice(summary.tax, locale)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-[var(--aura-chrome-soft)] text-sm font-body">
             <span>{summary.deliveryLabel ?? t('stitch.deliveryFee', 'Phí giao hàng')}</span>
             <span className="font-mono text-emerald-400 font-semibold">

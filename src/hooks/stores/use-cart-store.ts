@@ -41,6 +41,16 @@ function getInitialTableId(): string | null {
 }
 
 function loadInitialItems(): CartItem[] {
+  // Support clearing cart via URL parameter ?clear=true or ?reset=true
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('clear') === 'true' || params.get('clear_cart') === '1' || params.get('reset') === 'true') {
+      localStorage.removeItem(OLD_KEY);
+      localStorage.removeItem(NEW_KEY);
+      return [];
+    }
+  } catch { /* ignore */ }
+
   // Try new format first
   try {
     const raw = localStorage.getItem(NEW_KEY);

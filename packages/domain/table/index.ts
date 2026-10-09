@@ -11,3 +11,23 @@ export {
 } from './policies/status';
 export type { TableStatus } from './policies/status';
 export type { CafeTable, QrCodeRow } from './model/table-types';
+export type {
+  TablePhysicalStatus,
+  ReservationLifecycleStatus,
+  CanonicalTable,
+  CanonicalReservation,
+  CreateReservationPolicyInput,
+  SeatTableInput,
+  ReleaseTableInput,
+  AvailabilityQuery,
+} from './src/model/table-reservation-types';
+export {
+  validateOrderTable,
+  checkTableAvailability,
+} from './src/policies/table-availability-policy';
+export {
+  createCanonicalReservation,
+  updateReservationStatus,
+  seatTable,
+  releaseTable,
+} from './src/policies/table-reservation-policy';

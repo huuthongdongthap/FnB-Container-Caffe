@@ -429,7 +429,7 @@
   },
   "checkout": {
     "variantStandard": "Tiêu chuẩn",
-    "luxuryTax": "Phí dịch vụ (5%)",
+    "luxuryTax": "Phí dịch vụ",
     "deliveryFee": "Phí giao hàng",
     "failedToCreateOrder": "Không thể tạo đơn hàng",
     "paymentLinkFailed": "Liên kết thanh toán không thành công"
@@ -437,10 +437,10 @@
   "order": {
     "summaryTitle": "Đơn hàng ({{count}} món)",
     "subtotal": "Tạm tính",
-    "serviceFee": "Phí phục vụ (5%)",
+    "serviceFee": "Phí phục vụ",
     "deliveryFee": "Phí giao hàng",
     "total": "Tổng cộng",
-    "freeDeliveryQualified": "Miễn phí giao hàng",
+    "freeDeliveryQualified": "Miễn phí giao hàng (từ 2 ly)",
     "freeDeliveryMessage": "Thêm {{amount}} để miễn phí giao hàng",
     "discount": "Giảm giá",
     "itemQuantity": "x{{count}}",

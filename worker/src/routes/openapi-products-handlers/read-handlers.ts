@@ -35,15 +35,15 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       params.push(categoryId);
     }
     if (status) {
-      whereClause += ' AND p.status = ?';
-      params.push(status);
+      whereClause += ' AND p.is_available = ?';
+      params.push(status === 'active' ? 1 : 0);
     }
     if (minPrice !== undefined) {
-      whereClause += ' AND p.base_price >= ?';
+      whereClause += ' AND p.price >= ?';
       params.push(minPrice);
     }
     if (maxPrice !== undefined) {
-      whereClause += ' AND p.base_price <= ?';
+      whereClause += ' AND p.price <= ?';
       params.push(maxPrice);
     }
     if (tags) {
@@ -57,12 +57,12 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    // Get products with translations
+    // Get products directly from canonical products table
     const offset = (page - 1) * limit;
     const allowedSorts: Record<string, string> = {
       sort_order: 'p.sort_order',
       name: 'p.name',
-      base_price: 'p.base_price',
+      price: 'p.price',
       created_at: 'p.created_at',
       updated_at: 'p.updated_at',
     };
@@ -70,13 +70,13 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
     const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
-      `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
+      `SELECT p.*, c.name as category_name
        FROM products p
-       LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
+       LEFT JOIN categories c ON p.category_id = c.id
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
-    ).bind(locale, ...params, limit, offset).all()) as { results: ProductRow[] };
+    ).bind(...params, limit, offset).all()) as { results: ProductRow[] };
 
     const products = (rows.results || []).map((row) => formatProduct(row, locale));
 
@@ -93,11 +93,11 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const locale = c.req.query('locale') || 'vi';
 
     const row = (await db.prepare(
-      `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
+      `SELECT p.*, c.name as category_name
        FROM products p
-       LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
+       LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.id = ?`
-    ).bind(locale, id).first()) as ProductRow | null;
+    ).bind(id).first()) as ProductRow | null;
 
     if (!row) {
       return c.json({ success: false, error: 'Product not found' }, 404);
@@ -116,11 +116,11 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const locale = c.req.query('locale') || 'vi';
 
     const row = (await db.prepare(
-      `SELECT p.*, pt.name as translation_name, pt.description as translation_description, pt.ingredients as translation_ingredients, pt.allergens as translation_allergens, pt.story as translation_story
+      `SELECT p.*, c.name as category_name
        FROM products p
-       LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = ?
+       LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.slug = ?`
-    ).bind(locale, slug).first()) as ProductRow | null;
+    ).bind(slug).first()) as ProductRow | null;
 
     if (!row) {
       return c.json({ success: false, error: 'Product not found' }, 404);

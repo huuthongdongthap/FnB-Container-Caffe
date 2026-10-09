@@ -65,19 +65,16 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
       const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const now = new Date().toISOString();
 
-      // Record payment
+      // Record payment into canonical payments table
       await db.prepare(`
-        INSERT INTO order_payments (id, order_id, payment_number, method, amount, status, provider, provider_reference, metadata, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?)
+        INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'completed', ?, NULL, ?, ?)
       `).bind(
         paymentId,
         order_id,
-        transactionId,
         isApplePay ? 'apple_pay' : 'google_pay',
         amount,
-        isApplePay ? 'apple' : 'google',
         transactionId,
-        JSON.stringify(payment_token),
         now,
         now
       ).run();
@@ -85,9 +82,9 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
       // Update order status
       await db.prepare(`
         UPDATE orders
-        SET payment_status = 'paid', paid_at = ?, updated_at = ?
+        SET payment_status = 'paid', updated_at = ?
         WHERE id = ?
-      `).bind(now, now, order_id).run();
+      `).bind(now, order_id).run();
 
       return c.json({
         success: true,

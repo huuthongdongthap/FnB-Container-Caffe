@@ -12,6 +12,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { ExecutionContext } from 'hono';
 import type { D1Database } from '@cloudflare/workers-types';
+import { writeCanonicalAuditLog } from '@aura/domain-audit';
 
 // ── Types ──
 
@@ -71,19 +72,23 @@ export class AuditLogger {
     this.ctx.waitUntil(
       (async() => {
         try {
-          await this.db.prepare(
-            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(
-            entry.actor_id,
-            entry.actor_name,
-            entry.action,
-            entry.resource_type,
-            entry.resource_id ?? null,
-            entry.details ?? '{}',
-            entry.ip_address ?? null,
-            new Date().toISOString()
-          ).run();
+          let parsedDetails: Record<string, unknown> | null = null;
+          if (entry.details) {
+            try {
+              parsedDetails = JSON.parse(entry.details);
+            } catch {
+              parsedDetails = { raw: entry.details };
+            }
+          }
+
+          await writeCanonicalAuditLog(this.db, {
+            actor: { id: entry.actor_id, name: entry.actor_name },
+            action: entry.action,
+            resourceType: entry.resource_type,
+            resourceId: entry.resource_id,
+            metadata: parsedDetails || undefined,
+            ipAddress: entry.ip_address,
+          }, { policy: 'best_effort' });
         } catch {
           // Ghi log không quan trọng — không làm crash request
           // Audit logging is best-effort — never crash the request

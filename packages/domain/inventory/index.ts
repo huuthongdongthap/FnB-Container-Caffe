@@ -15,5 +15,27 @@ export { inventoryCRUD, inventoryTransactions, inventorySnapshots } from './src/
 // policies
 export { deductInventoryForOrder, restoreInventoryForOrder } from './src/routes/order-deduction';
 export { deductIngredientsForOrder, calculateBomDepletion, getRecipeForProduct } from './src/policies/bom-policy';
+export {
+  getCanonicalRecipe,
+  calculateOrderConsumption,
+  deductOrderStock,
+  calculateProductMargin,
+} from './src/policies/inventory-recipe-policy';
+export type {
+  CanonicalRecipe,
+  CanonicalRecipeComponent,
+  OrderConsumptionCalculation,
+  StockDeductionResult,
+} from './src/policies/inventory-recipe-policy';
+export {
+  createCanonicalPurchaseOrder,
+  receivePurchaseOrder,
+  cancelPurchaseOrder,
+  mapSupplierToErpnext,
+} from './src/policies/purchasing-receiving-policy';
+export type {
+  ReceiveItemInput,
+  ReceivePurchaseOrderResult,
+} from './src/policies/purchasing-receiving-policy';
 // types
 export type { Supplier, PurchaseOrderInput, RecipeComponent, Recipe } from './src/model/supplier-policy';

@@ -19,6 +19,15 @@ export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';
 export type { ActorRole } from './policies/transition-authorization';
+export {
+  canAccessOrder,
+  projectCustomerOrderPayload,
+  publishOrderEvent,
+} from './policies/customer-order-payload';
+export type {
+  CustomerOrderItemPayload,
+  CustomerOrderPayload,
+} from './policies/customer-order-payload';
 export type {
   RawOrderItemInput,
   EvaluatedOrderItem,

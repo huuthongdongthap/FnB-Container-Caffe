@@ -102,7 +102,7 @@ describe('Order lifecycle E2E', () => {
       }] },
       { match: (s) => s.includes('SELECT id, status, items, total'), firstRow: { id: 'ORD-TEST-001', status: 'pending' } },
       // Canonical read path (GET /api/orders/:id) selects the join alias o.*
-      { match: (s) => s.includes('SELECT o.*') && s.includes('LEFT JOIN tables'), firstRow: {
+      { match: (s) => s.includes('SELECT o.*') && (s.includes('LEFT JOIN tables') || s.includes('LEFT JOIN cafe_tables')), firstRow: {
         id: 'ORD-TEST-001', status: 'pending', payment_status: 'unpaid',
         total_amount: 50000, customer_name: 'Nguyen Van A', customer_phone: '0909123456',
         customer_address: null, payment_method: 'cod', notes: 'Less sugar',

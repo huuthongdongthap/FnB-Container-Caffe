@@ -59,7 +59,8 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
       return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
     }
 
-    const revoked = await (c.env as Env).AUTH_KV.get(`revoked:${token}`);
+    const authKv = (c.env as Env)?.AUTH_KV;
+    const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
     if (revoked) {
       return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
     }

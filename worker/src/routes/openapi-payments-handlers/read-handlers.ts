@@ -6,16 +6,13 @@ import { getDatabase } from '../../lib/db';
 interface PaymentRow {
   id: string;
   order_id: string;
-  payment_number: string;
   method: string;
   amount: number;
   status: string;
-  provider: string | null;
-  provider_reference: string | null;
-  metadata: string | null;
+  transaction_id: string | null;
+  payment_url: string | null;
   created_at: string;
   updated_at: string;
-  order_number?: string;
   [key: string]: unknown;
 }
 
@@ -61,33 +58,46 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     }
 
     const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM order_payments ${whereClause}`
+      `SELECT COUNT(*) as total FROM payments ${whereClause}`
     ).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
     const allowedSorts: Record<string, string> = {
-      created_at: 'op.created_at',
-      amount: 'op.amount',
-      status: 'op.status',
-      payment_method: 'op.payment_method',
-      updated_at: 'op.updated_at',
+      created_at: 'p.created_at',
+      amount: 'p.amount',
+      status: 'p.status',
+      payment_method: 'p.method',
+      updated_at: 'p.updated_at',
     };
-    const safeSort = allowedSorts[sort] || 'op.created_at';
+    const safeSort = allowedSorts[sort] || 'p.created_at';
     const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
     const orderClause = `${safeSort} ${safeDirection}`;
     const rows = (await db.prepare(
-      `SELECT op.*, o.order_number FROM order_payments op
-       LEFT JOIN orders o ON op.order_id = o.id
+      `SELECT p.* FROM payments p
        ${whereClause}
        ORDER BY ${orderClause}
        LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all()) as { results: PaymentRow[] };
 
     const payments = (rows.results || []).map((p) => ({
-      ...p,
-      metadata: p.metadata ? JSON.parse(p.metadata) : {},
-      order: { id: p.order_id, orderNumber: p.order_number },
+      id: p.id,
+      orderId: p.order_id,
+      order: { id: p.order_id },
+      amount: p.amount,
+      method: p.method,
+      status: p.status,
+      transactionId: p.transaction_id,
+      payosOrderCode: p.transaction_id ? parseInt(p.transaction_id, 10) || null : null,
+      payosPaymentLinkId: null,
+      qrCodeUrl: p.payment_url,
+      deeplink: null,
+      paidAt: p.status === 'completed' ? p.updated_at : null,
+      failedAt: p.status === 'failed' ? p.updated_at : null,
+      failureReason: null,
+      refundedAmount: p.status === 'refunded' ? p.amount : 0,
+      refundedAt: p.status === 'refunded' ? p.updated_at : null,
+      metadata: null,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     }));
@@ -104,9 +114,7 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const { id } = c.req.valid('param' as never) as { id: string };
 
     const payment = (await db.prepare(
-      `SELECT op.*, o.order_number FROM order_payments op
-       LEFT JOIN orders o ON op.order_id = o.id
-       WHERE op.id = ?`
+      'SELECT p.* FROM payments p WHERE p.id = ?'
     ).bind(id).first()) as PaymentRow | null;
 
     if (!payment) {
@@ -116,9 +124,23 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     return c.json({
       success: true,
       data: {
-        ...payment,
-        metadata: payment.metadata ? JSON.parse(payment.metadata) : {},
-        order: { id: payment.order_id, orderNumber: payment.order_number },
+        id: payment.id,
+        orderId: payment.order_id,
+        order: { id: payment.order_id },
+        amount: payment.amount,
+        method: payment.method,
+        status: payment.status,
+        transactionId: payment.transaction_id,
+        payosOrderCode: payment.transaction_id ? parseInt(payment.transaction_id, 10) || null : null,
+        payosPaymentLinkId: null,
+        qrCodeUrl: payment.payment_url,
+        deeplink: null,
+        paidAt: payment.status === 'completed' ? payment.updated_at : null,
+        failedAt: payment.status === 'failed' ? payment.updated_at : null,
+        failureReason: null,
+        refundedAmount: payment.status === 'refunded' ? payment.amount : 0,
+        refundedAt: payment.status === 'refunded' ? payment.updated_at : null,
+        metadata: null,
         createdAt: payment.created_at,
         updatedAt: payment.updated_at,
       },

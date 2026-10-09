@@ -26,7 +26,8 @@ export const orderItemSchema = z.object({
   name: z.string().min(1),
   qty: z.number().int().positive().optional(),
   quantity: z.number().int().positive().optional(),
-  price: z.number().nonnegative().optional()
+  price: z.number().nonnegative().optional(),
+  modifiers: z.array(z.unknown()).optional(),
 });
 
 // ── Re-export phone/email primitives from their canonical modules ──

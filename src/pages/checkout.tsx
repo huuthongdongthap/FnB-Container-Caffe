@@ -29,9 +29,10 @@ export function CheckoutPage() {
 
   const {
     items,
+    totalItems,
     subtotal,
-    serviceFee,
-    total,
+    deliveryFee,
+    qualifiesForFreeDelivery,
     updateQuantity,
     removeItem,
     clearCart,
@@ -61,12 +62,14 @@ export function CheckoutPage() {
       imageUrl: item.image || '',
     })),
     subtotal,
-    tax: serviceFee,
-    taxLabel: t('serviceFee', 'Phí phục vụ'),
-    deliveryFee: 0,
-    deliveryLabel: t('deliveryFee', 'Phí giao hàng'),
-    total,
-  }), [items, subtotal, serviceFee, total, t]);
+    tax: 0,
+    taxLabel: undefined,
+    deliveryFee,
+    deliveryLabel: qualifiesForFreeDelivery
+      ? t('deliveryFree', 'Miễn phí giao hàng (từ 2 ly)')
+      : t('deliveryFee', 'Phí giao hàng'),
+    total: subtotal + deliveryFee,
+  }), [items, subtotal, deliveryFee, qualifiesForFreeDelivery, t]);
 
   /* ── Place Order Handler ── */
   const handlePlaceOrder = useCallback(async (formData: CheckoutNewFormData) => {
@@ -90,6 +93,11 @@ export function CheckoutPage() {
       ? (validTableNumber ? 'dine_in' : 'takeaway')
       : (formData.orderType || 'delivery');
 
+    const effectiveShippingFee = effectiveOrderType === 'delivery'
+      ? (totalItems >= 2 ? 0 : 15_000)
+      : 0;
+    const effectiveTotal = subtotal + effectiveShippingFee;
+
     const payload = {
       items: items.map((i) => ({
         id: i.id,
@@ -97,7 +105,7 @@ export function CheckoutPage() {
         price: i.price,
         quantity: i.quantity,
       })),
-      total,
+      total: effectiveTotal,
       customer_name: formData.fullName,
       customer_phone: formData.phone,
       customer_email: '',
@@ -109,7 +117,8 @@ export function CheckoutPage() {
       payment_method: formData.paymentMethod,
       notes: formData.notes,
       delivery_time: 'now',
-      shipping_fee: 0,
+      shipping_fee: effectiveShippingFee,
+      service_fee: 0,
       discount: 0,
       tip: 0,
     };
@@ -122,7 +131,7 @@ export function CheckoutPage() {
           : [{ supportedMethods: 'https://google.com/pay', data: { apiVersion: 2, apiVersionMinor: 0 } }];
 
         const pr = new PaymentRequest(supportedMethods, {
-          total: { label: 'AURA CAFE', amount: { currency: 'VND', value: String(total) } },
+          total: { label: 'AURA CAFE', amount: { currency: 'VND', value: String(effectiveTotal) } },
         });
 
         const canPay = await pr.canMakePayment();
@@ -149,7 +158,7 @@ export function CheckoutPage() {
           body: JSON.stringify({
             order_id: order.id,
             payment_token: response.details,
-            amount: total,
+            amount: effectiveTotal,
             currency: 'VND',
           }),
         });
@@ -195,7 +204,7 @@ export function CheckoutPage() {
       // Handle PayOS redirect with internal retry
       if (formData.paymentMethod === 'payos') {
         setPayosRetrying(true);
-        const url = await retryCreatePaymentLink(order.id, total);
+        const url = await retryCreatePaymentLink(order.id, effectiveTotal);
         setPayosRetrying(false);
         if (url) {
           clearCart();
@@ -213,7 +222,7 @@ export function CheckoutPage() {
       submittingRef.current = false;
       throw err; // StitchCheckout catches and displays the error
     }
-  }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
+  }, [items, subtotal, totalItems, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 
   const isRedirecting = Boolean(searchParams.get('payment') && searchParams.get('order_id'));
 

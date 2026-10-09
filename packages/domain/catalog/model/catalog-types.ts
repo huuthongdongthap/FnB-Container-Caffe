@@ -12,6 +12,8 @@ export interface Product {
   is_available: number;
   sort_order: number;
   category_name?: string;
+  tags?: string | null;
+  badge?: string | null;
 }
 
 export interface Category {
@@ -28,8 +30,9 @@ export interface ModifierGroup {
   type: 'single' | 'multiple';
   required: number;
   sort_order: number;
-  created_at: string;
-  updated_at: string;
+  is_active?: number | boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ModifierChoice {
@@ -39,6 +42,8 @@ export interface ModifierChoice {
   price_delta: number;
   is_default: number;
   sort_order: number;
+  is_available?: number | boolean;
+  created_at?: string;
 }
 
 export interface ProductModifierGroup {

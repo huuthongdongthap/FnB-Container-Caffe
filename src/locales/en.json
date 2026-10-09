@@ -445,7 +445,7 @@
   },
   "checkout": {
     "variantStandard": "Standard",
-    "luxuryTax": "Service Fee (5%)",
+    "luxuryTax": "Service Fee",
     "deliveryFee": "Delivery Fee",
     "failedToCreateOrder": "Failed to create order",
     "paymentLinkFailed": "Payment link failed"
@@ -453,10 +453,10 @@
   "order": {
     "summaryTitle": "Order ({{count}} items)",
     "subtotal": "Subtotal",
-    "serviceFee": "Service Fee (5%)",
+    "serviceFee": "Service Fee",
     "deliveryFee": "Delivery Fee",
     "total": "Total",
-    "freeDeliveryQualified": "Free delivery",
+    "freeDeliveryQualified": "Free delivery (from 2 drinks)",
     "freeDeliveryMessage": "Add {{amount}} for free delivery",
     "discount": "Discount",
     "itemQuantity": "x{{count}}",

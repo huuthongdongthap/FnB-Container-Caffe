@@ -80,12 +80,22 @@ describe('routeItemToStation', () => {
     expect(routed.station_id).toBe('KS-COFFEE');
   });
 
-  test('returns null for unmapped category', () => {
+  test('returns null for unmapped category without fallback', () => {
     const routed = routeItemToStation(
       { name: 'Mystery', category_id: 'unmapped' },
       index,
     );
     expect(routed.station_id).toBeNull();
+  });
+
+  test('routes to deterministic fallback station when provided', () => {
+    const routed = routeItemToStation(
+      { name: 'Mystery', category_id: 'unmapped' },
+      index,
+      { station_id: 'KS-GENERAL', station_name: 'General' },
+    );
+    expect(routed.station_id).toBe('KS-GENERAL');
+    expect(routed.station_name).toBe('General');
   });
 
   test('reads PascalCase categoryId fallback', () => {
@@ -115,12 +125,6 @@ describe('groupItemsByStation', () => {
     expect(groups.get('KS-COFFEE')!.items).toHaveLength(2);
     expect(groups.get('KS-FOOD')!.items).toHaveLength(1);
   });
-
-  test('returns empty map for no matches', () => {
-    const orders = [{ id: 'o1', items: '[{"name":"X","category_id":"none"}]' }];
-    const groups = groupItemsByStation(orders, index);
-    expect(groups.size).toBe(0);
-  });
 });
 
 describe('filterItemsForStation', () => {
@@ -137,9 +141,10 @@ describe('filterItemsForStation', () => {
     expect(coffeeItems[1].name).toBe('Cronut');
   });
 
-  test('returns empty when station has no items', () => {
-    const itemsJson = '[{"name":"Latte","category_id":"coffee"}]';
-    const result = filterItemsForStation(itemsJson, 'KS-FOOD', index);
-    expect(result).toEqual([]);
+  test('includes unmapped items when isFallbackStation is true', () => {
+    const itemsJson = '[{"name":"Mystery","category_id":"unmapped"}]';
+    const result = filterItemsForStation(itemsJson, 'KS-GENERAL', index, true);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Mystery');
   });
 });

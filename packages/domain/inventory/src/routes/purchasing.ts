@@ -1,4 +1,9 @@
 import { Hono } from 'hono';
+import {
+  createCanonicalPurchaseOrder,
+  receivePurchaseOrder,
+  cancelPurchaseOrder,
+} from '../policies/purchasing-receiving-policy';
 import type { PurchaseOrderInput } from '../model/supplier-policy';
 
 interface D1Database {
@@ -20,70 +25,57 @@ interface AppEnv {
 type AppContext = { Bindings: AppEnv };
 
 /**
- * Create purchase order and record stock intake in a single transaction.
- * Inserts into purchase_orders + purchase_order_items, then updates
- * ingredient stock and creates 'in' type inventory_transactions.
+ * Canonical Purchasing Router
+ * Rules: PO creation does NOT touch stock. Stock is only incremented via Receiving.
  */
 export function purchasing(app: Hono<AppContext>) {
   app.post('/purchase-orders', async (c) => {
+    try {
+      const db = c.env.AURA_DB;
+      const body = (await c.req.json()) as PurchaseOrderInput;
+      const po = await createCanonicalPurchaseOrder(db as any, {
+        supplierId: body.supplier_id,
+        items: body.items.map(i => ({
+          ingredientId: i.ingredient_id,
+          quantity: i.quantity,
+          unitPrice: i.unit_cost,
+        })),
+        expectedDate: body.expected_date,
+        notes: body.notes,
+      });
+
+      return c.json({ success: true, data: po }, 201);
+    } catch (err) {
+      return c.json({ success: false, error: (err as Error).message }, 400);
+    }
+  });
+
+  app.post('/purchase-orders/:id/receive', async (c) => {
     const db = c.env.AURA_DB;
-    const body = (await c.req.json()) as PurchaseOrderInput;
-    const now = new Date().toISOString();
+    const id = c.req.param('id');
+    const body = await c.req.json() as { items: Array<{ ingredient_id: string; quantity: number }>; receipt_id?: string };
 
-    const supplier = await db
-      .prepare('SELECT id, name FROM suppliers WHERE id = ? AND is_active = 1')
-      .bind(body.supplier_id)
-      .first<{ id: string; name: string }>();
-    if (!supplier) {
-      return c.json({ success: false, error: 'Supplier not found or inactive' }, 404);
+    const result = await receivePurchaseOrder(
+      db as any,
+      id,
+      (body.items || []).map(i => ({ ingredientId: i.ingredient_id, receivedQuantity: i.quantity })),
+      { receiptId: body.receipt_id }
+    );
+
+    if (!result.ok) {
+      return c.json({ success: false, error: result.error }, 400);
     }
+    return c.json({ success: true, data: result });
+  });
 
-    const poId = `po_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
-    const poInsert = db.prepare(
-      `INSERT INTO purchase_orders (id, supplier_id, order_date, expected_date, status, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'received', ?, ?, ?)`
-    ).bind(poId, body.supplier_id, now.slice(0, 10), body.expected_date ?? null, body.notes ?? null, now, now);
-
-    const itemOps = [];
-    for (const item of body.items) {
-      const itemId = `poi_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-      itemOps.push(
-        db.prepare(
-          `INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_cost, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(itemId, poId, item.ingredient_id, item.quantity, item.unit_cost ?? 0, now)
-      );
+  app.post('/purchase-orders/:id/cancel', async (c) => {
+    const db = c.env.AURA_DB;
+    const id = c.req.param('id');
+    const result = await cancelPurchaseOrder(db as any, id);
+    if (!result.ok) {
+      return c.json({ success: false, error: result.error }, 400);
     }
-
-    await db.batch([poInsert, ...itemOps]);
-
-    // Stock intake: update ingredient current_stock + create inventory_transactions
-    const intakeOps = [];
-    for (const item of body.items) {
-      intakeOps.push(
-        db.prepare(
-          `UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?`
-        ).bind(item.quantity, now, item.ingredient_id)
-      );
-      intakeOps.push(
-        db.prepare(
-          `INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes)
-           VALUES (?, ?, 'in', ?, ?, 'purchase_order', ?)`
-        ).bind(
-          crypto.randomUUID(),
-          item.ingredient_id,
-          item.quantity,
-          poId,
-          `PO intake ${poId} from supplier ${supplier.name}`
-        )
-      );
-    }
-    if (intakeOps.length > 0) {
-      await db.batch(intakeOps);
-    }
-
-    return c.json({ success: true, data: { id: poId } }, 201);
+    return c.json({ success: true });
   });
 
   app.get('/purchase-orders', async (c) => {

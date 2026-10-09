@@ -6,26 +6,27 @@
 
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
+import { writeCanonicalAuditLog } from '@aura/domain-audit';
 
 export function audit(action: string): MiddlewareHandler<{ Bindings: Env }> {
   return async(c, next) => {
     await next();
     try {
-      const user = c.get('user');
+      const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenant_id?: string } | undefined;
       if (user && c.env.AURA_DB) {
-        const now = new Date().toISOString();
-        await c.env.AURA_DB.prepare(
-          'INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(
-          user.id,
-          user.name || user.email || 'unknown',
+        await writeCanonicalAuditLog(c.env.AURA_DB, {
+          actor: {
+            id: user.id || 'unknown',
+            name: user.name || user.email || 'unknown',
+            role: user.role,
+            tenantId: user.tenant_id,
+          },
           action,
-          action.split('_')[0] || 'resource', // e.g., 'product' from 'product_create'
-          extractResourceId(c) || null,
-          JSON.stringify({ method: c.req.method, path: c.req.path }),
-          c.req.header('cf-connecting-ip') || null,
-          now
-        ).run().catch(() => { /* non-fatal */ });
+          resourceType: action.split('_')[0] || 'resource',
+          resourceId: extractResourceId(c) || null,
+          metadata: { method: c.req.method, path: c.req.path },
+          ipAddress: c.req.header('cf-connecting-ip') || null,
+        }, { policy: 'best_effort' });
       }
     } catch {
       // non-fatal

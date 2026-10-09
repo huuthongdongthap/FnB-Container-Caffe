@@ -33,17 +33,33 @@ export function happyHourDiscountFor(
   return matched[0] ?? null;
 }
 
-export type Channel = 'dine_in' | 'takeaway' | 'delivery';
+export type Channel = 'dine_in' | 'takeaway' | 'online' | 'delivery';
+
+/**
+ * Normalizes input channel string into a valid supported Channel.
+ * Unsupported or invalid channels deterministically fall back to 'dine_in'.
+ */
+export function normalizeChannel(channel?: string | null): Channel {
+  if (!channel) return 'dine_in';
+  const clean = channel.trim().toLowerCase();
+  if (clean === 'takeaway') return 'takeaway';
+  if (clean === 'online') return 'online';
+  if (clean === 'delivery') return 'delivery';
+  if (clean === 'dine_in') return 'dine_in';
+  return 'dine_in';
+}
 
 export interface ChannelDeltaConfig {
-  dine_in: number;
-  takeaway: number;
-  delivery: number;
+  dine_in?: number;
+  takeaway?: number;
+  online?: number;
+  delivery?: number;
+  [channel: string]: number | undefined;
 }
 
 export interface ResolveItemPriceInput {
   basePriceCents: number;
-  channel: Channel;
+  channel: Channel | string;
   modifierChoices: ReadonlyArray<ModifierChoice>;
   happyHourWindows: ReadonlyArray<HappyHourWindow>;
   now: Date;
@@ -51,18 +67,19 @@ export interface ResolveItemPriceInput {
 }
 
 /**
- * Resolve the effective unit price (integer VND cents) for a menu item in a specific channel.
+ * Resolve the effective unit price (integer VND cents) for a product.
  *
- * Formula: effectivePrice = basePriceCents + channelDelta + sum(modifierChoices.price_delta) - happyHourDiscount
+ * Sequence:
+ * `base product price → channel delta → modifier delta → time rule → final sell price`
  *
- * - `basePriceCents`: The canonical price from `menu_items.price` (server-authoritative).
- * - `channel`: The customer's order type (`dine_in`, `takeaway`, `delivery`).
- * - `modifierChoices`: Array of selected modifier choices with their `price_delta` cents.
- * - `happyHourWindows`: All configured happy hour windows for discount matching.
- * - `now`: Current time for happy hour evaluation.
- * - `channelDeltas`: Optional per-channel price deltas (default: all 0).
+ * - `basePriceCents`: The canonical price from `products.price` (server-authoritative).
+ * - `channel`: Sales channel ('dine_in', 'takeaway', 'online', 'delivery').
+ * - `modifierChoices`: Selected modifier choices with authoritative `price_delta`.
+ * - `happyHourWindows`: Configured happy hour windows for time rule evaluation.
+ * - `now`: Current evaluation timestamp.
+ * - `channelDeltas`: Optional channel adjustments (default: 0).
  *
- * Returns the final unit price in integer VND cents, clamped to minimum 0.
+ * Returns the final sell price in integer VND cents, clamped to minimum 0.
  */
 export function resolveItemPrice(input: ResolveItemPriceInput): number {
   const {
@@ -71,28 +88,35 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
     modifierChoices,
     happyHourWindows,
     now,
-    channelDeltas = { dine_in: 0, takeaway: 0, delivery: 0 },
+    channelDeltas = {},
   } = input;
 
-  // Start with base catalog price
-  let effectivePrice = basePriceCents;
+  // 1. Base product price (integer VND cents >= 0)
+  let effectivePrice = Math.max(0, Math.floor(Number(basePriceCents) || 0));
 
-  // Apply channel delta (positive = surcharge, negative = discount)
-  effectivePrice += channelDeltas[channel] ?? 0;
+  // 2. Channel delta (positive surcharge or negative discount)
+  const normChannel = normalizeChannel(channel);
+  const delta =
+    channelDeltas[normChannel] ??
+    (normChannel === 'online' ? channelDeltas.delivery : (normChannel === 'delivery' ? channelDeltas.online : 0)) ??
+    0;
+  effectivePrice += Math.round(Number(delta) || 0);
 
-  // Aggregate modifier price deltas (always additive)
+  // 3. Modifier deltas (sum of validated modifier price deltas)
   for (const choice of modifierChoices) {
-    effectivePrice += choice.price_delta ?? 0;
+    effectivePrice += Math.round(Number(choice.price_delta) || 0);
   }
 
-  // Apply happy hour discount if active and matching
+  // 4. Time rule (Happy Hour active window)
   const hh = happyHourDiscountFor(happyHourWindows, now);
   if (hh) {
-    // discount_rate is a percentage (e.g., 10 = 10%)
-    const discountAmount = Math.floor((effectivePrice * hh.discount_rate) / 100);
+    const rawRate = Number(hh.discount_rate) || 0;
+    // Supports both 0..1 (e.g. 0.2 = 20%) and percentage 1..100 (e.g. 10 = 10%)
+    const discountMultiplier = rawRate <= 1 && rawRate > 0 ? rawRate : rawRate / 100;
+    const discountAmount = Math.floor(effectivePrice * discountMultiplier);
     effectivePrice -= discountAmount;
   }
 
-  // Clamp to minimum 0 (never negative price)
-  return Math.max(0, effectivePrice);
+  // 5. Final sell price: integer money value clamped to >= 0
+  return Math.max(0, Math.floor(effectivePrice));
 }

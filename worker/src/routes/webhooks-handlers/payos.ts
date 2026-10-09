@@ -89,7 +89,10 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
       }
 
       // Success may supersede a previous failure; failures may only transition from pending.
-      const newStatus = isSuccess ? 'completed' : 'failed';
+      const statusUpper = String(data.status || '').toUpperCase();
+      const isExpired = statusUpper === 'EXPIRED';
+      const isCancelled = statusUpper === 'CANCELLED';
+      const newStatus = isSuccess ? 'completed' : (isExpired ? 'expired' : isCancelled ? 'cancelled' : 'failed');
       const statusGuard = isSuccess ? 'status != \'completed\'' : 'status = \'pending\'';
       const transition = await db.prepare(
         `UPDATE payments SET status = ? WHERE transaction_id = ? AND ${statusGuard}`

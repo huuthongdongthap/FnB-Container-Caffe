@@ -86,10 +86,16 @@ export function canActorTransition(
       if (target === CANCELLED && origin !== 'served' && origin !== 'delivered') {
         return { ok: true };
       }
+      if ((target === 'failed' || target === 'expired') && origin !== 'served' && origin !== 'delivered') {
+        return { ok: true };
+      }
       return deny(role, origin, target);
 
     case 'kitchen':
       if (matches(KITCHEN_TARGETS, origin, target)) return { ok: true };
+      if (target === CANCELLED && (origin === 'confirmed' || origin === 'preparing')) {
+        return { ok: true };
+      }
       return deny(role, origin, target);
 
     case 'rider':
@@ -113,6 +119,7 @@ function deny(role: ActorRole, from: string, to: string): TransitionResult {
  * `owner` carries operator-level override; `waiter` is floor staff.
  */
 const ROLE_ALIASES: Record<string, ActorRole> = {
+  system: 'admin',
   owner: 'admin',
   waiter: 'staff',
   cashier: 'staff',

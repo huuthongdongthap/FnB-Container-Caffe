@@ -14,6 +14,7 @@ CREATE TABLE categories (
     slug TEXT UNIQUE NOT NULL,
     description TEXT,
     sort_order INTEGER DEFAULT 0,
+    image_url TEXT,
     display_name_vi TEXT,
     display_name_en TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -21,20 +22,24 @@ CREATE TABLE categories (
 );
 
 CREATE INDEX idx_categories_slug ON categories(slug);
+CREATE INDEX idx_categories_sort_order ON categories(sort_order);
 
 -- =====================================================
--- PRODUCTS TABLE (normalised menu items for KDS/POS)
+-- PRODUCTS TABLE (canonical Product master for POS/KDS/Inventory/ERPNext)
 -- =====================================================
 CREATE TABLE products (
     id TEXT PRIMARY KEY,
     category_id TEXT NOT NULL,
     name TEXT NOT NULL,
+    slug TEXT DEFAULT '',
     price INTEGER NOT NULL,
+    compare_at_price INTEGER,
     description TEXT,
     image_url TEXT,
     tags TEXT,          -- JSON array
     badge TEXT,
     is_available BOOLEAN DEFAULT 1,
+    sort_order INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -42,6 +47,8 @@ CREATE TABLE products (
 
 CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_available ON products(is_available);
+CREATE INDEX idx_products_slug ON products(slug);
+CREATE INDEX idx_products_sort_order ON products(sort_order);
 
 -- =====================================================
 -- CAFE_TABLES TABLE
@@ -67,6 +74,7 @@ CREATE TABLE menu_items (
     name TEXT NOT NULL,
     price INTEGER NOT NULL,
     description TEXT,
+    image_url TEXT,
     tags TEXT,  -- JSON array: ["Hot/Cold", "300ml"]
     badge TEXT,
     available BOOLEAN DEFAULT 1,
@@ -129,6 +137,12 @@ CREATE TABLE orders (
     points_earned INTEGER DEFAULT 0,
     locale TEXT DEFAULT 'vi-VN',
     location_id TEXT DEFAULT 'sa-dec-main',
+    order_type TEXT DEFAULT 'dine_in',
+    tip_amount INTEGER DEFAULT 0,
+    service_fee INTEGER DEFAULT 0,
+    updated_by TEXT,
+    customer_id TEXT,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -642,3 +656,40 @@ CREATE TABLE IF NOT EXISTS campaign_logs (
 
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_customer ON campaign_logs(customer_id, trigger);
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_sent ON campaign_logs(sent_at);
+
+-- =====================================================
+-- CATALOG MODIFIER CONTRACT
+-- Canonical hierarchy: modifier_groups -> modifier_choices -> product_modifier_groups
+-- =====================================================
+CREATE TABLE IF NOT EXISTS modifier_groups (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  type        TEXT NOT NULL DEFAULT 'single',
+  required    INTEGER NOT NULL DEFAULT 0,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  is_active   INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT DEFAULT (datetime('now')),
+  updated_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS modifier_choices (
+  id           TEXT PRIMARY KEY,
+  group_id     TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  price_delta  INTEGER NOT NULL DEFAULT 0,
+  is_default   INTEGER NOT NULL DEFAULT 0,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  is_available INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (group_id) REFERENCES modifier_groups(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS product_modifier_groups (
+  product_id  TEXT NOT NULL,
+  group_id    TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mod_choices_group_avail ON modifier_choices(group_id, is_available);
+CREATE INDEX IF NOT EXISTS idx_pm_groups_prod_grp ON product_modifier_groups(product_id, group_id);

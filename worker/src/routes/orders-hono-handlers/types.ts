@@ -3,20 +3,29 @@
  */
 
 /** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
-export function makeOrderId(): string {
+export function makeOrderId(prefix = 'ORD'): string {
   const bytes = new Uint8Array(3);
   crypto.getRandomValues(bytes);
   const rand = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  return (`ORD-${Date.now().toString(36)}${rand}`).toUpperCase();
+  return (`${prefix}-${Date.now().toString(36)}${rand}`).toUpperCase();
 }
 
 export interface OrderItem {
-  product_id: string;
-  product_name: string;
+  id?: string;
+  product_id?: string;
+  productId?: string;
+  menuItemId?: string;
+  name?: string;
+  product_name?: string;
   quantity: number;
-  unit_price: number;
-  subtotal: number;
+  unit_price?: number;
+  unitPriceCents?: number;
+  subtotal?: number;
+  subtotalCents?: number;
+  modifiers?: unknown[];
   notes?: string;
+  category_id?: string;
+  categoryId?: string;
 }
 
 export interface OrderRecord {

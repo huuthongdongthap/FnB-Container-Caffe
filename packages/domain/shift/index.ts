@@ -1,6 +1,6 @@
 // @aura/domain-shift — Shift bounded context
 // model
-export type { ShiftRecord } from './model/shift-types';
+export type { ShiftRecord, ShiftStatus, OpenShiftInput, PosSaleInput, CloseShiftInput, ShiftSummary } from './src/model/shift-pos-types';
 export type {
   CashDenomination,
   CashCount,
@@ -12,3 +12,9 @@ export type {
 export { shiftsRouter } from './commands/shifts';
 // policies
 export { reconcileShiftCash, getReconciliationForShift } from './src/policies/cash-reconciliation-policy';
+export {
+  openCanonicalShift,
+  recordShiftSale,
+  closeCanonicalShift,
+  canStaffOperateShift,
+} from './src/policies/shift-lifecycle-policy';

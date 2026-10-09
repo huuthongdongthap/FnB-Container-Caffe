@@ -15,83 +15,108 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
       providerReference?: string;
       metadata?: Record<string, unknown>;
     };
-    const user = c.get('user') as { id: string };
+    const user = c.get('user') as { id: string } | undefined;
     const now = new Date().toISOString();
 
-    const id = crypto.randomUUID();
-    const paymentNumber = `PAY-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
     // Verify order exists
-    const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(body.orderId).first();
+    const order = (await db.prepare('SELECT id, total, payment_status FROM orders WHERE id = ?').bind(body.orderId).first()) as {
+      id: string;
+      total: number;
+      payment_status: string;
+    } | null;
+
     if (!order) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
 
-    // Create payment record
+    if (order.payment_status === 'paid') {
+      return c.json({ success: false, error: 'Order already paid' }, 409);
+    }
+
+    // Server-authoritative amount validation
+    const serverTotal = parseInt(String(order.total), 10);
+    if (body.amount !== undefined && body.amount !== serverTotal) {
+      return c.json({ success: false, error: 'Tampered amount: does not match order total' }, 400);
+    }
+
+    // Idempotency: return existing pending payment if already created
+    const existing = (await db.prepare(
+      'SELECT id, payment_url, status FROM payments WHERE order_id = ? AND method = ? AND status IN (\'pending\', \'completed\') ORDER BY created_at DESC LIMIT 1'
+    ).bind(body.orderId, body.method).first()) as { id: string; payment_url: string | null; status: string } | null;
+
+    if (existing) {
+      if (existing.status === 'completed') {
+        return c.json({ success: false, error: 'Order already paid' }, 409);
+      }
+      return c.json({
+        success: true,
+        data: {
+          paymentId: existing.id,
+          paymentUrl: existing.payment_url,
+          qrCodeUrl: null,
+          deeplink: null,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          status: 'pending',
+        },
+      }, 201);
+    }
+
+    const id = crypto.randomUUID();
+    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // Create payment record in canonical payments table
     await db.prepare(
-      `INSERT INTO order_payments (id, order_id, payment_number, method, amount, status, provider, provider_reference, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?)`
     ).bind(
       id,
       body.orderId,
-      paymentNumber,
       body.method,
-      body.amount,
-      'pending',
-      body.provider || null,
-      body.providerReference || null,
-      JSON.stringify(body.metadata || {}),
+      serverTotal,
+      transactionId,
       now,
       now
     ).run();
-
-    // If PayOS, create payment link
-    if (body.method === 'payos' && c.env.PAYOS_CLIENT_ID) {
-      // TODO: Integrate with PayOS API to create payment link
-      // const paymentUrl = `https://pay.payos.vn/web/${id}`;
-    }
 
     // Audit log
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'payment_create', 'payment', id, JSON.stringify(body), now).run();
-
-    const payment = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first()) as {
-      metadata: string | null;
-      created_at: string;
-      updated_at: string;
-      [key: string]: unknown;
-    } | null;
+    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_create', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run();
 
     return c.json({
       success: true,
       data: {
-        ...payment!,
-        metadata: payment?.metadata ? JSON.parse(payment.metadata) : {},
-        createdAt: payment?.created_at,
-        updatedAt: payment?.updated_at,
+        paymentId: id,
+        paymentUrl: null,
+        qrCodeUrl: null,
+        deeplink: null,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        status: 'pending',
       },
     }, 201);
   });
 
-  // POST /api/payments/:id/refund - Refund payment
+  // POST /api/payments/refund - Refund payment
   router.openapi(PaymentRoutes.refund as any, async (c: any) => {
     const db = getDatabase(c);
-    const { id } = c.req.valid('param' as never) as { id: string };
-    const body = c.req.valid('json' as never) as { amount?: number; reason?: string; providerReference?: string };
-    const user = c.get('user') as { id: string };
+    const body = c.req.valid('json' as never) as { paymentId?: string; amount?: number; reason?: string };
+    const user = c.get('user') as { id: string } | undefined;
     const now = new Date().toISOString();
+    const targetId = body.paymentId || c.req.param?.('id');
 
-    const payment = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first()) as {
+    if (!targetId) {
+      return c.json({ success: false, error: 'Missing paymentId' }, 400);
+    }
+
+    const payment = (await db.prepare('SELECT id, order_id, amount, status, method FROM payments WHERE id = ?').bind(targetId).first()) as {
       id: string;
       order_id: string;
       amount: number;
       status: string;
       method: string;
-      provider: string | null;
-      metadata: string | null;
     } | null;
+
     if (!payment) {
       return c.json({ success: false, error: 'Payment not found' }, 404);
     }
@@ -102,65 +127,29 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     const refundAmount = body.amount || payment.amount;
 
-    // Create refund record (negative amount)
-    const refundId = crypto.randomUUID();
-    const refundNumber = `REF-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    // Update canonical payment status
+    await db.prepare('UPDATE payments SET status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, payment.id).run();
 
-    await db.prepare(
-      `INSERT INTO order_payments (id, order_id, payment_number, method, amount, status, provider, provider_reference, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      refundId,
-      payment.order_id,
-      refundNumber,
-      payment.method,
-      -refundAmount,
-      'completed',
-      payment.provider,
-      body.providerReference || null,
-      JSON.stringify({ ...JSON.parse(payment.metadata || '{}'), refundReason: body.reason, originalPaymentId: id }),
-      now,
-      now
-    ).run();
-
-    // Update original payment status
-    await db.prepare('UPDATE order_payments SET status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, id).run();
-
-    // Update order payment status
-    const remainingPaid = (await db.prepare(
-      'SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = \'completed\' AND amount > 0'
-    ).bind(payment.order_id).first()) as { total: number } | null;
-
-    const order = (await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first()) as { total_amount: number } | null;
-    let newPaymentStatus = 'unpaid';
-    if (remainingPaid && remainingPaid.total >= (order?.total_amount || 0)) {
-      newPaymentStatus = 'paid';
-    } else if (remainingPaid && remainingPaid.total > 0) {
-      newPaymentStatus = 'partial';
-    }
-
-    await db.prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?').bind(newPaymentStatus, now, payment.order_id).run();
+    // Update canonical order payment status
+    await db.prepare('UPDATE orders SET payment_status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, payment.order_id).run();
 
     // Audit log
+    const refundId = crypto.randomUUID();
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: id, reason: body.reason }), now).run();
-
-    const refund = (await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(refundId).first()) as {
-      metadata: string | null;
-      created_at: string;
-      updated_at: string;
-      [key: string]: unknown;
-    } | null;
+    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run();
 
     return c.json({
       success: true,
       data: {
-        ...refund!,
-        metadata: refund?.metadata ? JSON.parse(refund.metadata) : {},
-        createdAt: refund?.created_at,
-        updatedAt: refund?.updated_at,
+        id: refundId,
+        paymentId: payment.id,
+        amount: refundAmount,
+        reason: body.reason || null,
+        status: 'completed',
+        processedAt: now,
+        createdAt: now,
       },
     });
   });

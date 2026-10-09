@@ -1,3 +1,5 @@
+import { deductOrderStock } from '../policies/inventory-recipe-policy';
+
 interface D1Database {
   prepare: (sql: string) => {
     bind: (...args: any[]) => {
@@ -62,6 +64,20 @@ export async function deductInventoryForOrder(
   orderId: string,
   orderItems: Array<{ product_id: string; quantity: number; name?: string }>
 ): Promise<void> {
+  try {
+    const bomRes = await deductOrderStock(
+      env.AURA_DB as any,
+      orderId,
+      orderItems.map(i => ({ productId: i.product_id, quantity: i.quantity })),
+      { allowNegative: true }
+    );
+    if (bomRes.alreadyDeducted || (bomRes.ok && bomRes.depletions.length > 0)) {
+      return;
+    }
+  } catch (err) {
+    console.warn('[inventory] BOM deduction fallback:', (err as Error).message);
+  }
+
   for (const item of orderItems) {
     try {
       let invItem = await env.AURA_DB.prepare(
@@ -100,3 +116,4 @@ export async function deductInventoryForOrder(
     }
   }
 }
+

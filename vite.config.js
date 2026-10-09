@@ -41,6 +41,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__rootDir, 'src'),
+      '@aura/domain-audit': resolve(__rootDir, 'packages/domain/audit/index.ts'),
+      '@aura/domain-notification': resolve(__rootDir, 'packages/domain/notification/index.ts'),
+      '@aura/domain-integration': resolve(__rootDir, 'packages/domain/integration/index.ts'),
       '@aura/domain-customer': resolve(__rootDir, 'packages/domain/customer/index.ts'),
       '@aura/domain-crm': resolve(__rootDir, 'packages/domain/crm/index.ts'),
       '@aura/domain-order': resolve(__rootDir, 'packages/domain/order/index.ts'),
@@ -73,5 +76,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      '/api': {
+        target: 'https://aura-space-worker.sadec-marketing-hub.workers.dev',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

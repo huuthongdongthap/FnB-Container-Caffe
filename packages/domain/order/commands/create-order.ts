@@ -1,17 +1,16 @@
 /**
  * Orders — Create order handler
- * Extracted from routes/orders.ts to tree/orders/.
+ * Canonical Order Write Handler
  */
 
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
-import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
 import { generateId, parseJSON } from '../model/helpers';
 import { calculateOrderSnapshot } from '../policies/order-snapshot';
-import { notifyTelegram } from '../notifications/telegram';
-import { deductInventoryForOrder } from '@aura/domain-inventory';
-import { syncOrderToERPNext } from 'worker/src/tree/erpnext/sync.js';
+import { runPostOrderSideEffects } from './create-order-side-effects';
+import { verifyJWT } from 'worker/src/lib/jwt';
+import { resolveServerOrderOwnership } from '../../customer/policies/order-ownership-policy';
 
 const log = createLogger({ route: 'orders' });
 
@@ -37,8 +36,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const orderId = generateId('ORD_');
 
-    // ── Server-authoritative price snapshot (Phase 02) ──────────────
-    // Discards client-supplied totals/prices; evaluates from DB + policies.
+    // ── Server-authoritative price snapshot ──────────────
     const snapshot = await calculateOrderSnapshot(db, {
       items: data.items,
       order_type: data.order_type || 'dine_in',
@@ -52,79 +50,70 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     }
     const itemsJson = snapshot.itemsJson;
 
-    // If table_id (table_number from QR) provided, resolve to actual table UUID
-
-    // ── DO Broadcast (before D1 — Phase 1) ──────────────────────────
-    // CF throws RangeError for DO dispatch errors. Catch → log to KV.
+    // ── DO Broadcast (before D1) ──────────────────────────
     if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
       const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
       const stub = ns.get(ns.idFromName(orderId));
-      // Build event; table_id resolved below after table lookup
-      ;(async () => {
-        try {
-          await (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
-            orderId,
-            status: 'pending',
-            payment_status: 'unpaid',
-            items: snapshot.items,
-            total: snapshot.total,
-            customer_name: data.customer_name,
-            customer_phone: data.customer_phone,
-            table_id: null,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          });
-        } catch (e) {
-          if (env.AUTH_KV) {
-            const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-            await kv.put(`broadcast:fail:${orderId}`, JSON.stringify({
-              orderId,
-              error: 'DO_BROADCAST_FAILED',
-              message: (e as Error).message,
-              ts: new Date().toISOString(),
-            }), { expirationTtl: 86400 });
-          }
+      (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
+        orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+        customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: null,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      }).catch(e => {
+        if (env.AUTH_KV) {
+          (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace).put(
+            `broadcast:fail:${orderId}`,
+            JSON.stringify({ orderId, error: 'DO_BROADCAST_FAILED', message: (e as Error).message, ts: new Date().toISOString() }),
+            { expirationTtl: 86400 }
+          ).catch(() => {});
         }
-      })().catch(() => {});
+      });
     }
 
     let resolvedTableId: string | null = null;
     if (data.table_id) {
       const tableNum = data.table_id.trim();
-      let tableRow = await db.prepare(
-        'SELECT id FROM cafe_tables WHERE table_number = ?'
-      ).bind(tableNum).first<{ id: string }>();
+      let tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ?').bind(tableNum).first<{ id: string }>();
       if (!tableRow && tableNum !== tableNum.toUpperCase()) {
-        tableRow = await db.prepare(
-          'SELECT id FROM cafe_tables WHERE table_number = ?'
-        ).bind(tableNum.toUpperCase()).first<{ id: string }>();
+        tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ?').bind(tableNum.toUpperCase()).first<{ id: string }>();
       }
       if (tableRow) {
         resolvedTableId = tableRow.id;
-        // Auto-occupy the table
-        await db.prepare(
-          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
-        ).bind(tableRow.id).run();
+        await db.prepare("UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'").bind(tableRow.id).run();
       }
     }
 
-    // Dine-in invariant: an explicitly dine-in order must resolve to a real table.
-    // The validator requires table_id for order_type='dine_in', but a bogus table
-    // number would silently resolve to NULL here — reject instead of inserting an
-    // unassigned dine-in row that breaks KDS/table-map grouping downstream.
-    // Omitted order_type keeps legacy QR-flow behavior (falls back to dine_in at
-    // insert without the hard guard).
     if (data.order_type === 'dine_in' && !resolvedTableId) {
       return errorResponse('dine_in orders require a valid table_id (table_number from QR)', 400);
     }
 
+    const now = new Date().toISOString();
+
+    // ── Server-authoritative Customer Ownership Resolution ────────
+    let actor: { id?: string; role?: string } | null = null;
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ') && env.JWT_SECRET) {
+      try {
+        const payload = await verifyJWT(authHeader.substring(7), env.JWT_SECRET as string);
+        if (payload) actor = { id: payload.id || (payload as any).sub, role: payload.role };
+      } catch { /* guest */ }
+    }
+    const ownership = await resolveServerOrderOwnership({
+      actor,
+      clientSuppliedCustomerId: data.customer_id || null,
+      customerPhone: data.customer_phone || null,
+      db: db as any,
+    });
+    const resolvedCustomerId = ownership.customerId;
+
+    // ── Canonical D1 orders persistence ──────────────────────────
     await db.prepare(`
       INSERT INTO orders (
         id, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
         shipping_fee, discount, notes, delivery_time, table_id,
-        order_type, tip_amount, service_fee, customer_id, tenant_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        order_type, tip_amount, service_fee, customer_id, tenant_id,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       orderId, itemsJson,
       snapshot.total, 'pending',
@@ -138,204 +127,65 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       data.order_type || 'dine_in',
       snapshot.tip_amount,
       snapshot.service_fee,
-      data.customer_id || null,
-      data.tenant_id || 'default'
+      resolvedCustomerId,
+      data.tenant_id || 'default',
+      now, now
     ).run();
 
-    // Skip payment record for PayOS — create-link endpoint handles it with PayOS transaction data.
-    // Only create payment record for COD and other non-PayOS methods.
+    // ── Canonical D1 order_items persistence (7 columns) ─────────
+    for (const item of snapshot.items) {
+      const lineItemId = generateId('ITEM_');
+      await db.prepare(`
+        INSERT INTO order_items (
+          id, order_id, product_id, quantity, subtotal, modifiers, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        lineItemId,
+        orderId,
+        item.menuItemId,
+        item.quantity,
+        item.subtotalCents,
+        JSON.stringify(item.modifiers || []),
+        now
+      ).run();
+    }
+
+    // ── Canonical payments record (COD / non-PayOS) ─────────────
     if (validatedMethod !== 'payos') {
       const paymentId = generateId('PAY_');
       await db.prepare(`
-        INSERT INTO payments (id, order_id, method, amount, status)
-        VALUES (?, ?, ?, ?, ?)
-      `).bind(paymentId, orderId, validatedMethod, snapshot.total, 'pending').run();
+        INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(paymentId, orderId, validatedMethod, snapshot.total, 'pending', now, now).run();
     }
 
-    // Auto-create loyalty profile: email identity takes precedence, phone-only
-    // checkout falls back to phone-keyed lookup so walk-in guests still earn tiers.
-    // Follows phone-auth-handler pattern: synthetic email {phone}@loyalty.aura.
-    let customerIdForCapture: string | null = data.customer_id || null;
-    if (data.customer_email) {
-      await db.prepare(`
-        INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
-        VALUES (?, ?, ?, ?, 0, 0, 'bronze')
-        ON CONFLICT(email) DO UPDATE SET
-          name = excluded.name, phone = excluded.phone, updated_at = CURRENT_TIMESTAMP
-      `).bind(
-        generateId('CUST_'), data.customer_email, data.customer_name, data.customer_phone
-      ).run();
-      const linkedCust = await db.prepare(
-        'SELECT id FROM customers WHERE email = ?'
-      ).bind(data.customer_email).first<{ id: string }>();
-      if (linkedCust) customerIdForCapture = linkedCust.id;
-    } else if (data.customer_phone) {
-      const digits = String(data.customer_phone).replace(/\D/g, '');
-      if (digits.length >= 9 && digits.length <= 12) {
-        const existing = await db.prepare(
-          'SELECT id FROM customers WHERE phone = ?'
-        ).bind(digits).first<{ id: string }>();
+    // ── Post-order side effects (non-blocking) ───────────────────
+    await runPostOrderSideEffects({
+      db, env, ctx, orderId, data, snapshot, validatedMethod, resolvedTableId
+    });
 
-        if (!existing) {
-          const custId = generateId('CUST_');
-          const now = new Date().toISOString();
-          await db.batch([
-            db.prepare(
-              `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)`
-            ).bind(custId, `${digits}@loyalty.aura`, data.customer_name, digits, now, now),
-            db.prepare(
-              `INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
-               VALUES (?, ?, 0, 0, 0, ?, ?)`
-            ).bind(generateId('wal_'), custId, now, now),
-          ]);
-          customerIdForCapture = custId;
-        } else {
-          customerIdForCapture = existing.id;
-        }
-      }
-    }
-
-    // Customer-domain capture (additive, consent-gated — never blocks checkout):
-    // identity row + CustomerIdentified/OrderLinked events on the zero-based DB.
-    if (customerIdForCapture && ctx?.waitUntil) {
-      const captureCustId = customerIdForCapture;
-      ctx.waitUntil((async () => {
-        try {
-          const { identifyCustomer, linkOrder } = await import('@aura/domain-customer');
-          const identity = await identifyCustomer({
-            db, customerId: captureCustId,
-            phone: data.customer_phone, email: data.customer_email,
-            source: 'checkout'
-          });
-          if (identity) {
-            await linkOrder({
-              db, customerId: captureCustId, orderId,
-              total: snapshot.total, orderType: data.order_type
-            });
-          }
-        } catch (custErr) {
-          log.warn('Customer capture error (non-blocking):', { message: (custErr as Error).message, orderId });
-        }
-      })());
-    }
-
-    // ERPNext sync (fire-and-forget -- never block order creation)
-    if (ctx?.waitUntil) {
-      ctx.waitUntil(
-        Promise.resolve(
-          syncOrderToERPNext(
-            {
-              ERPNEXT_URL: (env as Record<string, string>).ERPNEXT_URL!,
-              ERPNEXT_API_KEY: (env as Record<string, string>).ERPNEXT_API_KEY!,
-              ERPNEXT_API_SECRET: (env as Record<string, string>).ERPNEXT_API_SECRET!
-            },
-            orderId,
-            {
-              customer_name: data.customer_name,
-              customer_phone: data.customer_phone,
-              customer_id: undefined,
-              table_id: resolvedTableId,
-              items: snapshot.items as unknown as Record<string, unknown>[],
-              total: snapshot.total,
-              payment_method: validatedMethod,
-              notes: data.notes
-            }
-          )
-        )
-      );
-    }
-    if (env.AUTH_KV) {
-      const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-      await kv.put('latest_order_ts', new Date().toISOString());
-    }
-
-    if (validatedMethod === 'cod') {
-      const telegramPromise = notifyTelegram(env, {
-        id: orderId, items: snapshot.items, total: snapshot.total,
+    // ── Cache idempotency response ──────────────────────────────
+    const idemBody = {
+      success: true, data: {
+        id: orderId, status: 'pending', payment_status: 'unpaid',
+        items: snapshot.items, total: snapshot.total,
+        customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
-        customer_address: data.customer_address, payment_method: validatedMethod,
-        notes: data.notes
-      }).catch(e => log.error('Telegram async error:', { message: (e as Error).message }));
-      if (ctx?.waitUntil) {
-        ctx.waitUntil(telegramPromise);
-      } else {
-        await telegramPromise;
-      }
+        customer_address: data.customer_address || null, payment_method: validatedMethod,
+        shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
+        notes: data.notes || null, delivery_time: data.delivery_time || 'now',
+        table_id: resolvedTableId, order_type: data.order_type || 'dine_in',
+        created_at: now
+      },
+      message: 'Order created successfully'
+    };
+    if (idemKey && env.AUTH_KV) {
+      const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+      await kv.put(`order:idempotency:${idemKey}`, JSON.stringify(idemBody), { expirationTtl: 86400 });
     }
-
-    // Notify kitchen staff via push (non-blocking)
-    const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
-    // @ts-ignore -- PushEnv needs AURA_DB binding
-    const pushPromise = sendPushToStaff(env, {
-      title: 'Đơn hàng mới 🍳',
-      body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
-      data: { url: '/kds', orderId }
-    }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
-    if (ctx?.waitUntil) {
-      ctx.waitUntil(pushPromise);
-    } else {
-      // cast ok - recordMetric returns Promise
-    }
-
-    if (ctx?.waitUntil) {
-      const mc = createMetricsCollector(db);
-      ctx.waitUntil(mc.recordMetric('order_created', snapshot.total, {
-        payment_method: validatedMethod, is_anonymous: !data.customer_email
-      }));
-    }
-
-    // Post-order: non-blocking inventory deduction (log-only on failure)
-    try {
-      await deductInventoryForOrder(env as unknown as import('worker/src/types/env').Env, orderId, snapshot.items.map(i => ({ product_id: i.menuItemId, quantity: i.quantity, name: i.name })));
-    } catch (e) {
-      log.warn('Inventory deduction failed for order', {
-        orderId,
-        message: (e as Error).message
-      });
-    }
-
-    if (data.customer_email) {
-      const { sendEmail } = await import('worker/src/lib/email.js');
-      const { renderOrderConfirm } = await import('worker/src/templates/order-confirm.js');
-      const paymentLabels: Record<string, string> = { cod: 'COD', payos: 'PayOS' };
-      const emailPromise = sendEmail(env, {
-        to: data.customer_email,
-        subject: `Xác nhận đơn hàng #${orderId} — AURA CAFE`,
-        html: renderOrderConfirm({
-          id: orderId,
-          items: snapshot.items.map(i => ({ name: i.name, qty: i.quantity, price: i.unitPriceCents })),
-          total: snapshot.total,
-          payment_method: paymentLabels[validatedMethod] || validatedMethod
-        })
-      }).catch(e => log.error('Email order confirm error:', { message: (e as Error).message }));
-      if (ctx?.waitUntil) {
-        ctx.waitUntil(emailPromise);
-      }
-    }
-
-  // ── Cache idempotency response ──────────────────────────────────
-  const idemBody = {
-    success: true, data: {
-      id: orderId, status: 'pending', payment_status: 'unpaid',
-      items: snapshot.items, total: snapshot.total,
-      customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
-      customer_name: data.customer_name, customer_phone: data.customer_phone,
-      customer_address: data.customer_address || null, payment_method: validatedMethod,
-      shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
-      notes: data.notes || null, delivery_time: data.delivery_time || 'now',
-      table_id: resolvedTableId, order_type: data.order_type || 'dine_in',
-      created_at: new Date().toISOString()
-    },
-    message: 'Order created successfully'
-  };
-  if (idemKey && env.AUTH_KV) {
-    const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    await kv.put(`order:idempotency:${idemKey}`, JSON.stringify(idemBody), { expirationTtl: 86400 });
+    return jsonResponse(idemBody, 201);
+  } catch (error) {
+    log.error('CreateOrder error:', { message: (error as Error).message });
+    return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
   }
-  return jsonResponse(idemBody, 201);
-} catch (error) {
-  log.error('CreateOrder error:', { message: (error as Error).message });
-  return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
-}
 }

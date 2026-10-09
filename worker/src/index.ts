@@ -15,12 +15,10 @@ import type { Env } from './types/env';
 
 // ── Sub-Routers ──
 import { customerMenuRouter } from './routes/customer-menu';
-import { ordersCoreRouter } from './routes/orders-core';
 import { authEndpointsRouter } from './routes/auth-endpoints';
 import { staffMobileRouter } from './routes/staff-mobile';
-import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
+import { ordersUnifiedRouter } from './routes/orders-unified';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
-import { orderStreamRouter } from './routes/order-stream';
 import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { registerFeatureRoutes } from './routes/features-router';
 import { registerIntegrationRoutes } from './routes/integrations-router';
@@ -28,9 +26,6 @@ import { subscriptionsRouter } from './routes/subscriptions';
 
 // ── OpenAPI & Docs ──
 import { openApiApp } from './lib/openapi';
-import { openApiCategoriesRouter } from './routes/openapi-categories';
-import { openApiProductsRouter } from './routes/openapi-products';
-import { openApiOrdersRouter } from './routes/openapi-orders';
 import { openApiTablesRouter } from './routes/openapi-tables';
 import { openApiAuthRouter } from './routes/openapi-auth';
 import { openApiPaymentsRouter } from './routes/openapi-payments';
@@ -70,15 +65,13 @@ app.use('*', correlationId());
 app.use('*', requestMetrics());
 app.onError(errorHandler);
 
-// ── Menu & Orders Core ──
+// ── Menu & Unified Orders Router (Single Runtime Owner) ──
 app.route('/api/menu', customerMenuRouter);
-app.route('/api/orders', ordersCoreRouter);
-app.route('/api/orders', ordersHonoRouter);
-app.route('/api/orders', orderStreamRouter);
+app.route('/api/orders', ordersUnifiedRouter);
 
 // ── Orders KDS & Realtime ──
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
-app.route('/api/kds/orders', ordersHonoRouter);
+app.route('/api/kds/orders', ordersUnifiedRouter);
 app.route('/api/kds/orders', kdsStreamRouter);
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 
@@ -93,9 +86,6 @@ registerFeatureRoutes(app);
 registerIntegrationRoutes(app);
 
 // ── OpenAPI Sub-Routers & Docs ──
-app.route('/', openApiCategoriesRouter);
-app.route('/', openApiProductsRouter);
-app.route('/', openApiOrdersRouter);
 app.route('/', openApiTablesRouter);
 app.route('/', openApiAuthRouter);
 app.route('/', openApiPaymentsRouter);

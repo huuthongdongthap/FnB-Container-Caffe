@@ -43,8 +43,8 @@ const handleCreateLink = async (c: any) => {
     const { order_id, description, customer_name } = parsed.data;
 
     const orderRow = await db.prepare(
-      'SELECT id, total, payment_status, customer_id, is_cod FROM orders WHERE id = ?'
-    ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null; is_cod: number }>();
+      'SELECT id, total, status, payment_status, customer_id, is_cod FROM orders WHERE id = ?'
+    ).bind(order_id).first<{ id: string; total: number; status: string; payment_status: string; customer_id: string | null; is_cod: number }>();
 
     if (!orderRow) {
       try {
@@ -53,7 +53,20 @@ const handleCreateLink = async (c: any) => {
       return c.json({ success: false, error: errMsg.order_not_found[locale] }, 404);
     }
 
-    const access = validatePayOSAccess(orderRow, customerId, user?.role);
+    if (orderRow.status === 'cancelled' || orderRow.status === 'failed' || orderRow.status === 'expired') {
+      return c.json({ success: false, error: `Cannot pay for ${orderRow.status} order` }, 409);
+    }
+
+    const rawAmount = parseInt(String(orderRow.total), 10);
+    if (!Number.isFinite(rawAmount) || rawAmount < 1000) {
+      return c.json({ success: false, error: errMsg.invalid_total[locale] }, 400);
+    }
+    if (parsed.data.amount !== undefined && parsed.data.amount !== rawAmount) {
+      return c.json({ success: false, error: 'Tampered amount: does not match order total' }, 400);
+    }
+    const amount = rawAmount;
+
+    const access = validatePayOSAccess({ ...orderRow, total: amount }, customerId, user?.role);
     if (!access.allowed && access.reason) {
       try {
         c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: access.reason }));
@@ -62,8 +75,6 @@ const handleCreateLink = async (c: any) => {
       return c.json({ success: false, error: errMsg[access.reason][locale] }, status);
     }
 
-    const amount = parseInt(String(orderRow.total), 10);
-
     // ── COD short-circuit: skip PayOS, mark order as paid immediately ──
     const rawIsCod = Number(orderRow.is_cod ?? 0);
     if (rawIsCod === 1 || orderRow.payment_status === 'cod_pending') {
@@ -71,6 +82,9 @@ const handleCreateLink = async (c: any) => {
       await db.prepare(
         'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
       ).bind(now, now, order_id).run();
+      await db.prepare(
+        'UPDATE payments SET status = \'completed\', updated_at = ? WHERE order_id = ? AND method = \'cod\''
+      ).bind(now, order_id).run();
       return c.json({ success: true, is_cod: true, message: 'Cash collected', order_id });
     }
 

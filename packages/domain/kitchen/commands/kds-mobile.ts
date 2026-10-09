@@ -2,6 +2,7 @@ import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import type { Env } from 'worker/src/types/env';
 import type { Context } from 'hono';
+import { executeKdsStatusTransition } from './kds-status-transition';
 
 const log = createLogger({ route: 'kds-mobile' });
 
@@ -23,9 +24,9 @@ export async function getKdsMobile(
     const orders = await context.env.AURA_DB
       .prepare(
         `SELECT o.id, o.table_id, o.items, o.status, o.created_at, o.updated_at,
-                t.table_number as table_name
+                COALESCE(t.table_number, t.id) as table_name
          FROM orders o
-         JOIN tables t ON t.id = o.table_id
+         LEFT JOIN cafe_tables t ON t.id = o.table_id
          WHERE o.status IN ('pending','preparing')
          ORDER BY o.created_at ASC`
       )
@@ -68,15 +69,36 @@ export async function updateKdsStatus(
     }
 
     const body = await context.req.json<{ status: string }>();
-    const allowed = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
-    if (!allowed.includes(String(body.status))) {
-      return errorResponse('Trạng thái không hợp lệ', 400);
+    if (!body?.status) {
+      return errorResponse('Thiếu status', 400);
     }
 
-    await context.env.AURA_DB
-      .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
-      .bind(body.status, new Date().toISOString(), orderId)
-      .run();
+    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+    try {
+      const ctx = context.executionCtx;
+      if (ctx) waitUntilFn = (p) => ctx.waitUntil(p);
+    } catch {
+      // Context without Cloudflare executionCtx (e.g. test harness)
+    }
+
+    const result = await executeKdsStatusTransition(
+      context.env.AURA_DB,
+      orderId,
+      body.status,
+      role,
+      {
+        kv: context.env.AUTH_KV,
+        waitUntil: waitUntilFn,
+      }
+    );
+
+    if (!result.success) {
+      return errorResponse(`Trạng thái không hợp lệ: ${result.error || ''}`, result.statusCode || 400);
+    }
+
+    if (result.idempotent) {
+      return jsonResponse({ success: true, idempotent: true });
+    }
 
     return jsonResponse({ success: true });
   } catch (err) {

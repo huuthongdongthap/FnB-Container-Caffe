@@ -19,3 +19,60 @@ export type { LinkOrderInput, LinkOrderResult } from './link-order';
 
 export { classifyIdentifier, normalizePhone, isPlausibleVnPhone } from './helpers';
 export type { IdentifierType } from './helpers';
+
+export {
+  resolveServerOrderOwnership,
+  findCustomerByIdentifier,
+  canAccessOrder,
+  claimGuestOrder,
+} from './policies/order-ownership-policy';
+export type {
+  IdentityLadderStage,
+  ActorContext,
+  OrderOwnershipResolution,
+  ResolveOwnershipInput,
+  ClaimGuestOrderInput,
+  ClaimGuestOrderResult,
+} from './policies/order-ownership-policy';
+
+export {
+  sanitizeCustomerEventPayload,
+  createCanonicalCustomerEvent,
+} from './events/customer-crm-event-contract';
+export type {
+  CanonicalEventType,
+  CanonicalCustomerEvent,
+  OrderCreatedPayload,
+  OrderPaidPayload,
+  OrderCancelledPayload,
+  OrderCompletedPayload,
+  VisitRecordedPayload,
+  CustomerIdentifiedPayload,
+  CustomerLinkedPayload,
+  AnyEventPayload,
+} from './events/customer-crm-event-contract';
+
+export {
+  dispatchCustomerEvent,
+} from './events/customer-event-dispatcher';
+export type {
+  DispatchCustomerEventInput,
+  DispatchCustomerEventResult,
+} from './events/customer-event-dispatcher';
+
+export {
+  getCustomerCanonicalProfile,
+  findOrCreateCustomerByIdentifier,
+  mergeCustomerProfiles,
+} from './policies/customer-lifecycle-policy';
+export type {
+  CanonicalCustomer,
+  CustomerProfileView,
+  CustomerIdentifier,
+  CustomerConsent,
+  CustomerMergeInput,
+  CustomerMergeResult,
+  CustomerIdentifierType,
+  LoyaltyTier,
+} from './model/customer-canonical-model';
+

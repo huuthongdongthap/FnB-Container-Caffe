@@ -1,47 +1,49 @@
 export interface ProductRow {
   id: string;
-  slug: string;
   category_id?: string | null;
-  base_price: number;
-  status?: string;
-  variants?: string | null;
-  modifiers?: string | null;
-  images?: string | null;
-  preparation_time_minutes?: number;
-  calories?: number | null;
-  nutrition_info?: string | null;
+  name: string;
+  slug?: string | null;
+  price: number;
+  compare_at_price?: number | null;
+  description?: string | null;
+  image_url?: string | null;
   tags?: string | null;
-  metadata?: string | null;
+  badge?: string | null;
+  is_available?: number;
+  sort_order?: number;
   created_at?: string;
   updated_at?: string;
-  translation_name?: string | null;
-  translation_description?: string | null;
-  translation_ingredients?: string | null;
-  translation_allergens?: string | null;
-  translation_story?: string | null;
+  category_name?: string | null;
 }
 
 export function formatProduct(row: ProductRow, locale: string = 'vi') {
+  let parsedTags: string[] = [];
+  try {
+    parsedTags = row.tags ? (typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags) : [];
+  } catch {
+    parsedTags = [];
+  }
+
   return {
     ...row,
-    translations: row.translation_name
-      ? [
-          {
-            locale,
-            name: row.translation_name,
-            description: row.translation_description,
-            ingredients: row.translation_ingredients,
-            allergens: row.translation_allergens ? JSON.parse(row.translation_allergens) : [],
-            story: row.translation_story,
-          },
-        ]
-      : [],
-    category: row.category_id ? { id: row.category_id } : null,
-    variants: row.variants ? JSON.parse(row.variants) : [],
-    modifiers: row.modifiers ? JSON.parse(row.modifiers) : [],
-    images: row.images ? JSON.parse(row.images) : [],
-    nutritionInfo: row.nutrition_info ? JSON.parse(row.nutrition_info) : null,
-    metadata: row.metadata ? JSON.parse(row.metadata) : null,
-    tags: row.tags ? JSON.parse(row.tags) : [],
+    slug: row.slug || row.id,
+    price: row.price,
+    status: row.is_available === 0 ? 'inactive' : 'active',
+    translations: [
+      {
+        locale,
+        name: row.name,
+        description: row.description || '',
+        ingredients: '',
+        allergens: [] as string[],
+        story: '',
+      },
+    ],
+    category: row.category_id ? { id: row.category_id, name: row.category_name || '' } : null,
+    variants: [] as unknown[],
+    modifiers: [] as unknown[],
+    images: row.image_url ? [{ url: row.image_url, isPrimary: true, displayOrder: 0 }] : [],
+    metadata: null,
+    tags: parsedTags,
   };
 }

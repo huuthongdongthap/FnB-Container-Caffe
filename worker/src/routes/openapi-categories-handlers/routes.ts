@@ -6,8 +6,22 @@ import { registerCategoryMutationHandlers } from './mutation-handlers';
 
 export const openApiCategoriesRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Apply auth middleware to this domain's routes only (sub-router is mounted at root)
-openApiCategoriesRouter.use('/api/categories/*', requireAuth(['owner', 'manager', 'staff']));
+const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+
+// Apply auth middleware to mutations only (keeping public GET routes unauthenticated)
+openApiCategoriesRouter.use('/api/categories', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    return staffAuth(c, next);
+  }
+  return next();
+});
+
+openApiCategoriesRouter.use('/api/categories/*', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    return staffAuth(c, next);
+  }
+  return next();
+});
 
 registerCategoryReadHandlers(openApiCategoriesRouter);
 registerCategoryMutationHandlers(openApiCategoriesRouter);

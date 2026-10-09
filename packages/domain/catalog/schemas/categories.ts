@@ -27,7 +27,7 @@ export const CategoryTranslationSchema = z.object({
 export const CategoryCreateSchema = z.object({
   slug: SlugSchema,
   type: CategoryTypeEnum,
-  parentId: z.string().uuid().nullable().optional(),
+  parentId: z.string().nullable().optional(),
   translations: z.array(CategoryTranslationSchema).min(1).openapi({
     description: 'At least one translation required (vi or en)',
   }),
@@ -40,7 +40,7 @@ export const CategoryCreateSchema = z.object({
 export const CategoryUpdateSchema = z.object({
   slug: SlugSchema.optional(),
   type: CategoryTypeEnum.optional(),
-  parentId: z.string().uuid().nullable().optional(),
+  parentId: z.string().nullable().optional(),
   translations: z.array(CategoryTranslationSchema).min(1).optional(),
   displayOrder: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
@@ -49,10 +49,10 @@ export const CategoryUpdateSchema = z.object({
 }).openapi('CategoryUpdate');
 
 export const CategoryResponseSchema: z.ZodType<any> = z.object({
-  id: z.string().uuid(),
+  id: z.string(),
   slug: SlugSchema,
   type: CategoryTypeEnum,
-  parentId: z.string().uuid().nullable(),
+  parentId: z.string().nullable(),
   translations: z.array(CategoryTranslationSchema),
   displayOrder: z.number().int().nonnegative(),
   isActive: z.boolean(),
@@ -172,7 +172,7 @@ export const CategoryRoutes = {
         content: {
           'application/json': {
             schema: z.object({
-              items: z.array(z.object({ id: z.string().uuid(), displayOrder: z.number().int().nonnegative() })),
+              items: z.array(z.object({ id: z.string(), displayOrder: z.number().int().nonnegative() })),
             }),
           },
         },

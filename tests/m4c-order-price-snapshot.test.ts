@@ -32,10 +32,15 @@ interface MockHappyHour {
 function createMockD1Database(options: {
   menuItems?: MockMenuItem[];
   happyHours?: MockHappyHour[];
+  modifierChoices?: Array<{ id: string; group_id: string; name: string; price_delta: number }>;
   tables?: Array<{ id: string; table_number: string; status: string }>;
 } = {}) {
   const menuItems = options.menuItems || [];
   const happyHours = options.happyHours || [];
+  const modifierChoices = options.modifierChoices || [
+    { id: 'extra_shot', group_id: 'g1', name: 'Extra Shot', price_delta: 10000 },
+    { id: 'oat_milk', group_id: 'g2', name: 'Oat Milk', price_delta: 5000 },
+  ];
   const tables = options.tables || [];
   const insertedOrders: Array<Record<string, unknown>> = [];
   const insertedPayments: Array<Record<string, unknown>> = [];
@@ -53,6 +58,18 @@ function createMockD1Database(options: {
                   const id = args[0] as string;
                   const item = menuItems.find((m) => m.id === id);
                   return (item as unknown as T) || null;
+                }
+                if (sql.includes('FROM modifier_choices WHERE id = ?')) {
+                  const id = args[0] as string;
+                  const choice = modifierChoices.find((c) => c.id === id);
+                  return (choice as unknown as T) || null;
+                }
+                if (sql.includes('FROM modifier_groups WHERE id = ?')) {
+                  const id = args[0] as string;
+                  return ({ id, name: 'Group', type: 'multiple', required: 0, is_active: 1 } as unknown as T);
+                }
+                if (sql.includes('FROM product_modifier_groups WHERE product_id = ? AND group_id = ?')) {
+                  return ({ product_id: args[0], group_id: args[1] } as unknown as T);
                 }
                 if (sql.includes('FROM cafe_tables WHERE table_number = ?')) {
                   const num = args[0] as string;

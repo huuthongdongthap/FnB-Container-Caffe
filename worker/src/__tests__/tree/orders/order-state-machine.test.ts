@@ -61,6 +61,8 @@ describe('isTerminal', () => {
   it('returns true for terminal states', () => {
     expect(isTerminal('completed')).toBe(true);
     expect(isTerminal('cancelled')).toBe(true);
+    expect(isTerminal('failed')).toBe(true);
+    expect(isTerminal('expired')).toBe(true);
   });
 
   it('returns false for active states', () => {
@@ -76,12 +78,14 @@ describe('isTerminal', () => {
 
 describe('ORDER_TRANSITIONS / TERMINAL_STATES', () => {
   it('exposes the full transition graph', () => {
-    expect(ORDER_TRANSITIONS.pending).toEqual(['confirmed', 'cancelled']);
+    expect(ORDER_TRANSITIONS.pending).toEqual(['confirmed', 'cancelled', 'failed', 'expired']);
     expect(ORDER_TRANSITIONS.completed).toEqual([]);
     expect(ORDER_TRANSITIONS.cancelled).toEqual([]);
+    expect(ORDER_TRANSITIONS.failed).toEqual([]);
+    expect(ORDER_TRANSITIONS.expired).toEqual([]);
   });
 
   it('lists terminal states', () => {
-    expect(TERMINAL_STATES).toEqual(['completed', 'cancelled']);
+    expect(TERMINAL_STATES).toEqual(['completed', 'cancelled', 'failed', 'expired']);
   });
 });
