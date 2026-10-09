@@ -68,15 +68,15 @@ if [[ "${1:-}" != "--skip-migrations" && "${2:-}" != "--skip-migrations" && "${3
       migration_name=$(basename "$migration")
       echo "Applying: $migration_name"
       # Capture output so we can distinguish benign re-run errors from real failures.
-      MIGRATION_OUTPUT=$(npx wrangler d1 execute fnb-caffe-db --file="$migration" --remote 2>&1)
-      MIGRATION_EXIT=$?
+      MIGRATION_EXIT=0
+      MIGRATION_OUTPUT=$(npx wrangler d1 execute fnb-caffe-db --file="$migration" --remote 2>&1) || MIGRATION_EXIT=$?
 
       if [[ $MIGRATION_EXIT -ne 0 ]]; then
         # D1 lacks ALTER TABLE ADD COLUMN IF NOT EXISTS, so migrations with bare
         # ADD COLUMN error with "duplicate column name" when re-applied. Treat that
         # as success — the schema state is already what the migration intended.
-        if echo "$MIGRATION_OUTPUT" | grep -q "duplicate column name"; then
-          echo "  OK (already applied): $migration_name — duplicate column name ignored."
+        if echo "$MIGRATION_OUTPUT" | grep -Eq "duplicate column name|already exists"; then
+          echo "  OK (already applied): $migration_name — duplicate/already exists ignored."
         else
           echo "ERROR: Migration $migration_name failed:"
           echo "$MIGRATION_OUTPUT" | tail -10

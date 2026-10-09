@@ -39,5 +39,9 @@ CREATE TABLE IF NOT EXISTS product_modifier_groups (
     PRIMARY KEY (product_id, group_id)
 );
 
+-- Column reconciliations if tables pre-existed from earlier migrations
+ALTER TABLE modifier_groups ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE modifier_choices ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1;
+
 CREATE INDEX IF NOT EXISTS idx_mod_choices_group_avail ON modifier_choices(group_id, is_available);
 CREATE INDEX IF NOT EXISTS idx_pm_groups_prod_grp ON product_modifier_groups(product_id, group_id);
