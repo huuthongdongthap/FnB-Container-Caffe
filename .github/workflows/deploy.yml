@@ -1,60 +1,171 @@
-name: Deploy
+name: Deploy Production
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deployment action to execute'
+        required: true
+        type: choice
+        options:
+          - deploy-pages
+          - worker-canary-10
+          - worker-promote-100
+          - worker-rollback
+        default: worker-canary-10
+      worker_version_id:
+        description: 'Candidate Worker Version ID (required for worker-promote-100; optional for specific rollback target)'
+        required: false
+        type: string
+        default: ''
+      baseline_version_id:
+        description: 'Baseline Worker Version ID for 90% canary or fallback rollback target'
+        required: false
+        type: string
+        default: '33d9e23b-711c-4278-82d1-b8013fedc41a'
+      rollback_reason:
+        description: 'Rollback message/reason (used when action is worker-rollback)'
+        required: false
+        type: string
+        default: 'Rollback to baseline version 33d9e23b-711c-4278-82d1-b8013fedc41a'
 
 jobs:
   deploy-pages:
+    name: Deploy Cloudflare Pages
+    if: ${{ inputs.action == 'deploy-pages' }}
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       deployments: write
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
+      - name: Verify Checked-out SHA
+        run: |
+          echo "Target Release Commit SHA: ${{ github.sha }}"
+          echo "Local Checked-out HEAD SHA: $(git rev-parse HEAD)"
 
-    - name: Install dependencies
-      run: npm ci --silent
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
 
-    - name: Build frontend
-      run: npx vite build --mode production
+      - name: Install root dependencies
+        run: npm ci --silent
 
-    - name: Deploy to Cloudflare Pages
-      uses: cloudflare/wrangler-action@v3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: b69fee03bdd94234eea8e4114cfc36ab
-        command: pages deploy dist --project-name=fnb-caffe-container
+      - name: Build frontend
+        run: npx vite build --mode production
 
-  deploy-worker:
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b69fee03bdd94234eea8e4114cfc36ab
+          command: pages deploy dist --project-name=fnb-caffe-container
+
+  worker-canary:
+    name: Worker Canary (10% Traffic)
+    if: ${{ inputs.action == 'worker-canary-10' }}
     runs-on: ubuntu-latest
-    needs: deploy-pages
+    environment: production
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
+      - name: Verify Checked-out SHA
+        run: |
+          echo "Candidate Release Commit SHA: ${{ github.sha }}"
+          echo "Local Checked-out HEAD SHA: $(git rev-parse HEAD)"
 
-    - name: Install root dependencies
-      run: npm ci --silent
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
 
-    - name: Link worker module
-      run: node -e "const fs = require('fs'); if (!fs.existsSync('node_modules/worker')) fs.symlinkSync('../worker', 'node_modules/worker', 'dir');"
+      - name: Install root dependencies
+        run: npm ci --silent
 
-    - name: Install worker dependencies
-      run: cd worker && npm ci --silent
+      - name: Link worker module
+        run: node -e "const fs = require('fs'); if (!fs.existsSync('node_modules/worker')) fs.symlinkSync('../worker', 'node_modules/worker', 'dir');"
 
-    - name: Deploy Worker
-      uses: cloudflare/wrangler-action@v3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: b69fee03bdd94234eea8e4114cfc36ab
-        workingDirectory: worker
-        command: deploy --var GIT_COMMIT_SHA:${{ github.sha }}
+      - name: Install worker dependencies
+        run: cd worker && npm ci --silent
+
+      - name: Upload Version and Deploy 10% Canary
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b69fee03bdd94234eea8e4114cfc36ab
+          workingDirectory: worker
+          command: |
+            set -e
+            echo "Uploading candidate version for SHA ${{ github.sha }}..."
+            UPLOAD_OUTPUT=$(npx wrangler versions upload --message "Candidate SHA ${{ github.sha }}" --var GIT_COMMIT_SHA:${{ github.sha }})
+            echo "$UPLOAD_OUTPUT"
+            VERSION_ID=$(echo "$UPLOAD_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
+            if [ -z "$VERSION_ID" ]; then
+              echo "Error: Could not extract Worker Version ID from wrangler output"
+              exit 1
+            fi
+            echo "Candidate Version ID: $VERSION_ID"
+            echo "Baseline Version ID: ${{ inputs.baseline_version_id }}"
+            echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> ${{ inputs.baseline_version_id }}"
+            npx wrangler versions deploy "$VERSION_ID@10" "${{ inputs.baseline_version_id }}@90" --yes
+
+  worker-promote:
+    name: Worker Promote to 100%
+    if: ${{ inputs.action == 'worker-promote-100' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Promote Worker Version to 100%
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b69fee03bdd94234eea8e4114cfc36ab
+          workingDirectory: worker
+          command: |
+            set -e
+            VERSION_ID="${{ inputs.worker_version_id }}"
+            if [ -z "$VERSION_ID" ]; then
+              echo "Error: worker_version_id is required for worker-promote-100"
+              exit 1
+            fi
+            echo "Promoting Worker Version $VERSION_ID to 100% production traffic..."
+            npx wrangler versions deploy "$VERSION_ID@100" --yes
+
+  worker-rollback:
+    name: Worker Rollback
+    if: ${{ inputs.action == 'worker-rollback' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Rollback Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b69fee03bdd94234eea8e4114cfc36ab
+          workingDirectory: worker
+          command: |
+            set -e
+            TARGET_VERSION="${{ inputs.worker_version_id || inputs.baseline_version_id }}"
+            echo "Rolling back Worker to version $TARGET_VERSION..."
+            npx wrangler rollback "$TARGET_VERSION" --message "${{ inputs.rollback_reason }}" --yes
