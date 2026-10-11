@@ -59,11 +59,10 @@ jobs:
         run: npx vite build --mode production
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: b69fee03bdd94234eea8e4114cfc36ab
-          command: pages deploy dist --project-name=fnb-caffe-container
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: npx wrangler pages deploy dist --project-name=fnb-caffe-container
 
   worker-canary:
     name: Worker Canary (10% Traffic)
@@ -94,25 +93,24 @@ jobs:
         run: cd worker && npm ci --silent
 
       - name: Upload Version and Deploy 10% Canary
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: b69fee03bdd94234eea8e4114cfc36ab
-          workingDirectory: worker
-          command: |
-            set -e
-            echo "Uploading candidate version for SHA ${{ github.sha }}..."
-            UPLOAD_OUTPUT=$(npx wrangler versions upload --message "Candidate SHA ${{ github.sha }}" --var GIT_COMMIT_SHA:${{ github.sha }})
-            echo "$UPLOAD_OUTPUT"
-            VERSION_ID=$(echo "$UPLOAD_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
-            if [ -z "$VERSION_ID" ]; then
-              echo "Error: Could not extract Worker Version ID from wrangler output"
-              exit 1
-            fi
-            echo "Candidate Version ID: $VERSION_ID"
-            echo "Baseline Version ID: ${{ inputs.baseline_version_id }}"
-            echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> ${{ inputs.baseline_version_id }}"
-            npx wrangler versions deploy "$VERSION_ID@10" "${{ inputs.baseline_version_id }}@90" --yes
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -e
+          echo "Uploading candidate version for SHA ${{ github.sha }}..."
+          UPLOAD_OUTPUT=$(npx wrangler versions upload --message "Candidate SHA ${{ github.sha }}" --var GIT_COMMIT_SHA:${{ github.sha }})
+          echo "$UPLOAD_OUTPUT"
+          VERSION_ID=$(echo "$UPLOAD_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
+          if [ -z "$VERSION_ID" ]; then
+            echo "Error: Could not extract Worker Version ID from wrangler output"
+            exit 1
+          fi
+          echo "Candidate Version ID: $VERSION_ID"
+          echo "Baseline Version ID: ${{ inputs.baseline_version_id }}"
+          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> ${{ inputs.baseline_version_id }}"
+          npx wrangler versions deploy "$VERSION_ID@10" "${{ inputs.baseline_version_id }}@90" --yes
 
   worker-promote:
     name: Worker Promote to 100%
@@ -128,21 +126,29 @@ jobs:
         with:
           node-version: '22.x'
 
+      - name: Install root dependencies
+        run: npm ci --silent
+
+      - name: Link worker module
+        run: node -e "const fs = require('fs'); if (!fs.existsSync('node_modules/worker')) fs.symlinkSync('../worker', 'node_modules/worker', 'dir');"
+
+      - name: Install worker dependencies
+        run: cd worker && npm ci --silent
+
       - name: Promote Worker Version to 100%
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: b69fee03bdd94234eea8e4114cfc36ab
-          workingDirectory: worker
-          command: |
-            set -e
-            VERSION_ID="${{ inputs.worker_version_id }}"
-            if [ -z "$VERSION_ID" ]; then
-              echo "Error: worker_version_id is required for worker-promote-100"
-              exit 1
-            fi
-            echo "Promoting Worker Version $VERSION_ID to 100% production traffic..."
-            npx wrangler versions deploy "$VERSION_ID@100" --yes
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -e
+          VERSION_ID="${{ inputs.worker_version_id }}"
+          if [ -z "$VERSION_ID" ]; then
+            echo "Error: worker_version_id is required for worker-promote-100"
+            exit 1
+          fi
+          echo "Promoting Worker Version $VERSION_ID to 100% production traffic..."
+          npx wrangler versions deploy "$VERSION_ID@100" --yes
 
   worker-rollback:
     name: Worker Rollback
@@ -158,14 +164,22 @@ jobs:
         with:
           node-version: '22.x'
 
+      - name: Install root dependencies
+        run: npm ci --silent
+
+      - name: Link worker module
+        run: node -e "const fs = require('fs'); if (!fs.existsSync('node_modules/worker')) fs.symlinkSync('../worker', 'node_modules/worker', 'dir');"
+
+      - name: Install worker dependencies
+        run: cd worker && npm ci --silent
+
       - name: Rollback Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: b69fee03bdd94234eea8e4114cfc36ab
-          workingDirectory: worker
-          command: |
-            set -e
-            TARGET_VERSION="${{ inputs.worker_version_id || inputs.baseline_version_id }}"
-            echo "Rolling back Worker to version $TARGET_VERSION..."
-            npx wrangler rollback "$TARGET_VERSION" --message "${{ inputs.rollback_reason }}" --yes
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -e
+          TARGET_VERSION="${{ inputs.worker_version_id || inputs.baseline_version_id }}"
+          echo "Rolling back Worker to version $TARGET_VERSION..."
+          npx wrangler rollback "$TARGET_VERSION" --message "${{ inputs.rollback_reason }}" --yes
