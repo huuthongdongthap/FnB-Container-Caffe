@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { tenantMiddleware } from '../middleware/tenant';
-import { getAdminOrders, getStats } from '@aura/domain-order';
+import { getAdminOrders, getStats, publishOrderEvent } from '@aura/domain-order';
 import { paymentRouter, nowPaymentsIPN } from '@aura/domain-payment';
 import { refundRouter } from './refunds';
 import { pushRouter } from './push';
@@ -101,8 +101,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
       .bind(status, now, orderId)
       .run();
-    await c.env.AUTH_KV?.put('latest_order_ts', now, { expirationTtl: 86400 }).catch(() => {});
-    await c.env.AUTH_KV?.put('orders:latest_updated_at', now, { expirationTtl: 86400 }).catch(() => {});
+    await publishOrderEvent(c.env.AUTH_KV, orderId, status).catch(() => {});
     return c.json({ success: true, id: orderId, status, updated_at: now });
   });
   app.post('/api/admin/orders/:id/complete', async (c) => {
@@ -115,8 +114,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
       .bind('completed', now, orderId)
       .run();
-    await c.env.AUTH_KV?.put('latest_order_ts', now, { expirationTtl: 86400 }).catch(() => {});
-    await c.env.AUTH_KV?.put('orders:latest_updated_at', now, { expirationTtl: 86400 }).catch(() => {});
+    await publishOrderEvent(c.env.AUTH_KV, orderId, 'completed').catch(() => {});
     return c.json({ success: true, id: orderId, status: 'completed', updated_at: now });
   });
   app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));

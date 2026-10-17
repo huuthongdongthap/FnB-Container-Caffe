@@ -26,7 +26,7 @@ function normalizeCustomer(raw: Record<string, unknown>): AdminCustomer {
     id: String(raw.id ?? ''),
     name: String(raw.name ?? ''),
     phone: String(raw.phone ?? ''),
-    tier: String(raw.tier ?? 'bronze'),
+    tier: String(raw.tier ?? raw.loyalty_tier ?? 'bronze'),
     totalOrders: Number(raw.totalOrders ?? raw.visit_count ?? 0),
     totalSpent: Number(raw.totalSpent ?? raw.total_spent ?? 0),
     lastVisit: String(raw.lastVisit ?? raw.updated_at ?? raw.created_at ?? ''),

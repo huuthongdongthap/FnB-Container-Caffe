@@ -20,7 +20,7 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
     }
     const role = payload.role as string;
-    if (role !== 'owner' && role !== 'manager' && role !== 'staff') {
+    if (role !== 'owner' && role !== 'manager' && role !== 'staff' && role !== 'admin') {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
@@ -89,7 +89,7 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
         return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
       }
       const role = payload.role as string;
-      if (role !== 'owner' && role !== 'manager' && role !== 'staff') {
+      if (role !== 'owner' && role !== 'manager' && role !== 'staff' && role !== 'admin') {
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
     }
@@ -101,7 +101,7 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
     const tierParam = c.req.query('tier');
     const offset = (page - 1) * limit;
 
-    let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) as total FROM customers c WHERE 1=1';
     let dataQuery = `${PROFILE_SQL}WHERE 1=1`;
     const params: unknown[] = [];
 
@@ -113,9 +113,9 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
       params.push(pattern, pattern, pattern);
     }
     if (tierParam) {
-      countQuery += ' AND c.loyalty_tier = ?';
-      dataQuery += ' AND c.loyalty_tier = ?';
-      params.push(tierParam.toUpperCase());
+      countQuery += ' AND LOWER(c.loyalty_tier) = LOWER(?)';
+      dataQuery += ' AND LOWER(c.loyalty_tier) = LOWER(?)';
+      params.push(tierParam);
     }
 
     dataQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';

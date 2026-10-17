@@ -28,6 +28,12 @@
    - Passed `{ kv: c.env?.AUTH_KV }` into `executeKdsStatusTransition` inside `stationTicketsRouter` (`kitchen-station-tickets.ts:80,122`).
    - Aligned RBAC in `orders-unified.ts:56-79` across `/checkout`, `/summary`, `/`, `/:id/mark-cod-paid`, `/:id/cancel`, `/:id/claim`, `/:id`, and `PATCH /:id` for `waiter`, `admin`, and kitchen roles (`kitchen`, `barista`, `chef`).
    - Added regression tests in `kitchen-kds-lifecycle.test.ts`, `orders-unified.test.ts`, and `customer-order-tracking.test.ts`.
+8. **Admin Customers D1 Schema Compatibility, Admin Order SSE Publishing & Split-Order Table Lookup (Phase 8)**:
+   - Updated `getAdminCustomers`, `createAdminCustomer`, and `updateAdminCustomer` (`worker/src/routes/admin-handlers.ts`) to query/mutate canonical D1 `customers` (`loyalty_tier`, `cashback_wallets` join, orders count subquery, non-null fallback `@loyalty.aura` email) with seamless fallback to the flat mock schema.
+   - Updated `/api/customers` and `/api/customers/segments` (`worker/src/routes/customers-handlers/admin-handlers.ts`) to authorize `role === 'admin'` and filter `LOWER(c.loyalty_tier) = LOWER(?)`.
+   - Updated `PATCH /api/admin/orders/:id/status` and `POST /api/admin/orders/:id/complete` (`worker/src/routes/features-router.ts:104,119`) to invoke `publishOrderEvent(c.env.AUTH_KV, orderId, status)`, syncing `order_event:${orderId}` alongside `latest_order_ts` and `orders:latest_updated_at`.
+   - Updated `splitOrders` (`packages/domain/order/commands/split-orders.ts:57`) to resolve tables by `WHERE table_number = ? OR id = ?`.
+   - Added regression tests in `worker/src/__tests__/routes/customers.test.ts` and `worker/src/__tests__/tree/orders/split-orders.test.ts`.
 
 ## Unresolved Questions
 - None.

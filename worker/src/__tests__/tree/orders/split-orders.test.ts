@@ -153,6 +153,8 @@ describe('split-orders', () => {
       await splitOrders(makeReq(validPayload), env);
 
       const calls = (db.prepare as unknown as { mock: { calls: [unknown, string][] } }).mock.calls as unknown[][];
+      // First call resolves either table_number or id
+      expect((calls[0][0] as string)).toContain('WHERE table_number = ? OR id = ?');
       // Second call: UPDATE cafe_tables SET status = 'Occupied'
       expect((calls[1][0] as string)).toContain('cafe_tables');
       expect((calls[1][0] as string)).toContain('Occupied');

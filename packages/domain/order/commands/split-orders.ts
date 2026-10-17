@@ -51,11 +51,11 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     const { orders, table_id } = parsed.data;
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
 
-    // Resolve table_number to table UUID and auto-occupy
+    // Resolve table_number or table id to table UUID and auto-occupy
     let resolvedTableId: string | null = null;
     const tableRow = await db.prepare(
-      'SELECT id FROM cafe_tables WHERE table_number = ?'
-    ).bind(table_id).first<{ id: string }>();
+      'SELECT id FROM cafe_tables WHERE table_number = ? OR id = ?'
+    ).bind(table_id, table_id).first<{ id: string }>();
 
     if (tableRow) {
       resolvedTableId = tableRow.id;
