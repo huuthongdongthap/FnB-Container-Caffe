@@ -8,7 +8,8 @@ FULL_SHA=$(git rev-parse HEAD)
 echo "Local SHA: $FULL_SHA"
 
 # Update wrangler.toml with current git SHA
-sed -i '' "s/^GIT_COMMIT_SHA = .*/GIT_COMMIT_SHA = \"$FULL_SHA\"/" wrangler.toml
+sed -i.tmp "s/^GIT_COMMIT_SHA = .*/GIT_COMMIT_SHA = \"$FULL_SHA\"/" wrangler.toml
+rm -f wrangler.toml.tmp
 
 echo "Deploying..."
 npx wrangler deploy

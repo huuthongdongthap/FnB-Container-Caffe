@@ -270,9 +270,11 @@ cp "$WRANGLER_CONFIG" "$WRANGLER_BACKUP"
 
 # Update worker name, CORS_ORIGIN, and project references in wrangler.toml
 # This is a minimal substitution; for full customization, maintain per-client configs.
-sed -i '' "s/^name = \".*\"/name = \"${PROJECT_NAME}\"/" "$WRANGLER_CONFIG"
+sed -i.tmp "s/^name = \".*\"/name = \"${PROJECT_NAME}\"/" "$WRANGLER_CONFIG"
+rm -f "${WRANGLER_CONFIG}.tmp"
 if grep -q '^CORS_ORIGIN' "$WRANGLER_CONFIG"; then
-  sed -i '' "s|^CORS_ORIGIN = \".*\"|CORS_ORIGIN = \"${CORS_ORIGIN}\"|" "$WRANGLER_CONFIG"
+  sed -i.tmp "s|^CORS_ORIGIN = \".*\"|CORS_ORIGIN = \"${CORS_ORIGIN}\"|" "$WRANGLER_CONFIG"
+  rm -f "${WRANGLER_CONFIG}.tmp"
 fi
 
 # Deploy
