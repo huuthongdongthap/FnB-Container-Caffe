@@ -169,6 +169,8 @@ describe('Customer Order Tracking Contract', () => {
     expect(parsed.orderId).toBe('ORD_EVENT_1');
     expect(parsed.status).toBe('preparing');
     expect(parsed.previous_status).toBe('confirmed');
+    expect(kvStore.get('latest_order_ts')).toBeTruthy();
+    expect(kvStore.get('orders:latest_updated_at')).toBeTruthy();
   });
 
   it('renders historical order without Catalog lookup even after catalog deletion', () => {

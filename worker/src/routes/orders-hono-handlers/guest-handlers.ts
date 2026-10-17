@@ -53,6 +53,13 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
   }
 
+  if (c.env?.AUTH_KV) {
+    await Promise.all([
+      c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+      c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+    ]);
+  }
+
   try {
     const { sendPushToStaff: notifyStaff } = await import('../../tree/push/notifier.js');
     const pushPromise = notifyStaff(c.env as Env, {
@@ -155,6 +162,13 @@ export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
         `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(lineItemId, orderId, prodId, item.qty || 1, subtotal, '[]', now).run();
+    }
+
+    if (c.env?.AUTH_KV) {
+      await Promise.all([
+        c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+        c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+      ]);
     }
 
     return c.json({ success: true, order_id: orderId, total, fulfillment_type: fulfillment }, 201);

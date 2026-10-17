@@ -45,9 +45,14 @@ export const kdsStreamRouter = new Hono<{ Bindings: Env }>();
 
 function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
   let items: unknown[] = [];
-  try {
-    items = JSON.parse(order.items);
-  } catch { /* keep empty */ }
+  if (Array.isArray(order.items)) {
+    items = order.items;
+  } else {
+    try {
+      const parsed = JSON.parse(order.items);
+      if (Array.isArray(parsed)) items = parsed;
+    } catch { /* keep empty */ }
+  }
 
   const elapsed = Math.round(
     (Date.now() - new Date(order.created_at).getTime()) / 60000
@@ -91,7 +96,7 @@ kdsStreamRouter.get('/stream', async(c) => {
       const queryActiveOrders = async(): Promise<KdsStreamOrder[]> => {
         const { results } = await db.prepare(
           `SELECT id, customer_name, table_id, items, status, created_at FROM orders
-           WHERE status IN ('pending', 'preparing')
+           WHERE status IN ('pending', 'confirmed', 'preparing')
            ORDER BY created_at ASC LIMIT 50`
         ).all<OrderRecord>();
         return (results || []).map(mapKdsOrder);

@@ -131,13 +131,18 @@ export async function publishOrderEvent(
   options?: { previousStatus?: string; waitUntil?: (p: Promise<unknown>) => void }
 ): Promise<void> {
   if (!kv || !orderId) return;
+  const now = new Date().toISOString();
   const payload = JSON.stringify({
     orderId,
     status,
     previous_status: options?.previousStatus,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
   });
-  const promise = kv.put(`order_event:${orderId}`, payload, { expirationTtl: 60 }).catch(() => {});
+  const promise = Promise.all([
+    kv.put(`order_event:${orderId}`, payload, { expirationTtl: 60 }),
+    kv.put('latest_order_ts', now),
+    kv.put('orders:latest_updated_at', now),
+  ]).catch(() => {});
   if (options?.waitUntil) {
     options.waitUntil(promise);
   } else {

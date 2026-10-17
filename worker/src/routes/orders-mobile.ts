@@ -167,6 +167,13 @@ export async function createOrderMobile(
       // Non-blocking if cafe_tables is not present in minimal test mock
     }
 
+    if (context.env?.AUTH_KV) {
+      await Promise.all([
+        context.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+        context.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+      ]);
+    }
+
     return jsonResponse({ success: true, order_id: id, total }, 201);
   } catch (err) {
     const errMsg = (err as Error).message;

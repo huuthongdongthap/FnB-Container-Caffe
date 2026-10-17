@@ -21,17 +21,23 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     const order = await db.prepare(
-      'SELECT id, total, status FROM orders WHERE id = ?'
-    ).bind(orderId).first<{ id: string; total: number; status: string }>();
+      'SELECT id, total, status, table_id FROM orders WHERE id = ?'
+    ).bind(orderId).first<{ id: string; total: number; status: string; table_id?: string | null }>();
     if (!order) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
-
-    await db.prepare(
-      'UPDATE orders SET table_id = ?, updated_at = ? WHERE id = ?'
-    ).bind(session.table_id, new Date().toISOString(), orderId).run();
+    if (order.status === 'cancelled') {
+      return c.json({ success: false, error: 'Cannot attach cancelled order to session' }, 409);
+    }
+    if (order.table_id && order.table_id === session.table_id) {
+      return c.json({ success: true, data: session, idempotent: true });
+    }
 
     const now = new Date().toISOString();
+    await db.prepare(
+      'UPDATE orders SET table_id = ?, updated_at = ? WHERE id = ?'
+    ).bind(session.table_id, now, orderId).run();
+
     await db.prepare(
       `UPDATE table_sessions
        SET order_count = order_count + 1,
@@ -40,6 +46,13 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
            updated_at = ?
        WHERE id = ?`
     ).bind(order.total, now, id).run();
+
+    if (c.env?.AUTH_KV) {
+      await Promise.all([
+        c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+        c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+      ]);
+    }
 
     const updated = await db.prepare(
       'SELECT * FROM table_sessions WHERE id = ?'

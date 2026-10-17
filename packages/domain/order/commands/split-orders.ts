@@ -132,6 +132,12 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
       });
     }
 
+    if (env.AUTH_KV) {
+      const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+      await kv.put('latest_order_ts', now).catch(() => {});
+      await kv.put('orders:latest_updated_at', now).catch(() => {});
+    }
+
     log.info('Split orders created', {
       count: createdOrders.length,
       table_id,

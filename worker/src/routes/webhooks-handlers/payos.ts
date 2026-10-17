@@ -131,6 +131,7 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
         const kv = c.env.AUTH_KV;
         if (kv) {
           await kv.put('latest_order_ts', now);
+          await kv.put('orders:latest_updated_at', now).catch(() => {});
         }
 
         try {

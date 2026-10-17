@@ -25,8 +25,8 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
   const categoryIndex = buildIndexFromDbRows(mappings || []);
 
   const { results: activeOrders } = await db.prepare(
-    'SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?) ORDER BY o.created_at ASC'
-  ).bind('pending', 'preparing', 'ready').all<Record<string, unknown>>();
+    'SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?) ORDER BY o.created_at ASC'
+  ).bind('pending', 'confirmed', 'preparing', 'ready').all<Record<string, unknown>>();
 
   const { results: assignedItems } = await db.prepare(
     'SELECT order_item_id FROM order_item_stations WHERE station_id = ?'
@@ -77,7 +77,7 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
   ).bind(compositeItemId, stationId, now).run();
 
   if (order.status === 'confirmed' || order.status === 'pending') {
-    await executeKdsStatusTransition(db, orderId, 'preparing', 'staff');
+    await executeKdsStatusTransition(db, orderId, 'preparing', 'staff', { kv: c.env?.AUTH_KV });
   }
 
   return c.json({
@@ -119,7 +119,7 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
 
   let finalStatus = order.status;
   if (allReady && (order.status === 'preparing' || order.status === 'confirmed')) {
-    const trans = await executeKdsStatusTransition(db, orderId, 'ready', 'staff');
+    const trans = await executeKdsStatusTransition(db, orderId, 'ready', 'staff', { kv: c.env?.AUTH_KV });
     if (trans.success) finalStatus = 'ready';
   }
 

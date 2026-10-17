@@ -10,6 +10,19 @@ const log = createLogger({ route: 'kds-mobile' });
 const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
 const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
 
+function parseKdsItems(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // GET /mobile/kds/orders — list active kitchen orders
 export async function getKdsMobile(
   context: Context<{ Bindings: Env }>
@@ -27,7 +40,7 @@ export async function getKdsMobile(
                 COALESCE(t.table_number, t.id) as table_name
          FROM orders o
          LEFT JOIN cafe_tables t ON t.id = o.table_id
-         WHERE o.status IN ('pending','preparing')
+         WHERE o.status IN ('pending','confirmed','preparing')
          ORDER BY o.created_at ASC`
       )
       .all();
@@ -39,7 +52,7 @@ export async function getKdsMobile(
         id: r.id as string,
         table_id: r.table_id as string,
         table_name: r.table_name as string | null,
-        items: JSON.parse((r.items as string) || '[]'),
+        items: parseKdsItems(r.items),
         status: r.status as string,
         created_at: r.created_at as string,
         updated_at: r.updated_at as string,

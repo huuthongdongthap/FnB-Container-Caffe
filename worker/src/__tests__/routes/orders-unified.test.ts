@@ -282,4 +282,51 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
     expect(statusRes.status).not.toBe(401);
     expect(statusRes.status).not.toBe(403);
   });
+
+  it('authorizes waiter on /checkout and barista on /kds and /:id/status', async () => {
+    const env = makeTestEnv();
+    const waiterToken = await generateJWT({ sub: 'w-1', role: 'waiter', name: 'Waiter' }, TEST_SECRET);
+    const baristaToken = await generateJWT({ sub: 'b-1', role: 'barista', name: 'Barista' }, TEST_SECRET);
+
+    const posRes = await app.fetch(
+      new Request('https://test.aura/api/orders/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${waiterToken}`,
+        },
+        body: JSON.stringify({
+          customer_name: 'Table 3 Guest',
+          customer_phone: '0901234567',
+          payment_method: 'cash',
+          order_type: 'dine_in',
+          items: [{ name: 'Cold Brew', product_id: 'prod-1', quantity: 1, price: 45000 }],
+        }),
+      }),
+      env
+    );
+    expect([200, 201]).toContain(posRes.status);
+
+    const kdsRes = await app.fetch(
+      new Request('https://test.aura/api/orders/kds', {
+        headers: { Authorization: `Bearer ${baristaToken}` },
+      }),
+      env
+    );
+    expect(kdsRes.status).toBe(200);
+
+    const statusRes = await app.fetch(
+      new Request('https://test.aura/api/orders/ORD-123/status', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${baristaToken}`,
+        },
+        body: JSON.stringify({ status: 'preparing' }),
+      }),
+      env
+    );
+    expect(statusRes.status).not.toBe(401);
+    expect(statusRes.status).not.toBe(403);
+  });
 });

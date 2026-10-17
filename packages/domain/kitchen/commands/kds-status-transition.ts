@@ -103,7 +103,11 @@ export async function executeKdsStatusTransition(
       previous_status: order.status,
       timestamp: now,
     });
-    const putPromise = options.kv.put(`order_event:${orderId}`, eventPayload, { expirationTtl: 60 });
+    const putPromise = Promise.all([
+      options.kv.put(`order_event:${orderId}`, eventPayload, { expirationTtl: 60 }),
+      options.kv.put('latest_order_ts', now),
+      options.kv.put('orders:latest_updated_at', now),
+    ]);
     if (options.waitUntil) {
       options.waitUntil(putPromise);
     } else {

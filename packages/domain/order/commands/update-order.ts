@@ -137,7 +137,9 @@ export async function updateOrder(
 
     if (env.AUTH_KV) {
       const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-      await kv.put('latest_order_ts', new Date().toISOString());
+      const nowIso = new Date().toISOString();
+      await kv.put('latest_order_ts', nowIso);
+      await kv.put('orders:latest_updated_at', nowIso).catch(() => {});
     }
 
     	// Loyalty credit — single call, idempotent (skips if earn already exists)

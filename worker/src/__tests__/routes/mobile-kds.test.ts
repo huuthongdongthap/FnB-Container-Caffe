@@ -132,7 +132,7 @@ describe('getKdsMobile', () => {
     expect(res.status).toBe(200);
   });
 
-  it('items are JSON-parsed', async () => {
+  it('items are JSON-parsed and malformed items degrade gracefully to empty array', async () => {
     const ordersWithItems: any[] = [
       {
         id: 'ORD_X',
@@ -143,12 +143,22 @@ describe('getKdsMobile', () => {
         updated_at: '2026-07-10T10:00:00Z',
         table_name: 'BÀN 01',
       },
+      {
+        id: 'ORD_BAD_JSON',
+        table_id: 'TBL_2',
+        items: '{malformed-json',
+        status: 'confirmed',
+        created_at: '2026-07-10T10:01:00Z',
+        updated_at: '2026-07-10T10:01:00Z',
+        table_name: 'BÀN 02',
+      },
     ];
     const ctx: any = makeCtx('owner', 'USR_1', '/mobile/kds/orders', 'GET', undefined, makeDb(ordersWithItems));
     const res = await getKdsMobile(ctx);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.orders[0].items).toEqual([{ name: 'Cà phê sữa', qty: 2 }]);
+    expect(body.orders[1].items).toEqual([]);
   });
 
   it('500 on DB error', async () => {

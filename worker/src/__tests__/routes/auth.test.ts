@@ -262,4 +262,41 @@ describe('verifyEmail & registerWithVerification hardening', () => {
       isActive: true,
     });
   });
+
+  it('getCurrentUser falls back to D1 users lookup for mobile staff JWT without email claim', async() => {
+    const { generateJWT } = await import('../../lib/jwt');
+    const env = createMockEnv();
+    (env as any).AURA_DB = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => {
+            if (sql.includes('FROM users WHERE id = ?') && args[0] === 'USR_MOB_99') {
+              return {
+                id: 'USR_MOB_99',
+                email: 'waiter99@aura.vn',
+                name: 'Waiter 99',
+                phone: '0909998888',
+                role: 'waiter',
+              };
+            }
+            return null;
+          },
+        }),
+      }),
+    };
+
+    const mobileToken = await generateJWT({ id: 'USR_MOB_99', role: 'waiter' }, TEST_JWT_SECRET, '8h');
+    const meReq = mockRequestWithHeader('GET', '/mobile/me', { Authorization: `Bearer ${mobileToken}` });
+    const meRes = await getCurrentUser(meReq, env);
+    expect(meRes.status).toBe(200);
+    const meBody = await meRes.json() as { success: boolean; user: Record<string, unknown> };
+    expect(meBody.success).toBe(true);
+    expect(meBody.user).toMatchObject({
+      id: 'USR_MOB_99',
+      email: 'waiter99@aura.vn',
+      name: 'Waiter 99',
+      phone: '0909998888',
+      role: 'waiter',
+    });
+  });
 });

@@ -196,4 +196,36 @@ describe('Kitchen / KDS Lifecycle & Coordination Contract', () => {
     expect(bodyB.all_items_ready).toBe(false);
     expect(orders[1].status).toBe('preparing');
   });
+
+  it('publishes order_event and realtime KV timestamps on station item start and ready transitions', async () => {
+    const order = {
+      id: 'ORD_KV_SYNC',
+      status: 'confirmed',
+      items: JSON.stringify([{ id: 'prod_1', name: 'Cold Brew' }]),
+      created_at: new Date().toISOString(),
+    };
+    const kvStore = new Map<string, string>();
+    const kv = {
+      put: async (k: string, v: string) => { kvStore.set(k, v); },
+      get: async (k: string) => kvStore.get(k) ?? null,
+    };
+    const { app, db } = makeMockLifecycleDb([order]);
+    const env = { AURA_DB: db, AUTH_KV: kv };
+
+    const startRes = await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_KV_SYNC/items/prod_1/start?station_id=KS_COFFEE', { method: 'POST' }),
+      env
+    );
+    expect(startRes.status).toBe(200);
+    expect(kvStore.get('latest_order_ts')).toBeTruthy();
+    expect(kvStore.get('orders:latest_updated_at')).toBeTruthy();
+    expect(JSON.parse(kvStore.get('order_event:ORD_KV_SYNC') || '{}').status).toBe('preparing');
+
+    const readyRes = await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_KV_SYNC/items/prod_1/ready?station_id=KS_COFFEE', { method: 'POST' }),
+      env
+    );
+    expect(readyRes.status).toBe(200);
+    expect(JSON.parse(kvStore.get('order_event:ORD_KV_SYNC') || '{}').status).toBe('ready');
+  });
 });

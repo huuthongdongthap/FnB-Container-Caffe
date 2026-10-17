@@ -77,6 +77,10 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
     if (isSuccess && payment.order_id) {
       await db.prepare('UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?')
         .bind(now, payment.order_id).run();
+      if (c.env?.AUTH_KV) {
+        await c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {});
+        await c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {});
+      }
     }
 
     // Audit log

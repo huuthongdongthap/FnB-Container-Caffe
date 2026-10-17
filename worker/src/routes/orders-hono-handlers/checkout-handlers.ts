@@ -124,6 +124,13 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
 
+  if (c.env?.AUTH_KV) {
+    await Promise.all([
+      c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+      c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+    ]);
+  }
+
   // Record order creation metric
   const mc = createMetricsCollector(db);
   try {
@@ -148,5 +155,5 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerCheckoutHandlers(app: Hono<{ Bindings: Env }>) {
-  app.post('/checkout', requireAuth(['owner', 'manager', 'staff']), audit('order_create_checkout'), handlePosCheckout);
+  app.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin']), audit('order_create_checkout'), handlePosCheckout);
 }

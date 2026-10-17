@@ -272,5 +272,28 @@ describe('cash reconciliation', () => {
     expect(mgrPost.status).toBe(500);
     const body = await mgrPost.json() as { error: string };
     expect(body.error).toBe('Cash reconciliation failed');
+
+    // Manager role POST with invalid opening_float or denominations -> 400
+    const badFloatPost = await app.request(
+      '/api/shifts/shift_1/reconcile',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_float: -50, denominations: [] }),
+      },
+      { AURA_DB: db }
+    );
+    expect(badFloatPost.status).toBe(400);
+
+    const badDenomPost = await app.request(
+      '/api/shifts/shift_1/reconcile',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_float: 100000, denominations: 'invalid' }),
+      },
+      { AURA_DB: db }
+    );
+    expect(badDenomPost.status).toBe(400);
   });
 });

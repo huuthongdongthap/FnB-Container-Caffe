@@ -291,7 +291,7 @@ describe('createOrderMobile', () => {
     expect(res.status).toBe(400);
   });
 
-  it('creates order with unique id containing timestamp', async () => {
+  it('creates order with unique id containing timestamp and updates AUTH_KV realtime timestamps', async () => {
     const ctx: any = mockOrdersContext({
       role: 'owner',
       method: 'POST',
@@ -300,6 +300,8 @@ describe('createOrderMobile', () => {
     const res = await createOrderMobile(ctx);
     const body = await res.json();
     expect(body.order_id).toMatch(/^ORD_/);
+    expect(await ctx.env.AUTH_KV.get('latest_order_ts')).toBeTruthy();
+    expect(await ctx.env.AUTH_KV.get('orders:latest_updated_at')).toBeTruthy();
   });
 
   it('returns 500 on database error during create', async () => {

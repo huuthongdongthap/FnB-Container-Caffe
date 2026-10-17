@@ -204,4 +204,22 @@ describe('table-sessions routes', () => {
     const { status, json } = await fetchHandler(db, 'GET', '/api/table-sessions/NOPE');
     expect(status).toBe(404);
   });
+
+  it('POST /api/table-sessions/:id/orders returns 409 for cancelled orders and is idempotent when already attached', async () => {
+    db = makeScriptedDB([
+      { match: (s) => s.includes('table_sessions') && s.includes("status != 'closed'"), rows: [{ id: 'SES-1', table_id: 'T1', status: 'active' }], firstRow: { id: 'SES-1', table_id: 'T1', status: 'active' } },
+      { match: (s) => s.includes('FROM orders WHERE id ='), rows: [{ id: 'ORD-CANCELLED', total: 50000, status: 'cancelled', table_id: null }], firstRow: { id: 'ORD-CANCELLED', total: 50000, status: 'cancelled', table_id: null } },
+    ]);
+    const cancelledRes = await fetchHandler(db, 'POST', '/api/table-sessions/SES-1/orders', { order_id: 'ORD-CANCELLED' });
+    expect(cancelledRes.status).toBe(409);
+
+    db = makeScriptedDB([
+      { match: (s) => s.includes('table_sessions') && s.includes("status != 'closed'"), rows: [{ id: 'SES-1', table_id: 'T1', status: 'ordering', order_count: 1, total_amount: 50000 }], firstRow: { id: 'SES-1', table_id: 'T1', status: 'ordering', order_count: 1, total_amount: 50000 } },
+      { match: (s) => s.includes('FROM orders WHERE id ='), rows: [{ id: 'ORD-ATTACHED', total: 50000, status: 'pending', table_id: 'T1' }], firstRow: { id: 'ORD-ATTACHED', total: 50000, status: 'pending', table_id: 'T1' } },
+    ]);
+    const idempRes = await fetchHandler(db, 'POST', '/api/table-sessions/SES-1/orders', { order_id: 'ORD-ATTACHED' });
+    expect(idempRes.status).toBe(200);
+    expect(idempRes.json.idempotent).toBe(true);
+    expect(idempRes.json.data.order_count).toBe(1);
+  });
 });

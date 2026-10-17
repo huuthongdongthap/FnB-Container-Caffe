@@ -26,15 +26,20 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   }
 
   const { results } = await db.prepare(
-    `SELECT * FROM orders WHERE status IN (?, 'preparing')${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
+    `SELECT * FROM orders WHERE status IN (?, 'confirmed', 'preparing')${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
   ).bind(status).all<OrderRecord>();
 
   const kdsOrders: KdsOrder[] = [];
   for (const order of results || []) {
     let items: OrderItem[] = [];
-    try {
-      items = JSON.parse(order.items);
-    } catch { /* keep empty */ }
+    if (Array.isArray(order.items)) {
+      items = order.items;
+    } else {
+      try {
+        const parsed = JSON.parse(order.items);
+        if (Array.isArray(parsed)) items = parsed;
+      } catch { /* keep empty */ }
+    }
 
     if (stationId && categoryIndex) {
       items = items.filter(item => {
@@ -148,7 +153,8 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
-  app.get('/kds', requireAuth(['owner', 'manager', 'staff']), handleGetKdsOrders);
-  app.patch('/:id/status', requireAuth(['owner', 'manager', 'staff']), audit('order_status_change'), handleUpdateOrderStatus);
-  app.patch('/:id/mark-cod-paid', requireAuth(['owner']), audit('order_cod_paid'), handleMarkCodPaid);
+  const kdsRoles = ['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef'];
+  app.get('/kds', requireAuth(kdsRoles), handleGetKdsOrders);
+  app.patch('/:id/status', requireAuth(kdsRoles), audit('order_status_change'), handleUpdateOrderStatus);
+  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 }

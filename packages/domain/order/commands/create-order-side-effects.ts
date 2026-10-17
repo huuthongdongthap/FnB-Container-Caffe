@@ -111,7 +111,9 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
 
   if (env.AUTH_KV) {
     const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    await kv.put('latest_order_ts', new Date().toISOString());
+    const nowIso = new Date().toISOString();
+    await kv.put('latest_order_ts', nowIso);
+    await kv.put('orders:latest_updated_at', nowIso).catch(() => {});
   }
 
   if (validatedMethod === 'cod') {
