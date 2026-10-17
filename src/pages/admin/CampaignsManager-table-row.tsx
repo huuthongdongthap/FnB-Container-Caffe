@@ -96,9 +96,9 @@ export function CampaignTableRow({
           <span
             className={
               stats && stats.success_rate >= 80
-                ? 'text-green-600'
+                ? 'text-green-400'
                 : stats && stats.success_rate >= 50
-                  ? 'text-yellow-600'
+                  ? 'text-yellow-400'
                   : ''
             }
           >

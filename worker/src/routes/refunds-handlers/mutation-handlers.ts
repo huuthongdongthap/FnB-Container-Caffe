@@ -14,7 +14,7 @@ import {
 
 export function registerRefundMutationHandlers(router: Hono<{ Bindings: Env }>): void {
   // POST /api/payments/refund
-  router.post('/refund', requireAuth(['owner', 'manager', 'staff']), audit('refund_create'), async (c) => {
+  router.post('/refund', requireAuth(['owner', 'manager', 'staff', 'admin']), audit('refund_create'), async (c) => {
     const db = c.env.AURA_DB;
     const mc = createMetricsCollector(db);
 
@@ -54,7 +54,7 @@ export function registerRefundMutationHandlers(router: Hono<{ Bindings: Env }>):
       }
 
       // ── Payment must be confirmed as paid ──
-      if (payment.status !== 'paid') {
+      if (payment.status !== 'paid' && payment.status !== 'completed') {
         try {
           c.executionCtx?.waitUntil(mc.recordMetric('refund_failed', 1, { reason: 'not_paid' }));
         } catch { /* executionCtx unavailable */ }

@@ -18,8 +18,9 @@ export async function checkOverdueOrders(env: Record<string, unknown>): Promise<
     const { results: overdue } = await db.prepare(`
       SELECT id, customer_name, status, created_at
       FROM orders
-      WHERE status IN ('Bep tiep nhan', 'Dang pha che')
+      WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
         AND created_at < ?
+        AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
     `).bind(cutoff).all<Record<string, unknown>>();
 
     if (!overdue.length) {

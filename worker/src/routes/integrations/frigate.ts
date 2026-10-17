@@ -23,7 +23,7 @@ const log = createLogger({ route: 'frigate-gateway' });
 export function createFrigateRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  const allow = requireAuth(['owner', 'manager', 'staff']);
+  const allow = requireAuth(['owner', 'admin', 'manager', 'staff']);
 
   // POST /api/integrations/frigate/events/sync
   app.post('/events/sync', allow, async(c) => {

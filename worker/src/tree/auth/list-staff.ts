@@ -87,6 +87,40 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
       } catch {
         // D1 fallback optional when mock DB does not define users table
       }
+
+      try {
+        const { results: staffRows } = await dbx.prepare(
+          "SELECT id, email, name, phone, role, is_active, created_at FROM staff_users"
+        ).all<Record<string, unknown>>();
+        const seenIds = new Set(users.map((u) => String(u.id)));
+        const seenEmails = new Set(users.map((u) => String(u.email || '').toLowerCase()).filter(Boolean));
+        for (const row of staffRows || []) {
+          const rowId = String(row.id || '');
+          const rowEmail = String(row.email || '').toLowerCase();
+          if ((rowId && seenIds.has(rowId)) || (rowEmail && seenEmails.has(rowEmail))) {
+            continue;
+          }
+          seenIds.add(rowId);
+          if (rowEmail) seenEmails.add(rowEmail);
+          const isActive = row.is_active !== undefined ? Boolean(row.is_active) : true;
+          const createdAt = String(row.created_at || '');
+          users.push({
+            id: rowId,
+            email: String(row.email || ''),
+            name: String(row.name || ''),
+            phone: String(row.phone || ''),
+            role: String(row.role || 'staff'),
+            position: String(row.role || 'staff'),
+            active: isActive,
+            isActive,
+            created_at: createdAt || null,
+            startedAt: createdAt,
+            last_login: null
+          });
+        }
+      } catch {
+        // staff_users table optional
+      }
     }
 
     users.sort((a, b) => {
@@ -104,7 +138,7 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
       role: String(u.position || u.role || 'staff'),
       phone: String(u.phone || ''),
       email: String(u.email || ''),
-      isActive: Boolean(u.active),
+      isActive: Boolean(u.active ?? u.isActive),
       startedAt: String(u.startedAt || u.created_at || '')
     }));
 

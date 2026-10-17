@@ -14,10 +14,10 @@ import { useReservations } from '@/hooks/use-reservations';
 export type { Zone } from './reservation-new-constants';
 export { GUEST_OPTIONS, TIMES, WEEK_DAYS, ZONES } from './reservation-new-constants';
 
-/** Parse "2 khách" → 2 */
+/** Parse "2 khách" → 2, "Nhóm 10+" → 10 */
 function parseGuestCount(label: string): number {
-  const n = parseInt(label, 10);
-  return Number.isFinite(n) ? n : 2;
+  const n = parseInt(label.replace(/\D/g, ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : 2;
 }
 
 /** Parse "DD/MM" + current year → ISO date "YYYY-MM-DD" */
@@ -50,7 +50,7 @@ export default function ReservationNew() {
   const currentZoneObj = ZONES.find((z) => z.id === selectedZone) ?? ZONES[0]!;
 
   // Real API hook — fetches available tables for selected date/time
-  const { tables, createReservation, isCreating, createError } = useReservations(
+  const { tables, createReservation, createReservationAsync, isCreating, createError } = useReservations(
     parseDateToISO(selectedDate),
     selectedTime,
   );
@@ -75,18 +75,32 @@ export default function ReservationNew() {
     ) ?? tables.find((t) => t.available) ?? null;
 
     if (matchedTable) {
-      // Call real API
-      createReservation({
+      const reservationPayload = {
         table_id: matchedTable.id,
         customer_name: fullName,
         customer_phone: phone,
         guest_count: parseGuestCount(selectedParty),
         date: parseDateToISO(selectedDate),
         time: selectedTime,
-      });
-      setBookingCode(matchedTable.table_number
-        ? `AURA-${String(matchedTable.table_number).padStart(4, '0')}`
-        : `AURA-${matchedTable.id.slice(-4).toUpperCase()}`);
+        notes: note.trim() || undefined,
+      };
+      try {
+        if (createReservationAsync) {
+          const result = await createReservationAsync(reservationPayload);
+          const resolvedNumber = result?.data?.table_number ?? matchedTable.table_number;
+          setBookingCode(resolvedNumber
+            ? `AURA-${String(resolvedNumber).padStart(4, '0')}`
+            : `AURA-${(result?.data?.id || matchedTable.id).slice(-4).toUpperCase()}`);
+        } else {
+          createReservation(reservationPayload);
+          setBookingCode(matchedTable.table_number
+            ? `AURA-${String(matchedTable.table_number).padStart(4, '0')}`
+            : `AURA-${matchedTable.id.slice(-4).toUpperCase()}`);
+        }
+      } catch {
+        setApiOffline(true);
+        setBookingCode(`DEMO-${Math.floor(1000 + Math.random() * 9000)}`);
+      }
     } else {
       // Graceful fallback: offline / no availability — generate demo booking code
       setApiOffline(true);

@@ -34,20 +34,20 @@ export default function SubscriptionSummaryCard({ subscription, isLoading }: Pro
               </span>
               <StatusBadge status={subscription.status} />
             </div>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted">
               <span>{formatVND(subscription.amount_vnd)}/tháng</span>
               {subscription.zone && <span className="ml-3">· Zone: {subscription.zone}</span>}
               {subscription.container_number && <span className="ml-3">· #{subscription.container_number}</span>}
             </div>
             {subscription.current_period_end && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted">
                 Gia hạn tiếp theo: {new Date(subscription.current_period_end).toLocaleDateString('vi-VN')}
               </div>
             )}
           </div>
         ) : (
-          <div className="mt-4 text-sm text-gray-600">
-            Chưa có subscription. <Link to="/subscriptions" className="text-blue-600 underline">Xem gói</Link>
+          <div className="mt-4 text-sm text-muted">
+            Chưa có subscription. <Link to="/subscriptions" className="text-sky-400 underline">Xem gói</Link>
           </div>
         )}
       </CardBody>

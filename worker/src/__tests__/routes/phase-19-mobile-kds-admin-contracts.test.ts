@@ -50,10 +50,12 @@ function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = 
         },
         run: async () => {
           if (sql.includes('UPDATE cafe_tables SET status = ?')) {
-            const [status, updated_at, id] = stmt._binds;
+            const status = stmt._binds[0];
+            const id = stmt._binds[stmt._binds.length - 1];
+            const updated_at = stmt._binds.length > 2 ? stmt._binds[1] : undefined;
             const current = cafeTables.get(String(id));
             if (current) {
-              cafeTables.set(String(id), { ...current, status, updated_at });
+              cafeTables.set(String(id), { ...current, status, ...(updated_at !== undefined ? { updated_at } : {}) });
             }
           }
           if (sql.includes('INSERT INTO orders')) {

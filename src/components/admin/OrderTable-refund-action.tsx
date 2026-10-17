@@ -34,8 +34,8 @@ export function RefundAction({ order, userRole, onRefund, t }: RefundActionProps
       className={cn(
         'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
         isAlreadyRefunded
-          ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
-          : 'bg-amber-50 text-amber-600 hover:bg-amber-100',
+          ? 'bg-surface/60 text-muted cursor-not-allowed'
+          : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25',
       )}
       title={isAlreadyRefunded ? t('adminOrders.refundAlready') : t('adminOrders.refundBtn')}
     >

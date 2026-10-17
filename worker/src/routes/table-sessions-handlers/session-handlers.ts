@@ -90,8 +90,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // Mark the table occupied.
     await db.prepare(
-      'UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?'
-    ).bind('Occupied', now, tableId).run();
+      'UPDATE cafe_tables SET status = ? WHERE id = ?'
+    ).bind('Occupied', tableId).run();
 
     const session = await db.prepare(
       'SELECT * FROM table_sessions WHERE id = ?'
@@ -136,8 +136,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     // Free the table when the session ends.
     if (nextStatus === 'closed' || nextStatus === 'no_show') {
       await db.prepare(
-        'UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?'
-      ).bind('Available', now, session.table_id).run();
+        'UPDATE cafe_tables SET status = ? WHERE id = ?'
+      ).bind('Available', session.table_id).run();
     }
 
     const updated = await db.prepare(

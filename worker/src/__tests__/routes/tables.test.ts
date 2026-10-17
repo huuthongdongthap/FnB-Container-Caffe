@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '@aura/domain-table';
+import { adminQRRouter } from '../../routes/admin-qr';
 import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../../tree/qr/signer';
 import { createMockEnv, createMockContext, mockRequestWithRole } from '../test-utils';
 
@@ -227,5 +228,33 @@ describe('QR image endpoint — GET /:slug on qrRouter', () => {
     const ts = Math.floor(Date.now() / 1000);
     const res = await execQR(`/nonexistent?ts=${ts}&sig=${await signedSig('nonexistent')}`, buildQRDb(false), { QR_SIGNING_SECRET: VALID_SECRET });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('adminQRRouter — GET /:slug/download and RBAC', () => {
+  it('returns 404 when slug does not exist in table_qr_codes for admin role', async() => {
+    const db = buildDb([], [], { row: null }, null);
+    const env = { ...createMockEnv(), AURA_DB: db, QR_SIGNING_SECRET: VALID_SECRET };
+    const ctx = createMockContext();
+    const req = await mockRequestWithRole('GET', '/unknown-slug/download', 'admin');
+    const res = await adminQRRouter.fetch(req, env as any, ctx as any);
+    expect(res.status).toBe(404);
+    const body = await res.json() as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Not found');
+  });
+
+  it('allows waiter and admin roles on PATCH /:id/occupy and /:id/release', async() => {
+    const db = buildDb(SAMPLE_TABLES, [], null, { row: SAMPLE_TABLES[0] });
+    const env = { ...createMockEnv(), AURA_DB: db };
+    const ctx = createMockContext();
+    const waiterReq = await mockRequestWithRole('PATCH', '/1/occupy', 'waiter');
+    const waiterRes = await tablesRouter.fetch(waiterReq, env as any, ctx as any);
+    expect(waiterRes.status).toBe(200);
+
+    const dbOccupied = buildDb(SAMPLE_TABLES, [], null, { row: SAMPLE_TABLES[1] });
+    const adminReq = await mockRequestWithRole('PATCH', '/2/release', 'admin');
+    const adminRes = await tablesRouter.fetch(adminReq, { ...env, AURA_DB: dbOccupied } as any, ctx as any);
+    expect(adminRes.status).toBe(200);
   });
 });

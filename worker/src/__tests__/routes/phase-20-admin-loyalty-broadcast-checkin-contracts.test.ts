@@ -117,6 +117,9 @@ describe('Phase 20: Admin Loyalty, Broadcast, Checkin & Subscriptions Contracts'
       expect(json.data[0].tier).toBe('gold');
       expect(json.data[0].total_spent).toBe(8500000);
       expect(json.data[0].visit_count).toBe(14);
+      const topCustomerSql = db.prepare.mock.calls.map((c: any[]) => String(c[0])).find((s: string) => s.includes('cashback_wallets cw ON cw.customer_id = c.id'));
+      expect(topCustomerSql).toContain('o.customer_id = c.id');
+      expect(topCustomerSql).toContain("o.status != 'cancelled'");
     });
 
     it('GET /export produces CSV with cashback_wallets balance and date_of_birth', async () => {

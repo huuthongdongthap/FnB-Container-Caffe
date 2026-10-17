@@ -83,7 +83,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.rewards.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager') {
+    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     const body = c.req.valid('json');
@@ -139,7 +139,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.rewards.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager') {
+    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     const { id } = c.req.valid('param');

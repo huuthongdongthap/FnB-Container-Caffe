@@ -40,7 +40,7 @@ export default function MetricsDashboardPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-6">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm mb-6">
             {error}
             <button
               onClick={fetchMetrics}

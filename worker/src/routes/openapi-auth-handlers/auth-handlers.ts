@@ -283,4 +283,46 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       },
     });
   });
+
+  // POST /api/auth/forgot-password - Request password reset with client-IP rate limiting
+  app.post('/api/auth/forgot-password', async (c: any) => {
+    const db = c.env.AURA_DB;
+    const data = (await c.req.json().catch(() => ({}))) as { email?: string };
+    const clientIp =
+      c.req.header('CF-Connecting-IP') ||
+      c.req.header('X-Forwarded-For') ||
+      data.email ||
+      'ip';
+
+    if (c.env?.AUTH_KV) {
+      const rlKey = `rate:forgot-password:${clientIp}`;
+      const count = Number((await c.env.AUTH_KV.get(rlKey)) || 0);
+      if (count >= 5) {
+        return c.json({ success: false, error: 'Too many password reset requests' }, 429);
+      }
+      await c.env.AUTH_KV.put(rlKey, String(count + 1), { expirationTtl: 300 });
+    }
+
+    if (!data.email) {
+      return c.json({ success: false, error: 'Email is required' }, 400);
+    }
+
+    const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(data.email).first();
+    if (!user) {
+      return c.json({ success: true, data: { success: true } });
+    }
+
+    const randomBuf = new Uint32Array(1);
+    crypto.getRandomValues(randomBuf);
+    const code = (100000 + (randomBuf[0] % 900000)).toString();
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    await db.prepare(
+      `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(crypto.randomUUID(), data.email, code, 'password_reset', expiresAt, 0, now).run();
+
+    return c.json({ success: true, data: { success: true } });
+  });
 }

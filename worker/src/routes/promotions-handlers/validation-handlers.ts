@@ -15,7 +15,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const data = parsed.data;
 
     const promo = await db.prepare(
-      'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
+      'SELECT * FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
     ).bind(data.code.trim().toUpperCase()).first<PromotionCode>();
 
     if (!promo) {
@@ -71,7 +71,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const data = parsed.data;
 
     const promo = await db.prepare(
-      'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
+      'SELECT * FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
     ).bind(data.code.trim().toUpperCase()).first<PromotionCode>();
 
     if (!promo) {
@@ -82,10 +82,10 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       return c.json({ success: false, error: 'Usage limit reached' }, 400);
     }
 
-    const discountAmount = Math.min(
-      Math.round(data.order_total * promo.percent / 100),
-      promo.max_discount
-    );
+    const rawDiscount = Math.round(data.order_total * promo.percent / 100);
+    const discountAmount = promo.max_discount > 0
+      ? Math.min(rawDiscount, promo.max_discount)
+      : rawDiscount;
 
     // Increment usage
     await db.prepare(

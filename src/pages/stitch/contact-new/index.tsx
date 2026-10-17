@@ -2,16 +2,30 @@ import { useState } from 'react';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { useContactStore } from '@/hooks/stores/use-contact-store';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
 
 export default function ContactNew() {
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({ name: '', contact: '', message: '' });
+  const { submitContact, loading, error, reset } = useContactStore();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formData.name || !formData.contact) return;
     setSubmitted(true);
+    try {
+      await submitContact(
+        formData.name.trim(),
+        formData.contact.trim(),
+        formData.message.trim(),
+      );
+      if (useContactStore.getState().error) {
+        setSubmitted(false);
+      }
+    } catch {
+      setSubmitted(false);
+    }
   };
 
   return (
@@ -130,7 +144,7 @@ export default function ContactNew() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => { setSubmitted(false); setFormData({ name: '', contact: '', message: '' }); }}
+                    onClick={() => { reset(); setSubmitted(false); setFormData({ name: '', contact: '', message: '' }); }}
                     className="mt-4 px-6 py-2 rounded-full border border-[var(--aura-chrome-mid)] text-xs uppercase tracking-wider"
                   >
                     Gửi tin nhắn khác
@@ -183,9 +197,16 @@ export default function ContactNew() {
                     />
                   </div>
 
+                  {error && (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300">
+                      {error}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] py-3.5 px-6 rounded-xl font-body text-xs font-bold uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 group cursor-pointer shadow-lg active:scale-[0.99]"
+                    disabled={loading}
+                    className="w-full bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] py-3.5 px-6 rounded-xl font-body text-xs font-bold uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 group cursor-pointer shadow-lg active:scale-[0.99] disabled:opacity-60"
                   >
                     <span>Gửi Tin Nhắn</span>
                     <Send className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

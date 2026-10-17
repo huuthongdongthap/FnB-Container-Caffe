@@ -7,6 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -44,6 +45,7 @@ function getInitialsAvatar(name: string): string {
 /* ─── Main Page Component ──────────────────────────────────────────── */
 
 export function ReferralPage() {
+  const navigate = useNavigate();
   const store = useReferralStore();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = !!user;
@@ -96,7 +98,11 @@ export function ReferralPage() {
       amount: r.cashbackAwarded,
     }));
 
-  const rewardAmount = store.referralCount > 0 ? 15.0 : 0;
+  const rewardAmount = store.cashbackEarned > 0
+    ? store.cashbackEarned
+    : store.referralCount > 0
+      ? 15.0
+      : 0;
 
   const data: ReferralPageData | undefined = store.referralCode
     ? {
@@ -142,7 +148,7 @@ export function ReferralPage() {
         errorMessage={errorMessage}
         onCopyCode={handleCopyCode}
         onViewProfile={() => {
-          /* Placeholder: profile view pending implementation */
+          navigate('/account');
         }}
       />
     </>

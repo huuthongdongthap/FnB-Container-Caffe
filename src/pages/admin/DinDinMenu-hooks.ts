@@ -21,11 +21,20 @@ export function useDinDinMenu() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<DinDinConfig>('/api/admin/dindin/config');
-      if (!data || typeof data !== 'object' || !Array.isArray(data.sections)) {
+      const raw = await apiFetch<DinDinConfig & { data?: { menu?: DinDinConfig; sections?: DinDinConfig['sections'] }; menu?: DinDinConfig }>('/api/admin/dindin/config');
+      const resolved = raw?.sections
+        ? raw
+        : raw?.data?.menu?.sections
+          ? raw.data.menu
+          : raw?.data?.sections
+            ? { sections: raw.data.sections }
+            : raw?.menu?.sections
+              ? raw.menu
+              : null;
+      if (!resolved || !Array.isArray(resolved.sections)) {
         throw new Error(t('dindin.errors.D07', { defaultValue: 'Cấu hình menu bị lỗi định dạng (D07)' }));
       }
-      setConfig(data);
+      setConfig(resolved);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi tải menu');
     } finally {
@@ -55,17 +64,25 @@ export function useDinDinMenu() {
 
   const saveItem = (sectionIdx: number) => {
     if (sectionIdx < 0 || sectionIdx >= config.sections.length) return;
-    if (editingItem === null || editingItem === undefined) return;
     const target = config.sections[sectionIdx];
-    if (!target || editingItem < 0 || editingItem >= target.items.length) return;
-    const updated: DinDinConfig = {
-      sections: config.sections.map((s, i) =>
-        i === sectionIdx ? { ...s, items: [...s.items] } : s
-      ),
+    if (!target) return;
+    const itemWithId: DinDinItem & { id: string } = {
+      ...newItem,
+      id: newItem.id?.trim() ? newItem.id.trim() : `item_${Date.now()}`,
     };
-    const sec = updated.sections[sectionIdx];
-    if (!sec) return;
-    (sec.items as DinDinItem[])[editingItem] = newItem;
+    const updated: DinDinConfig = {
+      sections: config.sections.map((s, i) => {
+        if (i !== sectionIdx) return s;
+        if (editingItem === null || editingItem === undefined) {
+          return { ...s, items: [...s.items, itemWithId] };
+        }
+        if (editingItem < 0 || editingItem >= s.items.length) return s;
+        return {
+          ...s,
+          items: s.items.map((it, idx) => (idx === editingItem ? itemWithId : it)),
+        };
+      }),
+    };
     setConfig(updated);
     setEditingSection(null);
     setEditingItem(null);

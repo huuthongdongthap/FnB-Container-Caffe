@@ -148,7 +148,7 @@ export function StaffNotificationSettings() {
       </CardHeader>
       <CardBody className="space-y-4">
         {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
             <AlertCircle size={16} aria-hidden="true" />
             {error}
           </div>

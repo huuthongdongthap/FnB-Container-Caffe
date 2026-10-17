@@ -18,7 +18,7 @@ const VendorSyncSchema = z.object({
 });
 
 
-const allow = requireAuth(['owner', 'manager', 'staff']);
+const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/vendors — list vendors

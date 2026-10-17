@@ -53,7 +53,7 @@ const DispatchPresenceSchema = z.object({
 });
 
 export function createHARouter() {
-  const auth = requireAuth(['owner', 'staff']);
+  const auth = requireAuth(['owner', 'admin', 'manager', 'staff']);
   const app = new Hono<{ Bindings: Env }>();
 
   // ── Devices ──

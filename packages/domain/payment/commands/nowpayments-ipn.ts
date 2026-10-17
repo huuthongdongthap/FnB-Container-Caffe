@@ -20,6 +20,20 @@ async function computeHMAC(body: string, secret: string): Promise<string> {
     .join('');
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
 export async function nowPaymentsIPN(request: Request, env: Record<string, unknown>) {
   try {
     const secret = env.NOWPAYMENTS_IPN_SECRET as string | undefined;
@@ -30,7 +44,12 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
     log.debug('IPN payload received', { paymentId: body.payment_id, status: body.payment_status });
 
     // Signature verification
+    const isProd = env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
     if (!secret) {
+      if (isProd) {
+        log.error('NOWPAYMENTS_IPN_SECRET not configured in production — rejecting IPN');
+        return new Response('Server configuration error', { status: 500 });
+      }
       log.warn('NOWPAYMENTS_IPN_SECRET not configured — accepting without verification (dev mode)');
     } else {
       const signature = request.headers.get('x-nowpayments-signature');
@@ -39,7 +58,7 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
         return new Response('Missing signature', { status: 401 });
       }
       const expected = await computeHMAC(bodyText, secret);
-      if (expected !== signature) {
+      if (!constantTimeEqual(expected, signature)) {
         log.warn('IPN signature verification failed');
         return new Response('Invalid signature', { status: 401 });
       }

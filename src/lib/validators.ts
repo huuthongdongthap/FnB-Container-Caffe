@@ -58,6 +58,7 @@ export const orderApiPayloadSchema = z.object({
   notes: z.string().max(500).optional(),
   delivery_time: z.enum(['now', 'scheduled']).optional(),
   shipping_fee: z.number().min(0).optional().default(0),
+  service_fee: z.number().min(0).optional(),
   discount: z.number().min(0).optional().default(0),
   tip: z.number().min(0).optional().default(0),
   table_id: z.string().optional(),

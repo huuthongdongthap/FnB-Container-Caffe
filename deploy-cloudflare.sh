@@ -154,8 +154,9 @@ if [[ "$WORKER_ONLY" == "false" ]]; then
   echo "[1/3] Building frontend with Vite..."
   npx vite build --mode production 2>&1 | tail -5
 
-  echo "Copying static assets and demos to dist..."
-  cp -r assets dist/ 2>/dev/null || echo "No assets to copy"
+  echo "Copying static SEO and signage assets to dist..."
+  cp robots.txt sitemap.xml dist/ 2>/dev/null || true
+  mkdir -p dist/signage && cp -r signage-widgets/*.html dist/signage/ 2>/dev/null || true
 
   # ── Cache-busting: generate version.json that Cloudflare sees as a new file ──
   GIT_COMMIT_SHA_FULL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")

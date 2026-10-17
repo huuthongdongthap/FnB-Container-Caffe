@@ -72,9 +72,12 @@ function useReorder() {
 
     clearCart();
     for (const item of items) {
+      const rawItem = item as unknown as Record<string, unknown>;
+      const resolvedProductId = String(rawItem.product_id ?? rawItem.productId ?? rawItem.id ?? '').trim();
       for (let i = 0; i < item.quantity; i++) {
         addItem({
-          id: crypto.randomUUID(),
+          id: resolvedProductId || crypto.randomUUID(),
+          ...(resolvedProductId ? { productId: resolvedProductId } : {}),
           name: item.name || 'Item',
           price: item.unitPriceCents >= 1000 ? item.unitPriceCents : item.unitPriceCents / 100,
         });

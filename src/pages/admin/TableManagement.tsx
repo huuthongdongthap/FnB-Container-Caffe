@@ -40,11 +40,16 @@ export default function TableManagementPage() {
 
 	const loadActiveOrders = useCallback(async () => {
 		try {
-			const res = await apiFetch<{ success: boolean; data: OrderRow[] }>('/api/orders?limit=20');
-			const rows = res?.success ? res.data : [];
+			const res = await apiFetch<{ success: boolean; data: unknown }>('/api/orders?limit=20');
+			const raw = res?.success ? (res.data as unknown) : [];
+			const rows = Array.isArray(raw)
+				? (raw as Array<{ table_id?: string; status: string }>)
+				: Array.isArray((raw as { orders?: unknown[] })?.orders)
+					? (raw as { orders: Array<{ table_id?: string; status: string }> }).orders
+					: [];
 			const counts: Record<string, number> = {};
 			for (const o of rows) {
-				if (ACTIVE_ORDER_STATUSES.has(o.status)) {
+				if (o.table_id && ACTIVE_ORDER_STATUSES.has(o.status)) {
 					counts[o.table_id] = (counts[o.table_id] || 0) + 1;
 				}
 			}

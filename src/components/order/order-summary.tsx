@@ -42,7 +42,7 @@ export function OrderSummary({
         </div>
       )}
       {qualifiesForFreeDelivery && subtotal > 0 && (
-        <div className="rounded-lg bg-green-50 p-3 text-center text-sm font-medium text-green-700">
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-center text-sm font-medium text-emerald-300">
           <PartyPopper size={14} className="inline" /> {t('order.freeDeliveryQualified')}
         </div>
       )}

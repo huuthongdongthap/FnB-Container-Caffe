@@ -12,7 +12,6 @@ Disallow: /portal/
 Disallow: /dashboard/
 Disallow: /kds/
 Disallow: /kitchen-display/
-Disallow: /track-order/
 Disallow: /success/
 Disallow: /failure/
 Disallow: /receipt-template.html
@@ -30,9 +29,10 @@ Allow: /about-us.html
 Allow: /contact.html
 Allow: /loyalty.html
 Allow: /table-reservation.html
+Allow: /track-order
 
 # Sitemap
-Sitemap: https://auraspace.vn/sitemap.xml
+Sitemap: https://auraspace.cafe/sitemap.xml
 
 # Crawl-delay for polite crawling
 Crawl-delay: 1

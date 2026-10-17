@@ -12,7 +12,7 @@ import type { ShiftRecord } from '../model/shift-types';
 export const shiftsRouter = new Hono<{ Bindings: Env }>();
 
 // POST /api/shifts/clock-in
-shiftsRouter.post('/clock-in', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+shiftsRouter.post('/clock-in', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef']), async (c) => {
   try {
     const db = c.env.AURA_DB;
     const body = await c.req.json() as Record<string, unknown>;
@@ -46,7 +46,7 @@ shiftsRouter.post('/clock-in', requireAuth(['owner', 'manager', 'staff']), async
 });
 
 // POST /api/shifts/clock-out
-shiftsRouter.post('/clock-out', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+shiftsRouter.post('/clock-out', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef']), async (c) => {
   try {
     const db = c.env.AURA_DB;
     const body = await c.req.json() as Record<string, unknown>;
@@ -88,7 +88,7 @@ shiftsRouter.post('/clock-out', requireAuth(['owner', 'manager', 'staff']), asyn
 });
 
 // GET /api/shifts/today — today's shifts
-shiftsRouter.get('/today', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+shiftsRouter.get('/today', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef']), async (c) => {
   try {
     const db = c.env.AURA_DB;
     const today = new Date().toISOString().slice(0, 10);
@@ -104,7 +104,7 @@ shiftsRouter.get('/today', requireAuth(['owner', 'manager', 'staff']), async (c)
 });
 
 // GET /api/shifts — list shifts
-shiftsRouter.get('/', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+shiftsRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef']), async (c) => {
   try {
     const db = c.env.AURA_DB;
     const dateFrom = c.req.query('from');

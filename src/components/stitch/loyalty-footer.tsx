@@ -18,10 +18,10 @@ export function LoyaltyFooter() {
         className="flex flex-wrap justify-center gap-[24px] text-[12px] leading-none uppercase tracking-widest font-semibold"
         style={{ color: 'var(--aura-chrome-bright)', fontFamily: "var(--aura-font-body)" }}
       >
-        <Link to="/privacy" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">
+        <Link to="/about" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">
           {t('loyalty.footerPrivacy', 'Privacy Policy')}
         </Link>
-        <Link to="/terms" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">
+        <Link to="/about" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">
           {t('loyalty.footerTerms', 'Terms of Service')}
         </Link>
         <Link to="/loyalty" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">

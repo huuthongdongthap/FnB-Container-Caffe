@@ -9,6 +9,7 @@ const log = createLogger({ route: 'kds-mobile' });
 // Allowed roles per action
 const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
 const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
+const VALID_STATUSES: string[] = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled'];
 
 function parseKdsItems(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
@@ -40,7 +41,7 @@ export async function getKdsMobile(
                 COALESCE(t.table_number, t.id) as table_name
          FROM orders o
          LEFT JOIN cafe_tables t ON t.id = o.table_id
-         WHERE o.status IN ('pending','confirmed','preparing')
+         WHERE o.status IN ('pending','confirmed','preparing','ready')
          ORDER BY o.created_at ASC`
       )
       .all();
@@ -82,8 +83,8 @@ export async function updateKdsStatus(
     }
 
     const body = await context.req.json<{ status: string }>();
-    if (!body?.status) {
-      return errorResponse('Thiếu status', 400);
+    if (!body?.status || !VALID_STATUSES.includes(body.status)) {
+      return errorResponse('Trạng thái không hợp lệ', 400);
     }
 
     let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
@@ -94,11 +95,15 @@ export async function updateKdsStatus(
       // Context without Cloudflare executionCtx (e.g. test harness)
     }
 
+    const effectiveRole = body.status === 'served' && ['kitchen', 'barista', 'chef'].includes(role)
+      ? 'staff'
+      : role;
+
     const result = await executeKdsStatusTransition(
       context.env.AURA_DB,
       orderId,
       body.status,
-      role,
+      effectiveRole,
       {
         kv: context.env.AUTH_KV,
         waitUntil: waitUntilFn,

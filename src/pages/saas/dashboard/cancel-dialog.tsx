@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 
 interface Props {
   subscriptionId: string;
@@ -21,7 +22,7 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
       const res = await fetch(`${API_BASE}/api/subscriptions/${subscriptionId}/cancel`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ reason: reason || 'Customer requested cancellation' }),
       });
       if (!res.ok) {
@@ -41,15 +42,15 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
       <button type="button" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>{trigger}</button>
       <Modal open={open} onClose={() => setOpen(false)} title="Hủy subscription">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted">
             Bạn có chắc muốn hủy subscription? Bạn sẽ mất quyền truy cập vào hết ngày hiện tại.
           </p>
           <label className="block text-sm">
-            <span className="text-gray-600">Lý do (tùy chọn)</span>
+            <span className="text-muted">Lý do (tùy chọn)</span>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-surface text-foreground p-2"
               rows={2}
             />
           </label>
@@ -60,7 +61,7 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
             </Button>
           </div>
           {cancel.isError && (
-            <p className="text-sm text-red-600">{(cancel.error as Error).message}</p>
+            <p className="text-sm text-red-400">{(cancel.error as Error).message}</p>
           )}
         </div>
       </Modal>

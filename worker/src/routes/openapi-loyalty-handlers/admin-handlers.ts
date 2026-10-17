@@ -12,7 +12,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     // Verify admin role
-    if (user.role !== 'owner' && user.role !== 'manager') {
+    if (user.role !== 'owner' && user.role !== 'manager' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
 
@@ -72,7 +72,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
 
     // Verify admin role
-    if (user.role !== 'owner' && user.role !== 'manager') {
+    if (user.role !== 'owner' && user.role !== 'manager' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
 
@@ -125,7 +125,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
 
     // Verify admin role
-    if (user.role !== 'owner' && user.role !== 'manager') {
+    if (user.role !== 'owner' && user.role !== 'manager' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
 

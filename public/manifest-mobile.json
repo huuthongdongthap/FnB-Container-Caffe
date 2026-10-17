@@ -5,8 +5,8 @@
   "start_url": "/mobile",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FFFFFF",
-  "theme_color": "#F97316",
+  "background_color": "#0E1322",
+  "theme_color": "#FFB95A",
   "icons": [
     {
       "src": "/icons/icon-192.png",

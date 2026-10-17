@@ -23,8 +23,9 @@ export interface CustomerProfile {
 export type OrderSummary = CustomerOrder;
 
 interface OrdersListResponse {
-  success: boolean;
-  data: { orders: CustomerOrder[]; meta: { page: number; limit: number; total: number; totalPages: number } };
+  success?: boolean;
+  orders?: CustomerOrder[];
+  data?: { orders?: CustomerOrder[]; meta?: { page: number; limit: number; total: number; totalPages: number } };
   error?: string;
   message?: string;
 }
@@ -62,8 +63,16 @@ export function useAccount() {
     setOrdersError(null);
     try {
       const ordersData = await apiFetch<OrdersListResponse>('/api/orders?limit=50&sort=created_at&order=desc');
-      if (ordersData.success) setOrders(ordersData.data?.orders || []);
-      else setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
+      const resolvedOrders = Array.isArray(ordersData.data?.orders)
+        ? ordersData.data.orders
+        : Array.isArray(ordersData.orders)
+          ? ordersData.orders
+          : null;
+      if (ordersData.success || resolvedOrders !== null) {
+        setOrders(resolvedOrders ?? []);
+      } else {
+        setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
+      }
     } catch {
       setOrdersError('Lỗi kết nối mạng');
     } finally {

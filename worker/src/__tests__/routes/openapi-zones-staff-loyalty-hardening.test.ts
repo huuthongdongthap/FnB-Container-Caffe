@@ -11,6 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { app } from '../../index';
+import { openApiOrdersRouter } from '../../routes/openapi-orders-handlers/routes';
 import { generateJWT, verifyPassword } from '../../lib/jwt';
 import { createMockEnv, createMockDB } from '../test-utils';
 
@@ -133,6 +134,7 @@ function makeHardeningTestEnv() {
     executedSqls,
     auditInserts,
     createdUsers,
+    store,
   };
 }
 
@@ -309,5 +311,114 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
       env
     );
     expect(createRewardRes.status).toBe(403);
+  });
+
+  it('authorizes admin role across OpenAPI loyalty admin summary, staff, table-zones, and cron routers', async () => {
+    const { env } = makeHardeningTestEnv();
+    const adminToken = await generateJWT({ sub: 'admin-1', role: 'admin', name: 'Admin' }, TEST_SECRET);
+
+    const summaryRes = await app.fetch(
+      new Request('https://test.aura/api/loyalty/admin/summary', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env
+    );
+    expect(summaryRes.status).toBe(200);
+
+    const zonesRes = await app.fetch(
+      new Request('https://test.aura/api/table-zones', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env
+    );
+    expect(zonesRes.status).toBe(200);
+
+    const staffRes = await app.fetch(
+      new Request('https://test.aura/api/staff', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env
+    );
+    expect(staffRes.status).toBe(200);
+
+    const cronRes = await app.fetch(
+      new Request('https://test.aura/api/cron/summary', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env
+    );
+    expect(cronRes.status).toBe(200);
+  });
+
+  it('publishes order_event, latest_order_ts, and orders:latest_updated_at to AUTH_KV on OpenAPI order creation', async () => {
+    const { env, store } = makeHardeningTestEnv();
+    const origPrepare = env.AURA_DB.prepare;
+    env.AURA_DB.prepare = ((sql: string) => {
+      const stmt = origPrepare(sql);
+      const origAll = stmt.all;
+      const origFirst = stmt.first;
+      stmt.all = async () => {
+        if (sql.includes('FROM menu_items')) {
+          return {
+            results: [
+              { id: OWNER_ID, name: 'Cà Phê Sữa Đá', price: 35000, available: 1 },
+            ],
+            success: true,
+          };
+        }
+        return origAll();
+      };
+      stmt.first = async () => {
+        if (sql.includes('FROM products') || sql.includes('FROM menu_items')) {
+          return {
+            id: OWNER_ID,
+            name: 'Cà Phê Sữa Đá',
+            price: 35000,
+            is_available: 1,
+            available: 1,
+            category_id: 'cat_coffee',
+          };
+        }
+        if (sql.includes('FROM orders')) {
+          return {
+            id: OWNER_ID,
+            order_number: 'ORD-20261017-ABC',
+            location_id: OWNER_ID,
+            items: JSON.stringify([{ menuItemId: OWNER_ID, name: 'Cà Phê Sữa Đá', quantity: 1, unitPriceCents: 35000, subtotalCents: 35000 }]),
+            subtotal: 35000,
+            discount_amount: 0,
+            tax_amount: 0,
+            total_amount: 35000,
+            status: 'pending',
+            payment_status: 'unpaid',
+            source: 'pos',
+            channel: 'dine_in',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return origFirst();
+      };
+      return stmt;
+    }) as any;
+
+    const createRes = await openApiOrdersRouter.fetch(
+      new Request('https://test.aura/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locationId: OWNER_ID,
+          items: [{ menuItemId: OWNER_ID, quantity: 1 }],
+          source: 'pos',
+          channel: 'dine_in',
+        }),
+      }),
+      env
+    );
+    expect(createRes.status).toBe(201);
+    expect(store.get('latest_order_ts')).toBeTruthy();
+    expect(store.get('orders:latest_updated_at')).toBeTruthy();
+    const orderEventKeys = Array.from(store.keys()).filter((k) => k.startsWith('order_event:'));
+    expect(orderEventKeys.length).toBe(1);
   });
 });

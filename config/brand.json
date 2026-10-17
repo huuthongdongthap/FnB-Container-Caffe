@@ -7,20 +7,20 @@
     "address": "29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2)",
     "phone": "+84 946 013 633",
     "email": "hello@auracafe.vn",
-    "domain": "auraspace.com",
+    "domain": "auraspace.cafe",
     "workerUrl": "https://aura-cafe.agencyos.network",
     "pagesUrl": "https://aura-cafe.pages.dev"
   },
   "seo": {
     "title": "AURA CAFE - Container Mộc Mạc Hiện Đại Sa Đéc",
     "description": "Quán cà phê container mộc mạc hiện đại tại Sa Đéc, Đồng Tháp. Không gian ấm cúng, gần gũi, thân thiện lý tưởng cho check-in, làm việc và họp mặt. Modern-rustic container cafe in Sa Dec, Dong Thap. Warm and welcoming for check-ins, work, and gatherings.",
-    "ogImage": "/photos/space-exterior-overview.webp",
+    "ogImage": "/photos/IMG_6564.webp",
     "locale": "vi_VN"
   },
   "theme": {
     "colors": {
-      "background": "#0A1A2E",
-      "foreground": "#F5F5F5",
+      "background": "#0E1322",
+      "foreground": "#E4E1E9",
       "primary": "#C9D6DF",
       "accent": "#6B9FB8",
       "secondary": "#2E5E8C",

@@ -34,7 +34,7 @@ export function CancelSubModal({
           onChange={(e) => onReasonChange(e.target.value)}
         />
         {errors._form && (
-          <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">{errors._form}</div>
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">{errors._form}</div>
         )}
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>{t('cancel')}</Button>

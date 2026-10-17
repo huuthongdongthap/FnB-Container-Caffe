@@ -1,6 +1,13 @@
 import { Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { ForecastItem } from './inventory-types';
 
+type RawForecastRecord = ForecastItem & {
+  item_id?: string;
+  item_sku?: string;
+  item_name?: string;
+  suggested_reorder_qty?: number;
+};
+
 interface InventoryForecastTabProps {
   forecastItems: ForecastItem[];
   loading?: boolean;
@@ -56,19 +63,25 @@ export function InventoryForecastTab({
                 </tr>
               )}
               {!loading &&
-                forecastItems.map((item) => {
+                forecastItems.map((rawItem, idx) => {
+                  const item = rawItem as RawForecastRecord;
+                  const id = item.id || item.item_id || `forecast-${idx}`;
+                  const sku = item.sku || item.item_sku || '—';
+                  const name = item.name || item.item_name || '—';
+                  const reorderQty = item.recommended_reorder_qty ?? item.suggested_reorder_qty;
+                  const currentStock = Number(item.current_stock ?? 0);
                   const risk = item.risk_level || 'HEALTHY';
                   const isCritical = risk === 'CRITICAL';
                   const isWarning = risk === 'WARNING';
 
                   return (
-                    <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                    <tr key={id} className="hover:bg-white/5 transition-colors">
                       <td className="py-3 px-4 font-mono text-[var(--aura-chrome-light)]">
-                        {item.sku}
+                        {sku}
                       </td>
-                      <td className="py-3 px-4 font-medium">{item.name}</td>
+                      <td className="py-3 px-4 font-medium">{name}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold">
-                        {item.current_stock.toLocaleString()} {item.unit || 'đv'}
+                        {currentStock.toLocaleString()} {item.unit || 'đv'}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-[var(--aura-text-muted)]">
                         {item.daily_run_rate ?? '0.00'} / ngày
@@ -101,8 +114,8 @@ export function InventoryForecastTab({
                         )}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-sky-400">
-                        {item.recommended_reorder_qty
-                          ? `+${item.recommended_reorder_qty} ${item.unit || ''}`
+                        {reorderQty
+                          ? `+${reorderQty} ${item.unit || ''}`
                           : '—'}
                       </td>
                     </tr>

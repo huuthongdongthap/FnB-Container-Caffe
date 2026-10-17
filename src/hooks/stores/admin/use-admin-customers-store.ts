@@ -2,9 +2,17 @@ import { create } from 'zustand';
 import type { AdminCustomer } from '@/hooks/use-admin';
 import { apiFetch } from '@/lib/api-client';
 
+export interface AdminCustomersPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages?: number;
+}
+
 interface AdminCustomersState {
   customers: AdminCustomer[];
   totalCount: number;
+  pagination: AdminCustomersPagination | null;
   loading: boolean;
   error: string | null;
   fetchCustomers: (page?: number, search?: string, tier?: string) => Promise<void>;
@@ -36,6 +44,7 @@ function normalizeCustomer(raw: Record<string, unknown>): AdminCustomer {
 export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => ({
   customers: [],
   totalCount: 0,
+  pagination: null,
   loading: false,
   error: null,
 
@@ -48,9 +57,20 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
 
       const body = await apiFetch<any>(`/api/admin/customers?${params}`);
       const rawList: Array<Record<string, unknown>> = body?.data || body?.customers || [];
+      const pagination: AdminCustomersPagination | null = body?.pagination
+        ? {
+            page: Number(body.pagination.page ?? page),
+            limit: Number(body.pagination.limit ?? 50),
+            total: Number(body.pagination.total ?? rawList.length ?? 0),
+            ...(body.pagination.totalPages !== undefined
+              ? { totalPages: Number(body.pagination.totalPages) }
+              : {}),
+          }
+        : null;
       set({
         customers: rawList.map(normalizeCustomer),
-        totalCount: body?.pagination?.total ?? body?.totalCount ?? rawList.length ?? 0,
+        totalCount: pagination?.total ?? body?.totalCount ?? rawList.length ?? 0,
+        pagination,
         loading: false,
         error: null,
       });
@@ -62,24 +82,43 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
 
   addCustomer: async (data) => {
     try {
-      const newCustomer: AdminCustomer = {
-        id: `c_${Date.now()}`,
-        name: data.name,
-        phone: data.phone,
-        tier: data.tier,
-        totalOrders: 0,
-        totalSpent: 0,
-        lastVisit: new Date().toISOString(),
-      };
-
+      let res: {
+        customer?: Record<string, unknown>;
+        data?: Record<string, unknown>;
+        id?: string;
+      } | null = null;
       try {
-        await apiFetch('/api/admin/customers', {
+        res = await apiFetch('/api/admin/customers', {
           method: 'POST',
           body: JSON.stringify(data),
         });
       } catch {
         // Fallback optimistic for local offline/mock demo
       }
+
+      const serverRecord = res?.customer ?? res?.data;
+      const serverId =
+        (serverRecord?.id as string | undefined) ??
+        res?.id ??
+        `c_${Date.now()}`;
+
+      const newCustomer: AdminCustomer = serverRecord
+        ? {
+            ...normalizeCustomer(serverRecord),
+            id: String(serverId),
+            name: String(serverRecord.name ?? data.name),
+            phone: String(serverRecord.phone ?? data.phone),
+            tier: String(serverRecord.tier ?? serverRecord.loyalty_tier ?? data.tier),
+          }
+        : {
+            id: String(serverId),
+            name: data.name,
+            phone: data.phone,
+            tier: data.tier,
+            totalOrders: 0,
+            totalSpent: 0,
+            lastVisit: new Date().toISOString(),
+          };
 
       set((state) => ({
         customers: [newCustomer, ...state.customers],

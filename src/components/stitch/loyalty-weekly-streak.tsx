@@ -16,7 +16,7 @@ export function WeeklyStreak({
   return (
     <section
       className="rounded-xl p-[24px]"
-      aria-label={t('loyalty.weeklyStreakAria')}
+      aria-label={t('loyalty.weeklyStreakAria', 'Weekly Streak')}
       data-glass="card"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
@@ -29,7 +29,7 @@ export function WeeklyStreak({
         className="mb-[24px] text-[24px] leading-[1.4] font-normal"
         style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
       >
-        {t('loyalty.weeklyStreak')}
+        {t('loyalty.weeklyStreak', 'Weekly Streak')}
       </h3>
       <div className="flex justify-between items-center gap-2">
         {days.map((day) => (
@@ -91,10 +91,10 @@ export function WeeklyStreak({
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)';
         }}
-        aria-label={t('loyalty.checkinAria')}
+        aria-label={t('loyalty.checkinAria', 'Check in at Roastery')}
       >
         <MapPin className="h-[20px] w-[20px]" />
-        {t('loyalty.checkinRoastery')}
+        {t('loyalty.checkinRoastery', 'Check in at Roastery')}
       </button>
     </section>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
@@ -50,9 +50,13 @@ export default function SalesReportsPage() {
   const comparison = useComparisonData(from, to);
   const groupedQ = useSalesGrouped(groupBy || 'day', from, to);
 
-  const { orders: recentOrders, loading: ordersLoading } = useAdminOrdersStore();
+  const { orders: recentOrders, loading: ordersLoading, fetchOrders } = useAdminOrdersStore();
   const { error: dataError, fetchDashboard } = useAdminDashboardStore();
   const { exportCsv, exporting, error: csvError } = useExportCsv(from, to);
+
+  useEffect(() => {
+    fetchOrders(1);
+  }, [fetchOrders]);
 
   const overview = overviewQ.data?.data ?? null;
   const isLoading = overviewQ.isLoading || dailyQ.isLoading;

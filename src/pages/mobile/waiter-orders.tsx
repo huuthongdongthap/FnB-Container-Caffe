@@ -29,8 +29,13 @@ export default function WaiterOrders() {
 
   const fetchTables = useCallback(async () => {
     try {
-      const body = await apiFetch<{ success: boolean; tables: TableInfo[] }>('/mobile/tables');
-      if (body.success) setTables(body.tables);
+      const body = await apiFetch<{ success: boolean; tables: Array<TableInfo & { number?: number }> }>('/mobile/tables');
+      if (body.success) {
+        setTables(body.tables.map((t) => ({
+          ...t,
+          table_number: t.table_number ?? t.number ?? 0,
+        })));
+      }
     } catch { /* silent */ }
   }, []);
 
@@ -38,7 +43,7 @@ export default function WaiterOrders() {
     try {
       const body = (await apiFetch<{ success: boolean; orders: MobileOrder[] }>('/mobile/orders'));
       if (body.success) {
-        const tableMap = new Map(tables.map((t) => [t.id, t.table_number]));
+        const tableMap = new Map(tables.map((t) => [t.id, (t as TableInfo & { number?: number }).number ?? t.table_number]));
         setOrders(body.orders.map((o) => ({ ...o, table_number: tableMap.get(o.table_id) ?? o.table_number ?? 0 })));
       }
     } catch { /* silent */ }
@@ -51,12 +56,14 @@ export default function WaiterOrders() {
     if (!selectedTableId) return;
     const validItems = newOrderItems.filter((i) => i.name.trim());
     if (validItems.length === 0) return;
+    const selectedTable = tables.find((t) => t.id === selectedTableId) as (TableInfo & { number?: number }) | undefined;
     setSubmitting(true);
     try {
       const body = await apiFetch<{ success: boolean }>('/mobile/orders', {
         method: 'POST',
         body: JSON.stringify({
           table_id: selectedTableId,
+          table_number: selectedTable?.number ?? selectedTable?.table_number,
           items: validItems.map((i) => ({
             name: i.name, quantity: i.quantity, price: i.price, note: i.note || undefined,
           })),
@@ -70,7 +77,7 @@ export default function WaiterOrders() {
         fetchTables();
       }
     } catch { /* silent */ } finally { setSubmitting(false); }
-  }, [selectedTableId, newOrderItems, fetchOrders, fetchTables]);
+  }, [selectedTableId, newOrderItems, tables, fetchOrders, fetchTables]);
 
   const updateItem = useCallback((idx: number, patch: Partial<OrderItem>) => {
     setNewOrderItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));

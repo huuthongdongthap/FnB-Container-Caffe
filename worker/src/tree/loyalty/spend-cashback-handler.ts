@@ -26,12 +26,14 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
 
-  const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(order_id).first<{ total_amount: number }>();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first<{ total_amount?: number; total?: number }>();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
-  if (order.total_amount < MIN_ORDER_TO_SPEND) {
+  const orderTotal = Number(order.total_amount ?? order.total ?? 0);
+
+  if (orderTotal < MIN_ORDER_TO_SPEND) {
     return c.json({
       success: false,
       error: `Don toi thieu ${MIN_ORDER_TO_SPEND.toLocaleString('vi-VN')}d de dung vi cashback`,
@@ -39,7 +41,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     }, 400);
   }
 
-  const maxAllowed = Math.round(order.total_amount * 0.5);
+  const maxAllowed = Math.round(orderTotal * 0.5);
   if (amount > maxAllowed) {
     return c.json({ success: false, error: 'Toi da 50% gia tr? don hang', max_allowed: maxAllowed }, 400);
   }
@@ -63,10 +65,17 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'So du khong du (race condition)', balance: wallet.balance }, 400);
   }
 
-  await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
+  try {
+    await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
+  } catch {
+    await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => {});
+  }
+  await db.prepare(
+    'INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, \'spend\', ?, ?, ?)'
+  ).bind(`cb_${Date.now()}`, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
   await db.prepare(
     'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: order.total_amount }), now).run();
+  ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), now).run();
 
   const updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
   return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet?.balance || 0 } });

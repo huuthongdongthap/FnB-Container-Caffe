@@ -14,25 +14,39 @@ const REMINDER_MINUTES = 30;
 
 export async function sendShiftReminders(env: Record<string, unknown>): Promise<{ checked: number; notified: number; errors: number }> {
   try {
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+    if (!db) {
+      return { checked: 0, notified: 0, errors: 0 };
+    }
 
     const now = new Date();
     const windowEnd = new Date(now.getTime() + REMINDER_MINUTES * 60_000).toISOString();
 
     // staff_shifts has: staff_name, role, clock_in, clock_in_planned, is_active
-    const { results: shifts } = await db
-      .prepare(
-        `SELECT id, staff_name, role, clock_in_planned
-         FROM staff_shifts
-         WHERE clock_in_planned IS NOT NULL
-           AND clock_in_planned >= ?
-           AND clock_in_planned <= ?
-           AND is_active = 1
-           AND (reminder_sent IS NULL OR reminder_sent = 0)
-        `
-      )
-      .bind(now.toISOString(), windowEnd)
-      .all<{ id: string; staff_name: string; role: string; clock_in_planned: string }>();
+    let shifts: Array<{ id: string; staff_name: string; role: string; clock_in_planned: string }> = [];
+    try {
+      const res = await db
+        .prepare(
+          `SELECT id, staff_name, role, clock_in_planned
+           FROM staff_shifts
+           WHERE clock_in_planned IS NOT NULL
+             AND clock_in_planned >= ?
+             AND clock_in_planned <= ?
+             AND is_active = 1
+             AND (reminder_sent IS NULL OR reminder_sent = 0)
+          `
+        )
+        .bind(now.toISOString(), windowEnd)
+        .all<{ id: string; staff_name: string; role: string; clock_in_planned: string }>();
+      shifts = res.results || [];
+    } catch (queryErr) {
+      const msg = String((queryErr as Error)?.message || '');
+      if (msg.includes('no such column') || msg.includes('no such table')) {
+        log.debug('staff_shifts reminder columns not present, skipping');
+        return { checked: 0, notified: 0, errors: 0 };
+      }
+      throw queryErr;
+    }
 
     if (!shifts.length) {
       log.debug('No upcoming shifts in reminder window');

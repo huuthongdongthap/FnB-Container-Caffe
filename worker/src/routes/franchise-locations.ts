@@ -25,7 +25,7 @@ const createLocationSchema = z.object({
   status: z.enum(['active', 'suspended', 'closed']).optional().default('active'),
 });
 
-franchiseRouter.use('/*', requireAuth(['owner', 'staff', 'manager']));
+franchiseRouter.use('/*', requireAuth(['owner', 'admin', 'staff', 'manager']));
 
 // GET /api/franchise/locations
 franchiseRouter.get('/locations', async (c) => {
@@ -52,8 +52,8 @@ franchiseRouter.get('/locations', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-// POST /api/franchise/locations (Owner only)
-franchiseRouter.post('/locations', requireAuth(['owner']), async (c) => {
+// POST /api/franchise/locations (Owner/Admin only)
+franchiseRouter.post('/locations', requireAuth(['owner', 'admin']), async (c) => {
   const user = c.get('user');
   if (!isHQSuperAdmin(user)) {
     return c.json({ success: false, error: 'Only HQ administrators can register franchise locations' }, 403);

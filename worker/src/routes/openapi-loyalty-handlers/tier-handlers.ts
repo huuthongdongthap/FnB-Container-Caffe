@@ -34,7 +34,7 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.tiers.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager') {
+    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     const { tier } = c.req.valid('param');

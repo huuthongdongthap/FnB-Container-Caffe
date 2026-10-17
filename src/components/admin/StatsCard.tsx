@@ -33,7 +33,7 @@ export function StatsCard({ title, value, type, icon, className, change }: Stats
             <p
               className={cn(
                 'text-xs mt-1 font-medium',
-                change.isPositive ? 'text-green-600' : 'text-red-600'
+                change.isPositive ? 'text-green-400' : 'text-red-400'
               )}
             >
               {change.isPositive ? '▲' : '▼'} {change.value.toLocaleString('vi-VN')}%

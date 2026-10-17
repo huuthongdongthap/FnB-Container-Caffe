@@ -30,6 +30,8 @@ const ACTION_TO_STORE: Record<string, string> = {
   preparing: 'preparing',
   ready: 'ready',
   serve: 'delivered',
+  served: 'delivered',
+  delivered: 'delivered',
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────────────── */
@@ -97,8 +99,13 @@ export default function AdminOrdersPage() {
 
   /* Fetch orders from the store whenever filter or search changes */
   useEffect(() => {
+    const backendStatus = activeFilter === 'all'
+      ? undefined
+      : activeFilter === 'served'
+        ? 'delivered'
+        : activeFilter;
     fetchOrders(1, {
-      status: activeFilter === 'all' ? undefined : activeFilter,
+      status: backendStatus,
       search: searchQuery || undefined,
     });
   }, [activeFilter, searchQuery, fetchOrders]);
@@ -127,8 +134,13 @@ export default function AdminOrdersPage() {
   );
 
   const handleRefresh = useCallback(() => {
+    const backendStatus = activeFilter === 'all'
+      ? undefined
+      : activeFilter === 'served'
+        ? 'delivered'
+        : activeFilter;
     fetchOrders(1, {
-      status: activeFilter === 'all' ? undefined : activeFilter,
+      status: backendStatus,
       search: searchQuery || undefined,
     });
   }, [fetchOrders, activeFilter, searchQuery]);

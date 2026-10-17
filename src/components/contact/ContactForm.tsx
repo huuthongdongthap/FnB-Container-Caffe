@@ -35,11 +35,14 @@ export function ContactForm({ className }: ContactFormProps) {
 
     try {
       await submitContact(name.trim(), phone.trim(), content.trim());
-      setName('');
-      setPhone('');
-      setContent('');
-      setErrors({});
-      setTouched({});
+      const state = useContactStore.getState();
+      if (state.submitted && !state.error) {
+        setName('');
+        setPhone('');
+        setContent('');
+        setErrors({});
+        setTouched({});
+      }
     } catch {
       // Error handled by hook
     }

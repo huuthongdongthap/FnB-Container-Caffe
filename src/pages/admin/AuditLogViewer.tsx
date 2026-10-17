@@ -85,7 +85,7 @@ export default function AuditLogViewerPage() {
 
           {/* ── Date range warning ── */}
           {dateRangeInvalid && (
-            <div className="mb-4 rounded-xl border border-yellow-300/30 bg-yellow-500/10 p-3 text-sm text-yellow-700">
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
               {t('audit.dateRangeWarning')}
             </div>
           )}

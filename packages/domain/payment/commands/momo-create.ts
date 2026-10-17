@@ -81,7 +81,7 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
     }
 
     const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
-    const isStaffOrOwner = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'staff';
+    const isStaffOrOwner = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'staff' || user?.role === 'admin';
     if (orderRow.customer_id && user?.id && orderRow.customer_id !== user.id && !isStaffOrOwner) {
       return c.json({
         success: false,
@@ -201,9 +201,9 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
     }
 
     // Persist payment record (retry on UNIQUE collision)
-    const paymentId = randomPaymentId();
     const now = new Date().toISOString();
-    const transId = String(data.transId || orderCode);
+    let paymentId = randomPaymentId();
+    let transId = String(orderCode || data.transId);
 
     let insertOk = false;
     for (let attempt = 0; attempt < 3 && !insertOk; attempt++) {
@@ -216,8 +216,10 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
           .run();
         insertOk = true;
       } catch {
-        // Colliding orderCode — regenerate and retry
+        // Colliding orderCode or paymentId — regenerate and retry
         orderCode = randomOrderCode();
+        paymentId = randomPaymentId();
+        transId = String(orderCode || data.transId);
       }
     }
 

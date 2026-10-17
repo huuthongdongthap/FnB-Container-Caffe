@@ -1,8 +1,10 @@
 import { API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 
 export async function downloadQrImage(slug: string, tableNumber: number): Promise<void> {
 	const res = await fetch(`${API_BASE}/api/admin/qr/${slug}/download`, {
 		credentials: 'include',
+		headers: getAuthHeaders(),
 	});
 	if (!res.ok) return;
 	const blob = await res.blob();

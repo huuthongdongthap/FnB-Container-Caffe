@@ -25,10 +25,9 @@ const SECRET = 'test-jwt-secret-at-least-16-chars';
 const KV = new Map<string, string>();
 function env(db: D1Database) { KV.clear(); return { AURA_DB: db, AUTH_KV: { get: async (k: string) => KV.has(k) ? KV.get(k) : null, put: async (k: string, v: string) => { KV.set(k, v); }, delete: async (k: string) => { KV.delete(k); } } as any, JWT_SECRET: SECRET } as any; }
 const app = new Hono<{ Bindings: any }>();
-app.use('/api/floor-plan/*', requireAuth(['owner', 'staff', 'manager']));
 app.route('/api/floor-plan', floorPlanRouter);
-async function fh(db: D1Database, m: string, p: string, b?: unknown) {
-  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' }, SECRET);
+async function fh(db: D1Database, m: string, p: string, b?: unknown, role: string = 'owner') {
+  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role }, SECRET);
   const r = await app.fetch(new Request(`https://test.aura${p}`, { method: m, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, ...(b ? { body: JSON.stringify(b) } : {}) }), env(db), { waitUntil: () => {} } as any);
   return { status: r.status, json: await r.json().catch(() => ({})) };
 }
@@ -75,5 +74,13 @@ describe('floor-plan routes', () => {
     const { status, json } = await fh(db, 'POST', '/api/floor-plan/T1/release');
     expect(status).toBe(200);
     expect(json.message).toContain('released');
+  });
+  it('GET / allows waiter and admin roles', async () => {
+    for (const role of ['waiter', 'admin']) {
+      const db = makeDB([{ match: (s) => s.includes('cafe_tables'), rows: [] }]);
+      const { status, json } = await fh(db, 'GET', '/api/floor-plan', undefined, role);
+      expect(status).toBe(200);
+      expect(json.success).toBe(true);
+    }
   });
 });

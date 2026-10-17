@@ -110,6 +110,27 @@ describe('Recruitment Worker Routes', () => {
     });
     const mgrRes = await app.fetch(mgrReq, env as any);
     expect(mgrRes.status).toBe(200);
+
+    const adminToken = await generateJWT(
+      { id: 'adm-1', email: 'admin@auraspace.cafe', name: 'Admin', role: 'admin' },
+      secret
+    );
+    const adminListRes = await app.fetch(
+      new Request('https://test.aura/api/recruitment/applications', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env as any
+    );
+    expect(adminListRes.status).toBe(200);
+
+    const adminDelRes = await app.fetch(
+      new Request('https://test.aura/api/recruitment/applications/APP_456', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }),
+      env as any
+    );
+    expect(adminDelRes.status).toBe(200);
   });
 });
 

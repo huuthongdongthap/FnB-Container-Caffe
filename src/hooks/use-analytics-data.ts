@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 
 /* ─── Types matching backend analytics endpoints ─── */
 
@@ -144,11 +145,18 @@ export function useDailyRevenue(from?: string, to?: string) {
  * Returns a Blob and triggers browser download.
  */
 export async function downloadAnalyticsCsv(start: string, end: string): Promise<void> {
-  const res = await apiFetch<{ success: boolean; data: Blob }>(
-    `/api/analytics/export?start=${start}&end=${end}`,
+  const res = await fetch(
+    `${API_BASE}/api/analytics/export?type=revenue&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+    {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    },
   );
-
-  const blob = res.data;
+  if (!res.ok) {
+    throw new Error(`CSV export failed (${res.status})`);
+  }
+  const text = await res.text();
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

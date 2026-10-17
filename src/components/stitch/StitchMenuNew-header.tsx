@@ -12,7 +12,7 @@ export function StitchMenuNewHeader({ brandName }: StitchMenuNewHeaderProps) {
   return (
     <header
       className="fixed top-0 z-50 w-full border-b border-[var(--aura-chrome-dim)]/30 bg-[var(--aura-surface-dim)]/60 backdrop-blur-md shadow-sm"
-      aria-label={t('stitch.header')}
+      aria-label={t('menu.CategoryNavAria', 'Danh mục thực đơn')}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2">
         <div

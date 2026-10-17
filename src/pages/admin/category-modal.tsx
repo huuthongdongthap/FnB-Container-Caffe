@@ -30,7 +30,7 @@ export function CategoryModal({
     <Modal open={open} onClose={onClose} title={editing ? t('adminMenu.editCategory') : t('adminMenu.addCategory')}>
       <div className="space-y-4">
         {errors._form && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{errors._form}</div>
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">{errors._form}</div>
         )}
 
         <Input

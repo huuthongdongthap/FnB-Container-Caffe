@@ -178,10 +178,12 @@ export function TicketCard({
         )}
         {isOverdue && (onComplete || onStart) && (
           <ActionButton
-            onClick={() => (onComplete ? onComplete(ticket.id) : onStart?.(ticket.id))}
+            onClick={() => (onStart ? onStart(ticket.id) : onComplete?.(ticket.id))}
             className="bg-error"
           >
-            {t('kds.priorityComplete', 'PRIORITY COMPLETE')}
+            {onStart
+              ? t('kds.startPrep', 'START PREP')
+              : t('kds.priorityComplete', 'PRIORITY COMPLETE')}
           </ActionButton>
         )}
       </div>

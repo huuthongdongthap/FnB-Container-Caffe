@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_BASE } from '@/lib/api-client';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -11,14 +12,17 @@ interface LoginUser {
   id: string;
   name: string;
   role: string;
-  device_id: string;
+  device_id?: string;
 }
 
 interface LoginResponse {
   success: boolean;
-  user: LoginUser;
+  user?: LoginUser;
+  staff?: LoginUser;
   token: string;
-  expires_in: number;
+  expires_in?: number;
+  error?: string;
+  message?: string;
 }
 
 interface MobileLoginProps {
@@ -122,6 +126,7 @@ function submitStyle(disabled: boolean): React.CSSProperties {
 export default function MobileLogin() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { login } = useMobileAuth();
   // Unchecked-indexed-access-safe accessor: valid indices 0-3, use non-null assertion at access points
   const pinRef0 = useRef<HTMLInputElement>(null);
   const pinRef1 = useRef<HTMLInputElement>(null);
@@ -184,26 +189,34 @@ export default function MobileLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ device_token: deviceToken.trim(), pin: fullPin }),
       });
-      const body = (await res.json()) as LoginResponse;
-      if (!res.ok || !body.success) {
-        setError('Đăng nhập thất bại — kiểm tra mã PIN / Login failed');
+      const data = (await res.json().catch(() => ({}))) as LoginResponse;
+      const staffProfile = data.staff ?? data.user;
+      if (!res.ok || !data.success || !data.token || !staffProfile) {
+        if (res.status === 429) {
+          setError(data.error || data.message || 'Quá nhiều lần thử — vui lòng thử lại sau / Too many login attempts');
+        } else if (res.status >= 500) {
+          setError(data.error || data.message || 'Lỗi máy chủ — vui lòng thử lại sau / Server error');
+        } else {
+          setError(data.error || data.message || 'Đăng nhập thất bại — kiểm tra mã PIN / Login failed');
+        }
         return;
       }
       const trimmedDevice = deviceToken.trim();
-      const userJson = JSON.stringify(body.user);
+      const userJson = JSON.stringify(staffProfile);
       localStorage.setItem('aura_device_token', trimmedDevice);
-      localStorage.setItem('aura_auth_token', body.token);
+      localStorage.setItem('aura_auth_token', data.token);
       localStorage.setItem('aura_user_data', userJson);
       localStorage.setItem('mobile_device', trimmedDevice);
-      localStorage.setItem('mobile_token', body.token);
+      localStorage.setItem('mobile_token', data.token);
       localStorage.setItem('mobile_user', userJson);
+      login(data.token, staffProfile);
       navigate('/mobile', { replace: true });
     } catch {
       setError('Không kết nối được máy chủ / Server connection error');
     } finally {
       setLoading(false);
     }
-  }, [pin, deviceToken, navigate]);
+  }, [pin, deviceToken, login, navigate]);
 
   return (
     <div style={wrap}>

@@ -41,8 +41,8 @@ const requireCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => 
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
   const customer = await c.env.AURA_DB.prepare(
-    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE email = ?'
-  ).bind(payload.email).first<Customer>();
+    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE email = ? OR id = ?'
+  ).bind(payload.email || '', payload.id || '').first<Customer>();
   if (!customer) {
     return c.json({ success: false, error: 'Customer not found' }, 404);
   }

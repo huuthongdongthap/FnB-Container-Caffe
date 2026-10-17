@@ -1,6 +1,7 @@
 import React from 'react';
-import { Route } from 'react-router-dom';
+import { Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 /** Wraps a route element in ErrorBoundary so a crash in one route doesn't take down the whole SPA. */
 function guarded(element: React.ReactNode): React.ReactNode {
@@ -81,12 +82,18 @@ export const publicRoutes = [
   <Route key="/tuyen-dung" path="/tuyen-dung" element={guarded(<RecruitmentPage />)} />,
   <Route key="/ung-tuyen" path="/ung-tuyen" element={guarded(<RecruitmentPage />)} />,
   <Route key="/brand" path="/brand" element={guarded(<BrandGuideline />)} />,
+  <Route key="/brand-guideline" path="/brand-guideline" element={<Navigate to="/brand" replace />} />,
+  <Route key="/support" path="/support" element={<Navigate to="/contact" replace />} />,
+  <Route key="/privacy" path="/privacy" element={<Navigate to="/about" replace />} />,
+  <Route key="/terms" path="/terms" element={<Navigate to="/about" replace />} />,
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
   <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
   <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
-  <Route key="/saas/dashboard" path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />,
-  <Route key="/saas/onboard/tenant" path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />,
-  <Route key="/saas/onboard" path="/saas/onboard" element={guarded(<OnboardingWizard />)} />,
+  <Route key="/saas" element={<ProtectedRoute />}>
+    <Route path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />
+    <Route path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />
+    <Route path="/saas/onboard" element={guarded(<OnboardingWizard />)} />
+  </Route>,
   <Route key="/stitch-gallery-screen-showcase" path="/stitch-gallery-screen-showcase" element={guarded(<StitchScreenGallery />)} />,
   ...['vi', 'en'].flatMap((loc) => [
     <Route key={`/${loc}/order`} path={`/${loc}/order`} element={guarded(<TableOrder />)} />,

@@ -13,7 +13,7 @@ import { requireAuth } from 'worker/src/middleware/auth';
 import type { StaffTipRow } from '../model/staff-types';
 
 const staffTipsRouter = new Hono<{ Bindings: Env }>();
-staffTipsRouter.use('/*', requireAuth(['owner', 'staff', 'manager']));
+staffTipsRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter']));
 
 // GET /api/staff-tips — daily tip rollup, filterable by staff / date
 staffTipsRouter.get('/', async (c) => {

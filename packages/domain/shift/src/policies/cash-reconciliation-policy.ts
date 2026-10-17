@@ -44,17 +44,39 @@ async function getCashPaymentsForShift(
 
   const endTime = shift.clock_out || new Date().toISOString();
 
-  const result = await db
-    .prepare(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM payments
-       WHERE payment_method = 'cash'
-       AND created_at >= ? AND created_at <= ?
-       AND status = 'completed'`
-    )
-    .bind(shift.clock_in, endTime)
-    .first<{ total: number }>();
+  try {
+    const result = await db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) as total FROM payments
+         WHERE method IN ('cash', 'cod')
+         AND created_at >= ? AND created_at <= ?
+         AND status = 'completed'`
+      )
+      .bind(shift.clock_in, endTime)
+      .first<{ total: number }>();
 
-  return result?.total ?? 0;
+    if (result && typeof result.total === 'number') {
+      return result.total;
+    }
+  } catch {
+    // Fallback for legacy schema/mocks using payment_method column
+  }
+
+  try {
+    const legacyResult = await db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) as total FROM payments
+         WHERE payment_method = 'cash'
+         AND created_at >= ? AND created_at <= ?
+         AND status = 'completed'`
+      )
+      .bind(shift.clock_in, endTime)
+      .first<{ total: number }>();
+
+    return legacyResult?.total ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**

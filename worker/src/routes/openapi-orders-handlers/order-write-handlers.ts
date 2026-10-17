@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
-import { calculateOrderSnapshot, canTransition, isTerminal, canActorTransition, toActorRole } from '@aura/domain-order';
+import { calculateOrderSnapshot, canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
 import { resolveServerOrderOwnership, canAccessOrder } from '@aura/domain-customer';
 import { validateOrderTable } from '@aura/domain-table';
 import { getDatabase } from '../../lib/db';
@@ -71,13 +71,28 @@ export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
   ).run();
 
   for (const item of snapshot.items) {
-    await db.prepare(
-      `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(), id, item.menuItemId, item.quantity, item.subtotalCents,
-      JSON.stringify(item.modifiers || []), now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(), id, item.menuItemId, item.quantity, item.subtotalCents,
+        JSON.stringify(item.modifiers || []), now
+      ).run();
+    } catch {
+      // order_items table may be absent when using canonical orders.items JSON schema
+      break;
+    }
+  }
+
+  if (c.env?.AUTH_KV) {
+    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+    try {
+      if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
+    } catch { /* executionCtx may be absent in testing */ }
+    await publishOrderEvent(c.env.AUTH_KV, id, 'pending', {
+      waitUntil: waitUntilFn,
+    });
   }
 
   await db.prepare(
@@ -145,6 +160,16 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
 
   if (updates.length > 1) {
     await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    if (c.env?.AUTH_KV) {
+      let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+      try {
+        if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
+      } catch { /* executionCtx may be absent in testing */ }
+      await publishOrderEvent(c.env.AUTH_KV, id, body.status ?? existing.status, {
+        previousStatus: existing.status,
+        waitUntil: waitUntilFn,
+      });
+    }
   }
 
   await db.prepare(

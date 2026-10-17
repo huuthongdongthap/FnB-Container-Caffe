@@ -10,7 +10,7 @@ import type { ModifierGroup, ModifierChoice } from '../model/catalog-types';
 import { happyHourRouter } from './happy-hour';
 
 export const menuModifiersRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);

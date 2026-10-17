@@ -75,8 +75,8 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     return c.json({ ok: true, at: new Date().toISOString() });
   });
 
-  // ── Dev: Simulate PayOS webhook + Telegram (owner-only) ──
-  app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async(c) => {
+  // ── Dev: Simulate PayOS webhook + Telegram (owner/admin) ──
+  app.post('/api/test/telegram-sim', requireAuth(['owner', 'admin']), audit('test_telegram_sim'), async(c) => {
     try {
       const body = await c.req.json<{ order_id?: string }>();
       if (!body.order_id) {
@@ -110,8 +110,8 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     }
   });
 
-  // ── Admin: Test Zalo ZNS (owner-only) ──
-  app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), async(c) => {
+  // ── Admin: Test Zalo ZNS (owner/admin) ──
+  app.post('/api/test/zalo-zns', requireAuth(['owner', 'admin']), audit('test_zalo_zns'), async(c) => {
     try {
       const { phone, template } = await c.req.json<{ phone?: string; template?: string }>();
       if (!phone || !template) {
@@ -130,7 +130,7 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   });
 
   // ── Admin: Manual cashback expiry warning run ──
-  app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('send_expiry_warnings'), async(c) => {
+  app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner', 'admin', 'manager']), audit('send_expiry_warnings'), async(c) => {
     const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>);
     return c.json({ ok: true, ...result });
   });

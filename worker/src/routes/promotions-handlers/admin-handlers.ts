@@ -27,7 +27,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   });
 
   // POST /api/promotions — create new promotion
-  router.post('/', requireAuth(['owner']), async (c) => {
+  router.post('/', requireAuth(['owner', 'manager', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const body = await c.req.json() as CreatePromotionInput;
     const code = body.code.trim().toUpperCase();
@@ -62,7 +62,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   });
 
   // PATCH /api/promotions/:code — update promotion
-  router.patch('/:code', requireAuth(['owner']), async (c) => {
+  router.patch('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const code = c.req.param('code').toUpperCase();
     const body = await c.req.json() as Partial<CreatePromotionInput>;
@@ -102,7 +102,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   });
 
   // DELETE /api/promotions/:code — delete promotion
-  router.delete('/:code', requireAuth(['owner']), async (c) => {
+  router.delete('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const code = c.req.param('code').toUpperCase();
     const existing = await db.prepare('SELECT code FROM promotions WHERE code = ?').bind(code).first();

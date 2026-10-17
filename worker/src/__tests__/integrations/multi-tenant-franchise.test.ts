@@ -346,5 +346,50 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(res.status).toBe(201);
       expect(insertedArgs[1]).toBe('tenant_sadec_02');
     });
+
+    it('authorizes HQ admin role across franchise, edge telemetry, demand forecast, and dynamic pricing routers', async () => {
+      const boundTenants: string[] = [];
+      const mockDb = {
+        prepare: vi.fn(() => ({
+          bind: vi.fn((...args: unknown[]) => {
+            if (typeof args[0] === 'string') {
+              boundTenants.push(args[0]);
+            }
+            return {
+              all: vi.fn().mockResolvedValue({ results: [] }),
+              first: vi.fn().mockResolvedValue(null),
+              run: vi.fn().mockResolvedValue({ success: true })
+            };
+          })
+        }))
+      };
+
+      const env = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any
+      });
+
+      const endpoints = [
+        '/api/franchise/locations?tenant_id=tenant_sadec_02',
+        '/api/edge/containers/status?tenant_id=tenant_sadec_02',
+        '/api/pricing/dynamic/rules?tenant_id=tenant_sadec_02',
+        '/api/inventory/forecasting/run-rate?tenant_id=tenant_sadec_02',
+        '/api/admin/metrics/forecast?tenant_id=tenant_sadec_02'
+      ];
+
+      for (const ep of endpoints) {
+        const req = await authRequest('GET', ep, 'admin', 'default');
+        const res = await app.fetch(req, env);
+        expect(res.status).toBe(200);
+      }
+
+      expect(boundTenants).toEqual([
+        'tenant_sadec_02',
+        'tenant_sadec_02',
+        'tenant_sadec_02',
+        'tenant_sadec_02',
+        'tenant_sadec_02'
+      ]);
+    });
   });
 });

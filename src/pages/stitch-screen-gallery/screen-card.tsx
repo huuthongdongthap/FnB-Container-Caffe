@@ -8,11 +8,14 @@ interface ScreenCardProps {
 }
 
 export function ScreenCard({ screen }: ScreenCardProps) {
+  const resolvedHref =
+    screen.route === '*' ? '/404-not-found' : (screen.route ?? undefined);
+
   return (
     <a
-      href={screen.route ?? undefined}
+      href={resolvedHref}
       className={`glass-panel rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 group ${
-        !screen.route ? 'opacity-60 pointer-events-none' : 'cursor-pointer'
+        !resolvedHref ? 'opacity-60 pointer-events-none' : 'cursor-pointer'
       }`}
     >
       {/* Icon bar */}

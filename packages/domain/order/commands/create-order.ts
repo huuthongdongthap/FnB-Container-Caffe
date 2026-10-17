@@ -78,7 +78,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       }
       if (tableRow) {
         resolvedTableId = tableRow.id;
-        await db.prepare("UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'").bind(tableRow.id).run();
+        await db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND status = 'Available'").bind(tableRow.id).run();
       }
     }
 

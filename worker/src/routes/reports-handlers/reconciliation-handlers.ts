@@ -40,14 +40,31 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
        GROUP BY DATE(created_at)`
     ).bind(from, to).all<{ date: string; total: number }>();
 
-    // ── Cash payouts (expense transactions in period) ──
-    const { results: cashPayouts } = await db.prepare(
-      `SELECT DATE(created_at) AS date, COALESCE(SUM(amount), 0) AS total
-       FROM expenses
-       WHERE payment_method = 'cash' AND status = 'approved'
-         AND DATE(created_at) BETWEEN ? AND ?
-       GROUP BY DATE(created_at)`
-    ).bind(from, to).all<{ date: string; total: number }>();
+    // ── Cash payouts (expense transactions in period, fallback to cash_payouts or empty when table absent) ──
+    let cashPayouts: { date: string; total: number }[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT DATE(created_at) AS date, COALESCE(SUM(amount), 0) AS total
+         FROM expenses
+         WHERE payment_method = 'cash' AND status = 'approved'
+           AND DATE(created_at) BETWEEN ? AND ?
+         GROUP BY DATE(created_at)`
+      ).bind(from, to).all<{ date: string; total: number }>();
+      cashPayouts = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT DATE(created_at) AS date, COALESCE(SUM(amount), 0) AS total
+           FROM cash_payouts
+           WHERE status = 'completed'
+             AND DATE(created_at) BETWEEN ? AND ?
+           GROUP BY DATE(created_at)`
+        ).bind(from, to).all<{ date: string; total: number }>();
+        cashPayouts = res.results || [];
+      } catch {
+        cashPayouts = [];
+      }
+    }
 
     // ── Payment method summary ──
     const { results: payMethods } = await db.prepare(

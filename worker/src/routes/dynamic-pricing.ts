@@ -152,7 +152,7 @@ dynamicPricingRouter.post('/calculate', async (c) => {
 });
 
 // GET /api/pricing/dynamic/rules
-dynamicPricingRouter.get('/rules', requireAuth(['owner', 'manager']), async (c) => {
+dynamicPricingRouter.get('/rules', requireAuth(['owner', 'admin', 'manager']), async (c) => {
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const { results } = await db.prepare(
@@ -163,7 +163,7 @@ dynamicPricingRouter.get('/rules', requireAuth(['owner', 'manager']), async (c) 
 });
 
 // POST /api/pricing/dynamic/rules
-dynamicPricingRouter.post('/rules', requireAuth(['owner', 'manager']), async (c) => {
+dynamicPricingRouter.post('/rules', requireAuth(['owner', 'admin', 'manager']), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = createRuleSchema.safeParse(body);
   if (!parsed.success) {

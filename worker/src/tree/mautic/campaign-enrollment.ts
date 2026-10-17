@@ -22,9 +22,23 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
   const errors: string[] = [];
 
   try {
-    const { results: masterCustomers } = await db.prepare(
-      'SELECT id, email, phone FROM customers WHERE tier = \'MASTER\' AND (email != \'\' OR phone != \'\') LIMIT 100'
-    ).all<{ id: string; email: string; phone: string }>();
+    let masterCustomers: Array<{ id: string; email: string; phone: string }> = [];
+    try {
+      const res = await db.prepare(
+        'SELECT id, email, phone FROM customers WHERE tier = \'MASTER\' AND (email != \'\' OR phone != \'\') LIMIT 100'
+      ).all<{ id: string; email: string; phone: string }>();
+      masterCustomers = res.results || [];
+    } catch (colErr) {
+      const msg = String((colErr as Error)?.message || '');
+      if (msg.includes('no such column')) {
+        const fallback = await db.prepare(
+          'SELECT id, email, phone FROM customers WHERE LOWER(loyalty_tier) IN (\'platinum\', \'master\') AND (email != \'\' OR phone != \'\') LIMIT 100'
+        ).all<{ id: string; email: string; phone: string }>();
+        masterCustomers = fallback.results || [];
+      } else {
+        throw colErr;
+      }
+    }
 
     for (const customer of masterCustomers || []) {
       try {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 
 interface Props {
   invoiceId: string;
@@ -11,6 +12,7 @@ export default function ReceiptDownloadButton({ invoiceId, invoiceNumber }: Prop
     try {
       const res = await fetch(`${API_BASE}/api/subscriptions/invoices/${invoiceId}/receipt`, {
         credentials: 'include',
+        headers: getAuthHeaders(),
       });
       if (!res.ok) {
         alert('Không thể tải hóa đơn');
@@ -35,7 +37,7 @@ export default function ReceiptDownloadButton({ invoiceId, invoiceNumber }: Prop
   return (
     <button
       onClick={handleDownload}
-      className="text-xs text-blue-600 underline hover:text-blue-800"
+      className="text-xs text-sky-400 underline hover:text-sky-300"
       type="button"
     >
       Tải hóa đơn

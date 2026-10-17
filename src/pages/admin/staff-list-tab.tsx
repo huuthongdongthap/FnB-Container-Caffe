@@ -13,7 +13,7 @@ export function StaffListTab() {
   const { t } = useTranslation();
   const { staff, loading, error, fetchStaff, registerStaff, toggleStaffActive } = useAdminStaffStore();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: '', role: '', phone: '', email: '', password: '' });
+  const [newStaff, setNewStaff] = useState({ name: '', role: 'staff', phone: '', email: '', password: '' });
   const [registerError, setRegisterError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,6 +26,10 @@ export function StaffListTab() {
 
   const handleAdd = async () => {
     if (!newStaff.name || !newStaff.role) return;
+    if (!newStaff.password || newStaff.password.length < 8) {
+      setRegisterError(t('adminStaff.passwordTooShort', 'Mật khẩu phải có ít nhất 8 ký tự'));
+      return;
+    }
     setRegisterError(null);
     try {
       await registerStaff({
@@ -36,7 +40,7 @@ export function StaffListTab() {
         password: newStaff.password,
       });
       setShowAddModal(false);
-      setNewStaff({ name: '', role: '', phone: '', email: '', password: '' });
+      setNewStaff({ name: '', role: 'staff', phone: '', email: '', password: '' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Register failed';
       setRegisterError(msg);
@@ -53,7 +57,7 @@ export function StaffListTab() {
     );
   }
 
-  if (error) {
+  if (error && staff.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-sm text-destructive mb-2">{error}</p>
@@ -149,18 +153,29 @@ export function StaffListTab() {
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)}>
         <div className="p-6 space-y-4">
           <h2 className="text-lg font-semibold">{t('adminStaff.addStaff')}</h2>
-          {registerError && <div className="text-red-600 text-xs">{registerError}</div>}
+          {registerError && <div className="text-red-400 text-xs">{registerError}</div>}
           <Input
             label={t('adminStaff.fieldName')}
             value={newStaff.name}
             onChange={(e) => setNewStaff((prev) => ({ ...prev, name: e.target.value }))}
           />
-          <Input
-            label={t('adminStaff.fieldRole')}
-            value={newStaff.role}
-            onChange={(e) => setNewStaff((prev) => ({ ...prev, role: e.target.value }))}
-            placeholder={t('adminStaff.fieldRolePlaceholder')}
-          />
+          <div>
+            <label htmlFor="staff-role" className="block text-xs font-medium text-muted mb-1">
+              {t('adminStaff.fieldRole')}
+            </label>
+            <select
+              id="staff-role"
+              value={newStaff.role}
+              onChange={(e) => setNewStaff((prev) => ({ ...prev, role: e.target.value }))}
+              className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="staff">Staff</option>
+              <option value="cashier">Cashier</option>
+              <option value="kitchen">Kitchen</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
           <Input
             label={t('adminStaff.fieldPhone')}
             value={newStaff.phone}
@@ -175,6 +190,7 @@ export function StaffListTab() {
           <Input
             label={t('adminStaff.fieldPassword')}
             type="password"
+            minLength={8}
             value={newStaff.password}
             onChange={(e) => setNewStaff((prev) => ({ ...prev, password: e.target.value }))}
           />

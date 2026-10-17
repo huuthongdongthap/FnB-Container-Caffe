@@ -5,7 +5,7 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'admin'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin'];
 const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin'];
 
 function normalizeOrderItems(raw: unknown): Array<Record<string, unknown>> {
@@ -148,10 +148,25 @@ export async function createOrderMobile(
       if (msg.includes('no such column') || msg.includes('has no column')) {
         await context.env.AURA_DB
           .prepare(
-            `INSERT INTO orders (id, table_id, items, status, created_at, updated_at)
-             VALUES (?, ?, ?, 'pending', ?, ?)`
+            `INSERT INTO orders (
+               id, table_id, customer_name, customer_phone,
+               items, total, status, payment_method, payment_status,
+               order_type, notes, created_at, updated_at
+             )
+             VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 'unpaid', 'dine_in', ?, ?, ?)`
           )
-          .bind(id, body.table_id, itemsJson, now, now)
+          .bind(
+            id,
+            body.table_id,
+            customerName,
+            customerPhone,
+            itemsJson,
+            total,
+            paymentMethod,
+            body.notes ?? null,
+            now,
+            now,
+          )
           .run();
       } else {
         throw insertErr;
@@ -160,8 +175,8 @@ export async function createOrderMobile(
 
     try {
       await context.env.AURA_DB
-        .prepare('UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?')
-        .bind('Occupied', now, body.table_id)
+        .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+        .bind('Occupied', body.table_id)
         .run();
     } catch {
       // Non-blocking if cafe_tables is not present in minimal test mock

@@ -41,13 +41,13 @@ export function CheckinForm({ onSubmit, ineligibleReason, className }: CheckinFo
   return (
     <div className={cn('max-w-md mx-auto', className)}>
       {ineligibleReason === 'already_checked_in_this_month' && (
-        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+        <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm">
           Bạn đã check-in tháng này rồi! Một khách hàng chỉ check-in 1 lần trong tháng.
         </div>
       )}
 
       {ineligibleReason === 'no_active_campaign' && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+        <div className="mb-4 p-3 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-sm">
           Hiện không có chương trình check-in nào hoạt động.
         </div>
       )}

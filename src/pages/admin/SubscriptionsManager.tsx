@@ -42,7 +42,7 @@ export default function SubscriptionsManagerPage() {
               ))}
             </div>
           ) : subs.statsQuery.isError ? (
-            <div className="mb-6 rounded-xl bg-red-500/10 p-3 text-sm text-red-800">
+            <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">
               {t('statsError')}{' '}
               <button onClick={() => subs.statsQuery.refetch()} className="underline">{t('statsRetry')}</button>
             </div>
@@ -90,10 +90,48 @@ export default function SubscriptionsManagerPage() {
               isError={plans.query.isError}
               onRefetch={() => plans.query.refetch()}
               onEdit={plans.openEditModal}
-              onDelete={(id) => plans.setDeletePlanId(id)}
+              onDelete={(id) => {
+                plans.setDeletePlanId(id);
+              }}
               onAdd={plans.openAddModal}
               t={t}
             />
+          )}
+
+          {plans.deletePlanId !== null && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+              <Card className="w-full max-w-md space-y-4 p-6">
+                <h2 className="text-lg font-semibold text-foreground">
+                  {t('deletePlanConfirmTitle', { defaultValue: 'Xác nhận xóa gói thuê bao' })}
+                </h2>
+                <p className="text-sm text-muted">
+                  {t('deletePlanConfirmDesc', { defaultValue: 'Bạn có chắc chắn muốn xóa gói thuê bao này không?' })}
+                </p>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => plans.setDeletePlanId(null)}
+                    className="rounded-lg border border-border bg-surface px-4 py-2 text-sm text-foreground hover:bg-muted/20"
+                  >
+                    {t('cancelBtn', { defaultValue: 'Hủy' })}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={plans.deleteMutation.isPending}
+                    onClick={() => {
+                      if (plans.deletePlanId) {
+                        plans.deleteMutation.mutate(plans.deletePlanId);
+                      }
+                    }}
+                    className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50"
+                  >
+                    {plans.deleteMutation.isPending
+                      ? t('deletingBtn', { defaultValue: 'Đang xóa...' })
+                      : t('confirmDeleteBtn', { defaultValue: 'Xác nhận xóa' })}
+                  </button>
+                </div>
+              </Card>
+            </div>
           )}
 
           {activeTab === 'invoices' && (

@@ -30,7 +30,7 @@ export interface FloorPlanTable {
 }
 
 const floorPlanRouter = new Hono<{ Bindings: Env }>();
-floorPlanRouter.use('/*', requireAuth(['owner', 'staff', 'manager']));
+floorPlanRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter']));
 
 // GET /api/floor-plan — live floor plan with active session linkage
 floorPlanRouter.get('/', async (c) => {
@@ -111,8 +111,8 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
 
   const now = new Date().toISOString();
   await db.prepare(
-    'UPDATE cafe_tables SET status = \'Overdue\', notes = COALESCE(?, notes), updated_at = ? WHERE id = ?'
-  ).bind(String(body.notes || 'No-show — awaiting auto-release'), now, id).run();
+    'UPDATE cafe_tables SET status = \'Overdue\', notes = COALESCE(?, notes) WHERE id = ?'
+  ).bind(String(body.notes || 'No-show — awaiting auto-release'), id).run();
 
   // Close any active session on the table (no-show).
   const session = await db.prepare(
@@ -123,8 +123,8 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
       'UPDATE table_sessions SET status = \'no_show\', closed_at = ?, updated_at = ? WHERE id = ?'
     ).bind(now, now, session.id).run();
     await db.prepare(
-      'UPDATE cafe_tables SET status = \'Available\', updated_at = ? WHERE id = ?'
-    ).bind(now, id).run();
+      'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
+    ).bind(id).run();
   }
 
   return c.json({
@@ -143,8 +143,8 @@ floorPlanRouter.post('/:id/release', async (c) => {
 
   const now = new Date().toISOString();
   await db.prepare(
-    'UPDATE cafe_tables SET status = \'Available\', updated_at = ? WHERE id = ?'
-  ).bind(now, id).run();
+    'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
+  ).bind(id).run();
 
   const session = await db.prepare(
     'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''

@@ -13,7 +13,7 @@ export function TierCard({
   return (
     <section
       className="relative overflow-hidden rounded-xl p-[24px] flex flex-col md:flex-row justify-between items-end md:items-stretch gap-[24px]"
-      aria-label={t('loyalty.tierCardAria', { tierName: data.tierName })}
+      aria-label={t('loyalty.tierCardAria', { tierName: data.tierName, defaultValue: `Membership tier card: ${data.tierName}` })}
       data-glass="platinum"
       style={{
         background: 'linear-gradient(135deg, color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent) 0%, color-mix(in srgb, var(--aura-surface-dim) 40%, transparent) 100%)',
@@ -130,9 +130,9 @@ export function TierCard({
             fontSize: '16px',
             lineHeight: '1.5',
           }}
-          aria-label={t('loyalty.redeemPointsAria', { balance: data.pointsBalance.toLocaleString() })}
+          aria-label={t('loyalty.redeemPointsAria', { balance: data.pointsBalance.toLocaleString(), defaultValue: `Redeem points — current balance ${data.pointsBalance.toLocaleString()}` })}
         >
-          {t('loyalty.redeemPoints')}
+          {t('loyalty.redeemPoints', 'Redeem Points')}
         </button>
       </div>
     </section>

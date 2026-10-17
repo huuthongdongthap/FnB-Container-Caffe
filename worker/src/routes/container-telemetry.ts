@@ -36,7 +36,7 @@ containerTelemetryRouter.post(
       return next();
     }
     if (isProd || c.req.header('Authorization') || providedSecret) {
-      return requireAuth(['owner', 'manager', 'staff'])(c, next);
+      return requireAuth(['owner', 'admin', 'manager', 'staff'])(c, next);
     }
     return next();
   },
@@ -120,7 +120,7 @@ containerTelemetryRouter.post(
 );
 
 // GET /api/edge/containers/status
-containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'manager']), async (c) => {
+containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin', 'manager']), async (c) => {
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
@@ -166,7 +166,7 @@ containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'manage
 });
 
 // GET /api/edge/containers/:id/history
-containerTelemetryRouter.get('/containers/:id/history', requireAuth(['owner', 'manager']), async (c) => {
+containerTelemetryRouter.get('/containers/:id/history', requireAuth(['owner', 'manager', 'admin']), async (c) => {
   const containerId = c.req.param('id');
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;

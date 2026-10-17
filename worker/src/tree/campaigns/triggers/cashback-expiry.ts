@@ -23,17 +23,35 @@ export async function detectCashbackExpiry(
     const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
     const now = new Date().toISOString();
 
-    const { results } = await db.prepare(`
-      SELECT ct.customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring
-      FROM cashback_transactions ct
-      JOIN customers c ON ct.customer_id = c.id
-      WHERE ct.type IN ('earn', 'bonus')
-        AND ct.expires_at IS NOT NULL
-        AND ct.expires_at <= ?
-        AND ct.expires_at > datetime('now')
-        AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
-      GROUP BY ct.customer_id
-    `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+    let results: ExpiringRow[] = [];
+    try {
+      const res = await db.prepare(`
+        SELECT cw.customer_id as customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring
+        FROM cashback_transactions ct
+        JOIN cashback_wallets cw ON cw.id = ct.wallet_id
+        JOIN customers c ON cw.customer_id = c.id
+        WHERE ct.type IN ('earn', 'bonus')
+          AND ct.expires_at IS NOT NULL
+          AND ct.expires_at <= ?
+          AND ct.expires_at > datetime('now')
+          AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+        GROUP BY cw.customer_id
+      `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+      results = res.results || [];
+    } catch {
+      const fallback = await db.prepare(`
+        SELECT ct.customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring
+        FROM cashback_transactions ct
+        JOIN customers c ON ct.customer_id = c.id
+        WHERE ct.type IN ('earn', 'bonus')
+          AND ct.expires_at IS NOT NULL
+          AND ct.expires_at <= ?
+          AND ct.expires_at > datetime('now')
+          AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+        GROUP BY ct.customer_id
+      `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+      results = fallback.results || [];
+    }
 
     const customers: CampaignCustomer[] = results.map(row => ({
       id: row.customer_id,

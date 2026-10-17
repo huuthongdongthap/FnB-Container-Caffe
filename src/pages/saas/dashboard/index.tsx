@@ -31,7 +31,7 @@ export default function CustomerDashboardPage() {
         <HelmetHead title="Dashboard — AURA CAFE" description="Customer dashboard" canonical="/saas/dashboard" />
         <Card className="p-10">
           <h2 className="font-display text-xl font-bold">Vui lòng đăng nhập</h2>
-          <p className="mt-2 text-sm text-gray-600">Bạn cần đăng nhập để xem dashboard.</p>
+          <p className="mt-2 text-sm text-muted">Bạn cần đăng nhập để xem dashboard.</p>
           <Link to="/account"><Button className="mt-4">Đăng nhập</Button></Link>
         </Card>
       </div>

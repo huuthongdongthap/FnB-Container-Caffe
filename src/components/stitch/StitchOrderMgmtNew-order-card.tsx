@@ -14,9 +14,10 @@ import { StatusBadge, OrderActionButton } from './StitchOrderMgmtNew-status-badg
 interface OrderCardProps {
   order: OrderData;
   onAction?: () => void;
+  onViewDetails?: () => void;
 }
 
-export function OrderCard({ order, onAction }: Readonly<OrderCardProps>) {
+export function OrderCard({ order, onAction, onViewDetails }: Readonly<OrderCardProps>) {
   const { t } = useTranslation();
 
   const isCancelled = order.status === 'cancelled';
@@ -125,7 +126,7 @@ export function OrderCard({ order, onAction }: Readonly<OrderCardProps>) {
           <div className="grid grid-cols-2 gap-2">
             <OrderActionButton
               label={tTerminal('details')}
-              onClick={onAction}
+              onClick={onViewDetails ?? (isServed ? undefined : onAction)}
             />
             <OrderActionButton
               label={tTerminal(actionLabel.toLowerCase()) || actionLabel}

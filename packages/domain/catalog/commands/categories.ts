@@ -15,7 +15,7 @@ import type { Category } from '../model/catalog-types';
 import { syncCategorySlugToMenuProjection } from '../policies/menu-projection';
 
 export const categoriesRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 // ── 1. Static Literal Routes (MUST PRECEDENCE OVER /:id) ──
 categoriesRouter.get('/tree', async (c) => {

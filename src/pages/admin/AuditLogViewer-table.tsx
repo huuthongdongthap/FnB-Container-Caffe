@@ -17,13 +17,13 @@ interface AuditTableProps {
 function ActionBadge({ action }: { action: string }) {
   const color =
     action === 'DELETE'
-      ? 'bg-red-500/10 text-red-600'
+      ? 'bg-red-500/15 text-red-400'
       : action === 'CREATE'
-        ? 'bg-green-500/10 text-green-600'
+        ? 'bg-green-500/15 text-green-400'
         : action === 'UPDATE'
-          ? 'bg-blue-500/10 text-blue-600'
+          ? 'bg-blue-500/15 text-blue-400'
           : action === 'LOGIN' || action === 'LOGOUT'
-            ? 'bg-purple-500/10 text-purple-600'
+            ? 'bg-purple-500/15 text-purple-300'
             : 'bg-muted/10 text-muted';
 
   return (

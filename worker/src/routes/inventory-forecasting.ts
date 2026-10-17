@@ -11,7 +11,7 @@ import type { InventoryForecastItem } from '../types/api';
 
 export const inventoryForecastingRouter = new Hono<{ Bindings: Env }>();
 
-inventoryForecastingRouter.use('/*', requireAuth(['owner', 'manager', 'staff']));
+inventoryForecastingRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'staff']));
 
 interface InventoryRow {
   id: string;

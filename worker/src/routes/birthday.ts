@@ -5,10 +5,47 @@
 
 import { Hono } from 'hono';
 import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
+import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
 
 
 export const birthdayRouter = new Hono<{ Bindings: Env }>();
+
+type BirthdayCustomerRow = {
+  id: string;
+  name: string;
+  phone?: string;
+  birthday?: string | null;
+  date_of_birth?: string | null;
+};
+
+async function findBirthdayCustomer(
+  db: Env['AURA_DB'],
+  by: { id?: string; phone?: string }
+): Promise<{ id: string; name: string; phone: string; birthday: string } | null> {
+  const col = by.id ? 'id' : 'phone';
+  const val = by.id ?? by.phone ?? '';
+  let row: BirthdayCustomerRow | null = null;
+  try {
+    row = await db
+      .prepare(`SELECT id, name, phone, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
+      .bind(val)
+      .first<BirthdayCustomerRow>();
+  } catch {
+    row = await db
+      .prepare(`SELECT id, name, phone, birthday FROM customers WHERE ${col} = ?`)
+      .bind(val)
+      .first<BirthdayCustomerRow>();
+  }
+  if (!row) return null;
+  const resolvedBirthday = row.birthday ?? row.date_of_birth ?? '';
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone ?? '',
+    birthday: resolvedBirthday,
+  };
+}
 
 const DEFAULT_BIRTHDAY_CONFIG = {
   discountPercent: 15,
@@ -36,7 +73,15 @@ birthdayRouter.get('/config', async (c) => {
 });
 
 // PUT /api/admin/birthday/config — update birthday campaign configuration
-birthdayRouter.put('/config', async (c) => {
+birthdayRouter.put(
+  '/config',
+  async (c, next) => {
+    if (c.env?.JWT_SECRET) {
+      return requireAuth(['owner', 'manager', 'admin', 'staff'])(c, next);
+    }
+    await next();
+  },
+  async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>;
   const raw = await c.env.AUTH_KV?.get('config:birthday');
   const prev = raw ? (JSON.parse(raw) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>) : {};
@@ -62,17 +107,10 @@ birthdayRouter.get('/check', async(c) => {
   }
 
   try {
-    let customer: { id: string; name: string; phone: string; birthday: string } | null = null;
-
-    if (customerId) {
-      customer = await db.prepare(
-        'SELECT id, name, phone, birthday FROM customers WHERE id = ?'
-      ).bind(customerId).first<{ id: string; name: string; phone: string; birthday: string }>();
-    } else if (phone) {
-      customer = await db.prepare(
-        'SELECT id, name, phone, birthday FROM customers WHERE phone = ?'
-      ).bind(phone).first<{ id: string; name: string; phone: string; birthday: string }>();
-    }
+    const customer = await findBirthdayCustomer(
+      db,
+      customerId ? { id: customerId } : { phone: phone || '' }
+    );
 
     if (!customer || !customer.birthday) {
       return c.json({ success: true, data: { eligible: false, reason: 'No birthday on file' } });
@@ -133,9 +171,7 @@ birthdayRouter.post('/redeem', async(c) => {
   }
   const data = parsed.data;
 
-  const customer = await db.prepare(
-    'SELECT id, name, birthday FROM customers WHERE id = ?'
-  ).bind(data.customer_id).first<{ id: string; name: string; birthday: string }>();
+  const customer = await findBirthdayCustomer(db, { id: data.customer_id });
 
   if (!customer || !customer.birthday) {
     return c.json({ success: false, error: 'Customer not found or no birthday' }, 404);

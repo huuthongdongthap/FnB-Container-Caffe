@@ -133,6 +133,9 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'st
   if (!checkin) {
     return c.json({ success: false, error: 'Checkin not found' }, 404);
   }
+  if (checkin.status !== 'pending') {
+    return c.json({ success: false, error: `Already ${checkin.status}` }, 400);
+  }
 
   await db.prepare('UPDATE checkins SET status = ? WHERE id = ?').bind('rejected', id).run();
 

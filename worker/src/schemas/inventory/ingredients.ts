@@ -4,12 +4,12 @@ import {
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
-  IdParamsSchema,
   LocaleEnum,
   DateTimeSchema,
   MoneySchema,
   ReferenceSchema,
 } from '../common';
+import { IdParamsSchema } from './common';
 
 export const IngredientTranslationSchema = z.object({
   locale: LocaleEnum,
@@ -25,8 +25,8 @@ export const IngredientCreateSchema = z.object({
   currentStock: z.number().default(0),
   minStock: z.number().int().nonnegative().default(10),
   maxStock: z.number().int().nonnegative().optional(),
-  locationId: z.string().uuid().optional(),
-  supplierId: z.string().uuid().nullable().optional(),
+  locationId: z.string().min(1).optional(),
+  supplierId: z.string().min(1).nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientCreate');
@@ -39,14 +39,14 @@ export const IngredientUpdateSchema = z.object({
   currentStock: z.number().optional(),
   minStock: z.number().int().nonnegative().optional(),
   maxStock: z.number().int().nonnegative().optional(),
-  locationId: z.string().uuid().optional(),
-  supplierId: z.string().uuid().nullable().optional(),
+  locationId: z.string().min(1).optional(),
+  supplierId: z.string().min(1).nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientUpdate');
 
 export const IngredientResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   sku: z.string(),
   name: z.string(),
   unit: z.string(),
@@ -54,9 +54,9 @@ export const IngredientResponseSchema = z.object({
   currentStock: z.number(),
   minStock: z.number().int().nonnegative(),
   maxStock: z.number().int().nonnegative().nullable(),
-  locationId: z.string().uuid().nullable(),
+  locationId: z.string().min(1).nullable(),
   location: ReferenceSchema.nullable().optional(),
-  supplierId: z.string().uuid().nullable(),
+  supplierId: z.string().min(1).nullable(),
   supplier: ReferenceSchema.nullable().optional(),
   translations: z.array(IngredientTranslationSchema),
   metadata: z.record(z.string(), z.unknown()).nullable(),

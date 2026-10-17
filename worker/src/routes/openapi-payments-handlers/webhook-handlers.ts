@@ -20,12 +20,21 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
     };
     const now = new Date().toISOString();
 
+    if (!body?.data || body.data.orderCode === undefined || body.data.orderCode === null) {
+      return c.json({ success: false, error: 'Missing webhook payload data' }, 400);
+    }
+
     const signature = body.signature || c.req.header('X-PayOS-Signature');
     if (!signature) {
       return c.json({ success: false, error: 'Missing signature' }, 401);
     }
 
-    if (c.env.PAYOS_CHECKSUM_KEY && body.data) {
+    const isProd = c.env?.ENVIRONMENT === 'production' || (c.env as Record<string, unknown>)?.NODE_ENV === 'production';
+    if (!c.env?.PAYOS_CHECKSUM_KEY && isProd) {
+      return c.json({ success: false, error: 'Webhook verification key not configured' }, 500);
+    }
+
+    if (c.env?.PAYOS_CHECKSUM_KEY) {
       const isValid = await verifySignature(body.data as Record<string, unknown>, signature, c.env.PAYOS_CHECKSUM_KEY);
       if (!isValid) {
         return c.json({ success: false, error: 'Invalid signature' }, 401);
@@ -84,10 +93,17 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
     }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, 'system', 'payment_webhook', 'payment', payment.id, JSON.stringify({ status: newStatus }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind('payment_webhook', 'system', 'payment', payment.id, JSON.stringify({ status: newStatus }), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, 'system', 'payment_webhook', 'payment', payment.id, JSON.stringify({ status: newStatus }), now).run().catch(() => {});
+    }
 
     return c.json({ success: true, data: { received: true } });
   });

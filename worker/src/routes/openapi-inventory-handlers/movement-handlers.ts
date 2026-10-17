@@ -39,13 +39,33 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM stock_movements ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const items = (await db.prepare(
-      `SELECT * FROM stock_movements ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
+    let itemsResults: any[] = [];
+    try {
+      const aliasWhere = whereClause
+        ? whereClause.replace(/ingredient_id/g, 'sm.ingredient_id').replace(/created_at/g, 'sm.created_at').replace(/\btype =/g, 'sm.type =')
+        : '';
+      const items = (await db.prepare(
+        `SELECT sm.*, i.name as ingredient_name, i.sku as ingredient_sku, i.unit as ingredient_unit
+         FROM stock_movements sm
+         LEFT JOIN ingredients i ON sm.ingredient_id = i.id
+         ${aliasWhere}
+         ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      itemsResults = items.results || [];
+    } catch {
+      try {
+        const items = (await db.prepare(
+          `SELECT * FROM stock_movements ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()) as { results: any[] };
+        itemsResults = items.results || [];
+      } catch {
+        itemsResults = [];
+      }
+    }
 
     return c.json({
       success: true,
-      data: items.results || [],
+      data: itemsResults,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });

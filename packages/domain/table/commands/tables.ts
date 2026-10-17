@@ -87,7 +87,7 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string) {
 }
 
 // PATCH /api/tables/:id/occupy — staff/manager-only (QR guests use guest-checkin instead)
-tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff']), audit('table_occupy'), async (c) => {
+tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']), audit('table_occupy'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const table = await updateTable(db, id, 'Occupied');
@@ -98,7 +98,7 @@ tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff']), au
 });
 
 // PATCH /api/tables/:id/release — staff/manager-only
-tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff']), audit('table_release'), async (c) => {
+tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']), audit('table_release'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const table = await updateTable(db, id, 'Available');
@@ -109,7 +109,7 @@ tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff']), a
 });
 
 // PATCH /api/tables/:id/status — set arbitrary status (staff/manager-only)
-tablesRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff']), audit('table_status_change'), async (c) => {
+tablesRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']), audit('table_status_change'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;

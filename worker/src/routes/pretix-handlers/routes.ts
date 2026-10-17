@@ -8,7 +8,7 @@ import { registerGenerateHandler } from './generate-handler';
 
 export const pretixRouter = new Hono();
 
-const pretixStaffAuth = requireAuth(['owner', 'manager', 'staff']);
+const pretixStaffAuth = requireAuth(['owner', 'admin', 'manager', 'staff']);
 const guardPretixOps: MiddlewareHandler = async (c, next) => {
   const env = (c.env ?? {}) as { ENVIRONMENT?: string; NODE_ENV?: string };
   const isProd = env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';

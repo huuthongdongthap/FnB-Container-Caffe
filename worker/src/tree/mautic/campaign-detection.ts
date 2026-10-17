@@ -32,8 +32,26 @@ async function detectAndEnroll(
     return { detected: 0, enrolled: 0 };
   }
 
-  const { results } = await db.prepare(query).bind(...queryParams).all();
-  const customers = (results || []) as Array<Record<string, unknown>>;
+  let customers: Array<Record<string, unknown>> = [];
+  try {
+    const { results } = await db.prepare(query).bind(...queryParams).all();
+    customers = (results || []) as Array<Record<string, unknown>>;
+  } catch (err) {
+    const msg = String((err as Error)?.message || '');
+    if (msg.includes('no such column') && query.includes('c.loyalty_tier')) {
+      try {
+        const fallbackQuery = query
+          .replace('c.loyalty_tier', 'c.tier as loyalty_tier')
+          .replace(/c\.date_of_birth/g, 'c.birthday');
+        const { results } = await db.prepare(fallbackQuery).bind(...queryParams).all();
+        customers = (results || []) as Array<Record<string, unknown>>;
+      } catch {
+        return { detected: 0, enrolled: 0 };
+      }
+    } else {
+      return { detected: 0, enrolled: 0 };
+    }
+  }
   const detected = customers.length;
   let enrolled = 0;
 

@@ -56,7 +56,7 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
 				});
 			}
 			const payload = await verifyJWT(token, env.JWT_SECRET);
-			if (!payload || !['owner', 'staff'].includes(payload.role)) {
+			if (!payload || !['owner', 'manager', 'admin', 'staff'].includes(payload.role)) {
 				return new Response(JSON.stringify({ success: false, error: 'Không đủ quyền truy cập' }), {
 					status: 403, headers: { 'Content-Type': 'application/json' }
 				});
@@ -96,6 +96,20 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
 
 		// DELETE /api/erpnext/configure — clear credentials from KV
 		if (method === 'DELETE' && path === '/configure') {
+			if (env.JWT_SECRET) {
+				const token = getAuthToken(request);
+				if (!token) {
+					return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+						status: 401, headers: { 'Content-Type': 'application/json' }
+					});
+				}
+				const payload = await verifyJWT(token, env.JWT_SECRET);
+				if (!payload || !['owner', 'manager', 'admin', 'staff'].includes(payload.role)) {
+					return new Response(JSON.stringify({ success: false, error: 'Không đủ quyền truy cập' }), {
+						status: 403, headers: { 'Content-Type': 'application/json' }
+					});
+				}
+			}
 			if (env.AUTH_KV) {
 				await env.AUTH_KV.delete('erpnext:api_url');
 				await env.AUTH_KV.delete('erpnext:api_key');

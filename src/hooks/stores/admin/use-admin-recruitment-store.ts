@@ -62,8 +62,8 @@ export const useAdminRecruitmentStore = create<AdminRecruitmentState>((set, get)
 
     try {
       const params = new URLSearchParams();
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.position) params.append('position', filters.position);
+      if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
+      if (filters?.position && filters.position !== 'all') params.append('position', filters.position);
       if (filters?.search) params.append('search', filters.search);
 
       const queryStr = params.toString() ? `?${params.toString()}` : '';
@@ -170,8 +170,20 @@ export const useAdminRecruitmentStore = create<AdminRecruitmentState>((set, get)
   },
 
   addCandidate: async (candidate) => {
+    let serverId: string | undefined;
+    try {
+      const res = await apiFetch<{ id?: string; data?: { id?: string } }>('/api/recruitment/apply', {
+        method: 'POST',
+        body: JSON.stringify(candidate),
+        silent: true,
+      });
+      serverId = res?.id ?? res?.data?.id;
+    } catch {
+      // Local addition remains when offline
+    }
+
     const newApp: RecruitmentApplication = {
-      id: `APP_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: serverId ?? `APP_${Date.now()}`,
       ...candidate,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -187,16 +199,6 @@ export const useAdminRecruitmentStore = create<AdminRecruitmentState>((set, get)
       localStorage.setItem('aura_recruitment_applications', JSON.stringify(local.slice(0, 50)));
     } catch {
       // Ignore
-    }
-
-    try {
-      await apiFetch('/api/recruitment/apply', {
-        method: 'POST',
-        body: JSON.stringify(candidate),
-        silent: true,
-      });
-    } catch {
-      // Local addition remains
     }
   },
 }));

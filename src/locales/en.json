@@ -92,7 +92,13 @@
     "facebook": "Facebook",
     "instagram": "Instagram",
     "tiktok": "TikTok",
-    "copyright": "© {{year}} AURA CAFE · 29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap"
+    "copyright": "© {{year}} AURA CAFE · 29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap",
+    "PrivacyPolicy": "Privacy Policy",
+    "TermsOfService": "Terms of Service",
+    "Support": "Support",
+    "footerAriaLabel": "Footer",
+    "footerPrivacy": "Privacy Policy",
+    "footerTerms": "Terms"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -396,7 +402,13 @@
     "close": "Close",
     "send": "Send",
     "toggleOpen": "Open chat",
-    "toggleClosed": "Close chat"
+    "toggleClosed": "Close chat",
+    "loadError": "Failed to load conversations",
+    "retry": "Retry",
+    "messageCount": "{{count}} messages",
+    "sendError": "Failed to send message",
+    "back": "Back",
+    "replyPlaceholder": "Type a reply..."
   },
   "adminChart": {
     "noProductData": "No product data yet",
@@ -461,12 +473,14 @@
     "clearSearchAriaLabel": "Clear search",
     "notFound": "Item not found",
     "notFoundDesc": "Try changing the filter or searching with a different keyword.",
-    "featured": "Featured"
+    "featured": "Featured",
+    "CategoryNavAria": "Menu categories"
   },
   "checkout": {
     "variantStandard": "Standard",
     "luxuryTax": "Service Fee",
     "deliveryFee": "Delivery Fee",
+    "payment": "Payment",
     "failedToCreateOrder": "Failed to create order",
     "paymentLinkFailed": "Payment link failed"
   },
@@ -545,8 +559,7 @@
     "seoTitle": "Order Online — AURA CAFE Sa Dec",
     "seoDescription": "Order coffee, milk tea, and more online at AURA CAFE Sa Dec. Fast delivery and easy pickup options available.",
     "ogTitle": "Order Online — AURA CAFE Sa Dec",
-    "ogDescription": "Order your favorites online from AURA CAFE — Container Caffe Sa Dec",
-    "payment": "Payment"
+    "ogDescription": "Order your favorites online from AURA CAFE — Container Caffe Sa Dec"
   },
   "loyalty": {
     "navTiers": "Tiers",
@@ -624,7 +637,55 @@
     "currentTier": "Current Tier",
     "tierFromPoints": "From {{points}} points",
     "pointMultiplier": "Point Multiplier",
-    "cashbackRate": "Cashback"
+    "cashbackRate": "Cashback",
+    "ReferralAriaLabel": "Refer a friend and earn rewards",
+    "ReferralTitle": "Refer a Friend",
+    "ReferralBody": "Share your referral code. When a friend completes their first order, both of you receive 200 bonus points.",
+    "CodeCopied": "Copied",
+    "CopyCode": "Copy Code",
+    "TierBenefitsAriaLabel": "Membership tier benefits",
+    "TierComparisonTitle": "Tier Benefits Comparison",
+    "CurrentBadge": "Current",
+    "TierCardAriaLabel": "Membership tier card",
+    "TierProgressAriaLabel": "Membership tier progress",
+    "CurrentTierLabel": "Current Tier",
+    "GoldMember": "Gold Member",
+    "AvailableBalance": "Available Balance",
+    "ProgressTo": "Progress to",
+    "PlatinumTier": "Platinum Tier",
+    "GoldMaxMessage": "You have reached the highest tier! Enjoy all VIP privileges.",
+    "StreakBonusHint": "Maintain your daily check-in streak to earn double reward points.",
+    "WeeklyStreakAriaLabel": "Weekly check-in streak",
+    "RewardProgressAriaLabel": "Check-in reward progress",
+    "WeeklyStreakTitle": "Weekly Check-in Streak",
+    "BonusPts": "+50 bonus pts",
+    "StreakCompletedMsg": "Congratulations! You completed a 7-day streak and earned +50 bonus points!",
+    "StreakRemainingMsg": "{{remaining}} more days to earn +50 weekly bonus points!",
+    "CheckingIn": "Checking in...",
+    "CheckedInToday": "Checked in today",
+    "DailyCheckinCta": "Daily Check-in (+10 pts)",
+    "RedeemPointsTitle": "Redeem Points",
+    "PointsBalance": "Points balance",
+    "CostLabel": "Cost",
+    "PtsUnit": "pts",
+    "ClaimedLabel": "Claimed",
+    "RedeemBtn": "Redeem",
+    "FooterTagline": "Experience rustic container coffee and member privileges in Sa Dec.",
+    "TermsOfService": "Terms of Service",
+    "PrivacyPolicy": "Privacy Policy",
+    "HelpCenter": "Help Center",
+    "Copyright": "© 2026 AURA CAFE. All rights reserved.",
+    "footerPrivacy": "Privacy Policy",
+    "footerTerms": "Terms of Service",
+    "footerBlackTier": "Gold Tier Privileges",
+    "footerContact": "Contact Support",
+    "footerCopyright": "© 2026 AURA CAFE. ALL RIGHTS RESERVED.",
+    "referralSectionAria": "Referral Section",
+    "tierBenefitsAria": "Membership Tier Benefits",
+    "tierCardAria": "Membership tier card: {{tierName}}",
+    "redeemPointsAria": "Redeem points — current balance {{balance}}",
+    "weeklyStreakAria": "Weekly Streak",
+    "checkinAria": "Check in at Roastery"
   },
   "contact": {
     "breadcrumbHome": "Home",
@@ -641,7 +702,13 @@
     "followUs": "Follow Us",
     "hotline": "Hotline",
     "weekdayHours": "Mon — Fri: 06:00 — 22:00",
-    "weekendHours": "Sat — Sun: 06:00 — 23:00"
+    "weekendHours": "Sat — Sun: 06:00 — 23:00",
+    "FooterPrivacy": "Privacy Policy",
+    "FooterTerms": "Terms of Service",
+    "FooterSupport": "Support",
+    "footerPrivacy": "Privacy Policy",
+    "footerTerms": "Terms of Service",
+    "footerSupport": "Support"
   },
   "reviews": {
     "seoTitle": "Guest Reviews | Aura Cafe",
@@ -1334,7 +1401,19 @@
     "theDigitalReserve": "The Digital Reserve",
     "landing": {
       "phoneValue": "+84 946 013 633"
-    }
+    },
+    "notFound": {
+      "privacyPolicy": "Privacy Policy",
+      "termsOfService": "Terms of Service",
+      "contact": "Contact",
+      "copyright": "© 2026 AURA CAFE. CONTAINER COFFEE SPACE."
+    },
+    "header": "Menu header",
+    "brandName": "AURA CAFE",
+    "nav": "Main navigation",
+    "navHome": "Home",
+    "navMenu": "Menu",
+    "navLocation": "Location"
   },
   "about": {
     "heroSubtitle": "Local Container Coffee — 3 container blocks, 5 experience zones in Sa Dec",
@@ -1712,11 +1791,13 @@
     "title": "AURA CAFE Menu",
     "subtitle": "Container Caffe & Space · Sa Dec",
     "loading": "Loading menu...",
+    "errorLoading": "Could not load menu. Retrying...",
+    "seoTitle": "TV Menu — AURA CAFE Sa Dec",
+    "seoDescription": "Digital TV menu display for AURA CAFE Sa Dec. Discover coffee, tea, and signature beverages.",
     "retry": "Retry",
     "featured": "Featured",
     "soldOut": "Sold Out"
   },
-  "stitch.theDigitalReserve": "The Digital Reserve",
   "account.error.retry": "Retry",
   "account.error.title": "An error occurred",
   "account.loading": "Loading...",
@@ -1941,7 +2022,7 @@
     "recentShifts": "Recent Shifts",
     "noRecentShifts": "No recent shifts",
     "fieldPassword": "Password",
-    "fieldRolePlaceholder": "e.g. Pha che, Phuc vu, Thu ngan",
+    "fieldRolePlaceholder": "E.g., Barista, Server, Cashier",
     "recruitment": "Recruitment",
     "recruitmentTitle": "Staff Recruitment",
     "recruitmentSubtitle": "Manage job candidate applications for AURA CAFE",
@@ -2255,6 +2336,59 @@
       "staff": "Staff",
       "payment": "Payment",
       "reservation": "Reservation"
+    }
+  },
+  "orderSuccess": {
+    "SupportAria": "Order support",
+    "NeedHelp": "Need help with your order?",
+    "ContactSupport": "Contact Support"
+  },
+  "brand": {
+    "breadcrumbs": {
+      "home": "Home",
+      "brandGuideline": "Brand Guideline"
+    },
+    "fonts": {
+      "display": "Display & Headlines",
+      "body": "Body & Interface",
+      "utility": "Metrics & Code"
+    },
+    "hero": {
+      "descriptionPrefix": "Brand identity system of ",
+      "descriptionSuffix": " — the intersection of rustic industrial container architecture and contemporary coffee culture in Sa Dec."
+    },
+    "colors": {
+      "descriptionPrefix": "Core color palette inspired by ",
+      "descriptionSuffix": " and warm nocturnal cafe lighting, adhering to Material Design 3 contrast standards."
+    },
+    "typography": {
+      "description": "Clean, modern typography system optimized for Vietnamese legibility across mobile devices and digital TV displays."
+    },
+    "materials": {
+      "description": "A harmonious blend of upcycled industrial materials and warm natural textures that define the signature spatial identity of AURA CAFE.",
+      "cortenSteelDesc": "Original container steel surface with natural patina, symbolizing industrial durability and character.",
+      "walnutOakDesc": "Warm natural wood grain that balances metallic surfaces and creates an inviting atmosphere.",
+      "smokedBrassDesc": "Brushed metallic brass accents that highlight the brew bar and decorative lighting fixtures.",
+      "blackTerrazzoDesc": "Stain-resistant dark terrazzo stone that complements the Midnight Navy color palette."
+    },
+    "rules": {
+      "do1": "Use warm, approachable, and authentic Mekong Delta hospitality tone.",
+      "do2": "Prioritize real venue photography with natural light or warm evening ambiance.",
+      "do3": "Preserve the master logo aspect ratio without circular cropping and maintain clear space.",
+      "do4": "Ensure text contrast meets WCAG AA standards on dark surfaces (#0E1322).",
+      "do5": "Highlight sustainable upcycled container architecture and green spaces.",
+      "dont1": "Avoid overly corporate, distant, or exaggerated marketing jargon.",
+      "dont2": "Never distort, recolor arbitrarily, or circular-crop the brand mark.",
+      "dont3": "Never use dark-on-dark (-600 or darker) text classes directly on dark backgrounds.",
+      "dont4": "Do not introduce fonts outside the Be Vietnam Pro and JetBrains Mono families.",
+      "dont5": "Avoid generic stock photos that misrepresent the actual container venue."
+    },
+    "voice": {
+      "description": "The AURA CAFE brand voice is rustic, sincere, and welcoming — connecting modern lifestyle with the peaceful charm of Sa Dec.",
+      "doTitle": "DO'S",
+      "dontTitle": "DON'TS",
+      "slogan": "Rustic in steel, warm at heart",
+      "subSlogan": "AURA CAFE — Container Coffee Space in the Heart of Sa Dec"
     }
   }
 }

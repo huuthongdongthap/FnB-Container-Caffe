@@ -110,7 +110,7 @@ export default function KitchenDisplay() {
   const filteredOrders = activeStation === 'all'
     ? activeOrders
     : activeOrders.filter((o) => orderMatchesStation(o, activeStation));
-  const pendingCount = activeOrders.filter((o) => o.status === 'pending').length;
+  const pendingCount = activeOrders.filter((o) => o.status === 'pending' || o.status === 'confirmed').length;
   const preparingCount = activeOrders.filter((o) => o.status === 'preparing').length;
 
   // Count orders per station for badges

@@ -118,7 +118,7 @@ export const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
 export const STATUS_BAR_CLASSES: Record<OrderStatus, string> = {
   pending: 'bg-[var(--aura-chrome-light, #C9D6DF)] shadow-[0_0_10px_rgba(201,214,223,0.5)]',
   preparing: 'bg-[var(--aura-chrome-bright, #E8EEF3)] shadow-[0_0_10px_rgba(232,238,243,0.5)]',
-  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(var(--aura-chrome-light),0.5)]',
+  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(201,214,223,0.5)]',
   served: 'bg-[var(--aura-text-secondary, #a0a8b0)] shadow-[0_0_10px_rgba(160,168,176,0.5)]',
   cancelled: 'bg-[var(--aura-error, #FFB4AB)] shadow-[0_0_10px_rgba(255,180,171,0.5)]',
 };
@@ -131,6 +131,7 @@ export function getActionForStatus(status: OrderStatus): string {
     case 'pending': return 'Preparing';
     case 'preparing': return 'Ready';
     case 'ready': return 'Serve';
+    case 'served': return 'Completed';
     default: return 'Completed';
   }
 }

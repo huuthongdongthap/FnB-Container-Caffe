@@ -104,10 +104,7 @@ export function CheckoutPage() {
 
     const payload = {
       items: items.map((i) => {
-        const rawId = i.productId || i.id || '';
-        const baseProductId = (rawId.includes('-') || rawId.includes('_'))
-          ? rawId.split(/[-_]/)[0]?.trim() || rawId
-          : rawId;
+        const baseProductId = (i.productId || i.id || '').trim();
         return {
           id: i.id,
           product_id: baseProductId,
@@ -168,14 +165,21 @@ export function CheckoutPage() {
         }
 
         // Send payment token to backend
+        const storedToken = typeof localStorage !== 'undefined'
+          ? (localStorage.getItem('aura_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('token'))
+          : null;
+        const resolvedOrderAmount = Number((order as unknown as { total?: number }).total ?? order.totalAmount ?? effectiveTotal);
         const res = await fetch(`${API_BASE}/api/payments/payment-request`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+          },
           body: JSON.stringify({
             order_id: order.id,
             payment_token: response.details,
-            amount: order.totalAmount || effectiveTotal,
+            amount: resolvedOrderAmount,
             currency: 'VND',
           }),
         });
@@ -184,7 +188,7 @@ export function CheckoutPage() {
         if (result.success) {
           await response.complete('success');
           try {
-            localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.totalAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName }));
+            localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: resolvedOrderAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName }));
             localStorage.removeItem('aura_checkout_form');
           } catch { /* */ }
           clearCart();
@@ -211,12 +215,20 @@ export function CheckoutPage() {
         throw new Error(useOrderStore.getState().error || t('failedToCreateOrder'));
       }
 
-      const serverTotal = Number((order as unknown as { total?: number }).total || order.totalAmount || effectiveTotal);
+      const rawOrder = (order as unknown as { order?: typeof order; data?: typeof order })?.order
+        ?? (order as unknown as { data?: typeof order })?.data
+        ?? order;
+      const orderId = rawOrder.id;
+      const serverTotal = Number(
+        (rawOrder as unknown as { totalAmount?: number; total?: number }).totalAmount
+        ?? (rawOrder as unknown as { total?: number }).total
+        ?? effectiveTotal
+      );
 
       // Save order info for success page
       try {
         localStorage.setItem('pendingOrder', JSON.stringify({
-          id: order.id,
+          id: orderId,
           total: serverTotal,
           payment_method: formData.paymentMethod,
           customer_name: formData.fullName,
@@ -226,7 +238,7 @@ export function CheckoutPage() {
       // Handle PayOS redirect with internal retry
       if (formData.paymentMethod === 'payos') {
         setPayosRetrying(true);
-        const url = await retryCreatePaymentLink(order.id, serverTotal);
+        const url = await retryCreatePaymentLink(orderId, serverTotal);
         setPayosRetrying(false);
         if (url) {
           window.location.href = url;
@@ -241,7 +253,7 @@ export function CheckoutPage() {
         localStorage.removeItem('aura_checkout_form');
       } catch { /* storage unavailable */ }
       clearCart();
-      navigate(`/order-success?order_id=${order.id}`);
+      navigate(`/order-success?order_id=${orderId}`);
     } catch (err) {
       submittingRef.current = false;
       throw err; // StitchCheckout catches and displays the error

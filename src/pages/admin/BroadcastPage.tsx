@@ -69,7 +69,7 @@ export default function BroadcastPage() {
         title="Gửi tin nhắn hàng loạt — Broadcast — AURA CAFE"
         description="Gửi tin nhắn ZNS, SMS và Email đến khách hàng tại AURA CAFE. Bulk messaging via ZNS, SMS & Email."
       />
-      <div className="min-h-screen bg-background p-6 dark:bg-gray-950">
+      <div className="min-h-screen bg-background p-6">
         <div className="mx-auto max-w-2xl">
           <div className="mb-6">
             <h1 className="text-2xl font-display font-bold">
@@ -79,7 +79,7 @@ export default function BroadcastPage() {
           </div>
 
           {sendMutation.error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">
               <p className="font-medium">{t('broadcast.error')}</p>
               <p className="text-sm">{sendMutation.error.message}</p>
             </div>

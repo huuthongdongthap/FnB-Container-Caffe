@@ -78,11 +78,19 @@ export default function InventoryPage() {
 
   const handleSubmitMovement = async (payload: {
     ingredientId: string;
-    type: 'in' | 'out' | 'adjust' | 'waste';
+    type: 'in' | 'out' | 'adjustment' | 'adjust' | 'waste';
     quantity: number;
     notes?: string;
   }) => {
-    await apiFetch('/api/inventory/movements', { method: 'POST', body: JSON.stringify(payload) });
+    const normalizedType = payload.type === 'adjust' ? 'adjustment' : payload.type;
+    await apiFetch('/api/inventory/movements', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        type: normalizedType,
+        movementType: normalizedType,
+      }),
+    });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-inventory-movements'] }),
@@ -117,7 +125,7 @@ export default function InventoryPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
                     isActive
-                      ? 'bg-[var(--aura-chrome-light,#c9d6df)] text-black shadow-sm'
+                      ? 'bg-[var(--aura-chrome-light,#c9d6df)] text-[var(--md-sys-color-on-primary)] shadow-sm'
                       : 'bg-white/5 text-[var(--aura-text-muted)] hover:bg-white/10 hover:text-[var(--aura-text-primary)]'
                   }`}
                 >

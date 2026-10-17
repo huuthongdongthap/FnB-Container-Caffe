@@ -31,12 +31,12 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
             <Skeleton className="h-8 w-full" />
           </div>
         ) : !invoices || invoices.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-600">Chưa có hóa đơn nào.</p>
+          <p className="mt-4 text-sm text-muted">Chưa có hóa đơn nào.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500">
+                <tr className="text-left text-muted">
                   <th className="pb-2">Số hóa đơn</th>
                   <th className="pb-2">Kỳ</th>
                   <th className="pb-2">Số tiền</th>
@@ -48,7 +48,7 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
                 {invoices.map((inv) => {
                   const isPayable = inv.status === 'pending' || inv.status === 'processing';
                   return (
-                    <tr key={inv.id} className="border-t">
+                    <tr key={inv.id} className="border-t border-white/10">
                       <td className="py-2">{inv.invoice_number || '—'}</td>
                       <td className="py-2">{formatDateRange(inv.period_start, inv.period_end)}</td>
                       <td className="py-2">{formatVND(inv.amount_vnd)}</td>
@@ -57,12 +57,12 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
                         {isPayable ? (
                           <Button size="sm" onClick={() => handlePay(inv.id)}>Thanh toán</Button>
                         ) : (
-                          <span className="text-xs text-gray-500">—</span>
+                          <span className="text-xs text-muted">—</span>
                         )}
                         {inv.status === 'paid' ? (
                           <ReceiptDownloadButton invoiceId={inv.id} invoiceNumber={inv.invoice_number || ''} />
                         ) : (
-                          <span className="text-xs text-gray-500" title="Chưa thanh toán">🔒</span>
+                          <span className="text-xs text-muted" title="Chưa thanh toán">🔒</span>
                         )}
                       </td>
                     </tr>

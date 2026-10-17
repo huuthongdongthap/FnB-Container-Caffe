@@ -167,7 +167,16 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     }
 
     // Check if ingredient is used in recipes or purchase orders
-    const usedInRecipe = await db.prepare('SELECT 1 FROM recipe_ingredients WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+    let usedInRecipe = null;
+    try {
+      usedInRecipe = await db.prepare('SELECT 1 FROM recipe_items WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+    } catch {
+      try {
+        usedInRecipe = await db.prepare('SELECT 1 FROM recipe_ingredients WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+      } catch {
+        usedInRecipe = null;
+      }
+    }
     if (usedInRecipe) {
       return c.json({ success: false, error: 'Cannot delete ingredient used in recipes' }, 409);
     }

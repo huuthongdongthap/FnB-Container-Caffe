@@ -2,6 +2,7 @@ export interface KitchenItem {
   name: string;
   quantity: number;
   modifiers?: string[];
+  note?: string;
   notes?: string;
   station?: KitchenStation;
 }
@@ -12,7 +13,7 @@ export interface KitchenOrder {
   id: string;
   table_name: string;
   items: KitchenItem[];
-  status: 'pending' | 'preparing' | 'ready' | 'served';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served';
   created_at: string;
   station?: KitchenStation;
 }

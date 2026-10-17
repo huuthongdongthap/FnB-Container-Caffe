@@ -13,13 +13,13 @@ export function segmentSQL(segment: string): { sql: string; params?: string[] } 
   case 'all':
     return { sql: 'SELECT id, name, phone, email FROM customers' };
   case 'loyalty_bronze':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'bronze\'' };
+    return { sql: "SELECT id, name, phone, email FROM customers WHERE (loyalty_tier = 'bronze' OR LOWER(loyalty_tier) = 'bronze')" };
   case 'loyalty_silver':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'silver\'' };
+    return { sql: "SELECT id, name, phone, email FROM customers WHERE (loyalty_tier = 'silver' OR LOWER(loyalty_tier) = 'silver')" };
   case 'loyalty_gold':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'gold\'' };
+    return { sql: "SELECT id, name, phone, email FROM customers WHERE (loyalty_tier = 'gold' OR LOWER(loyalty_tier) = 'gold')" };
   case 'loyalty_platinum':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'platinum\'' };
+    return { sql: "SELECT id, name, phone, email FROM customers WHERE (loyalty_tier = 'platinum' OR LOWER(loyalty_tier) = 'platinum')" };
   case 'active_30d':
     return {
       sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email

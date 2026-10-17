@@ -35,7 +35,7 @@ export function PromotionFormModal({
     >
       <div className="space-y-4">
         {errors._form && (
-          <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">
             {errors._form}
           </div>
         )}

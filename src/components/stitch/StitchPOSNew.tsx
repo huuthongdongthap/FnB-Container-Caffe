@@ -104,9 +104,15 @@ export function StitchPOSNew({
   const total = subtotal + tax;
   const cartItemCount = cart.reduce((a, c) => a + c.quantity, 0);
 
-  const handleCompleteOrder = (completedCart: POSNewCartItem[], completedTotal: number) => {
-    onCompleteOrder?.(completedCart, completedTotal);
-    setCart([]);
+  const handleCompleteOrder = async (completedCart: POSNewCartItem[], completedTotal: number) => {
+    try {
+      const result = await onCompleteOrder?.(completedCart, completedTotal);
+      if (result !== false) {
+        setCart([]);
+      }
+    } catch {
+      // Keep cart items if order completion fails
+    }
   };
 
   /* ─── Loading State ─────────────────────────────────────────────── */

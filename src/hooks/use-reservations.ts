@@ -20,7 +20,10 @@ export interface ReservationPayload {
   guest_count: number;
   date: string;
   time: string;
+  notes?: string;
 }
+
+export type CreateReservationData = ReservationPayload;
 
 export interface ReservationResult {
   success: boolean;
@@ -36,6 +39,7 @@ interface ReservationsResult {
   isLoadingTables: boolean;
   availabilityError: Error | null;
   createReservation: (payload: ReservationPayload) => void;
+  createReservationAsync: (payload: ReservationPayload) => Promise<ReservationResult>;
   isCreating: boolean;
   createError: Error | null;
   refetchAvailability: () => void;
@@ -52,10 +56,16 @@ export function useReservations(date: string, time: string): ReservationsResult 
   } = useQuery<TableInfo[]>({
     queryKey: ['reservations-availability', date, time],
     queryFn: async () => {
-      const res = await apiFetch<{ success: boolean; data: TableInfo[] }>(
+      const res = await apiFetch<
+        TableInfo[] | { success?: boolean; data?: TableInfo[] | { tables?: TableInfo[] }; tables?: TableInfo[] }
+      >(
         `/api/reservations/availability?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`
       );
-      return res.data;
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.data)) return res.data;
+      if (res?.data && !Array.isArray(res.data) && Array.isArray(res.data.tables)) return res.data.tables;
+      if (Array.isArray(res?.tables)) return res.tables;
+      return [];
     },
     enabled: !!date && !!time,
     staleTime: 30_000,
@@ -78,6 +88,7 @@ export function useReservations(date: string, time: string): ReservationsResult 
     isLoadingTables,
     availabilityError: availabilityError as Error | null,
     createReservation: (payload: ReservationPayload) => createMutation.mutate(payload),
+    createReservationAsync: (payload: ReservationPayload) => createMutation.mutateAsync(payload),
     isCreating: createMutation.isPending,
     createError: createMutation.error as Error | null,
     refetchAvailability,

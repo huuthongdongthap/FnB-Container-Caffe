@@ -36,13 +36,29 @@ async function verifySignature(data: Record<string, unknown>, secretKey: string)
     .join('');
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
 // ── Route ────────────────────────────────────────────────────────────────────
 momoWebhookRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
   const now = new Date().toISOString();
+  let rawBody = '';
 
   try {
-    const raw = await c.req.text();
+    rawBody = await c.req.text();
+    const raw = rawBody;
 
     // Probe check — empty body
     if (!raw || raw.trim().length === 0) {
@@ -82,7 +98,7 @@ momoWebhookRouter.post('/', async(c) => {
     };
 
     const computedSig = await verifySignature(signParams, secretKey);
-    if (computedSig !== String(payload.signature)) {
+    if (!constantTimeEqual(computedSig, String(payload.signature))) {
       return c.json({ error: -1, message: 'Invalid signature', message_en: 'Invalid signature' }, 400);
     }
 
@@ -93,10 +109,10 @@ momoWebhookRouter.post('/', async(c) => {
     // ── Idempotency lookup ──────────────────────────────────────────────────
     const payment = await db
       .prepare(
-        'SELECT id, order_id, status FROM payments WHERE transaction_id = ? AND method = \'momo\''
+        'SELECT id, order_id, amount, status FROM payments WHERE transaction_id = ? AND method = \'momo\''
       )
       .bind(orderId)
-      .first<{ id: string; order_id: string; status: string }>();
+      .first<{ id: string; order_id: string; amount?: number | string; status: string }>();
 
     if (!payment) {
       return c.json({ error: 0, message: `Unknown order: ${orderId}` });
@@ -104,6 +120,16 @@ momoWebhookRouter.post('/', async(c) => {
 
     if (payment.status === 'completed') {
       return c.json({ error: 0, message: 'Already processed' });
+    }
+
+    if (
+      payment.amount !== undefined &&
+      payment.amount !== null &&
+      payload.amount !== undefined &&
+      payload.amount !== null &&
+      Number(payload.amount) !== Number(payment.amount)
+    ) {
+      return c.json({ error: -1, message: 'Amount mismatch', message_en: 'Amount mismatch' }, 400);
     }
 
     const newStatus = success ? 'completed' : 'failed';
@@ -186,13 +212,8 @@ momoWebhookRouter.post('/', async(c) => {
     return c.json({ error: 0, message: 'OK' });
   } catch (err) {
     // DLQ
-    let rawForDlq = '';
-    try {
-      rawForDlq = await c.req.text();
-    } catch {
-      rawForDlq = '<unreadable>';
-    }
-    const kv = c.env.AURA_KV;
+    const rawForDlq = rawBody || '<unreadable>';
+    const kv = c.env.AUTH_KV ?? (c.env as unknown as { AURA_KV?: import('@cloudflare/workers-types').KVNamespace }).AURA_KV;
     if (kv) {
       try {
         await kv.put(

@@ -2,6 +2,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OfflineBanner from '@/components/pwa/offline-banner';
 import OrderQueueIndicator from '@/components/pwa/OrderQueueIndicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
@@ -46,10 +47,12 @@ function AppContent() {
             <Routes>
               {/* ── OPS SHELL ── */}
               <Route element={<OpsShell />}>
-                <Route path="/kds" element={<KDSPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/kds" element={<KDSPage />} />
+                  <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
+                </Route>
                 <Route path="/tv-menu" element={<TVMenuPage />} />
                 <Route path="/pos/table/:tableId" element={<TableOrder />} />
-                <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
 
                 {/* ── MOBILE ROUTES (ops staff surfaces) ── */}
                 {mobileRoutes}

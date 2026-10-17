@@ -33,8 +33,8 @@ export interface StitchPOSNewProps {
   brandName?: string;
   /** Tax rate as a decimal (e.g. 0.05 = 5 %) */
   taxRate?: number;
-  /** Fired when "Complete Order" is clicked */
-  onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void;
+  /** Fired when "Complete Order" is clicked; return false to keep cart on error */
+  onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void | boolean | Promise<void | boolean>;
   /** Fired when a payment method is selected */
   onPayment?: (method: 'payos' | 'cod') => void;
   /** Currently identified customer (null when none) */

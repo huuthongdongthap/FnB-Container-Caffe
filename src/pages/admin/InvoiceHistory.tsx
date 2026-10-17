@@ -65,11 +65,11 @@ export default function AdminInvoiceHistoryPage() {
             </CardHeader>
             <CardBody>
               {error && (
-                <div className="p-4 rounded-lg bg-red-500/10 text-red-700 text-sm mb-4 flex items-center justify-between">
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm mb-4 flex items-center justify-between">
                   <span>{error}</span>
                   <button
                     onClick={fetchInvoices}
-                    className="underline hover:no-underline text-red-800 ml-3"
+                    className="underline hover:no-underline text-red-200 ml-3"
                   >
                     {t('invoices.retry')}
                   </button>

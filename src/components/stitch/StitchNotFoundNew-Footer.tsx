@@ -3,9 +3,9 @@ interface FooterProps {
 }
 
 const footerLinks = [
-  { label: 'Privacy', path: '/privacy' },
-  { label: 'Terms', path: '/terms' },
-  { label: 'Contact', path: '/contact' },
+  { label: 'Privacy', path: '/privacy', href: '/about' },
+  { label: 'Terms', path: '/terms', href: '/about' },
+  { label: 'Contact', path: '/contact', href: '/contact' },
 ] as const;
 
 export function Footer({ onNavigate }: FooterProps) {
@@ -15,7 +15,13 @@ export function Footer({ onNavigate }: FooterProps) {
         {footerLinks.map((link) => (
           <button type="button"
             key={link.label}
-            onClick={() => onNavigate?.(link.path)}
+            onClick={() => {
+              if (onNavigate) {
+                onNavigate(link.path);
+              } else if (typeof window !== 'undefined') {
+                window.location.assign(link.href);
+              }
+            }}
             className="font-body text-[12px] font-semibold tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] hover:text-[var(--aura-bronze-shimmer)] transition-colors"
           >
             {link.label}

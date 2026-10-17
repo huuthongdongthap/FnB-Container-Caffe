@@ -8,7 +8,7 @@ import { registerCheckoutHandlers } from './checkout-handlers';
 export const dindinRouter = new Hono<{ Bindings: Env }>();
 
 // All endpoints protected by admin auth
-dindinRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
+dindinRouter.use('*', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']));
 
 registerConfigHandlers(dindinRouter);
 registerCartHandlers(dindinRouter);

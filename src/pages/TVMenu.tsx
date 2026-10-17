@@ -19,7 +19,7 @@ export default function TVMenuPage() {
         <div className="min-h-screen bg-[color:var(--aura-noir-deep)] flex items-center justify-center">
           <div className="text-center text-gray-400">
             <div className="w-10 h-10 border-3 border-gray-600 border-t-gold rounded-full animate-spin mx-auto mb-4" />
-            <span className="text-2xl">{t('loading')}</span>
+            <span className="text-2xl">{t('loading', 'Đang tải thực đơn...')}</span>
           </div>
         </div>
       </>
@@ -37,7 +37,7 @@ export default function TVMenuPage() {
         <div className="min-h-screen bg-[color:var(--aura-noir-deep)] flex items-center justify-center">
           <div className="text-center text-red-400">
             <span className="text-5xl block mb-4"><TriangleAlert size={36} className="inline" /></span>
-            <span className="text-2xl">{t('errorLoading')}</span>
+            <span className="text-2xl">{t('errorLoading', 'Không thể tải thực đơn. Đang thử lại...')}</span>
           </div>
         </div>
       </>

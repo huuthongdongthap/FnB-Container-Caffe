@@ -89,6 +89,7 @@ export const useAdminStaffStore = create<AdminStaffState>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ error: message });
+      throw err instanceof Error ? err : new Error(message);
     }
   },
 
@@ -100,9 +101,9 @@ export const useAdminStaffStore = create<AdminStaffState>((set, get) => ({
       staff: state.staff.map((s) => (s.id === id ? { ...s, isActive: nextActive } : s)),
     }));
     try {
-      await apiFetch<any>(`/api/auth/staff/${encodeURIComponent(id)}`, {
+      await apiFetch<any>(`/api/staff/${encodeURIComponent(id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ is_active: nextActive ? 1 : 0, active: nextActive }),
+        body: JSON.stringify({ isActive: nextActive, is_active: nextActive ? 1 : 0, active: nextActive }),
       });
     } catch {
       // Optimistic state kept if endpoint is offline in demo mode

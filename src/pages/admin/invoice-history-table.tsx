@@ -38,7 +38,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               <td className="py-3 px-2 font-mono text-xs">
                 {inv.order_id ? (
                   <span
-                    className="text-blue-600 hover:underline cursor-pointer"
+                    className="text-blue-400 hover:underline cursor-pointer"
                     title={inv.erpnext_id || ''}
                   >
                     {truncateId(inv.order_id)}
@@ -73,7 +73,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                   href={getInvoicePdfUrl(inv.erpnext_id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
                 >
                   PDF
                 </a>

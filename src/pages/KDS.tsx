@@ -16,6 +16,7 @@ export type { Ticket, TicketStatus } from './kds-types';
 
 export default function KDSPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewFilter, setViewFilter] = useState<
     'all' | 'priority' | 'preparing' | 'ready'
@@ -37,13 +38,16 @@ export default function KDSPage() {
     if (
       orders.length > prevOrderCountRef.current &&
       soundEnabled &&
+      !audioUnavailable &&
       audioRef.current
     ) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => {
+        setAudioUnavailable(true);
+      });
     }
     prevOrderCountRef.current = orders.length;
-  }, [orders.length, soundEnabled]);
+  }, [orders.length, soundEnabled, audioUnavailable]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -140,7 +144,12 @@ export default function KDSPage() {
         description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
       />
       <div className="relative">
-        <audio ref={audioRef} preload="auto" className="hidden">
+        <audio
+          ref={audioRef}
+          preload="none"
+          className="hidden"
+          onError={() => setAudioUnavailable(true)}
+        >
           <source src="/sounds/new-order.mp3" type="audio/mpeg" />
         </audio>
 

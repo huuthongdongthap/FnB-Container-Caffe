@@ -40,7 +40,7 @@ export default function NotificationSettingsPage() {
         }
       />
 
-      <div className="min-h-screen bg-background p-4 lg:p-6 dark:bg-gray-950">
+      <div className="min-h-screen bg-background p-4 lg:p-6">
         <div className="mx-auto space-y-6">
           {/* Page header */}
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -66,7 +66,7 @@ export default function NotificationSettingsPage() {
 
           {/* Error banner */}
           {subs.fetchError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-300">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <AlertCircle size={16} aria-hidden="true" />

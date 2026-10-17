@@ -15,7 +15,7 @@ export async function requireAdmin(c: Context<{ Bindings: Env }>): Promise<Respo
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
-  if (!['owner', 'admin', 'staff'].includes(payload.role || '')) {
+  if (!['owner', 'manager', 'admin', 'staff'].includes(payload.role || '')) {
     return c.json({ success: false, error: 'Forbidden — admin only' }, 403);
   }
   return null;
@@ -31,7 +31,7 @@ export async function requireVendor(c: Context<{ Bindings: Env }>): Promise<Resp
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
-  if (!['owner', 'admin', 'vendor', 'customer'].includes(payload.role || '')) {
+  if (!['owner', 'manager', 'admin', 'staff', 'vendor', 'customer'].includes(payload.role || '')) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
   return null;

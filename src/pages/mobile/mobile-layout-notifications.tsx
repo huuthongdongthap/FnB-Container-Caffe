@@ -2,8 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { PushNotificationToggle } from '@/components/pwa/push-notification-toggle';
 import { NOTIF_CARD, NOTIF_UNREAD, NOTIF_READ, NOTIF_TITLE, NOTIF_MSG, NOTIF_TIME, notifEmpty } from './mobile-layout-styles';
+
+declare module '@/components/pwa/push-notification-toggle-types' {
+  interface PushNotificationToggleProps {
+    role?: string;
+  }
+}
 
 interface NotifItem {
   id: string;
@@ -14,6 +21,7 @@ interface NotifItem {
 }
 
 export default function NotificationsScreen() {
+  const { user: staff } = useMobileAuth();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
 
   useEffect(() => {
@@ -41,7 +49,7 @@ export default function NotificationsScreen() {
 
   return (
     <div style={{ padding: '12px 14px' }}>
-      <PushNotificationToggle />
+      <PushNotificationToggle role={staff?.role || 'staff'} />
       <div style={{ height: 12 }} />
       {notifs.length === 0 ? (
         <div style={notifEmpty}>

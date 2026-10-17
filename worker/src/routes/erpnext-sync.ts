@@ -20,7 +20,7 @@ interface InventoryTxnRow {
   created_at: string;
 }
 
-const allow = requireAuth(['owner', 'manager', 'staff']);
+const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   app.get('/api/erpnext/sync/inventory', allow, async(c) => {

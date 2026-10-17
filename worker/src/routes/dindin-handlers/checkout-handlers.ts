@@ -107,6 +107,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       const itemsJson = JSON.stringify(
         cart.items.map((i) => ({
           product_id: i.id ?? `dindin_${(i.name ?? '').replace(/\s+/g, '_').toLowerCase()}`,
+          name: i.name ?? '',
           quantity: Math.max(1, Number(i.qty ?? 1)),
           price: Number(i.price ?? 0),
         }))
@@ -129,6 +130,15 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       }
 
       await writeCart(c.env, sessionId, emptyCart());
+
+      if (c.env.AUTH_KV) {
+        const ts = new Date().toISOString();
+        await Promise.all([
+          kvSet(c.env.AUTH_KV, 'latest_order_ts', ts, 3600),
+          kvSet(c.env.AUTH_KV, 'orders:latest_updated_at', ts, 3600),
+          kvSet(c.env.AUTH_KV, `order_event:${orderId}`, JSON.stringify({ status: 'pending', updatedAt: ts }), 3600),
+        ]).catch(() => undefined);
+      }
 
       if (idempotencyKey) {
         await kvSet(

@@ -153,4 +153,33 @@ describe('checkin & push admin contract smoke', () => {
     );
     expect(delRes.status).toBe(200);
   });
+
+  it('PATCH /:id/reject — blocks rejecting an already approved check-in with 400', async() => {
+    const app = new Hono();
+    app.route('/api/checkin', checkinRouter);
+
+    const db = makeDB();
+    db._stmt.first.mockResolvedValueOnce({
+      id: 'ci_approved',
+      customer_id: 'cust-01',
+      customer_name: 'Nguyen Van A',
+      checkin_date: '2026-10-17',
+      checkin_time: '2026-10-17T08:00:00Z',
+      reward_amount: 5000,
+      status: 'approved',
+      staff_id: 'staff-1',
+      created_at: '2026-10-17T08:00:00Z',
+    });
+
+    const env = { ...createMockEnv(), AURA_DB: db };
+    const res = await app.fetch(
+      new Request('https://test.aura/api/checkin/ci_approved/reject', { method: 'PATCH' }),
+      env
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('Already approved');
+    expect(db._stmt.run).not.toHaveBeenCalled();
+  });
 });

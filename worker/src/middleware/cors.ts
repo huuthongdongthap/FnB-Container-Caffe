@@ -11,12 +11,18 @@ const ALLOWED_ORIGINS = [
   'http://localhost:8787',
   'https://auracafe.vn',
   'https://staging.auracafe.vn',
+  'https://auraspace.cafe',
+  'https://www.auraspace.cafe',
 ];
 
 function isAllowedOrigin(origin: string): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
-  return origin.endsWith('.auracafe.vn') || /^http:\/\/localhost:\d+$/.test(origin);
+  return (
+    origin.endsWith('.auracafe.vn') ||
+    origin.endsWith('.auraspace.cafe') ||
+    /^http:\/\/localhost:\d+$/.test(origin)
+  );
 }
 
 export function getCorsOrigin(originHeader?: string | null): string {
@@ -31,7 +37,7 @@ export function corsHeaders(origin: string, withCredentials = false) {
   const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': safeOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-ID, Idempotency-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-ID, X-Reset-Key, X-Request-ID, Idempotency-Key, X-Tenant-ID, X-Edge-Telemetry-Secret',
     'Access-Control-Max-Age': '86400',
   };
   if (withCredentials) {

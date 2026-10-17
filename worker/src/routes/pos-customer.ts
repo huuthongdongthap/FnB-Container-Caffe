@@ -11,7 +11,7 @@ import { requireStaff } from '../middleware/staff-auth';
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/pos/customer?phone=09xxxxxxxx
-posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter']), async (c) => {
+posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 'admin']), async (c) => {
   const phone = c.req.query('phone')?.trim();
   if (!phone) {
     return errorResponse('Thiếu số điện thoại', 400);

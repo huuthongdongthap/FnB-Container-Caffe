@@ -11,4 +11,5 @@ export interface DinDinCart {
   items: CartItem[];
   total: number;
   createdAt?: string;
+  updatedAt?: string;
 }

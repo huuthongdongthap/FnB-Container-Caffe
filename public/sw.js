@@ -16,10 +16,11 @@ const CACHE_VERSION = 'aura-v4';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
+  '/offline.html',
   '/manifest.json',
-  '/images/favicon.svg',
-  '/images/favicon-192x192.png',
-  '/images/favicon-512x512.png'
+  '/favicon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 // ---- Install: populate static cache ----
@@ -128,19 +129,20 @@ async function networkFirst(request, url) {
     }
     return response;
   } catch {
-    // Navigation: fall back to cached index.html (SPA shell)
+    // Navigation: fall back to cached index.html or offline.html
     if (isNavigation(url)) {
       const fallback = await caches.match('/');
       if (fallback) return fallback;
       const fallback2 = await caches.match('/index.html');
       if (fallback2) return fallback2;
+      const offlinePage = await caches.match('/offline.html');
+      if (offlinePage) return offlinePage;
     }
 
-    // API: queue for retry when back online
+    // API GET: return 503 offline JSON (do not queue GET requests or return fake 200)
     if (isApiRequest(url)) {
-      await queueRequest(request);
-      return new Response(JSON.stringify({ offline: true, queued: true }), {
-        status: 200,
+      return new Response(JSON.stringify({ success: false, offline: true, error: 'Offline' }), {
+        status: 503,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -181,11 +183,11 @@ self.addEventListener('push', (event) => {
     data = {};
   }
 
-  const title = data.title || 'AURA CAFE Cafe';
+  const title = data.title || 'AURA CAFE';
   const options = {
     body: data.body || 'Don hang cua ban da san sang!',
-    icon: '/images/favicon-192x192.png',
-    badge: '/images/favicon-192x192.png',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
@@ -207,7 +209,7 @@ self.addEventListener('notificationclick', (event) => {
 
   const targetUrl = event.notification.data?.url || '/?tab=orders';
 
-  if (event.action === 'view') {
+  if (event.action === 'view' || !event.action) {
     event.waitUntil(clients.openWindow(targetUrl));
   }
 });

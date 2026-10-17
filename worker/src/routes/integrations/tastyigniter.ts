@@ -41,8 +41,8 @@ const SyncOrderSchema = z.object({
 export function createTIRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  // Middleware: owner, manager, staff only
-  const allow = requireAuth(['owner', 'manager', 'staff']);
+  // Middleware: owner, admin, manager, staff only
+  const allow = requireAuth(['owner', 'admin', 'manager', 'staff']);
 
   // POST /api/integrations/tastyigniter/sync/menu
   // Pull menu from TI and cache locally (fire-and-forget).

@@ -4,21 +4,21 @@ import {
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
-  IdParamsSchema,
   DateTimeSchema,
   MoneySchema,
   ReferenceSchema,
 } from '../common';
+import { IdParamsSchema } from './common';
 
 export const PurchaseOrderSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   orderNumber: z.string().openapi({ example: 'PO-20260826-001' }),
-  supplierId: z.string().uuid(),
+  supplierId: z.string().min(1),
   supplier: ReferenceSchema.nullable().optional(),
-  locationId: z.string().uuid(),
+  locationId: z.string().min(1),
   status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).default('draft'),
   items: z.array(z.object({
-    ingredientId: z.string().uuid(),
+    ingredientId: z.string().min(1),
     ingredientName: z.string(),
     quantity: z.number().int().positive(),
     unitCost: MoneySchema,
@@ -35,10 +35,10 @@ export const PurchaseOrderSchema = z.object({
 }).openapi('PurchaseOrder');
 
 export const PurchaseOrderCreateSchema = z.object({
-  supplierId: z.string().uuid(),
-  locationId: z.string().uuid(),
+  supplierId: z.string().min(1),
+  locationId: z.string().min(1),
   items: z.array(z.object({
-    ingredientId: z.string().uuid(),
+    ingredientId: z.string().min(1),
     quantity: z.number().int().positive(),
     unitCost: MoneySchema,
   })).min(1),
@@ -71,7 +71,7 @@ export const purchaseOrderRoutes = {
     security: [{ BearerAuth: [] }],
     request: {
       query: PaginationQuerySchema.extend({
-        supplierId: z.string().uuid().optional(),
+        supplierId: z.string().min(1).optional(),
         status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),
@@ -130,7 +130,7 @@ export const purchaseOrderRoutes = {
           'application/json': {
             schema: z.object({
               items: z.array(z.object({
-                ingredientId: z.string().uuid(),
+                ingredientId: z.string().min(1),
                 receivedQuantity: z.number().int().positive(),
               })).min(1),
             }),

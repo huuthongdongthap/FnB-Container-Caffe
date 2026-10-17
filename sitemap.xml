@@ -8,55 +8,55 @@
 
   <!-- Main Pages -->
   <url>
-    <loc>https://auraspace.vn/</loc>
+    <loc>https://auraspace.cafe/</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/menu</loc>
+    <loc>https://auraspace.cafe/menu</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/checkout</loc>
+    <loc>https://auraspace.cafe/checkout</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/about-us</loc>
+    <loc>https://auraspace.cafe/about-us</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/contact</loc>
+    <loc>https://auraspace.cafe/contact</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/loyalty</loc>
+    <loc>https://auraspace.cafe/loyalty</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://auraspace.vn/table-reservation</loc>
+    <loc>https://auraspace.cafe/table-reservation</loc>
     <lastmod>2026-03-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://auraspace.vn/track-order</loc>
+    <loc>https://auraspace.cafe/track-order</loc>
     <lastmod>2026-04-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

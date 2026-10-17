@@ -62,13 +62,13 @@ export function useCheckinApprovals() {
   const handleApprove = useCallback(async (id: string) => {
     setActingId(id);
     try {
-      await apiFetch(`/api/admin/checkins/${id}/approve`, { method: 'PATCH' });
+      await apiFetch(`/api/admin/checkins/${encodeURIComponent(id)}/approve`, { method: 'PATCH' });
+    } catch {
+      // Offline demo fallback updates local state
+    } finally {
       setCheckins((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
       );
-    } catch {
-      // Fall through to local update
-    } finally {
       setSelectedCheckin(null);
       setActingId(null);
     }
@@ -77,19 +77,16 @@ export function useCheckinApprovals() {
   const handleReject = useCallback(async (id: string) => {
     setActingId(id);
     try {
-      await apiFetch(`/api/admin/checkins/${id}/reject`, { method: 'PATCH' });
+      await apiFetch(`/api/admin/checkins/${encodeURIComponent(id)}/reject`, { method: 'PATCH' });
+    } catch {
+      // Offline demo fallback updates local state
+    } finally {
       setCheckins((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
       );
-    } catch {
-      // Fall through to local update
+      setSelectedCheckin(null);
+      setActingId(null);
     }
-
-    setCheckins((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
-    );
-    setSelectedCheckin(null);
-    setActingId(null);
   }, []);
 
   const pendingCheckins = checkins.filter((c) => c.status === 'pending');

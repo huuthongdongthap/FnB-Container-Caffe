@@ -40,7 +40,7 @@ export default function AdminDevicesPage() {
 
           {/* Error */}
           {d.error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 text-red-300 text-sm">
               {d.error}
               <button onClick={d.refresh} className="ml-3 underline hover:no-underline">Thử lại</button>
             </div>

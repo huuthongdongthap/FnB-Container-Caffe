@@ -15,8 +15,9 @@ const STORAGE_KEYS = {
 interface MobileUser {
   id: string;
   name: string;
-  role: 'owner' | 'manager' | 'staff' | 'waiter';
+  role: 'owner' | 'manager' | 'staff' | 'waiter' | string;
   email?: string;
+  device_id?: string;
 }
 
 interface AuthState {
@@ -28,7 +29,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (deviceToken: string, pin: string) => Promise<boolean>;
+  login: (tokenOrDevice: string, userOrPin: string | MobileUser) => Promise<boolean>;
   logout: () => void;
   refresh: () => Promise<boolean>;
   isAuthenticated: boolean;
@@ -178,7 +179,24 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     }
   }, [state.deviceToken]);
 
-  const login = useCallback(async (deviceToken: string, pin: string): Promise<boolean> => {
+  const login = useCallback(async (tokenOrDevice: string, userOrPin: string | MobileUser): Promise<boolean> => {
+    if (typeof userOrPin === 'object' && userOrPin !== null) {
+      const device = getStoredDevice();
+      writeStorage(STORAGE_KEYS.token, tokenOrDevice);
+      writeStorage(STORAGE_KEYS.user, userOrPin);
+      writeStorage('aura_auth_token', tokenOrDevice);
+      writeStorage('aura_user_data', userOrPin);
+      setState({
+        user: userOrPin,
+        token: tokenOrDevice,
+        deviceToken: device,
+        loading: false,
+        error: null,
+      });
+      return true;
+    }
+    const deviceToken = tokenOrDevice;
+    const pin = userOrPin;
     setState(s => ({ ...s, loading: true, error: null }));
     try {
       const res = await fetch(
@@ -190,18 +208,19 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         }
       );
       const data = await res.json();
+      const userProfile = data.staff ?? data.user;
       if (!res.ok || data.success === false) {
         setState(s => ({ ...s, loading: false, error: data.error || 'Đăng nhập thất bại' }));
         return false;
       }
       writeStorage(STORAGE_KEYS.token, data.token);
-      writeStorage(STORAGE_KEYS.user, data.user);
+      writeStorage(STORAGE_KEYS.user, userProfile);
       writeStorage(STORAGE_KEYS.device, deviceToken);
       writeStorage('aura_auth_token', data.token);
-      writeStorage('aura_user_data', data.user);
+      writeStorage('aura_user_data', userProfile);
       writeStorage('aura_device_token', deviceToken);
       setState({
-        user: data.user,
+        user: userProfile,
         token: data.token,
         deviceToken,
         loading: false,

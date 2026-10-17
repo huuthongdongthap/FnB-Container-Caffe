@@ -106,7 +106,11 @@ signageRouter.get('/promos', async(c) => {
   const db = c.env.AURA_DB;
   try {
     const { results } = await db.prepare(
-      'SELECT code, percent, max_discount, min_order, expires_at FROM promotions WHERE is_active = 1'
+      `SELECT code, percent, max_discount, min_order, expires_at
+       FROM promotions
+       WHERE is_active = 1
+         AND (starts_at IS NULL OR starts_at <= datetime('now'))
+         AND (expires_at IS NULL OR expires_at >= datetime('now'))`
     ).all<SignagePromo>();
 
     c.header('Cache-Control', 'public, max-age=300');

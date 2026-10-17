@@ -102,12 +102,12 @@ export function SubscriptionTable({
                     </td>
                     <td className="py-3 pr-4">
                       {sub.subscribed ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                        <span className="inline-flex items-center gap-1 text-xs text-green-400">
                           <Wifi size={14} aria-hidden="true" />
                           {isVi ? 'Đã kết nối' : 'Active'}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-400">
                           <WifiOff size={14} aria-hidden="true" />
                           {isVi ? 'Chưa kết nối' : 'Inactive'}
                         </span>

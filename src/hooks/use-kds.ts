@@ -173,8 +173,16 @@ export function useKDS(station: string = 'all'): KDSResult {
   }, [station, queryClient]);
 
   const completeMutation = useMutation({
-    mutationFn: (orderId: string) =>
-      apiFetch(`/api/admin/orders/${orderId}/complete`, { method: 'POST' }),
+    mutationFn: async (orderId: string) => {
+      try {
+        return await apiFetch(`/api/admin/orders/${orderId}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'ready' }),
+        });
+      } catch {
+        return apiFetch(`/api/admin/orders/${orderId}/complete`, { method: 'POST' });
+      }
+    },
     onSuccess: (_data, orderId) => {
       queryClient.setQueryData<KDSOrder[]>(['kds-orders', station], (prev = []) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: 'ready' } : o))

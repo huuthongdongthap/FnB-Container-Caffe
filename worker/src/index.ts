@@ -43,6 +43,7 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/(www\.)?auraspace\.cafe$/,
+  /^https:\/\/[a-z0-9-]+\.auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
   /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
   /^https?:\/\/localhost(:\d+)?$/,
@@ -55,7 +56,16 @@ app.use('/*', cors({
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Reset-Key', 'X-Request-ID'],
+  allowHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Session-ID',
+    'X-Reset-Key',
+    'X-Request-ID',
+    'Idempotency-Key',
+    'X-Tenant-ID',
+    'X-Edge-Telemetry-Secret'
+  ],
   exposeHeaders: ['X-Request-ID'],
   credentials: true,
   maxAge: 86400

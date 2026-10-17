@@ -40,7 +40,8 @@ export default function PricingCard({ tier, locale }: Props): ReactNode {
   const cta = isVi ? tier.ctaTextVi : tier.ctaTextEn;
 
   const handleClick = () => {
-    navigate(`/${locale}${tier.ctaLink}`);
+    const target = tier.ctaLink?.startsWith('/') ? tier.ctaLink : `/${tier.ctaLink || 'subscribe'}`;
+    navigate(target);
   };
 
   return (

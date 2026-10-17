@@ -22,7 +22,7 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
 
   if (remaining <= 0) {
     return (
-      <span className={cn('text-green-600 font-medium text-sm', className)}>
+      <span className={cn('text-green-400 font-medium text-sm', className)}>
         <Check size={16} className="inline" /> {t('tracking.badgeDelivered')}
       </span>
     );
@@ -40,7 +40,7 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
   }
 
   return (
-    <span className={cn('text-amber-600 font-medium text-sm', className)}>
+    <span className={cn('text-amber-400 font-medium text-sm', className)}>
       <Timer size={16} className="inline" /> {timeText}
     </span>
   );

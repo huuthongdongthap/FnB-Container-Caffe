@@ -1,6 +1,14 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 import { TABLE_STATUS_STYLES, STATUS_LABEL_KEY } from './GenerateQR-constants';
 import type { QrCardProps } from './GenerateQR-types';
+
+function buildInlineQrSvgDataUrl(label: string): string {
+	const safeLabel = label.replace(/[<>&"']/g, '').slice(0, 24);
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"><rect width="200" height="200" rx="12" fill="#ffffff"/><rect x="16" y="16" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="30" y="30" width="24" height="24" fill="#111827"/><rect x="132" y="16" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="146" y="30" width="24" height="24" fill="#111827"/><rect x="16" y="132" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="30" y="146" width="24" height="24" fill="#111827"/><rect x="84" y="84" width="32" height="32" fill="#111827"/><text x="100" y="192" text-anchor="middle" font-family="monospace" font-size="10" fill="#374151">${safeLabel}</text></svg>`;
+	return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
 export function QrCard({
 	tableNumber,
@@ -18,6 +26,32 @@ export function QrCard({
 	const statusKey = STATUS_LABEL_KEY[normalizedStatus] ?? STATUS_LABEL_KEY.available;
 	const { t } = useTranslation();
 	const statusLabel = t(statusKey ?? 'qrCodes.status.available');
+	const [resolvedSrc, setResolvedSrc] = useState<string | null>(qrPngUrl);
+
+	useEffect(() => {
+		setResolvedSrc(qrPngUrl);
+	}, [qrPngUrl]);
+
+	const handleImgError = async () => {
+		if (qrPngUrl) {
+			try {
+				const res = await fetch(qrPngUrl, {
+					credentials: 'include',
+					headers: getAuthHeaders(),
+				});
+				if (res?.ok && typeof res.blob === 'function') {
+					const blob = await res.blob();
+					setResolvedSrc(URL.createObjectURL(blob));
+					return;
+				}
+			} catch {
+				// Fall through to inline SVG fallback
+			}
+		}
+		setResolvedSrc(buildInlineQrSvgDataUrl(slug || `T-${tableNumber}`));
+	};
+
+	const imgSrc = resolvedSrc || (slug ? buildInlineQrSvgDataUrl(slug) : null);
 
 	return (
 		<div
@@ -33,10 +67,11 @@ export function QrCard({
 			<div className="text-xl font-bold font-display text-foreground mb-3">
 				{tableNumber}
 			</div>
-			{qrPngUrl ? (
+			{imgSrc ? (
 				<img
-					src={qrPngUrl}
+					src={imgSrc}
 					alt={`QR table ${tableNumber} zone ${zoneName}`}
+					onError={handleImgError}
 					className="rounded-lg w-[200px] h-[200px] object-contain bg-surface p-1"
 					width={200}
 					height={200}

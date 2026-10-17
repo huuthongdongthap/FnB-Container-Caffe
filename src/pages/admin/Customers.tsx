@@ -13,6 +13,7 @@ export default function AdminCustomersPage() {
   const { t } = useTranslation('adminCustomers');
   const {
     customers,
+    totalCount,
     loading,
     error,
     fetchCustomers,
@@ -78,7 +79,7 @@ export default function AdminCustomersPage() {
             <div>
               <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
               <p className="text-sm text-muted mt-0.5">
-                {loading ? t('loading') : t('customerCount', { count: customers.length })}
+                {loading ? t('loading') : t('customerCount', { count: totalCount || customers.length })}
               </p>
             </div>
             <Button

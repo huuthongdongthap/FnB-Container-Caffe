@@ -51,12 +51,12 @@ export function SyncStatus({ status, isLoading, className }: SyncStatusProps) {
           </p>
         )}
         {status.pendingItems > 0 && (
-          <p className="text-xs text-amber-600">
+          <p className="text-xs text-amber-400">
             {status.pendingItems} {t('adminSync.pendingItems')}
           </p>
         )}
         {status.errorMessage && (
-          <p className="text-xs text-red-500 mt-1">{status.errorMessage}</p>
+          <p className="text-xs text-red-400 mt-1">{status.errorMessage}</p>
         )}
       </div>
     </div>

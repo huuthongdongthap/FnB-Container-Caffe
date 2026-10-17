@@ -53,5 +53,5 @@ export const SCREENS: Screen[] = [
   // Not yet wired
   { name: 'Design Gallery', slug: 'GalleryNew', route: '/gallery', source: 'new-screens/design-gallery', icon: '🖼️', status: 'routed' },
   // 404
-  { name: '404 Not Found', slug: 'NotFoundNew', route: '*', source: 'new-screens/404-not-found', icon: '🔍', status: 'routed' },
+  { name: '404 Not Found', slug: 'NotFoundNew', route: '/404-not-found', source: 'new-screens/404-not-found', icon: '🔍', status: 'routed' },
 ] as const;

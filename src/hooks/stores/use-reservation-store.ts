@@ -26,6 +26,7 @@ export interface ReservationPayload {
   guest_count: number;
   date: string;
   time: string;
+  notes?: string;
 }
 
 interface ReservationState {
@@ -55,9 +56,15 @@ export const useReservationStore = create<ReservationState>((set) => ({
         `/api/reservations/availability?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`,
       );
 
+      const rawData = body?.data ?? body;
+      const tables = Array.isArray(rawData)
+        ? rawData
+        : (Array.isArray(rawData?.tables) ? rawData.tables : []);
+      const slots = Array.isArray(rawData?.slots) ? rawData.slots : [];
+
       set({
-        availableSlots: body.data?.slots ?? [],
-        tables: body.data?.tables ?? [],
+        availableSlots: slots,
+        tables,
         loading: false,
         error: null,
       });

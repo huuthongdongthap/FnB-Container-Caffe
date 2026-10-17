@@ -14,9 +14,9 @@ export function OrderSuccessNewFooter() {
 
   return (
     <footer className="w-full py-8 border-t border-white/5 flex flex-col items-center gap-2 px-5 bg-transparent">
-      <nav className="flex gap-4 mb-2" aria-label={t('footer.footerAriaLabel')}>
+      <nav className="flex gap-4 mb-2" aria-label={t('orderSuccess.SupportAria', 'Hỗ trợ đơn hàng')}>
         <a
-          href="#"
+          href="/contact"
           className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
         >
           {t('stitch.orderSuccessNewSupport', {
@@ -24,7 +24,7 @@ export function OrderSuccessNewFooter() {
           })}
         </a>
         <a
-          href="#"
+          href="/about"
           className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
         >
           {t('footer.footerPrivacy', {
@@ -32,7 +32,7 @@ export function OrderSuccessNewFooter() {
           })}
         </a>
         <a
-          href="#"
+          href="/about"
           className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
         >
           {t('footer.footerTerms', { defaultValue: 'TERMS' })}

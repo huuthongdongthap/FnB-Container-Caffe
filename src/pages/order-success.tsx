@@ -131,8 +131,15 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     if (!currentOrder?.items?.length) return;
     clearCart();
     currentOrder.items.forEach((item) => {
+      const rawItem = item as unknown as Record<string, unknown>;
+      const resolvedProductId = String(rawItem.product_id ?? rawItem.productId ?? rawItem.id ?? item.name);
       for (let i = 0; i < item.quantity; i++) {
-        addItem({ id: item.name, name: item.name, price: item.unitPriceCents });
+        addItem({
+          id: resolvedProductId,
+          productId: resolvedProductId,
+          name: item.name,
+          price: item.unitPriceCents,
+        });
       }
     });
     showToast('Đã thêm lại vào giỏ hàng', 'success');

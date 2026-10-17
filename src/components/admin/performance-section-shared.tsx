@@ -7,7 +7,7 @@ export function ErrorCard({ message, onRetry }: ErrorCardProps) {
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-red-600">{message}</p>
+        <p className="text-sm text-red-400">{message}</p>
         <button
           onClick={onRetry}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"

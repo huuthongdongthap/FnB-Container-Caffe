@@ -7,7 +7,7 @@ export function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
   return (
     <section
       className="rounded-xl p-[24px]"
-      aria-label={t('loyalty.tierBenefitsAria')}
+      aria-label={t('loyalty.tierBenefitsAria', 'Membership Tier Benefits')}
       data-glass="card"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
@@ -20,7 +20,7 @@ export function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
         className="text-[12px] leading-none uppercase tracking-[0.2em] font-semibold mb-[24px]"
         style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
-        {t('loyalty.tierBenefits')}
+        {t('loyalty.tierBenefits', 'Tier Benefits')}
       </h3>
       <ul className="space-y-[12px]">
         {benefits.map((benefit) => (

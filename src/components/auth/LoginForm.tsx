@@ -42,7 +42,7 @@ export function LoginForm() {
       <h2 className="text-2xl font-bold"><LockIcon className="inline mr-2" size={24} />Đăng nhập</h2>
 
       {error && (
-        <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700" role="alert">
+        <div className="rounded-md bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300" role="alert">
           {error}
         </div>
       )}
@@ -57,10 +57,10 @@ export function LoginForm() {
           placeholder="email@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           autoComplete="email"
         />
-        {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
+        {fieldErrors.email && <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p>}
       </div>
 
       <div>
@@ -73,10 +73,10 @@ export function LoginForm() {
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           autoComplete="current-password"
         />
-        {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
+        {fieldErrors.password && <p className="mt-1 text-xs text-red-400">{fieldErrors.password}</p>}
       </div>
 
       <button

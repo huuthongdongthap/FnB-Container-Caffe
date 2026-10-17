@@ -92,7 +92,13 @@
     "facebook": "Facebook",
     "instagram": "Instagram",
     "tiktok": "TikTok",
-    "copyright": "© 2026 AURA CAFE SA ĐÉC · 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp"
+    "copyright": "© 2026 AURA CAFE SA ĐÉC · 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp",
+    "PrivacyPolicy": "Chính sách bảo mật",
+    "TermsOfService": "Điều khoản dịch vụ",
+    "Support": "Hỗ trợ",
+    "footerAriaLabel": "Chân trang",
+    "footerPrivacy": "Chính sách bảo mật",
+    "footerTerms": "Điều khoản"
   },
   "admin": {
     "dashboard": "Bảng điều khiển",
@@ -380,7 +386,13 @@
     "close": "Đóng",
     "send": "Gửi",
     "toggleOpen": "Mở chat",
-    "toggleClosed": "Đóng chat"
+    "toggleClosed": "Đóng chat",
+    "loadError": "Không thể tải danh sách hội thoại",
+    "retry": "Thử lại",
+    "messageCount": "{{count}} tin nhắn",
+    "sendError": "Không thể gửi tin nhắn",
+    "back": "Quay lại",
+    "replyPlaceholder": "Nhập nội dung phản hồi..."
   },
   "adminChart": {
     "noProductData": "Chưa có dữ liệu sản phẩm",
@@ -445,7 +457,8 @@
     "clearSearchAriaLabel": "Xoá tìm kiếm",
     "notFound": "Không tìm thấy món",
     "notFoundDesc": "Thử thay đổi bộ lọc hoặc tìm kiếm với từ khóa khác.",
-    "featured": "Nổi bật"
+    "featured": "Nổi bật",
+    "CategoryNavAria": "Danh mục thực đơn"
   },
   "checkout": {
     "variantStandard": "Tiêu chuẩn",
@@ -608,7 +621,55 @@
     "currentTier": "Cấp bậc hiện tại",
     "tierFromPoints": "Từ {{points}} điểm",
     "pointMultiplier": "Hệ số điểm",
-    "cashbackRate": "Hoàn tiền"
+    "cashbackRate": "Hoàn tiền",
+    "ReferralAriaLabel": "Giới thiệu bạn bè nhận thưởng",
+    "ReferralTitle": "Giới Thiệu Bạn Bè",
+    "ReferralBody": "Chia sẻ mã giới thiệu của bạn. Khi bạn bè hoàn tất đơn đầu tiên, cả hai sẽ nhận 200 điểm thưởng.",
+    "CodeCopied": "Đã sao chép",
+    "CopyCode": "Sao chép mã",
+    "TierBenefitsAriaLabel": "Quyền lợi hạng thành viên",
+    "TierComparisonTitle": "Quyền Lợi Theo Hạng",
+    "CurrentBadge": "Hiện tại",
+    "TierCardAriaLabel": "Thẻ hạng thành viên",
+    "TierProgressAriaLabel": "Tiến độ thăng hạng thành viên",
+    "CurrentTierLabel": "Hạng hiện tại",
+    "GoldMember": "Thành viên Vàng",
+    "AvailableBalance": "Số dư khả dụng",
+    "ProgressTo": "Tiến độ lên",
+    "PlatinumTier": "Hạng Bạch Kim",
+    "GoldMaxMessage": "Bạn đã đạt hạng cao nhất! Tận hưởng toàn bộ đặc quyền VIP.",
+    "StreakBonusHint": "Duy trì chuỗi điểm danh để nhận nhân đôi điểm thưởng.",
+    "WeeklyStreakAriaLabel": "Chuỗi điểm danh tuần",
+    "RewardProgressAriaLabel": "Tiến độ nhận thưởng điểm danh",
+    "WeeklyStreakTitle": "Chuỗi Điểm Danh Tuần",
+    "BonusPts": "+50 điểm thưởng",
+    "StreakCompletedMsg": "Chúc mừng! Bạn đã hoàn thành chuỗi 7 ngày và nhận +50 điểm thưởng!",
+    "StreakRemainingMsg": "Còn {{remaining}} ngày nữa để nhận +50 điểm thưởng tuần!",
+    "CheckingIn": "Đang điểm danh...",
+    "CheckedInToday": "Đã điểm danh hôm nay",
+    "DailyCheckinCta": "Điểm Danh Hàng Ngày (+10 điểm)",
+    "RedeemPointsTitle": "Đổi Điểm Thưởng",
+    "PointsBalance": "Số dư điểm",
+    "CostLabel": "Chi phí",
+    "PtsUnit": "điểm",
+    "ClaimedLabel": "Đã đổi",
+    "RedeemBtn": "Đổi quà",
+    "FooterTagline": "Trải nghiệm cà phê container mộc mạc và đặc quyền thành viên tại Sa Đéc.",
+    "TermsOfService": "Điều khoản dịch vụ",
+    "PrivacyPolicy": "Chính sách bảo mật",
+    "HelpCenter": "Trung tâm hỗ trợ",
+    "Copyright": "© 2026 AURA CAFE. Đã đăng ký bản quyền.",
+    "footerPrivacy": "Chính sách bảo mật",
+    "footerTerms": "Điều khoản dịch vụ",
+    "footerBlackTier": "Đặc quyền hạng Vàng",
+    "footerContact": "Liên hệ hỗ trợ",
+    "footerCopyright": "© 2026 AURA CAFE. ĐÃ ĐĂNG KÝ BẢN QUYỀN.",
+    "referralSectionAria": "Giới thiệu bạn bè",
+    "tierBenefitsAria": "Quyền lợi hạng thành viên",
+    "tierCardAria": "Thẻ hạng thành viên: {{tierName}}",
+    "redeemPointsAria": "Đổi điểm thưởng — số dư hiện tại {{balance}}",
+    "weeklyStreakAria": "Chuỗi điểm danh hàng tuần",
+    "checkinAria": "Điểm danh tại quán"
   },
   "referral": {
     "cashbackReceived": "Tiền cashback đã nhận",
@@ -641,7 +702,13 @@
     "followUs": "Theo Dõi Chúng Tôi",
     "hotline": "Hotline",
     "weekdayHours": "Thứ 2 — Thứ 6: 06:00 — 22:00",
-    "weekendHours": "Thứ 7 — Chủ Nhật: 06:00 — 23:00"
+    "weekendHours": "Thứ 7 — Chủ Nhật: 06:00 — 23:00",
+    "FooterPrivacy": "Chính sách bảo mật",
+    "FooterTerms": "Điều khoản dịch vụ",
+    "FooterSupport": "Hỗ trợ",
+    "footerPrivacy": "Chính sách bảo mật",
+    "footerTerms": "Điều khoản dịch vụ",
+    "footerSupport": "Hỗ trợ"
   },
   "reviews": {
     "seoTitle": "Đánh Giá Khách Hàng | Aura Cafe",
@@ -1334,7 +1401,19 @@
     },
     "landing": {
       "phoneValue": "+84 946 013 633"
-    }
+    },
+    "notFound": {
+      "privacyPolicy": "Chính sách bảo mật",
+      "termsOfService": "Điều khoản dịch vụ",
+      "contact": "Liên hệ",
+      "copyright": "© 2026 AURA CAFE. KHÔNG GIAN CÀ PHÊ CONTAINER."
+    },
+    "header": "Đầu trang thực đơn",
+    "brandName": "AURA CAFE",
+    "nav": "Điều hướng chính",
+    "navHome": "Trang chủ",
+    "navMenu": "Thực đơn",
+    "navLocation": "Vị trí"
   },
   "about": {
     "heroSubtitle": "Quán Cà Phê Container Bản Địa — 3 khối container chia 5 phân khu không gian tại Sa Đéc",
@@ -1712,6 +1791,9 @@
     "title": "Thực Đơn AURA CAFE",
     "subtitle": "Container Caffe & Space · Sa Đéc",
     "loading": "Đang tải thực đơn...",
+    "errorLoading": "Không thể tải thực đơn. Đang thử lại...",
+    "seoTitle": "TV Menu — AURA CAFE Sa Đéc",
+    "seoDescription": "Màn hình thực đơn điện tử TV cho AURA CAFE Sa Đéc. Khám phá cà phê, trà và thức uống đặc trưng.",
     "retry": "Thử lại",
     "featured": "Món đặc sắc",
     "soldOut": "Tạm hết"
@@ -2254,6 +2336,59 @@
       "staff": "Nhân viên",
       "payment": "Thanh toán",
       "reservation": "Đặt bàn"
+    }
+  },
+  "orderSuccess": {
+    "SupportAria": "Hỗ trợ đơn hàng",
+    "NeedHelp": "Cần hỗ trợ với đơn hàng của bạn?",
+    "ContactSupport": "Liên hệ bộ phận hỗ trợ"
+  },
+  "brand": {
+    "breadcrumbs": {
+      "home": "Trang chủ",
+      "brandGuideline": "Brand Guideline"
+    },
+    "fonts": {
+      "display": "Hiển thị & Tiêu đề",
+      "body": "Nội dung & Giao diện",
+      "utility": "Số liệu & Mã"
+    },
+    "hero": {
+      "descriptionPrefix": "Hệ thống nhận diện thương hiệu ",
+      "descriptionSuffix": " — sự giao thoa giữa kiến trúc container công nghiệp mộc mạc và trải nghiệm cà phê đương đại tại Sa Đéc."
+    },
+    "colors": {
+      "descriptionPrefix": "Bảng màu chủ đạo lấy cảm hứng từ ",
+      "descriptionSuffix": " cùng ánh sáng ấm áp của không gian cà phê về đêm, tuân thủ chuẩn tương phản Material Design 3."
+    },
+    "typography": {
+      "description": "Hệ thống chữ viết rõ ràng, hiện đại, tối ưu khả năng đọc tiếng Việt trên mọi kích thước màn hình từ điện thoại đến màn hình TV."
+    },
+    "materials": {
+      "description": "Sự kết hợp hài hòa giữa vật liệu công nghiệp tái chế và chất liệu tự nhiên ấm áp tạo nên bản sắc không gian độc bản của AURA CAFE.",
+      "cortenSteelDesc": "Bề mặt thép container nguyên bản với sắc rỉ sét tự nhiên, biểu trưng cho sự bền bỉ và cá tính công nghiệp.",
+      "walnutOakDesc": "Gỗ tự nhiên vân ấm giúp cân bằng sự lạnh lẽo của kim loại, mang lại cảm giác gần gũi và thư thái.",
+      "smokedBrassDesc": "Chi tiết đồng xước ánh kim tạo điểm nhấn tinh tế cho quầy pha chế và hệ thống đèn trang trí.",
+      "blackTerrazzoDesc": "Đá mài terrazzo tối màu chống bám bẩn, bền vững và hài hòa với bảng màu Midnight Navy."
+    },
+    "rules": {
+      "do1": "Sử dụng ngôn từ ấm áp, gần gũi, mộc mạc chuẩn miền Tây.",
+      "do2": "Ưu tiên hình ảnh thực tế tại quán với ánh sáng tự nhiên hoặc ánh đèn vàng ấm.",
+      "do3": "Giữ nguyên tỷ lệ logo gốc, không cắt tròn và đảm bảo khoảng trống an toàn.",
+      "do4": "Đảm bảo độ tương phản văn bản đạt chuẩn WCAG AA trên nền tối (#0E1322).",
+      "do5": "Nhấn mạnh trải nghiệm không gian container tái chế xanh và bền vững.",
+      "dont1": "Không dùng từ ngữ sáo rỗng, khoa trương hoặc xa cách với khách hàng địa phương.",
+      "dont2": "Không biến dạng, đổi màu tùy tiện hoặc cắt tròn biểu tượng thương hiệu.",
+      "dont3": "Không sử dụng chữ tối màu (-600 trở lên) trực tiếp trên nền tối.",
+      "dont4": "Không lạm dụng quá nhiều phông chữ ngoài bộ Be Vietnam Pro và JetBrains Mono.",
+      "dont5": "Không sử dụng hình ảnh stock thiếu chân thực hoặc sai lệch phong cách quán."
+    },
+    "voice": {
+      "description": "Giọng điệu thương hiệu AURA CAFE mộc mạc, chân thành và hiếu khách — kết nối nhịp sống hiện đại với hơi thở yên bình của vùng đất hoa Sa Đéc.",
+      "doTitle": "NÊN LÀM (DO'S)",
+      "dontTitle": "KHÔNG NÊN (DON'TS)",
+      "slogan": "Mộc mạc từ chất thép, ấm áp từ tâm giao",
+      "subSlogan": "AURA CAFE — Không gian cà phê container giữa lòng Sa Đéc"
     }
   }
 }

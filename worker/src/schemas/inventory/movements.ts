@@ -10,25 +10,25 @@ import {
 } from '../common';
 
 export const StockMovementSchema = z.object({
-  id: z.string().uuid(),
-  ingredientId: z.string().uuid(),
+  id: z.string().min(1),
+  ingredientId: z.string().min(1),
   ingredient: ReferenceSchema.nullable().optional(),
   type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']),
   quantity: z.number(),
   unitCost: MoneySchema.nullable(),
-  referenceId: z.string().uuid().nullable(),
+  referenceId: z.string().min(1).nullable(),
   referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).nullable(),
   notes: z.string().max(500).optional(),
-  performedBy: z.string().uuid().nullable(),
+  performedBy: z.string().min(1).nullable(),
   createdAt: DateTimeSchema,
 }).openapi('StockMovement');
 
 export const StockMovementCreateSchema = z.object({
-  ingredientId: z.string().uuid(),
+  ingredientId: z.string().min(1),
   type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']),
   quantity: z.number(),
   unitCost: MoneySchema.optional(),
-  referenceId: z.string().uuid().optional(),
+  referenceId: z.string().min(1).optional(),
   referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).optional(),
   notes: z.string().max(500).optional(),
 }).openapi('StockMovementCreate');
@@ -51,7 +51,7 @@ export const movementRoutes = {
     security: [{ BearerAuth: [] }],
     request: {
       query: PaginationQuerySchema.extend({
-        ingredientId: z.string().uuid().optional(),
+        ingredientId: z.string().min(1).optional(),
         type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']).optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),

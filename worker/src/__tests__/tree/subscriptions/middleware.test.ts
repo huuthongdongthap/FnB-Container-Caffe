@@ -79,6 +79,12 @@ describe('requireAdmin', () => {
     const res = await requireAdmin(mkCtx({ authHeader: 'Bearer tok' }) as never);
     expect(res).toBeNull();
   });
+
+  it('passes through for manager role', async() => {
+    jwtMock.mockResolvedValue({ role: 'manager' });
+    const res = await requireAdmin(mkCtx({ authHeader: 'Bearer tok' }) as never);
+    expect(res).toBeNull();
+  });
 });
 
 describe('requireVendor', () => {

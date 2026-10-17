@@ -63,16 +63,16 @@ export function PhotoUpload({ onUpload, className }: PhotoUploadProps) {
           type="button"
           onClick={() => inputRef.current?.click()}
           className={cn(
-            'w-full max-w-sm mx-auto p-8 rounded-xl border-2 border-dashed border-gray-300',
-            'hover:border-blue-400 hover:bg-blue-50 transition-all cursor-pointer',
+            'w-full max-w-sm mx-auto p-8 rounded-xl border-2 border-dashed border-border',
+            'hover:border-primary/60 hover:bg-surface/60 transition-all cursor-pointer',
             'flex flex-col items-center gap-2'
           )}
         >
           <span className="text-4xl"><Camera size={36} className="block mx-auto" /></span>
-          <span className="text-sm font-medium text-gray-600">
+          <span className="text-sm font-medium text-foreground">
             Chụp ảnh tại quán
           </span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-muted">
             Chụp ảnh quán cà phê hoặc đồ uống của bạn
           </span>
         </button>

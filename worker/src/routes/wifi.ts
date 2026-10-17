@@ -75,8 +75,8 @@ export function createWifiRoutes() {
   });
 
   // POST /api/wifi/authorize
-  // Staff/Manager/Owner manual MAC grant/revoke override
-  app.post('/authorize', requireAuth(['owner', 'manager', 'staff']), async(c) => {
+  // Staff/Manager/Admin/Owner manual MAC grant/revoke override
+  app.post('/authorize', requireAuth(['owner', 'admin', 'manager', 'staff']), async(c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>();
       const parsed = WifiAuthorizeSchema.safeParse(body);

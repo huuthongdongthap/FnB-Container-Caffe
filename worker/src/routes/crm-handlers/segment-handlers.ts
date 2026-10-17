@@ -9,7 +9,7 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
    * List all segment definitions with counts (no member list).
    * Auth: owner, manager or staff only.
    */
-  router.get('/segments', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+  router.get('/segments', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
 
@@ -23,7 +23,7 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
    * Paginated member list for a segment.
    * Auth: owner, manager or staff only.
    */
-  router.get('/segments/:key/customers', requireAuth(['owner', 'manager', 'staff']), async (c) => {
+  router.get('/segments/:key/customers', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
     const key = c.req.param('key');

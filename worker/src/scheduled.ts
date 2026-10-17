@@ -26,21 +26,29 @@ export async function handleScheduled(
   env: Env,
   ctx: ExecutionContext
 ): Promise<void> {
-  ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(pruneOldMetrics(env.AURA_DB, 7));
-  ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
-  ctx.waitUntil((async () => {
-    await syncMauticContacts(env as unknown as Record<string, unknown>);
-    await Promise.all([
+  const safeWait = (promise: Promise<unknown>) => {
+    ctx.waitUntil(promise.catch(() => {}));
+  };
+
+  safeWait(checkOverdueOrders(env as unknown as Record<string, unknown>));
+  safeWait(pruneOldMetrics(env.AURA_DB, 7));
+  safeWait(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
+  safeWait(processErpnextProductSync(env as unknown as Record<string, unknown>));
+  safeWait((async () => {
+    try {
+      await syncMauticContacts(env as unknown as Record<string, unknown>);
+    } catch {
+      // Non-blocking scheduled sync
+    }
+    await Promise.allSettled([
       detectWinbackCandidates(env as unknown as Record<string, unknown>),
       detectBirthdayCandidates(env as unknown as Record<string, unknown>),
     ]);
   })());
-  ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
-  ctx.waitUntil(dispatchAlerts(env));
+  safeWait(autoPostDailySpecials(env as unknown as Record<string, unknown>));
+  safeWait(autoPostNewPromotions(env as unknown as Record<string, unknown>));
+  safeWait(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
+  safeWait(runCampaignTriggers(env as unknown as Record<string, unknown>));
+  safeWait(sendShiftReminders(env as unknown as Record<string, unknown>));
+  safeWait(dispatchAlerts(env));
 }

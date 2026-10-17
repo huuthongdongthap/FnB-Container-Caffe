@@ -21,7 +21,7 @@ export function ReferralBlock({
   return (
     <section
       className="relative overflow-hidden rounded-xl p-[24px]"
-      aria-label={t('loyalty.referralSectionAria')}
+      aria-label={t('loyalty.referralSectionAria', 'Referral Section')}
       data-glass="card"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
@@ -40,13 +40,13 @@ export function ReferralBlock({
         className="mb-2 text-[24px] leading-[1.4] font-normal"
         style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
       >
-        {t('loyalty.referEarn')}
+        {t('loyalty.referEarn', 'Refer & Earn')}
       </h3>
       <p
         className="mb-[24px] text-[16px] leading-[1.5] font-normal"
         style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
-        {t('loyalty.referDescription')}
+        {t('loyalty.referDescription', 'Invite friends and earn bonus points.')}
       </p>
 
       {/* Code display */}
@@ -71,14 +71,14 @@ export function ReferralBlock({
           onMouseLeave={(e) => {
             if (!copied) (e.currentTarget as HTMLElement).style.color = 'var(--aura-chrome-bright)';
           }}
-          aria-label={copied ? t('loyalty.codeCopiedAria') : t('loyalty.copyCodeAria')}
+          aria-label={copied ? t('loyalty.codeCopiedAria', 'Code copied') : t('loyalty.copyCodeAria', 'Copy code')}
         >
           {copied ? (
             <Check className="h-[18px] w-[18px]" />
           ) : (
             <Copy className="h-[18px] w-[18px]" />
           )}
-          {copied ? t('loyalty.copied') : t('loyalty.copy')}
+          {copied ? t('loyalty.copied', 'Copied') : t('loyalty.copy', 'Copy')}
         </button>
       </div>
 
@@ -87,7 +87,7 @@ export function ReferralBlock({
         <button
          type="button"
           className="flex-1 py-2 bg-white/5 border border-[var(--aura-chrome-soft)]/20 rounded flex items-center justify-center hover:bg-white/10 transition-all"
-          aria-label={t('loyalty.shareCodeAria')}
+          aria-label={t('loyalty.shareCodeAria', 'Share code')}
         >
           <Share2 className="h-4 w-4" style={{ color: 'var(--aura-chrome-soft)' }} />
         </button>
@@ -103,7 +103,7 @@ export function ReferralBlock({
             lineHeight: '1',
           }}
         >
-          {t('loyalty.shareInviteLink')}
+          {t('loyalty.shareInviteLink', 'Share Invite Link')}
         </button>
       </div>
     </section>

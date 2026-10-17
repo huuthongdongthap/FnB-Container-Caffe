@@ -22,8 +22,8 @@ export function SuccessModal({ open, onClose, successDetails }: SuccessModalProp
   return (
     <Modal open={open} onClose={onClose} title={t('successTitle')}>
       <div className="text-center mb-4">
-        <div className="w-16 h-16 mx-auto mb-2 bg-green-100 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none">
+        <div className="w-16 h-16 mx-auto mb-2 bg-emerald-500/15 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-emerald-400" viewBox="0 0 24 24" fill="none">
             <polyline points="4 12 10 18 20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>

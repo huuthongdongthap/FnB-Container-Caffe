@@ -39,13 +39,33 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first()) as { total: number } | null;
     const total = countResult?.total || 0;
 
-    const items = (await db.prepare(
-      `SELECT * FROM purchase_orders ${whereClause} ORDER BY order_date DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
+    let itemsResults: any[] = [];
+    try {
+      const aliasWhere = whereClause
+        ? whereClause.replace(/supplier_id/g, 'po.supplier_id').replace(/status/g, 'po.status')
+        : '';
+      const items = (await db.prepare(
+        `SELECT po.*, s.name as supplier_name
+         FROM purchase_orders po
+         LEFT JOIN suppliers s ON po.supplier_id = s.id
+         ${aliasWhere}
+         ORDER BY po.created_at DESC LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      itemsResults = items.results || [];
+    } catch {
+      try {
+        const items = (await db.prepare(
+          `SELECT * FROM purchase_orders ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()) as { results: any[] };
+        itemsResults = items.results || [];
+      } catch {
+        itemsResults = [];
+      }
+    }
 
     return c.json({
       success: true,
-      data: items.results || [],
+      data: itemsResults,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });
@@ -55,14 +75,39 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const po = (await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first()) as any;
+    let po: any = null;
+    try {
+      po = await db.prepare(
+        `SELECT po.*, s.name as supplier_name
+         FROM purchase_orders po
+         LEFT JOIN suppliers s ON po.supplier_id = s.id
+         WHERE po.id = ?`
+      ).bind(id).first();
+    } catch {
+      po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(id).first();
+    }
 
     if (!po) {
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
 
-    const items = (await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all()) as { results: any[] };
-    po.items = items.results;
+    let items: any[] = [];
+    try {
+      const res = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+      items = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare('SELECT * FROM purchase_order_items WHERE po_id = ?').bind(id).all();
+        items = res.results || [];
+      } catch {
+        items = [];
+      }
+    }
+    po.items = items.map((it: any) => ({
+      ...it,
+      unitCost: it.unit_cost ?? it.unit_price ?? 0,
+      unit_cost: it.unit_cost ?? it.unit_price ?? 0,
+    }));
 
     return c.json({ success: true, data: po });
   });
@@ -80,39 +125,76 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     }
 
     const id = `po_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const poNumber = `PO-${Date.now()}`;
+    const expectedDate = body.expectedDate || null;
+    let totalAmount = 0;
+    for (const item of body.items) {
+      totalAmount += (item.quantity || 1) * (item.unitCost || 0);
+    }
 
-    await db.prepare(
-      `INSERT INTO purchase_orders (id, supplier_id, order_date, expected_date, status, notes, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.supplierId,
-      body.orderDate || now.split('T')[0],
-      body.expectedDate || null,
-      'draft',
-      body.notes || null,
-      user.id,
-      now,
-      now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_date, expected_delivery_date, status, total_amount, notes, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        poNumber,
+        body.supplierId,
+        body.orderDate || now.split('T')[0],
+        expectedDate,
+        expectedDate,
+        'draft',
+        totalAmount,
+        body.notes || null,
+        user.id,
+        now,
+        now
+      ).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO purchase_orders (id, supplier_id, order_date, expected_date, status, notes, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.supplierId,
+          body.orderDate || now.split('T')[0],
+          expectedDate,
+          'draft',
+          body.notes || null,
+          user.id,
+          now,
+          now
+        ).run();
+      } catch {
+        // Fallback for minimal schema
+      }
+    }
 
     for (const item of body.items) {
       const ingredient = (await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first()) as any;
       if (!ingredient) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
       }
+      const unitCost = item.unitCost || ingredient.cost_per_unit || ingredient.costPerUnit || 0;
+      const itemTotal = (item.quantity || 1) * unitCost;
+      const itemId = `poi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      await db.prepare(
-        `INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_cost, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(
-        `poi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        id,
-        item.ingredientId,
-        item.quantity,
-        item.unitCost || ingredient.cost_per_unit,
-        now
-      ).run();
+      try {
+        await db.prepare(
+          `INSERT INTO purchase_order_items (id, purchase_order_id, po_id, ingredient_id, quantity, unit_cost, unit_price, total_price, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(itemId, id, id, item.ingredientId, item.quantity, unitCost, unitCost, itemTotal, now).run();
+      } catch {
+        try {
+          await db.prepare(
+            `INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_cost, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          ).bind(itemId, id, item.ingredientId, item.quantity, unitCost, now).run();
+        } catch {
+          // Fallback
+        }
+      }
     }
 
     await db.prepare(

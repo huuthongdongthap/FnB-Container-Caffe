@@ -30,7 +30,7 @@ export function PlanModal({
     <Modal open={open} onClose={onClose} title={editing ? t('editPlanTitle') : t('addPlanTitle')}>
       <div className="max-h-[70vh] space-y-4 overflow-y-auto">
         {errors._form && (
-          <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">{errors._form}</div>
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">{errors._form}</div>
         )}
 
         <Input label={t('fieldPlanName')} placeholder={t('fieldPlanNamePlaceholder')} value={form.name} onChange={(e) => onChange('name', e.target.value)} error={errors.name} />

@@ -64,17 +64,12 @@ export function OrderPage() {
             },
           );
 
-          if (checkinRes.status === 409) {
-            setSubmitError('Bàn đang được sử dụng');
-            setIsSubmitting(false);
-            return;
-          }
           if (checkinRes.status === 404) {
             setSubmitError('Mã QR không hợp lệ');
             setIsSubmitting(false);
             return;
           }
-          if (!checkinRes.ok) {
+          if (!checkinRes.ok && checkinRes.status !== 409) {
             const body = await checkinRes.json().catch(() => ({}));
             throw new Error(
               body.message || `Lỗi xác nhận bàn (${checkinRes.status})`,

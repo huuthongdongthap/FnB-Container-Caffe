@@ -36,7 +36,7 @@ interface StatsResponse {
 }
 
 interface SubmitReviewPayload {
-  order_id: string;
+  order_id?: string;
   rating: number;
   comment?: string;
   customer_name?: string;
@@ -48,6 +48,7 @@ interface SubmitReviewResponse {
 }
 
 export const reviewFormSchema = z.object({
+  order_id: z.string().optional(),
   rating: z.number().int().min(1, 'Vui lòng chọn số sao').max(5),
   comment: z.string().max(500, 'Nhận xét tối đa 500 ký tự').optional(),
   customer_name: z.string().min(1, 'Tên không được để trống').max(100).optional(),
@@ -84,9 +85,13 @@ export function useSubmitReview() {
         const firstError = parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ';
         throw new Error(firstError);
       }
+      const requestBody = {
+        ...parsed.data,
+        order_id: parsed.data.order_id || payload.order_id || 'general',
+      };
       return apiFetch<SubmitReviewResponse>('/api/reviews', {
         method: 'POST',
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(requestBody),
       });
     },
     onSuccess: () => {

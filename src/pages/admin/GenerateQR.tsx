@@ -28,7 +28,7 @@ export default function GenerateQRPage() {
 		return (
 			<div className="min-h-screen bg-background p-6">
 				<div className="max-w-7xl mx-auto">
-					<div className="bg-red-500/10 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+					<div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">
 						{error}
 						<button onClick={loadTables} className="ml-3 underline hover:no-underline">
 							{t('qrCodes.retry')}
@@ -48,7 +48,7 @@ export default function GenerateQRPage() {
 				<div className="max-w-7xl mx-auto">
 					<div className="mb-6">
 						<h1 className="text-2xl font-display font-bold">{t('qrCodes.pageTitle')}</h1>
-						<p className="text-sm text-gray-500 mt-1">{t('qrCodes.pageSubtitle')}</p>
+						<p className="text-sm text-muted mt-1">{t('qrCodes.pageSubtitle')}</p>
 					</div>
 					<FilterToolbar
 						filterZone={filterZone}

@@ -19,8 +19,8 @@ export function SubscriptionTestResults({ results }: Props) {
           key={name}
           className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
             res.ok
-              ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300'
-              : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+              ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+              : 'border border-red-500/30 bg-red-500/10 text-red-300'
           }`}
         >
           {res.ok ? (

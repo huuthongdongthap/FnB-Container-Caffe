@@ -88,10 +88,17 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
     ).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_create', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind('payment_create', user?.id || 'system', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_create', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run().catch(() => {});
+    }
 
     return c.json({
       success: true,
@@ -114,7 +121,7 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const now = new Date().toISOString();
     const targetId = body.paymentId || c.req.param?.('id');
 
-    if (user?.role && !['owner', 'manager', 'staff'].includes(user.role)) {
+    if (user?.role && !['owner', 'manager', 'staff', 'admin'].includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
@@ -134,7 +141,7 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
       return c.json({ success: false, error: 'Payment not found' }, 404);
     }
 
-    if (payment.status !== 'completed') {
+    if (payment.status !== 'completed' && payment.status !== 'paid') {
       return c.json({ success: false, error: 'Can only refund completed payments' }, 409);
     }
 
@@ -148,10 +155,17 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     // Audit log
     const refundId = crypto.randomUUID();
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind('payment_refund', user?.id || 'system', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run().catch(() => {});
+    }
 
     return c.json({
       success: true,

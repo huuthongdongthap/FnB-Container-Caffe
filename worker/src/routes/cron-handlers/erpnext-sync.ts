@@ -16,19 +16,29 @@ export async function processErpnextRetryQueue(
     return { processed: 0, succeeded: 0, failed: 0 };
   }
 
-  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  if (!db) {
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
 
-  // Pull pending entries that are due (next_retry_at is null or past)
-  const { results: pending } = await db
-    .prepare(
-      `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at
-       FROM erpnext_sync_queue
-       WHERE status = 'pending'
-         AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
-       ORDER BY created_at ASC
-       LIMIT 50`
-    )
-    .all<Record<string, unknown>>();
+  let pending: Array<Record<string, unknown>> = [];
+  try {
+    // Pull pending entries that are due (next_retry_at is null or past)
+    const res = await db
+      .prepare(
+        `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at
+         FROM erpnext_sync_queue
+         WHERE status = 'pending'
+           AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
+         ORDER BY created_at ASC
+         LIMIT 50`
+      )
+      .all<Record<string, unknown>>();
+    pending = res.results || [];
+  } catch (err) {
+    log.error('erpnext_sync_queue_query_error', { error: (err as Error)?.message });
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
 
   if (!pending.length) {
     return { processed: 0, succeeded: 0, failed: 0 };

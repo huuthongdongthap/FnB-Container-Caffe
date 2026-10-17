@@ -118,15 +118,7 @@ routes.forEach((route: any, idx) => {
   }
 });
 
-// Route definitions still have to be visited so OpenAPIHono knows about them
-// when it renders the spec document; the handlers below are unreachable.
-routes.forEach((route: any) => {
-  openApiApp.openapi(route as any, async (c) => {
-    return c.json({ success: false, error: 'Route not bound' }, 501);
-  });
-});
-
-// Mount all real route handlers (overrides stubs above)
+// Mount all real route handlers first so they take precedence over fallback stubs
 openApiApp.route('/', openApiCategoriesRouter);
 openApiApp.route('/', openApiProductsRouter);
 openApiApp.route('/', openApiOrdersRouter);
@@ -138,6 +130,18 @@ openApiApp.route('/', openApiInventoryRouter);
 openApiApp.route('/', openApiLoyaltyRouter);
 openApiApp.route('/', openApiPromotionsRouter);
 openApiApp.route('/', openApiCronRouter);
+
+// Route definitions still have to be visited so OpenAPIHono knows about unbound routes
+// when it renders the spec document; routes already registered by sub-routers above are preserved.
+routes.forEach((route: any) => {
+  try {
+    openApiApp.openapi(route as any, async (c) => {
+      return c.json({ success: false, error: 'Route not bound' }, 501);
+    });
+  } catch {
+    // Route already registered by live sub-router
+  }
+});
 
 // Health check route
 const healthRoute = createRoute({

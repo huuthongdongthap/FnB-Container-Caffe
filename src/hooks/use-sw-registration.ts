@@ -15,13 +15,38 @@ export function useSWRegistration() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    navigator.serviceWorker.ready
-      .then((reg) => {
-        setRegistration(reg);
-      })
-      .catch(() => {
-        // non-fatal: SW may not be available in dev
+    const attachUpdateListener = (reg: ServiceWorkerRegistration) => {
+      setRegistration(reg);
+      if (reg.waiting) {
+        setIsUpdateAvailable(true);
+      }
+      reg.addEventListener?.('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            setIsUpdateAvailable(true);
+          }
+        });
       });
+    };
+
+    if (typeof navigator.serviceWorker.register === 'function') {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then(attachUpdateListener)
+        .catch(() => {
+          // non-fatal: SW may not be available in dev
+        });
+    }
+
+    if (navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready
+        .then(attachUpdateListener)
+        .catch(() => {
+          // non-fatal: SW may not be available in dev
+        });
+    }
 
     const handler = () => setIsUpdateAvailable(true);
     navigator.serviceWorker.addEventListener('controllerchange', handler);
@@ -31,8 +56,9 @@ export function useSWRegistration() {
   }, []);
 
   const skipWaiting = useCallback(() => {
-    if (registration?.active) {
-      registration.active.postMessage({ type: 'SKIP_WAITING' });
+    const target = registration?.waiting || registration?.active;
+    if (target) {
+      target.postMessage({ type: 'SKIP_WAITING' });
     }
   }, [registration]);
 

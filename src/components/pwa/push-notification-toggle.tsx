@@ -105,7 +105,7 @@ export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
   return (
     <div style={styles.container}>
       <div style={styles.iconWrapper}>
-        <Bell className="h-5 w-5" style={{ color: '#F97316' }} />
+        <Bell className="h-5 w-5" style={{ color: 'var(--aura-gold, #C9A84C)' }} />
       </div>
       <div style={styles.textBlock}>
         <p style={styles.title}>

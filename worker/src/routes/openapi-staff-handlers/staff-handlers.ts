@@ -217,6 +217,60 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
     }
 
+    // Sync with staff_users table if present
+    try {
+      const staffUpdates: string[] = [];
+      const staffParams: (string | number | null)[] = [];
+      if (body.name !== undefined) { staffUpdates.push('name = ?'); staffParams.push(body.name); }
+      if (body.email !== undefined) { staffUpdates.push('email = ?'); staffParams.push(body.email); }
+      if (body.phone !== undefined) { staffUpdates.push('phone = ?'); staffParams.push(body.phone); }
+      if (body.role !== undefined) { staffUpdates.push('role = ?'); staffParams.push(body.role); }
+      if (body.isActive !== undefined) { staffUpdates.push('is_active = ?'); staffParams.push(body.isActive ? 1 : 0); }
+      staffUpdates.push('updated_at = ?');
+      staffParams.push(now);
+      staffParams.push(id);
+      if (staffUpdates.length > 1) {
+        await db.prepare(`UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ?`).bind(...staffParams).run();
+      }
+    } catch {
+      // staff_users table optional
+    }
+
+    // Dual-store sync: update AUTH_KV cached user record if bound
+    if (c.env.AUTH_KV) {
+      try {
+        const oldEmail = existing.email;
+        const newEmail = body.email || oldEmail;
+        const kvKey = `user:${oldEmail}`;
+        const raw = await c.env.AUTH_KV.get(kvKey);
+        let kvUser: any = raw ? JSON.parse(raw) : null;
+        if (!kvUser) {
+          const rawById = await c.env.AUTH_KV.get(`user:${id}`);
+          if (rawById) kvUser = JSON.parse(rawById);
+        }
+        if (kvUser) {
+          const updatedKv = {
+            ...kvUser,
+            name: body.name !== undefined ? body.name : kvUser.name,
+            phone: body.phone !== undefined ? body.phone : kvUser.phone,
+            role: body.role !== undefined ? body.role : kvUser.role,
+            position: body.role !== undefined ? body.role : (kvUser.position || kvUser.role),
+            active: body.isActive !== undefined ? body.isActive : (kvUser.active ?? kvUser.isActive),
+            isActive: body.isActive !== undefined ? body.isActive : (kvUser.isActive ?? kvUser.active),
+            email: newEmail,
+            updated_at: now,
+          };
+          if (newEmail !== oldEmail) {
+            await c.env.AUTH_KV.delete(kvKey);
+          }
+          await c.env.AUTH_KV.put(`user:${newEmail}`, JSON.stringify(updatedKv));
+          await c.env.AUTH_KV.put(`user:${id}`, JSON.stringify(updatedKv)).catch(() => {});
+        }
+      } catch {
+        // Non-blocking KV sync failure
+      }
+    }
+
     // Audit log (redact password if present)
     const { password: _redactedUpdatePw, ...auditUpdateBody } = body;
     await db.prepare(

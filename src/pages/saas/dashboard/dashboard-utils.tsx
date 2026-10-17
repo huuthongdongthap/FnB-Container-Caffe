@@ -1,14 +1,14 @@
 import React from 'react';
 
 const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  pending: 'bg-blue-100 text-blue-800',
-  paid: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  overdue: 'bg-amber-100 text-amber-800',
-  processing: 'bg-blue-100 text-blue-800',
-  manual: 'bg-amber-100 text-amber-800',
-  cancelled: 'bg-red-100 text-red-800',
+  active: 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300',
+  pending: 'bg-sky-500/10 border border-sky-500/30 text-sky-300',
+  paid: 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300',
+  failed: 'bg-red-500/10 border border-red-500/30 text-red-300',
+  overdue: 'bg-amber-500/10 border border-amber-500/30 text-amber-300',
+  processing: 'bg-sky-500/10 border border-sky-500/30 text-sky-300',
+  manual: 'bg-amber-500/10 border border-amber-500/30 text-amber-300',
+  cancelled: 'bg-red-500/10 border border-red-500/30 text-red-300',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -27,7 +27,7 @@ export function formatVND(value: number): string {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const color = STATUS_STYLES[status] || 'bg-gray-100 text-gray-800';
+  const color = STATUS_STYLES[status] || 'bg-white/5 border border-white/10 text-muted';
   const label = STATUS_LABELS[status] || status;
 
   return (

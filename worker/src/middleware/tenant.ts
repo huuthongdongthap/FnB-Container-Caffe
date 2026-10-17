@@ -10,7 +10,7 @@ const log = createLogger({ route: 'tenant' });
  */
 export function isHQSuperAdmin(user?: { role?: string; tenantId?: string } | null): boolean {
   if (!user) return false;
-  return user.role === 'owner' && (!user.tenantId || user.tenantId === 'default' || user.tenantId === 'hq');
+  return (user.role === 'owner' || user.role === 'admin') && (!user.tenantId || user.tenantId === 'default' || user.tenantId === 'hq');
 }
 
 /**

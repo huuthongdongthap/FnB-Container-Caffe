@@ -59,7 +59,6 @@ function makeEnv(db: D1Database) {
 }
 
 const testApp = new Hono<{ Bindings: any }>();
-testApp.use('/api/pos/customer*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
 testApp.route('/api/pos/customer', posCustomerRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown, role: string = 'staff') {
@@ -240,7 +239,7 @@ describe('pos-customer routes', () => {
       visit_count: 1,
     };
 
-    for (const role of ['owner', 'manager', 'staff', 'waiter']) {
+    for (const role of ['owner', 'manager', 'staff', 'waiter', 'admin']) {
       db = makeScriptedDB([
         {
           match: (sql) => sql.includes('FROM customers'),

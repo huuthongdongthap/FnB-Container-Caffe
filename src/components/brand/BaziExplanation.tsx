@@ -90,13 +90,13 @@ export function BaziExplanation({ className }: BaziExplanationProps) {
       {/* Allowed / Forbidden */}
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-6">
-          <h3 className="font-display text-lg font-semibold text-green-600">
-            <Check size={16} className="inline text-green-500" /> Nên dùng
+          <h3 className="font-display text-lg font-semibold text-green-400">
+            <Check size={16} className="inline text-green-400" /> Nên dùng
           </h3>
           <ul className="mt-3 space-y-2">
             {ALLOWED.map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
+                <span className="mt-0.5 shrink-0 text-green-400" aria-hidden="true"><Check size={16} className="inline text-green-400" /></span>
                 <span>{renderWithHexBadges(item)}</span>
               </li>
             ))}

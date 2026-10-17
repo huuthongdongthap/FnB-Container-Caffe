@@ -58,11 +58,17 @@ export function useHandleViewCart({
       try {
         if (hasValidTable && tableId) {
           try {
+            const storedToken = typeof localStorage !== 'undefined'
+              ? (localStorage.getItem('aura_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('token'))
+              : null;
             const checkinRes = await fetch(
               `${API_BASE}/api/orders/guest-checkin`,
               {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+                },
                 body: JSON.stringify({
                   customer_name: guestName.trim(),
                   customer_phone: normalizePhone(guestPhone).trim(),
@@ -77,17 +83,7 @@ export function useHandleViewCart({
               setIsSubmitting(false);
               return;
             }
-            if (checkinRes.status === 409) {
-              setSubmitError(
-                t('tableOccupied', {
-                  defaultValue:
-                    'Bàn này đang được sử dụng. Vui lòng chọn bàn khác.',
-                }),
-              );
-              setIsSubmitting(false);
-              return;
-            }
-            if (!checkinRes.ok) {
+            if (!checkinRes.ok && checkinRes.status !== 409) {
               let bodyMsg: string | undefined;
               try {
                 const parsed = (await checkinRes.json()) as Record<
@@ -139,15 +135,18 @@ export function useHandleViewCart({
         };
 
         const order = await createOrder(payload);
+        const resolvedOrder = (order as unknown as { order?: { id?: string }; data?: { id?: string } })?.order
+          ?? (order as unknown as { data?: { id?: string } })?.data
+          ?? order;
 
-        if (order?.id) {
+        if (resolvedOrder?.id) {
           try {
             await flushQueuedOrders();
           } catch {
             /* non-fatal */
           }
           navigate(
-            `/order-success?order_id=${encodeURIComponent(order.id)}`,
+            `/order-success?order_id=${encodeURIComponent(resolvedOrder.id)}`,
           );
         } else {
           throw new Error(

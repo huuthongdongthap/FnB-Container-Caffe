@@ -78,7 +78,13 @@ export function StitchLoyaltyNew({
   }
 
   /* ─── Empty State ───────────────────────────────────────────────── */
-  if (!data || data.pointsBalance === 0) {
+  if (
+    !data ||
+    (data.pointsBalance === 0 &&
+      data.rewards.length === 0 &&
+      data.pointsHistory.length === 0 &&
+      (!data.tierLadder || data.tierLadder.length === 0))
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
         <LoyaltyEmpty />

@@ -70,6 +70,13 @@ export default function SystemHubPage() {
   const { customers, fetchCustomers } = useAdminCustomersStore();
 
   useEffect(() => {
+    const hasAuthToken =
+      typeof window !== 'undefined' &&
+      Boolean(
+        window.localStorage.getItem('auth_token') ||
+          window.localStorage.getItem('aura_access_token'),
+      );
+    if (!hasAuthToken) return;
     fetchOrders().catch(() => {});
     fetchCustomers(1).catch(() => {});
   }, [fetchOrders, fetchCustomers]);
@@ -423,7 +430,9 @@ export default function SystemHubPage() {
                     </span>
                     <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Localhost:5173
+                      {typeof window !== 'undefined' && window.location?.host
+                        ? window.location.host
+                        : 'auraspace.cafe'}
                     </span>
                   </div>
                   <p className="text-xs text-[var(--aura-text-secondary,#a0a8b0)]">

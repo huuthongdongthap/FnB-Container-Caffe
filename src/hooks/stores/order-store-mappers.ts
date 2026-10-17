@@ -8,7 +8,7 @@ import type { CustomerOrder, CustomerOrderItem, OrderStatus, PaymentStatus } fro
 
 /* ─── Currency Formatting ───────────────────────────────────────────────── */
 function formatVndCents(cents: number): string {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cents / 100);
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cents);
 }
 
 /* ─── Status Label Mapping ──────────────────────────────────────────────── */

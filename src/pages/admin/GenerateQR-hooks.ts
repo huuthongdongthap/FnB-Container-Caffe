@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
 import type { AdminQRTable } from './GenerateQR-types';
 
 export function useQrTables(t: (key: string) => string) {
@@ -13,10 +13,10 @@ export function useQrTables(t: (key: string) => string) {
 			const response = await apiFetch<{ success: boolean; data: AdminQRTable[] }>(
 				'/api/admin/qr/tables',
 			);
-			const host = typeof window !== 'undefined' ? window.location.origin : '';
+			const baseUrl = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
 			const enriched = (response?.data ?? []).map((item) => ({
 				...item,
-				qr_png_url: `${host}/api/admin/qr/${item.slug}/png`,
+				qr_png_url: item.qr_png_url || `${baseUrl}/api/admin/qr/${item.slug}/png`,
 			}));
 			setTables(enriched);
 			setLoading(false);

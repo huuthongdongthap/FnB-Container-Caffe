@@ -14,7 +14,7 @@ import type { CafeTable, QrCodeRow } from '@aura/domain-table';
 export const adminQRRouter = new Hono<{ Bindings: Env }>();
 
 // ── Auth gate ──────────────────────────────────────────────────────
-adminQRRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
+adminQRRouter.use('*', requireAuth(['owner', 'manager', 'staff', 'admin']));
 
 // ── GET /api/admin/qr/tables — list all tables with QR data ──────
 adminQRRouter.get('/tables', async(c) => {
@@ -98,8 +98,7 @@ adminQRRouter.get('/:slug/download', async(c) => {
     .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
     .bind(slug)
     .first();
-  const qrRow =
-    (qrRowRaw as { table_id: number } | null) ?? { table_id: -1 };
+  const qrRow = qrRowRaw as { table_id: number } | null;
   if (!qrRow) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }

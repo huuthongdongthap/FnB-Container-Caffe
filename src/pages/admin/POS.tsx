@@ -76,6 +76,8 @@ export default function AdminPOSPage() {
       const resolvedTableId = tableId ?? selectedTableId;
 
       try {
+        const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
+        const serviceFee = Math.max(0, Math.round(total - subtotal));
         const result = await checkoutMutation.mutateAsync({
           items: cart.map((ci) => ({
             id: ci.id,
@@ -83,7 +85,7 @@ export default function AdminPOSPage() {
             price: ci.price,
             quantity: ci.quantity,
           })),
-          total,
+          total: Math.round(total),
           customer_name: customer?.name || t('adminPOS.customerDefaultName'),
           customer_phone: customer?.phone || '0900000000',
           customer_id: customer?.id,
@@ -91,17 +93,31 @@ export default function AdminPOSPage() {
           customer_address: t('adminPOS.customerDefaultAddress'),
           payment_method: paymentMethod,
           shipping_fee: 0,
+          service_fee: serviceFee,
           discount: 0,
           tip: 0,
           ...(resolvedTableId ? { table_id: resolvedTableId } : {}),
         });
 
         if (result.success) {
-          if (
-            paymentMethod === 'payos' &&
-            (result.payment_url || result.checkout_url)
-          ) {
-            const url = result.payment_url || result.checkout_url;
+          let resolvedUrl = result.payment_url || result.checkout_url;
+          const createdOrderId = result.order_id || result.order?.id;
+          if (paymentMethod === 'payos' && !resolvedUrl && createdOrderId) {
+            try {
+              const payRes = await payOSMutation.mutateAsync({
+                order_id: createdOrderId,
+                total: Math.round(total),
+                cancel_url: window.location.href,
+                return_url: window.location.href,
+                description: `POS #${createdOrderId.slice(0, 8)}`,
+              });
+              resolvedUrl = payRes.payment_url || payRes.checkout_url || payRes.checkoutUrl;
+            } catch {
+              // Non-fatal: order created, staff can retry payment link
+            }
+          }
+          if (paymentMethod === 'payos' && resolvedUrl) {
+            const url = resolvedUrl;
             // Use React Router navigate instead of window.open (blocked on tablets)
             // Store URL for in-app iframe / link fallback
             setPaymentUrl(url ?? null);
@@ -121,20 +137,23 @@ export default function AdminPOSPage() {
 
           setCheckoutSuccess(true);
           setTimeout(() => setCheckoutSuccess(false), 5000);
+          return true;
         } else {
           setCheckoutError(
             result.message || t('adminPOS.createOrderError'),
           );
+          return false;
         }
       } catch (err) {
         setCheckoutError(
           err instanceof Error ? err.message : t('adminPOS.createOrderError'),
         );
+        return false;
       } finally {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation.mutateAsync, isCompleting, customer, selectedTableId, t, navigate],
+    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, isCompleting, customer, selectedTableId, t, navigate],
   );
 
   /* ── Render ───────────────────────────────────────────────────────── */

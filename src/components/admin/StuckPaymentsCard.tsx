@@ -38,17 +38,17 @@ export function StuckPaymentsCard() {
   if (!data || data.total === 0) return null;
 
   return (
-    <Card className="border-amber-300 bg-amber-50/30">
+    <Card className="border-amber-500/30 bg-amber-500/10">
       <CardHeader>
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex w-full items-center justify-between"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+          <span className="flex items-center gap-2 text-sm font-semibold text-amber-300">
             <AlertTriangle className="h-4 w-4" />
             Thanh toán treo
           </span>
-          <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-800">
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-200">
             {data.total}
           </span>
         </button>
@@ -58,10 +58,10 @@ export function StuckPaymentsCard() {
         <CardBody>
           {data.stuck.length > 0 && (
             <div className="mb-3">
-              <p className="mb-2 text-xs font-medium text-amber-700">
+              <p className="mb-2 text-xs font-medium text-amber-300">
                 Sai khớp số tiền ({data.stuck.length})
               </p>
-              <ul className="space-y-1 text-xs text-amber-800/80">
+              <ul className="space-y-1 text-xs text-amber-200/80">
                 {data.stuck.slice(0, 5).map((s) => (
                   <li key={s.orderId} className="flex justify-between">
                     <span>#{s.orderId}</span>
@@ -71,7 +71,7 @@ export function StuckPaymentsCard() {
                   </li>
                 ))}
                 {data.stuck.length > 5 && (
-                  <li className="text-amber-600">
+                  <li className="text-amber-300">
                     ...và {data.stuck.length - 5} giao dịch khác
                   </li>
                 )}
@@ -81,10 +81,10 @@ export function StuckPaymentsCard() {
 
           {data.dlq.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-medium text-amber-700">
+              <p className="mb-2 text-xs font-medium text-amber-300">
                 Lỗi webhook ({data.dlq.length})
               </p>
-              <ul className="space-y-1 text-xs text-amber-800/80">
+              <ul className="space-y-1 text-xs text-amber-200/80">
                 {data.dlq.slice(0, 5).map((d) => (
                   <li key={d.key} className="truncate">
                     <span className="font-mono text-[10px]">{d.key.replace('webhook:dlq:', '')}</span>
@@ -92,7 +92,7 @@ export function StuckPaymentsCard() {
                   </li>
                 ))}
                 {data.dlq.length > 5 && (
-                  <li className="text-amber-600">
+                  <li className="text-amber-300">
                     ...và {data.dlq.length - 5} lỗi khác
                   </li>
                 )}

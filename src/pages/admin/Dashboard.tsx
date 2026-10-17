@@ -41,7 +41,7 @@ export default function AdminDashboardPage() {
       <div className="min-h-screen bg-background p-6">
         <HelmetHead {...DASHBOARD_HELMET} />
         <div className="mx-auto max-w-7xl">
-          <div className="rounded-xl border border-border bg-red-500/10 p-4 text-sm text-red-700">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
             {statsError}
             <button onClick={() => fetchDashboard()} className="ml-3 underline hover:no-underline">
               {t('common:retry')}

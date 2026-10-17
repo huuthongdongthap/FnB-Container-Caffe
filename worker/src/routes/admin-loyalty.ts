@@ -93,12 +93,12 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
     if (v && typeof v.avg === 'number' && v.avg > 0) {
       avgVisits = Math.round(v.avg);
     } else {
-      const ord = await db.prepare('SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders GROUP BY customer_phone)').first<{ avg: number }>();
+      const ord = await db.prepare("SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders WHERE status != 'cancelled' GROUP BY COALESCE(NULLIF(customer_id, ''), customer_phone))").first<{ avg: number }>();
       avgVisits = Math.round(ord?.avg || v?.avg || 0);
     }
   } catch {
     try {
-      const ord = await db.prepare('SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders GROUP BY customer_phone)').first<{ avg: number }>();
+      const ord = await db.prepare("SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders WHERE status != 'cancelled' GROUP BY COALESCE(NULLIF(customer_id, ''), customer_phone))").first<{ avg: number }>();
       avgVisits = Math.round(ord?.avg || 0);
     } catch {}
   }
@@ -199,7 +199,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
     const res = await db.prepare(`
       SELECT c.id, c.name, c.phone, c.loyalty_tier as tier,
              COALESCE(cw.total_spent, 0) as total_spent,
-             (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) as visit_count
+             (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') as visit_count
       FROM customers c
       LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
       ORDER BY total_spent DESC
@@ -238,7 +238,7 @@ adminLoyaltyRouter.get('/export', async(c) => {
                c.loyalty_tier AS tier,
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count,
+               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
                c.created_at
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -254,7 +254,7 @@ adminLoyaltyRouter.get('/export', async(c) => {
                c.loyalty_tier AS tier,
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count,
+               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
                c.created_at
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id

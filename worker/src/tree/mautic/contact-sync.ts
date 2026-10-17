@@ -27,11 +27,27 @@ export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boo
   try {
     const since = syncStatus.last_sync || new Date(Date.now() - 3600000).toISOString();
 
-    const { results } = await db.prepare(
-      `SELECT id, name, phone, email, tier, total_spent, visit_count,
-        (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
-       FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
-    ).bind(since).all<CustomerContact>();
+    let results: CustomerContact[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT id, name, phone, email, tier, total_spent, visit_count,
+          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
+         FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
+      ).bind(since).all<CustomerContact>();
+      results = res.results || [];
+    } catch (colErr) {
+      const msg = String((colErr as Error)?.message || '');
+      if (msg.includes('no such column')) {
+        const fallback = await db.prepare(
+          `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count,
+            (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
+           FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
+        ).bind(since).all<CustomerContact>();
+        results = fallback.results || [];
+      } else {
+        throw colErr;
+      }
+    }
 
     if (!results || results.length === 0) {
       syncStatus.status = 'completed';

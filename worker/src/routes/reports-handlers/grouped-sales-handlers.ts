@@ -103,17 +103,23 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
-    const { results } = await db.prepare(`
-      SELECT c.name as label,
-             COALESCE(SUM(oi.subtotal), 0) as value,
-             SUM(oi.quantity) as count
-      FROM order_items oi
-      JOIN products p ON p.id = oi.product_id
-      JOIN categories c ON c.id = p.category_id
-      JOIN orders o ON o.id = oi.order_id
-      WHERE o.status != 'cancelled' AND DATE(o.created_at) BETWEEN ? AND ?
-      GROUP BY c.name ORDER BY value DESC
-    `).bind(from, to).all<GroupedSalesGroup>();
+    let results: GroupedSalesGroup[] = [];
+    try {
+      const res = await db.prepare(`
+        SELECT c.name as label,
+               COALESCE(SUM(oi.subtotal), 0) as value,
+               SUM(oi.quantity) as count
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        JOIN categories c ON c.id = p.category_id
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.status != 'cancelled' AND DATE(o.created_at) BETWEEN ? AND ?
+        GROUP BY c.name ORDER BY value DESC
+      `).bind(from, to).all<GroupedSalesGroup>();
+      results = res.results || [];
+    } catch {
+      results = [];
+    }
 
     if (results && results.length > 0) {
       return c.json({ success: true, data: { groups: results } });

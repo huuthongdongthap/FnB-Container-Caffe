@@ -61,10 +61,14 @@ export function useSubscriptionPlans(t: (key: string, options?: Record<string, u
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch(`/api/subscriptions/plans/${id}`, { method: 'DELETE' }),
+      apiFetch(`/api/subscriptions/plans/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
       setDeletePlanId(null);
+    },
+    onError: (err: Error) => {
+      setErrors({ _form: err.message });
     },
   });
 

@@ -10,7 +10,7 @@ import type { HappyHourWindow } from '../model/catalog-types';
 import { happyHourDiscountFor } from '../policies/pricing';
 
 export const happyHourRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);

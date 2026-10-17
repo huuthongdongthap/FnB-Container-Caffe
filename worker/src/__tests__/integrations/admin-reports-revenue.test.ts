@@ -137,4 +137,30 @@ describe('Admin Revenue Analytics & Grouped Sales Handlers', () => {
     expect(json.data.avgOrderValue).toBe(100000);
     expect(json.data.changePercent).toBe(25);
   });
+
+  it('GET /sales-by-category falls back to orders.items JSON when order_items table is absent', async () => {
+    const mockDb = {
+      prepare: vi.fn().mockImplementation((sql: string) => ({
+        bind: vi.fn().mockReturnValue({
+          all: vi.fn().mockImplementation(async () => {
+            if (sql.includes('FROM order_items')) {
+              throw new Error('D1_ERROR: no such table: order_items');
+            }
+            return {
+              results: [
+                { items: JSON.stringify([{ name: 'Cold Brew', category: 'Cà phê', quantity: 2, price: 45000 }]) }
+              ]
+            };
+          })
+        })
+      }))
+    };
+
+    const env = { AURA_DB: mockDb } as unknown as Env;
+    const res = await reportsRouter.request('/sales-by-category?from=2026-10-01&to=2026-10-05', {}, env);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { success: boolean; data: { groups: Array<{ label: string; value: number; count: number }> } };
+    expect(json.success).toBe(true);
+    expect(json.data.groups).toEqual([{ label: 'Cà phê', value: 90000, count: 2 }]);
+  });
 });

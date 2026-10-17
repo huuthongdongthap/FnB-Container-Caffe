@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StitchMobileOrderNew } from '@/components/stitch';
@@ -150,8 +150,9 @@ export function TableOrder(): ReactNode {
   const navigate = useNavigate();
   const location = useLocation();
   const isPosRoute = location.pathname.startsWith('/pos');
+  const { tableId: paramTableId } = useParams<{ tableId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawTable = searchParams.get('table') || searchParams.get('ban');
+  const rawTable = searchParams.get('table') || searchParams.get('ban') || (paramTableId && paramTableId !== 'select' ? paramTableId : null);
   const tableId = rawTable?.trim() ?? '';
   const hasValidTable = isTableIdValid(rawTable);
 
@@ -161,6 +162,20 @@ export function TableOrder(): ReactNode {
   const [guestPhone, setGuestPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aura_saved_customer');
+      if (saved) {
+        const parsed = JSON.parse(saved) as { fullName?: string; phone?: string };
+        if (parsed.fullName && !guestName) setGuestName(parsed.fullName);
+        if (parsed.phone && !guestPhone) setGuestPhone(parsed.phone);
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load saved customer once on mount
+  }, []);
 
   const handleSelectTable = (selected: string) => {
     setSearchParams({ table: selected });

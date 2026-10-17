@@ -19,8 +19,8 @@ export function StatusActions({ currentStatus, isUpdating, onUpdate, t }: Status
           className={cn(
             'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
             status === 'cancelled'
-              ? 'bg-red-50 text-red-600 hover:bg-red-100'
-              : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
+              ? 'bg-red-500/15 text-red-300 hover:bg-red-500/25'
+              : 'bg-sky-500/15 text-sky-300 hover:bg-sky-500/25',
             isUpdating && 'opacity-50 cursor-not-allowed'
           )}
         >

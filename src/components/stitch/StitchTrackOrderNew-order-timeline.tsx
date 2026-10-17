@@ -11,14 +11,16 @@ export interface OrderTimelineProps {
 }
 
 /** Canonical status order for the timeline; anything before the current status is completed */
-const STATUS_FLOW = ['confirmed', 'preparing', 'ready', 'served', 'delivered'] as const;
+const STATUS_FLOW = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed'] as const;
 
 const STATUS_LABEL_KEYS: Record<(typeof STATUS_FLOW)[number], string> = {
+  pending: 'trackOrder.stepPending',
   confirmed: 'trackOrder.stepConfirmed',
   preparing: 'trackOrder.stepPreparing',
   ready: 'trackOrder.stepReady',
   served: 'trackOrder.stepServed',
   delivered: 'trackOrder.stepDelivered',
+  completed: 'trackOrder.stepCompleted',
 };
 
 export function OrderTimeline({ status }: OrderTimelineProps) {

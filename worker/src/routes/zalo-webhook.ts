@@ -31,6 +31,55 @@ const zaloWebhookSchema = z.object({
   user_phone: z.string().optional()
 });
 
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
+async function verifyZaloSignature(
+  rawBody: string,
+  signatureHeader: string,
+  secret: string,
+  appId = '',
+  timestamp = ''
+): Promise<boolean> {
+  const normalizedSig = signatureHeader.replace(/^mac=/i, '').trim().toLowerCase();
+  const enc = new TextEncoder();
+
+  // Standard HMAC-SHA256 over raw body
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const hmacDigest = await crypto.subtle.sign('HMAC', hmacKey, enc.encode(rawBody));
+  const hmacHex = Array.from(new Uint8Array(hmacDigest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  if (constantTimeEqual(hmacHex, normalizedSig)) {
+    return true;
+  }
+
+  // Zalo OA SHA-256 digest: sha256(appId + data + timestamp + OAsecretKey)
+  const shaDigest = await crypto.subtle.digest(
+    'SHA-256',
+    enc.encode(`${appId}${rawBody}${timestamp}${secret}`)
+  );
+  const shaHex = Array.from(new Uint8Array(shaDigest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return constantTimeEqual(shaHex, normalizedSig);
+}
+
 // GET /api/webhooks/zalo — Webhook verification challenge
 zaloWebhookRouter.get('/', (c) => {
   const challenge = c.req.query('challenge');
@@ -42,7 +91,31 @@ zaloWebhookRouter.get('/', (c) => {
 
 // POST /api/webhooks/zalo — Inbound Zalo message event
 zaloWebhookRouter.post('/', async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const rawBody = await c.req.text().catch(() => '{}');
+  let body: Record<string, unknown> = {};
+  try {
+    body = JSON.parse(rawBody || '{}') as Record<string, unknown>;
+  } catch {
+    return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
+  }
+
+  const envRecord = (c.env || {}) as unknown as Record<string, unknown>;
+  const zaloSecret = (envRecord.ZALO_OA_SECRET || envRecord.ZALO_APP_SECRET) as string | undefined;
+  const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
+  const signatureHeader = c.req.header('X-ZaloOA-Signature') || c.req.header('x-zalooa-signature');
+
+  if (zaloSecret && (isProd || signatureHeader)) {
+    if (!signatureHeader) {
+      return c.json({ success: false, error: 'Missing Zalo webhook signature' }, 401);
+    }
+    const appId = String(body.app_id || envRecord.ZALO_APP_ID || '');
+    const timestamp = String(body.timestamp || '');
+    const valid = await verifyZaloSignature(rawBody, signatureHeader, zaloSecret, appId, timestamp);
+    if (!valid) {
+      return c.json({ success: false, error: 'Invalid Zalo webhook signature' }, 401);
+    }
+  }
+
   const parsed = zaloWebhookSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid Zalo webhook event' }, 400);
@@ -108,7 +181,7 @@ zaloWebhookRouter.post(
   async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
     if (isProd || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'staff'])(c, next);
+      return requireAuth(['owner', 'manager', 'staff', 'admin'])(c, next);
     }
     return next();
   },

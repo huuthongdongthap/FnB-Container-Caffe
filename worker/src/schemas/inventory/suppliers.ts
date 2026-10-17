@@ -4,12 +4,12 @@ import {
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
-  IdParamsSchema,
   DateTimeSchema,
 } from '../common';
+import { IdParamsSchema } from './common';
 
 export const SupplierSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string().min(1).max(100),
   contactName: z.string().max(100).nullable(),
   email: z.string().email().nullable(),

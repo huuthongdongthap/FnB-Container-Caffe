@@ -27,14 +27,28 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet>();
   const balance = wallet?.balance || 0;
 
-  const lifetimeRow = await db.prepare(
-    'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
-  ).bind(customer.id).first<{ total: number }>();
+  let lifetimeRow: { total: number } | null = null;
+  try {
+    lifetimeRow = await db.prepare(
+      'SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\')'
+    ).bind(customer.id).first<{ total: number }>();
+  } catch {
+    lifetimeRow = await db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
+    ).bind(customer.id).first<{ total: number }>();
+  }
 
   const sevenDays = new Date(Date.now() + 7 * 86400000).toISOString();
-  const expiringRow = await db.prepare(
-    'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
-  ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+  let expiringRow: { total: number; cnt: number } | null = null;
+  try {
+    expiringRow = await db.prepare(
+      'SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime(\'now\')'
+    ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+  } catch {
+    expiringRow = await db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
+    ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+  }
 
   const nextTierRow = await db.prepare(
     'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'

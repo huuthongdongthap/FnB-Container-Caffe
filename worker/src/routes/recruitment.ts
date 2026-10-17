@@ -188,8 +188,8 @@ recruitmentRouter.post('/apply', rateLimitMiddleware(RECRUITMENT_RATE_LIMIT), su
 recruitmentRouter.post('/', rateLimitMiddleware(RECRUITMENT_RATE_LIMIT), submitApplication);
 
 // Protected staff/admin routes
-recruitmentRouter.use('/applications/*', requireAuth(['owner', 'manager', 'staff']));
-recruitmentRouter.use('/applications', requireAuth(['owner', 'manager', 'staff']));
+recruitmentRouter.use('/applications/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+recruitmentRouter.use('/applications', requireAuth(['owner', 'manager', 'staff', 'admin']));
 recruitmentRouter.get('/applications', listApplications);
 recruitmentRouter.patch('/applications/:id', updateApplicationStatus);
-recruitmentRouter.delete('/applications/:id', requireAuth(['owner', 'manager']), deleteApplication);
+recruitmentRouter.delete('/applications/:id', requireAuth(['owner', 'manager', 'admin']), deleteApplication);

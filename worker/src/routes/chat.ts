@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { requireAuth } from '../middleware/auth';
+import { getAuthToken, verifyJWT } from '../lib/jwt';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'chat' });
@@ -21,7 +22,8 @@ const log = createLogger({ route: 'chat' });
 const sendMessageSchema = z.object({
   name: z.string().min(1, 'Ten khong duoc de trong').max(100),
   phone: z.string().min(8, 'So dien thoai khong hop le').max(15),
-  message: z.string().min(1, 'Tin nhan khong duoc de trong').max(2000)
+  message: z.string().min(1, 'Tin nhan khong duoc de trong').max(2000),
+  direction: z.enum(['customer', 'admin']).optional(),
 });
 
 // ── Rate limit helper ──
@@ -73,9 +75,21 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
 
     const db = c.env.AURA_DB;
     const now = new Date().toISOString();
+    let resolvedDirection: 'customer' | 'admin' = 'customer';
+    if (parsed.data.direction === 'admin') {
+      const token = getAuthToken(c.req.raw);
+      if (token && c.env.JWT_SECRET) {
+        const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
+        if (payload && ['owner', 'manager', 'staff', 'admin'].includes(String(payload.role || ''))) {
+          resolvedDirection = 'admin';
+        }
+      } else if (!c.env.JWT_SECRET) {
+        resolvedDirection = 'admin';
+      }
+    }
     const result = await db.prepare(
       'INSERT INTO contact_messages (name, phone, message, direction, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(name.trim(), phone.trim(), message.trim(), 'customer', now).run();
+    ).bind(name.trim(), phone.trim(), message.trim(), resolvedDirection, now).run();
 
     return jsonResponse({
       success: true,
@@ -151,7 +165,7 @@ export const chatRouter = new Hono<{ Bindings: Env }>();
 chatRouter.post('/messages', (c) => sendMessage(c));
 
 // Protected: get all conversations
-chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff']), (c) => getConversations(c));
+chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getConversations(c));
 
 // Protected: get message history for a phone
-chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff']), (c) => getMessageHistory(c));
+chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getMessageHistory(c));

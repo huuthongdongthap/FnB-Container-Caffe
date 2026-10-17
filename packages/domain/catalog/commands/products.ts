@@ -20,7 +20,7 @@ import {
 } from '../policies/menu-projection';
 
 export const productsRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff']);
+const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 // ── 1. Static / Literal Prefix Routes (MUST PRECEDENCE OVER /:id) ──
 productsRouter.get('/slug/:slug', async (c) => {

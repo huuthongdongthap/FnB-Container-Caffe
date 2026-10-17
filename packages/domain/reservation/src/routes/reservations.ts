@@ -115,7 +115,7 @@ reservationsRouter.post('/', async (c) => {
 });
 
 // GET /api/reservations?date=&limit=&offset=
-reservationsRouter.get('/', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
+reservationsRouter.get('/', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -138,7 +138,7 @@ reservationsRouter.get('/', requireAuth(['owner', 'staff', 'manager']) as any, a
 });
 
 // PATCH /api/reservations/:id/approve
-reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
+reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -152,7 +152,7 @@ reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager
 });
 
 // PATCH /api/reservations/:id/reject
-reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
+reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -167,7 +167,7 @@ reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager'
 });
 
 // DELETE /api/reservations/:id
-reservationsRouter.delete('/:id', requireAuth(['owner', 'staff', 'manager']) as any, async (c) => {
+reservationsRouter.delete('/:id', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 

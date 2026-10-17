@@ -96,7 +96,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
                 COALESCE(SUM(o.total), 0) as total_spent,
                 COUNT(o.id) as order_count
          FROM customers c
-         LEFT JOIN orders o ON o.customer_id = c.id AND o.status != 'cancelled'
+         LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND o.customer_phone = c.phone)) AND o.status != 'cancelled'
          GROUP BY c.id ORDER BY c.created_at`
       ).all<CustomerExportRow>();
 

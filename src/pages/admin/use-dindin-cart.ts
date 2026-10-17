@@ -20,8 +20,9 @@ export function useDinDinCart() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<DinDinCart[]>('/api/admin/dindin/carts');
-      setCarts(Array.isArray(data) ? data : []);
+      const raw = await apiFetch<DinDinCart[] | { data?: DinDinCart[]; carts?: DinDinCart[] }>('/api/admin/dindin/carts');
+      const list = Array.isArray(raw) ? raw : raw?.data ?? raw?.carts ?? [];
+      setCarts(Array.isArray(list) ? list : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
     } finally {
@@ -34,7 +35,14 @@ export function useDinDinCart() {
     setError(null);
     setD02Alert(null);
     try {
-      setActiveCart(await apiFetch<DinDinCart>(`/api/admin/dindin/cart/${encodeURIComponent(sessionId)}`));
+      const raw = await apiFetch<DinDinCart & { data?: DinDinCart; cart?: DinDinCart }>(`/api/admin/dindin/cart/${encodeURIComponent(sessionId)}`);
+      const unwrapped = raw?.data ?? raw?.cart ?? raw;
+      setActiveCart({
+        sessionId: unwrapped?.sessionId || sessionId,
+        items: Array.isArray(unwrapped?.items) ? unwrapped.items : [],
+        total: Number(unwrapped?.total ?? 0),
+        updatedAt: unwrapped?.updatedAt,
+      });
       setSessionInput(sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
@@ -54,8 +62,14 @@ export function useDinDinCart() {
     setMessage(null);
     setD02Alert(null);
     try {
-      const body: Record<string, unknown> = { sessionId: activeCart.sessionId, op, itemId: targetItemId, qty: itemQty };
-      if (op === 'update') body.qty = itemQty;
+      const body: Record<string, unknown> = {
+        sessionId: activeCart.sessionId,
+        op,
+        action: op,
+        itemId: targetItemId,
+        qty: itemQty,
+        item: { id: targetItemId, qty: itemQty, quantity: itemQty },
+      };
       const result = (await apiFetch<Record<string, unknown>>(`/api/admin/dindin/cart/${encodeURIComponent(activeCart.sessionId)}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -63,7 +77,15 @@ export function useDinDinCart() {
       if ((result as { code?: string }).code === 'D01') throw new Error((result as { message?: string }).message ?? 'Giỏ hàng rỗng (D01)');
       if ((result as { code?: string }).code === 'D02') setD02Alert((result as { message?: string }).message ?? 'Sai giá / món không thuộc menu (D02)');
       if ((result as { code?: string }).code === 'D07') throw new Error((result as { message?: string }).message ?? 'Lỗi cấu trúc giỏ (D07)');
-      setActiveCart((result as { cart?: DinDinCart }).cart ?? (result as unknown as DinDinCart));
+      const nextCart = (result as { data?: DinDinCart; cart?: DinDinCart }).data
+        ?? (result as { cart?: DinDinCart }).cart
+        ?? (result as unknown as DinDinCart);
+      setActiveCart({
+        sessionId: nextCart?.sessionId || activeCart.sessionId,
+        items: Array.isArray(nextCart?.items) ? nextCart.items : activeCart.items,
+        total: Number(nextCart?.total ?? activeCart.total ?? 0),
+        updatedAt: nextCart?.updatedAt,
+      });
       setMessage(t('dindin.cartUpdated', { defaultValue: 'Đã cập nhật giỏ hàng' }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');

@@ -67,7 +67,7 @@ export function DevicesTable({ devices, loading, onRevoke }: Props) {
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs font-medium">
                       <Shield className="h-3 w-3" />
                       {ROLE_LABEL[d.role] || d.role}
                     </span>
@@ -81,7 +81,7 @@ export function DevicesTable({ devices, loading, onRevoke }: Props) {
                       variant="ghost"
                       size="sm"
                       onClick={() => onRevoke(d)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1"
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/15 p-1"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

@@ -89,7 +89,7 @@ export default function CampaignsManagerPage() {
           </div>
 
           {error && (
-            <div className="mb-4 flex items-center gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800">
+            <div className="mb-4 flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-300">
               <span className="flex-1">{t('campaigns.loadError', { message: error.message })}</span>
               <Button size="sm" variant="secondary" onClick={() => refetch()}>
                 {t('campaigns.retry')}

@@ -8,7 +8,7 @@ interface InventoryMovementModalProps {
   onClose: () => void;
   onSubmit: (data: {
     ingredientId: string;
-    type: 'in' | 'out' | 'adjust' | 'waste';
+    type: 'in' | 'out' | 'adjustment' | 'adjust' | 'waste';
     quantity: number;
     notes?: string;
   }) => Promise<void>;
@@ -20,7 +20,7 @@ export function InventoryMovementModal({
   onClose,
   onSubmit,
 }: Readonly<InventoryMovementModalProps>) {
-  const [type, setType] = useState<'in' | 'out' | 'adjust' | 'waste'>('in');
+  const [type, setType] = useState<'in' | 'out' | 'adjustment' | 'waste'>('in');
   const [qty, setQty] = useState<string>('1');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +59,7 @@ export function InventoryMovementModal({
   const types = [
     { id: 'in' as const, label: 'Nhập kho (+)', icon: ArrowDownRight, color: 'text-emerald-400 border-emerald-500/30' },
     { id: 'out' as const, label: 'Xuất kho (-)', icon: ArrowUpRight, color: 'text-sky-400 border-sky-500/30' },
-    { id: 'adjust' as const, label: 'Kiểm kê (+/-)', icon: RefreshCw, color: 'text-amber-400 border-amber-500/30' },
+    { id: 'adjustment' as const, label: 'Kiểm kê (+/-)', icon: RefreshCw, color: 'text-amber-400 border-amber-500/30' },
     { id: 'waste' as const, label: 'Hao hụt (-)', icon: Trash2, color: 'text-rose-400 border-rose-500/30' },
   ];
 
@@ -144,7 +144,7 @@ export function InventoryMovementModal({
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--aura-accent,#c9d6df)] text-black hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--aura-accent,#c9d6df)] text-[var(--md-sys-color-on-primary)] hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {submitting ? 'Đang lưu...' : 'Xác nhận'}
             </button>

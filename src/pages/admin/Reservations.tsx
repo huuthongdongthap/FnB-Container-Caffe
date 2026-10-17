@@ -17,10 +17,10 @@ const FILTER_KEYS: Record<FilterValue, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  confirmed: 'bg-green-500/10 text-green-600 border-green-500/20',
-  cancelled: 'bg-red-500/10 text-red-600 border-red-500/20',
-  completed: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  pending: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20',
+  confirmed: 'bg-green-500/10 text-green-300 border-green-500/20',
+  cancelled: 'bg-red-500/10 text-red-300 border-red-500/20',
+  completed: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
 };
 
 function ReservationCard({

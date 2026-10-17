@@ -56,7 +56,7 @@ export function ZoneStatsSection({ zoneStats, loading, error, onRetry }: ZoneSta
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
         {error}
         <button onClick={onRetry} className="ml-3 underline hover:no-underline">{t('common:retry')}</button>
       </div>

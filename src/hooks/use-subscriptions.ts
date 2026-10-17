@@ -76,8 +76,13 @@ export function useMyInvoices() {
   return useQuery<Invoice[]>({
     queryKey: ['my-invoices'],
     queryFn: async () => {
-      const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices');
-      return res.data;
+      try {
+        const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices/list');
+        return res.data;
+      } catch {
+        const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices');
+        return res.data;
+      }
     },
     staleTime: 30_000,
     retry: false,

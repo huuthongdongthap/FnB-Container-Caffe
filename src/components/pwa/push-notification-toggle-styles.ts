@@ -20,7 +20,7 @@ export const styles: Record<string, React.CSSProperties> = {
     width: '40px',
     height: '40px',
     borderRadius: '12px',
-    backgroundColor: 'rgba(249,115,22,0.12)',
+    backgroundColor: 'rgba(201,168,76,0.14)',
   },
   textBlock: {
     flex: 1,
@@ -68,7 +68,7 @@ export const styles: Record<string, React.CSSProperties> = {
     display: 'inline-block',
     marginTop: '8px',
     fontSize: '12px',
-    color: '#F97316',
+    color: 'var(--aura-gold, #C9A84C)',
     textDecoration: 'none',
     fontWeight: 500,
     fontFamily: 'var(--aura-font-body)',

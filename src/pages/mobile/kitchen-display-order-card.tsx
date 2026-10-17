@@ -14,8 +14,10 @@ interface Props {
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Chờ',
+  confirmed: 'Đã xác nhận',
   preparing: 'Đang làm',
   ready: 'Sẵn',
+  served: 'Đã phục vụ',
 };
 
 export default function KitchenOrderCard({ order, updatingId, onStatusChange }: Props) {
@@ -34,15 +36,16 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
       </div>
 
       {order.items.map((item, idx) => {
-        const rawItem = item as KitchenOrder['items'][number] & { qty?: number; product_name?: string };
+        const rawItem = item as KitchenOrder['items'][number] & { qty?: number; product_name?: string; note?: string; notes?: string };
         const qty = rawItem.quantity ?? rawItem.qty ?? 1;
         const name = rawItem.name || rawItem.product_name || '';
+        const itemNote = item.note ?? (item as { notes?: string }).notes;
         return (
           <div key={idx} style={itemRow}>
             <span style={itemQty}>{qty}x</span>
             <div style={{ flex: 1 }}>
               <div style={itemName}>{name}</div>
-              {item.notes && <div style={{ fontSize: 12, color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic', marginTop: 2 }}>{item.notes}</div>}
+              {itemNote && <div style={{ fontSize: 12, color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic', marginTop: 2 }}>{itemNote}</div>}
               {item.modifiers && item.modifiers.length > 0 && (
                 <div style={itemModifier}>{item.modifiers.join(', ')}</div>
               )}
@@ -51,7 +54,7 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
         );
       })}
 
-      {order.status === 'pending' && (
+      {(order.status === 'pending' || order.status === 'confirmed') && (
         <div style={actions}>
           <button
             style={{ ...btnStart, opacity: isUpdating ? 0.6 : 1 }}
@@ -78,7 +81,19 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
       )}
 
       {order.status === 'ready' && (
-        <div style={noOrderText}>Đã sẵn sàng / Ready</div>
+        <>
+          <div style={noOrderText}>Đã sẵn sàng / Ready</div>
+          <div style={actions}>
+            <button
+              style={{ ...btnReady, opacity: isUpdating ? 0.6 : 1 }}
+              disabled={isUpdating}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onStatusChange(order.id, 'served')}
+            >
+              Đã phục vụ / Served
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

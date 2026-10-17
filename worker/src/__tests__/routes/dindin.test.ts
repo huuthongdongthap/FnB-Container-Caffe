@@ -396,6 +396,9 @@ describe('dindinRouter', () => {
       expect(body).toBeDefined();
       expect(body.success).toBe(true);
       expect(body.orderId).toBeDefined();
+      expect(await kv.get('latest_order_ts')).toBeTruthy();
+      expect(await kv.get('orders:latest_updated_at')).toBeTruthy();
+      expect(await kv.get(`order_event:${body.orderId}`)).toBeTruthy();
       // cart cleared
       const cartRes = await dindinRouter.fetch(req('GET', '/cart/ok'), makeEnv(mkDB(), kv));
       const cartParsed = (await (cartRes.json() as any));

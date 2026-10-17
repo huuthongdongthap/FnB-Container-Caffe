@@ -243,6 +243,14 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       const customerInv = await mockRequestWithRole('GET', '/api/erpnext-invoices/list', 'customer');
       const customerInvRes = await app.fetch(customerInv, env as any);
       expect(customerInvRes.status).toBe(403);
+
+      const unauthDelCfg = new Request('https://test.aura/api/erpnext/configure', { method: 'DELETE' });
+      const unauthDelCfgRes = await app.fetch(unauthDelCfg, env as any);
+      expect(unauthDelCfgRes.status).toBe(401);
+
+      const adminCustomersReq = await mockRequestWithRole('GET', '/api/erpnext/customers', 'admin' as any);
+      const adminCustomersRes = await app.fetch(adminCustomersReq, env as any);
+      expect(adminCustomersRes.status).toBe(200);
     });
   });
 

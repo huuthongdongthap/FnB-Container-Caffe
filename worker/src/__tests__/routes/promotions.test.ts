@@ -133,4 +133,34 @@ describe('Promotions Routes (/api/promotions)', () => {
     expect(body.data.discount_amount).toBe(20000); // 10% of 200000
     expect(runMock).toHaveBeenCalled();
   });
+
+  it('POST / allows admin and manager roles to create promotions', async () => {
+    for (const role of ['admin', 'manager']) {
+      const env = { ...createMockEnv(), JWT_SECRET: 'test-jwt-secret-at-least-16-chars' };
+      let callIdx = 0;
+      env.AURA_DB.prepare = vi.fn().mockImplementation(() => ({
+        bind: vi.fn().mockReturnValue({
+          first: vi.fn().mockImplementation(async () => {
+            callIdx += 1;
+            return callIdx === 1 ? null : { code: 'NEWPROMO', percent: 15, is_active: 1 };
+          }),
+          run: vi.fn().mockResolvedValue({ success: true })
+        })
+      })) as any;
+
+      const res = await promotionsRouter.request('/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: mockToken(role)
+        },
+        body: JSON.stringify({ code: 'newpromo', percent: 15 })
+      }, env);
+
+      expect(res.status).toBe(201);
+      const body = await res.json() as any;
+      expect(body.success).toBe(true);
+      expect(body.data.code).toBe('NEWPROMO');
+    }
+  });
 });

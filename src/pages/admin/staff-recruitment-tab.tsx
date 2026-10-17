@@ -43,7 +43,11 @@ export function RecruitmentTab() {
   const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
-    fetchApplications({ search, position: filterPos, status: filterStatus });
+    fetchApplications({
+      search: search || undefined,
+      position: filterPos !== 'all' ? filterPos : undefined,
+      status: filterStatus !== 'all' ? filterStatus : undefined,
+    });
   }, [fetchApplications, search, filterPos, filterStatus]);
 
   const cleanPhone = (phone: string) => phone.replace(/\D/g, '');

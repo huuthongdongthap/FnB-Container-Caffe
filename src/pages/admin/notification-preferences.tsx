@@ -19,20 +19,24 @@ function ToggleSwitch({
   enabled,
   disabled,
   onClick,
+  ariaLabel,
 }: {
   enabled: boolean;
   disabled: boolean;
   onClick: () => void;
+  ariaLabel: string;
 }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={enabled}
+      aria-label={ariaLabel}
       onClick={onClick}
       disabled={disabled}
       className={`
         relative h-8 w-14 rounded-full transition-colors duration-200
-        ${enabled ? 'bg-[var(--aura-primary)]' : 'bg-gray-300 dark:bg-gray-600'}
+        ${enabled ? 'bg-[var(--aura-primary)]' : 'bg-surface border border-border'}
       `}
     >
       <span
@@ -88,11 +92,12 @@ export function NotificationPreferences({
             enabled={settings.autoNotifyNewOrder}
             disabled={saving}
             onClick={() => onToggle('autoNotifyNewOrder')}
+            ariaLabel={isVi ? 'Thông báo đơn hàng mới' : 'New order notifications'}
           />
         </div>
 
         {/* Sound alerts */}
-        <div className="flex items-center justify-between rounded-lg border border-border bg-[var(--aura-bg-elevated)] p-4 dark:bg-gray-800/40">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-[var(--aura-bg-elevated)] p-4">
           <div className="flex items-center gap-3">
             <div className={`rounded-lg p-2 ${settings.soundAlerts ? 'bg-[var(--aura-primary)]/10' : 'bg-muted/20'}`}>
               {settings.soundAlerts ? (
@@ -116,12 +121,13 @@ export function NotificationPreferences({
             enabled={settings.soundAlerts}
             disabled={saving}
             onClick={() => onToggle('soundAlerts')}
+            ariaLabel={isVi ? 'Âm thanh cảnh báo' : 'Sound alerts'}
           />
         </div>
 
         {/* Save indicator */}
         {saved && (
-          <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-300">
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
             <CheckCircle2 size={16} aria-hidden="true" />
             {isVi ? 'Đã lưu cài đặt' : 'Settings saved'}
           </div>

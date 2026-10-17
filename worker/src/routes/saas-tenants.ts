@@ -68,14 +68,14 @@ export function createTenantRoutes() {
     }
   });
 
-router.use('/create', requireAuth(['owner', 'customer']));
+router.use('/create', requireAuth(['owner', 'admin', 'customer']));
 
   router.post('/create', async (c) => {
     const currentUser = c.get('user');
     if (!currentUser) {
       return c.json({ ok: false, error: 'unauthenticated' } as const, 401);
     }
-    if (currentUser.role !== 'owner') {
+    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
       return c.json({ ok: false, error: 'forbidden' } as const, 403);
     }
 

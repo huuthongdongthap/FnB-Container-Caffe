@@ -10,7 +10,7 @@ import { getTenantId } from '../middleware/tenant';
 
 export const demandForecastRouter = new Hono<{ Bindings: Env }>();
 
-demandForecastRouter.use('/*', requireAuth(['owner', 'manager']));
+demandForecastRouter.use('/*', requireAuth(['owner', 'admin', 'manager']));
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 

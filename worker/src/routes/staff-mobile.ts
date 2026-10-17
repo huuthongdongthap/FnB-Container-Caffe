@@ -28,11 +28,11 @@ mobilePublic.post('/refresh', staffTokenRefresh);
 mobilePublic.get('/me', (c) => getCurrentUser(c.req.raw, c.env));
 staffMobileRouter.route('/', mobilePublic);
 
-// ── Protected: device management (owner|manager only) ──
-staffMobileRouter.use('/devices', requireStaff(['owner', 'manager']));
-staffMobileRouter.use('/devices/*', requireStaff(['owner', 'manager']));
+// ── Protected: device management (owner|manager|admin) ──
+staffMobileRouter.use('/devices', requireStaff(['owner', 'manager', 'admin']));
+staffMobileRouter.use('/devices/*', requireStaff(['owner', 'manager', 'admin']));
 const mobileDevices = new Hono<{ Bindings: Env }>();
-mobileDevices.use('*', requireStaff(['owner', 'manager']));
+mobileDevices.use('*', requireStaff(['owner', 'manager', 'admin']));
 mobileDevices.post('/register', registerStaffDevice);
 mobileDevices.delete('/:device_id', revokeStaffDevice);
 mobileDevices.get('/', listStaffDevices);
@@ -47,29 +47,29 @@ mobileKds.patch('/orders/:id/status', updateKdsStatus);
 staffMobileRouter.route('/kds', mobileKds);
 
 // ── Protected: Notifications (mobile PWA) ──
-staffMobileRouter.use('/notifications', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-staffMobileRouter.use('/notifications/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+staffMobileRouter.use('/notifications', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/notifications/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 const mobileNotifs = new Hono<{ Bindings: Env }>();
-mobileNotifs.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+mobileNotifs.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 mobileNotifs.get('/', getNotifications);
 mobileNotifs.post('/subscribe', subscribePush);
 mobileNotifs.post('/:id/read', markNotificationRead);
 staffMobileRouter.route('/notifications', mobileNotifs);
 
 // ── Protected: Tables ──
-staffMobileRouter.use('/tables', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-staffMobileRouter.use('/tables/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+staffMobileRouter.use('/tables', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/tables/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 const mobileTables = new Hono<{ Bindings: Env }>();
-mobileTables.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+mobileTables.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 mobileTables.get('/', getTablesMobile);
 mobileTables.patch('/:id', updateTableStatus);
 staffMobileRouter.route('/tables', mobileTables);
 
 // ── Protected: Orders ──
-staffMobileRouter.use('/orders', requireStaff(['owner', 'manager', 'staff', 'waiter']));
-staffMobileRouter.use('/orders/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+staffMobileRouter.use('/orders', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/orders/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 const mobileOrders = new Hono<{ Bindings: Env }>();
-mobileOrders.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+mobileOrders.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin']));
 mobileOrders.get('/', getOrdersMobile);
 mobileOrders.post('/', createOrderMobile);
 mobileOrders.get('/:id', getOrderDetail);

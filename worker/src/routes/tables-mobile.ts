@@ -5,7 +5,7 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'tables-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'admin'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin'];
 const UPDATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin'];
 
 const D1_TO_MOBILE_STATUS: Record<string, 'free' | 'occupied' | 'reserved'> = {
@@ -151,8 +151,8 @@ export async function updateTableStatus(
     if (!useLegacyTable) {
       try {
         await context.env.AURA_DB
-          .prepare('UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?')
-          .bind(MOBILE_TO_D1_STATUS[requestedStatus], now, tableId)
+          .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+          .bind(MOBILE_TO_D1_STATUS[requestedStatus], tableId)
           .run();
       } catch (err) {
         if (String((err as Error)?.message || '').includes('no such table')) {
