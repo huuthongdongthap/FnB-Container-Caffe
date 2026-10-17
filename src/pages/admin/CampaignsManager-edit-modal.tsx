@@ -67,7 +67,7 @@ export function EditCampaignModal({
                     className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
                       checked
                         ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-border bg-white text-muted hover:border-muted/40'
+                        : 'border-border bg-surface text-muted hover:border-muted/40'
                     }`}
                   >
                     <div

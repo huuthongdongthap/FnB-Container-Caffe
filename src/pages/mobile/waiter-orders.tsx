@@ -45,7 +45,7 @@ export default function WaiterOrders() {
   }, [tables]);
 
   useEffect(() => { fetchTables(); }, [fetchTables]);
-  useEffect(() => { if (tables.length > 0) fetchOrders(); }, [tables, fetchOrders]);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const submitOrder = useCallback(async () => {
     if (!selectedTableId) return;
@@ -122,8 +122,8 @@ export default function WaiterOrders() {
         <div style={tableGrid}>
           {tables.map((t) => (
             <div key={t.id} style={tableCardStyle(t.status)}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e' }}>Bàn {t.table_number}</div>
-              <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--md-sys-color-on-surface)' }}>Bàn {t.table_number}</div>
+              <div style={{ fontSize: 11, color: 'var(--md-sys-color-on-surface-variant)', marginTop: 4 }}>
                 {TABLE_STATUS_LABELS[t.status]?.vi} / {TABLE_STATUS_LABELS[t.status]?.en}
               </div>
             </div>

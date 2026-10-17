@@ -14,15 +14,6 @@ export function RewardCard({
     <div
       className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:border-[var(--aura-chrome-bright)]/40"
       onClick={() => onClaim?.(reward.id)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClaim?.(reward.id);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={t('loyalty.claimRewardAria', { title: reward.title, points: reward.pointsCost })}
       data-glass="card"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
@@ -57,7 +48,8 @@ export function RewardCard({
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
         <button
-         type="button"
+          type="button"
+          aria-label={t('loyalty.claimRewardAria', { title: reward.title, points: reward.pointsCost })}
           onClick={(e) => {
             e.stopPropagation();
             onClaim?.(reward.id);

@@ -48,11 +48,11 @@ export default function SubscriptionsPage() {
             AURA Subscription
           </div>
           <h1 className="font-display text-4xl font-bold md:text-5xl">
-            Goi thue <span className="text-[color:var(--aura-chrome-bright)]">Container</span>
+            Gói thuê <span className="text-[color:var(--aura-chrome-bright)]">Container</span>
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-[color:var(--aura-chrome-bright)]/70">
-            Lua chon goi thue container phu hop voi nhu cau kinh doanh cua ban.
-            Linh hoat nang cap, huy bat cu luc nao.
+            Lựa chọn gói thuê container phù hợp với nhu cầu kinh doanh của bạn.
+            Linh hoạt nâng cấp, huỷ bất cứ lúc nào.
           </p>
         </section>
 
@@ -90,8 +90,8 @@ export default function SubscriptionsPage() {
         {/* Subscribe Error */}
         {subscribeError && (
           <div className="mb-6 mx-auto max-w-md">
-            <div className="rounded-xl bg-red-50 p-4 text-center">
-              <p className="text-sm text-red-800">{subscribeError}</p>
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
+              <p className="text-sm text-red-300">{subscribeError}</p>
             </div>
           </div>
         )}
@@ -100,9 +100,9 @@ export default function SubscriptionsPage() {
         {!isLoading && !isError && (!plans || plans.length === 0) && (
           <Card className="p-10 text-center">
             <span className="mb-3 block text-4xl">&#128722;</span>
-            <h3 className="font-display text-lg font-bold">Chua co goi thue nao</h3>
+            <h3 className="font-display text-lg font-bold">Chưa có gói thuê nào</h3>
             <p className="text-sm text-[color:var(--aura-chrome-bright)]/60">
-              Hien tai chua co goi thue container nao. Quay lai sau nhe!
+              Hiện tại chưa có gói thuê container nào. Quay lại sau nhé!
             </p>
           </Card>
         )}
@@ -114,13 +114,13 @@ export default function SubscriptionsPage() {
               <div className="flex flex-col items-center gap-3 md:flex-row md:justify-between">
                 <div className="text-center md:text-left">
                   <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--aura-chrome-bright)]">
-                    Goi hien tai
+                    Gói hiện tại
                   </p>
                   <p className="mt-1 font-display text-lg font-bold">
                     {currentSub.plan_name || 'Container ' + (currentSub.container_number || '')}
                   </p>
                   <div className="mt-1 flex items-center gap-3 text-sm text-[color:var(--aura-chrome-bright)]/60">
-                    <span>{formatVND(currentSub.amount_vnd)}/thang</span>
+                    <span>{formatVND(currentSub.amount_vnd)}/tháng</span>
                     <span>·</span>
                     <span>{currentSub.zone}</span>
                     <span>·</span>
@@ -130,7 +130,7 @@ export default function SubscriptionsPage() {
                 <div className="flex gap-2">
                   <Link to="/account">
                     <Button variant="secondary" size="sm">
-                      Quan ly goi
+                      Quản lý gói
                     </Button>
                   </Link>
                 </div>
@@ -159,24 +159,24 @@ export default function SubscriptionsPage() {
         {!isLoading && !isError && plans && plans.length > 0 && (
           <section className="mt-16">
             <Card className="p-8 text-center">
-              <h2 className="mb-6 font-display text-2xl font-bold">Tai sao chon AURA?</h2>
+              <h2 className="mb-6 font-display text-2xl font-bold">Tại sao chọn AURA?</h2>
               <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-3">
                 <div>
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--aura-chrome-bright)]/10 text-lg font-bold text-[color:var(--aura-chrome-bright)]">
                     1
                   </div>
-                  <h3 className="font-display text-base font-bold">Linh hoat</h3>
+                  <h3 className="font-display text-base font-bold">Linh hoạt</h3>
                   <p className="mt-1 text-xs text-[color:var(--aura-chrome-bright)]/60">
-                    Nang cap hoac huy bat cu luc nao, khong rang buoc
+                    Nâng cấp hoặc huỷ bất cứ lúc nào, không ràng buộc
                   </p>
                 </div>
                 <div>
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--aura-chrome-bright)]/10 text-lg font-bold text-[color:var(--aura-chrome-bright)]">
                     2
                   </div>
-                  <h3 className="font-display text-base font-bold">Tien ich day du</h3>
+                  <h3 className="font-display text-base font-bold">Tiện ích đầy đủ</h3>
                   <p className="mt-1 text-xs text-[color:var(--aura-chrome-bright)]/60">
-                    Container duoc trang bi day du noi that, dieu hoa, wifi
+                    Container được trang bị đầy đủ nội thất, điều hoà, wifi
                   </p>
                 </div>
                 <div>

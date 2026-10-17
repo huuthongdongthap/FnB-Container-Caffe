@@ -24,7 +24,8 @@ export function CustomerTable({
     let result = [...customers];
 
     if (tierFilter) {
-      result = result.filter((c) => c.tier === tierFilter);
+      const target = tierFilter.toLowerCase();
+      result = result.filter((c) => (c.tier || '').toLowerCase() === target);
     }
 
     if (searchQuery) {
@@ -75,7 +76,15 @@ export function CustomerTable({
                   {customer.totalSpent.toLocaleString('vi-VN')}₫
                 </td>
                 <td className="py-2.5 px-3 text-center">
-                  <Badge variant={customer.tier === 'VIP' ? 'info' : customer.tier === 'PLATINUM' ? 'warning' : 'default'}>
+                  <Badge
+                    variant={
+                      customer.tier?.toUpperCase() === 'VIP' || customer.tier?.toLowerCase() === 'gold'
+                        ? 'info'
+                        : customer.tier?.toUpperCase() === 'PLATINUM'
+                          ? 'warning'
+                          : 'default'
+                    }
+                  >
                     {customer.tier}
                   </Badge>
                 </td>
@@ -102,7 +111,7 @@ export function CustomerTable({
                           type="button"
                           onClick={() => onDelete(customer)}
                           aria-label={`Xóa khách ${customer.name}`}
-                          className="p-1.5 rounded-md hover:bg-red-50 text-muted hover:text-red-600 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-md hover:bg-red-500/15 text-muted hover:text-red-400 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

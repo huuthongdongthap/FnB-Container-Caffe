@@ -54,13 +54,17 @@ function formatCurrency(amount: number): string {
 function mapAdminOrder(ao: AdminOrder): OrderData {
   const rawRecord = ao as unknown as Record<string, unknown>;
   const tableVal = rawRecord.table ?? rawRecord.table_id ?? rawRecord.table_number ?? '';
+  const lineItems =
+    Array.isArray(ao.itemsList) && ao.itemsList.length > 0
+      ? ao.itemsList
+      : [{ name: `${ao.items} items`, quantity: 1 }];
   return {
     id: ao.id,
     customer: ao.customer || 'Guest',
     table: String(tableVal || ''),
     timeAgo: formatTimeAgo(ao.createdAt),
     status: STORE_TO_STITCH[ao.status] ?? 'pending',
-    items: [{ name: `${ao.items} items`, quantity: 1 }],
+    items: lineItems,
     total: formatCurrency(ao.total),
   };
 }

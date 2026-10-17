@@ -23,7 +23,7 @@ export function CheckinRow({ checkin, isSelected, onClick }: CheckinRowProps) {
     >
       <CardBody>
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-lg shrink-0">
+          <div className="w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center text-lg shrink-0">
             &#128100;
           </div>
           <div className="flex-1 min-w-0">

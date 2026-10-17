@@ -8,15 +8,16 @@ export default function ProfileScreen({ user, onLogout }: { user: MobileUser; on
   const { t } = useTranslation();
   return (
     <div style={{ padding: '16px 16px 24px' }}>
-      <div style={{ ...NOTIF_CARD, textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <div style={{ ...NOTIF_CARD, textAlign: 'center', boxShadow: 'var(--md-sys-elevation-level1)' }}>
         <div style={PROFILE_AVATAR}>{user.name.charAt(0).toUpperCase()}</div>
         <div style={PROFILE_NAME}>{user.name}</div>
         <div style={PROFILE_ROLE}>{user.role}</div>
         <div style={PROFILE_ID}>ID: {user.id.slice(0, 8)}</div>
       </div>
       <button
+        type="button"
         onClick={onLogout}
-        style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 15, fontWeight: 600, border: '2px solid #fecaca', borderRadius: 12, background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: "var(--aura-font-body)" }}
+        style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 15, fontWeight: 600, border: '1.5px solid var(--md-sys-color-error)', borderRadius: 12, background: 'var(--aura-noir-mid)', color: 'var(--md-sys-color-error)', cursor: 'pointer', fontFamily: 'var(--aura-font-body)' }}
       >
         {t('auth.logout', 'Đăng xuất / Logout')}
       </button>

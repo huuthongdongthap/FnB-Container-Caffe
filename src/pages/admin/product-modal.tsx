@@ -33,7 +33,7 @@ export function ProductModal({
     <Modal open={open} onClose={onClose} title={editing ? t('adminMenu.editProduct') : t('adminMenu.addProduct')}>
       <div className="space-y-4">
         {errors._form && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{errors._form}</div>
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300">{errors._form}</div>
         )}
 
         <Input
@@ -55,7 +55,7 @@ export function ProductModal({
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-foreground">{t('adminMenu.fieldDescription')}</label>
           <textarea
-            className="rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground placeholder:text-muted transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent min-h-[80px] resize-y"
+            className="rounded-lg border border-border bg-surface px-4 py-2.5 text-base text-foreground placeholder:text-muted transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent min-h-[80px] resize-y"
             placeholder={t('adminMenu.descriptionPlaceholder')}
             value={form.description}
             onChange={(e) => onChange('description', e.target.value)}
@@ -75,7 +75,7 @@ export function ProductModal({
           <label className="text-sm font-medium text-foreground">{t('adminMenu.fieldCategory')}</label>
           <select
             className={cn(
-              'rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground transition-colors duration-150',
+              'rounded-lg border border-border bg-surface px-4 py-2.5 text-base text-foreground transition-colors duration-150',
               'focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent',
               errors.category_id && 'border-destructive',
             )}

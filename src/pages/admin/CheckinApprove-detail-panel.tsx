@@ -31,7 +31,7 @@ export function CheckinDetailPanel({
     <Card>
       <CardBody>
         <div className="text-center mb-4">
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-3xl mx-auto mb-3">
+          <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center text-3xl mx-auto mb-3">
             &#128100;
           </div>
           <h3 className="font-semibold">{checkin.memberName}</h3>
@@ -42,7 +42,7 @@ export function CheckinDetailPanel({
         </div>
 
         {checkin.photoUrl ? (
-          <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 aspect-video flex items-center justify-center">
+          <div className="mb-4 rounded-lg overflow-hidden bg-surface border border-border aspect-video flex items-center justify-center">
             <AuraImage src={checkin.photoUrl} alt="Check-in photo" className="w-full h-full object-cover" />
           </div>
         ) : (

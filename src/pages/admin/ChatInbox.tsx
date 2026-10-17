@@ -84,7 +84,7 @@ export default function ChatInboxPage() {
 
           {/* Error state */}
           {listError && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
               {listError}
               <button
                 onClick={loadConversations}
@@ -101,10 +101,10 @@ export default function ChatInboxPage() {
               {Array.from({ length: 5 }).map((_, i) => (
                 <div
                   key={i}
-                  className="animate-pulse rounded-xl border border-border bg-white p-4"
+                  className="animate-pulse rounded-xl border border-border bg-surface p-4"
                 >
-                  <div className="mb-2 h-4 w-32 rounded bg-gray-200" />
-                  <div className="h-3 w-64 rounded bg-gray-100" />
+                  <div className="mb-2 h-4 w-32 rounded bg-muted/20" />
+                  <div className="h-3 w-64 rounded bg-muted/15" />
                 </div>
               ))}
             </div>
@@ -112,7 +112,7 @@ export default function ChatInboxPage() {
 
           {/* Empty state */}
           {!listLoading && !listError && conversations.length === 0 && (
-            <div className="rounded-xl border border-border bg-white p-8 text-center">
+            <div className="rounded-xl border border-border bg-surface p-8 text-center">
               <div className="mb-2 text-4xl flex justify-center">
                 <MessageCircle size={40} aria-hidden="true" className="text-muted" />
               </div>
@@ -127,7 +127,7 @@ export default function ChatInboxPage() {
                 <button
                   key={conv.phone}
                   onClick={() => handleSelectConversation(conv.phone, conv.name)}
-                  className="w-full rounded-xl border border-border bg-white p-4 text-left transition-colors hover:bg-accent/10"
+                  className="w-full rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:bg-accent/10"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

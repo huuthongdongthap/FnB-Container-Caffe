@@ -26,10 +26,10 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
     <div
       data-testid="order-ticket"
       className={cn(
-        'rounded-lg border p-4 mb-3 shadow-sm transition-colors',
+        'rounded-lg border p-4 mb-3 shadow-sm transition-colors text-foreground',
         isOverdue
-          ? 'bg-red-500/10 border-red-300'
-          : 'bg-white border-gray-200'
+          ? 'bg-red-500/10 border-red-500/40'
+          : 'bg-surface border-border'
       )}
     >
       <div className="flex items-center justify-between mb-2">
@@ -37,7 +37,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
           <span className="text-lg font-bold font-display">
             Bàn {order.table}
           </span>
-          <span className="text-xs text-gray-500 font-mono">
+          <span className="text-xs text-muted font-mono">
             #{order.id}
           </span>
         </div>
@@ -45,13 +45,13 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
           <span
             className={cn(
               'text-sm font-mono font-bold',
-              isOverdue ? 'text-red-600' : 'text-gray-600'
+              isOverdue ? 'text-red-400' : 'text-muted'
             )}
           >
             {elapsedMinutes}m
           </span>
           {order.status === 'preparing' && (
-            <span className="flex items-center gap-1 text-xs font-medium text-blue-600">
+            <span className="flex items-center gap-1 text-xs font-medium text-blue-400">
               <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -60,7 +60,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
             </span>
           )}
           {order.station && (
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
+            <span className="text-xs px-2 py-0.5 rounded bg-muted/20 text-muted uppercase">
               {order.station}
             </span>
           )}
@@ -75,12 +75,12 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
                 {item.name}
               </span>
               {item.quantity > 1 && (
-                <span className="text-xs text-gray-500 ml-1">
+                <span className="text-xs text-muted ml-1">
                   x{item.quantity}
                 </span>
               )}
               {item.modifiers && item.modifiers.length > 0 && (
-                <div className="text-xs text-gray-500 ml-2">
+                <div className="text-xs text-muted ml-2">
                   {item.modifiers.map((m, mi) => (
                     <span key={mi} className="mr-1">
                       {m}
@@ -89,7 +89,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
                 </div>
               )}
               {item.notes && (
-                <p className="text-xs text-amber-600 ml-2 mt-0.5">
+                <p className="text-xs text-amber-400 ml-2 mt-0.5">
                   Ghi chú: {item.notes}
                 </p>
               )}
@@ -99,7 +99,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
       </div>
 
       {onComplete && order.status === 'pending' && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="mt-3 pt-3 border-t border-border">
           {showConfirm ? (
             <div className="flex gap-2">
               <button
@@ -113,7 +113,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
               </button>
               <button
                 onClick={() => setShowConfirm(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                className="px-3 py-1.5 text-xs font-medium rounded bg-muted/20 text-foreground hover:bg-muted/30 transition-colors"
               >
                 Hủy
               </button>

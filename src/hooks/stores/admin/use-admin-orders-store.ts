@@ -28,21 +28,26 @@ function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
     return raw as unknown as AdminOrder;
   }
   let itemsCount = 1;
+  let itemsList: Array<{ name: string; quantity: number }> | undefined;
+  const extractItems = (arr: unknown[]) =>
+    arr.map((entry) => {
+      const it = (entry ?? {}) as Record<string, unknown>;
+      return {
+        name: String(it.name ?? it.product_name ?? it.title ?? 'Item'),
+        quantity: typeof it.quantity === 'number' ? it.quantity : typeof it.qty === 'number' ? it.qty : 1,
+      };
+    });
   if (typeof raw.items === 'number') {
     itemsCount = raw.items;
   } else if (Array.isArray(raw.items)) {
-    itemsCount = raw.items.reduce(
-      (sum: number, it: Record<string, unknown>) => sum + (typeof it?.quantity === 'number' ? it.quantity : 1),
-      0
-    ) || raw.items.length;
+    itemsList = extractItems(raw.items);
+    itemsCount = itemsList.reduce((sum, it) => sum + it.quantity, 0) || raw.items.length;
   } else if (typeof raw.items === 'string' || typeof raw.items_json === 'string') {
     try {
       const parsed = JSON.parse(String(raw.items ?? raw.items_json));
       if (Array.isArray(parsed)) {
-        itemsCount = parsed.reduce(
-          (sum: number, it: Record<string, unknown>) => sum + (typeof it?.quantity === 'number' ? it.quantity : 1),
-          0
-        ) || parsed.length;
+        itemsList = extractItems(parsed);
+        itemsCount = itemsList.reduce((sum, it) => sum + it.quantity, 0) || parsed.length;
       }
     } catch {
       itemsCount = 1;
@@ -53,6 +58,7 @@ function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
     id: String(raw.id ?? ''),
     customer: String(raw.customer ?? raw.customerName ?? raw.customer_name ?? 'Guest'),
     items: itemsCount,
+    ...(itemsList ? { itemsList } : {}),
     total: Number(raw.total ?? 0),
     status: String(raw.status ?? 'pending'),
     payment: String(raw.payment ?? raw.paymentMethod ?? raw.payment_method ?? raw.payment_status ?? 'cash'),

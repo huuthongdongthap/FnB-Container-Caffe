@@ -158,6 +158,7 @@ export default function GalleryNew() {
                 <button
                   key={zone}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setActiveFilter(zone)}
                   className={`text-left p-5 min-h-[44px] rounded-2xl border transition-all duration-300 cursor-pointer group ${
                     isActive
@@ -200,6 +201,7 @@ export default function GalleryNew() {
             <button
               key={f}
               type="button"
+              aria-pressed={activeFilter === f}
               onClick={() => setActiveFilter(f)}
               className={`px-4 sm:px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeFilter === f

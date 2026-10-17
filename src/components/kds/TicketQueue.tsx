@@ -21,11 +21,11 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="rounded-lg border border-gray-200 p-4 animate-pulse bg-[var(--aura-bg-surface)]"
+            className="rounded-lg border border-border p-4 animate-pulse bg-[var(--aura-bg-surface)]"
           >
-            <div className="h-4 bg-gray-200 rounded w-1/3 mb-3" />
-            <div className="h-3 bg-gray-200 rounded w-2/3 mb-2" />
-            <div className="h-3 bg-gray-200 rounded w-1/2" />
+            <div className="h-4 bg-muted/20 rounded w-1/3 mb-3" />
+            <div className="h-3 bg-muted/20 rounded w-2/3 mb-2" />
+            <div className="h-3 bg-muted/20 rounded w-1/2" />
           </div>
         ))}
       </div>
@@ -34,10 +34,10 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
 
   if (sortedOrders.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+      <div className="flex flex-col items-center justify-center py-16 text-muted">
         <span className="text-5xl mb-4 opacity-50"><Check size={36} className="block mx-auto opacity-50" /></span>
         <p className="text-base font-medium">Không có đơn hàng chờ xử lý</p>
-        <p className="text-sm mt-1 text-gray-600">Tất cả đơn đã hoàn thành</p>
+        <p className="text-sm mt-1 text-muted/80">Tất cả đơn đã hoàn thành</p>
       </div>
     );
   }
@@ -53,7 +53,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         <QueueColumn
           title="Chờ xác nhận"
           count={pendingCount}
-          colorClass="border-amber-400 bg-amber-50"
+          colorClass="border-amber-400 bg-amber-500/10"
           dataCol="pending"
         >
           {sortedOrders
@@ -70,7 +70,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         <QueueColumn
           title="Đang chuẩn bị"
           count={preparingCount}
-          colorClass="border-blue-400 bg-blue-50"
+          colorClass="border-blue-400 bg-blue-500/10"
           dataCol="preparing"
         >
           {sortedOrders
@@ -83,7 +83,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         <QueueColumn
           title="Sẵn sàng"
           count={readyCount}
-          colorClass="border-green-400 bg-green-50"
+          colorClass="border-green-400 bg-emerald-500/10"
           dataCol="ready"
         >
           {sortedOrders
@@ -96,7 +96,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         <QueueColumn
           title="Đã phục vụ"
           count={servedCount}
-          colorClass="border-gray-300 bg-[var(--aura-bg-surface)]"
+          colorClass="border-border bg-[var(--aura-bg-surface)]"
           dataCol="served"
         >
           {sortedOrders

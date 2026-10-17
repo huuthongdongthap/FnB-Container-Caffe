@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -27,31 +27,92 @@ interface MobileLoginProps {
 
 /* ── Static styles ──────────────────────────────────────────────────*/
 
-const wrap: React.CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f7f4', fontFamily: "var(--aura-font-body)", padding: 16 };
-const card: React.CSSProperties = { width: '100%', maxWidth: 380, background: '#ffffff', borderRadius: 16, padding: '32px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.04)' };
-const logo: React.CSSProperties = { fontSize: 28, fontWeight: 700, color: '#F97316', textAlign: 'center', marginBottom: 4, letterSpacing: '-0.5px' };
-const subtitle: React.CSSProperties = { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32 };
-const label: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a2e', marginBottom: 6 };
-const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', fontSize: 16, border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none', background: '#f9fafb', color: '#1a1a2e', fontFamily: "var(--aura-font-body)", transition: 'border-color 0.15s' };
+const wrap: React.CSSProperties = {
+  minHeight: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'var(--aura-noir-void)',
+  color: 'var(--md-sys-color-on-surface)',
+  fontFamily: 'var(--aura-font-body)',
+  padding: 16,
+};
+const card: React.CSSProperties = {
+  width: '100%',
+  maxWidth: 380,
+  background: 'var(--aura-noir-mid)',
+  border: '1px solid var(--md-sys-color-outline-variant)',
+  borderRadius: 16,
+  padding: '32px 24px',
+  boxShadow: 'var(--md-sys-elevation-level2)',
+};
+const logo: React.CSSProperties = {
+  fontSize: 28,
+  fontWeight: 700,
+  color: 'var(--md-sys-color-primary)',
+  textAlign: 'center',
+  marginBottom: 4,
+  letterSpacing: '-0.5px',
+};
+const subtitle: React.CSSProperties = {
+  fontSize: 14,
+  color: 'var(--md-sys-color-on-surface-variant)',
+  textAlign: 'center',
+  marginBottom: 32,
+};
+const label: React.CSSProperties = {
+  display: 'block',
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--md-sys-color-on-surface)',
+  marginBottom: 6,
+};
+const input: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '12px 14px',
+  fontSize: 16,
+  border: '1.5px solid var(--md-sys-color-outline-variant)',
+  borderRadius: 10,
+  outline: 'none',
+  background: 'var(--aura-noir-void)',
+  color: 'var(--md-sys-color-on-surface)',
+  fontFamily: 'var(--aura-font-body)',
+  transition: 'border-color 0.15s',
+};
 const pinRow: React.CSSProperties = { display: 'flex', gap: 10, justifyContent: 'center', margin: '8px 0 24px' };
-const errorBox: React.CSSProperties = { marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', fontSize: 13, textAlign: 'center' };
+const errorBox: React.CSSProperties = {
+  marginTop: 16,
+  padding: '10px 14px',
+  background: 'var(--md-sys-color-error-container)',
+  border: '1px solid var(--md-sys-color-error)',
+  borderRadius: 10,
+  color: 'var(--md-sys-color-on-error-container)',
+  fontSize: 13,
+  textAlign: 'center',
+};
 
 /* ── Factory functions ──────────────────────────────────────────────*/
 
 function pinBoxStyle(focused: boolean): React.CSSProperties {
   return {
     width: 52, height: 60, textAlign: 'center', fontSize: 24, fontWeight: 600,
-    border: focused ? '2px solid #F97316' : '2px solid #e5e7eb', borderRadius: 12,
-    background: '#f9fafb', color: '#1a1a2e', outline: 'none',
-    boxShadow: focused ? '0 0 0 3px rgba(249,115,22,0.15)' : 'none',
-    fontFamily: "var(--aura-font-body)", caretColor: '#F97316',
+    border: focused ? '2px solid var(--md-sys-color-primary)' : '2px solid var(--md-sys-color-outline-variant)',
+    borderRadius: 12,
+    background: 'var(--aura-noir-void)',
+    color: 'var(--md-sys-color-on-surface)',
+    outline: 'none',
+    boxShadow: focused ? 'var(--aura-glow-chrome)' : 'none',
+    fontFamily: 'var(--aura-font-body)',
+    caretColor: 'var(--md-sys-color-primary)',
   };
 }
 
 function submitStyle(disabled: boolean): React.CSSProperties {
   return {
     width: '100%', padding: '14px 0', fontSize: 16, fontWeight: 600, border: 'none', borderRadius: 12,
-    background: '#F97316', color: '#ffffff', cursor: 'pointer', fontFamily: "var(--aura-font-body)",
+    background: 'var(--md-sys-color-primary)', color: 'var(--md-sys-color-on-primary)', cursor: 'pointer', fontFamily: 'var(--aura-font-body)',
     transition: 'opacity 0.15s', marginTop: 8, opacity: disabled ? 0.7 : 1,
   };
 }
@@ -59,7 +120,7 @@ function submitStyle(disabled: boolean): React.CSSProperties {
 /* ── Component ────────────────────────────────────────────────────── */
 
 export default function MobileLogin() {
-  const { login } = useMobileAuth();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   // Unchecked-indexed-access-safe accessor: valid indices 0-3, use non-null assertion at access points
   const pinRef0 = useRef<HTMLInputElement>(null);
@@ -75,7 +136,7 @@ export default function MobileLogin() {
   const [focusedIdx, setFocusedIdx] = useState<number>(0);
 
   useEffect(() => {
-    const stored = localStorage.getItem('aura_device_token');
+    const stored = localStorage.getItem('aura_device_token') || localStorage.getItem('mobile_device');
     if (stored) setDeviceToken(stored);
   }, []);
 
@@ -128,17 +189,21 @@ export default function MobileLogin() {
         setError('Đăng nhập thất bại — kiểm tra mã PIN / Login failed');
         return;
       }
-      localStorage.setItem('aura_device_token', deviceToken.trim());
+      const trimmedDevice = deviceToken.trim();
+      const userJson = JSON.stringify(body.user);
+      localStorage.setItem('aura_device_token', trimmedDevice);
       localStorage.setItem('aura_auth_token', body.token);
-      localStorage.setItem('aura_user_data', JSON.stringify(body.user));
-       // login already stored in hook
-    window.location.hash = '#/mobile';
+      localStorage.setItem('aura_user_data', userJson);
+      localStorage.setItem('mobile_device', trimmedDevice);
+      localStorage.setItem('mobile_token', body.token);
+      localStorage.setItem('mobile_user', userJson);
+      navigate('/mobile', { replace: true });
     } catch {
       setError('Không kết nối được máy chủ / Server connection error');
     } finally {
       setLoading(false);
     }
-  }, [pin, deviceToken]);
+  }, [pin, deviceToken, navigate]);
 
   return (
     <div style={wrap}>

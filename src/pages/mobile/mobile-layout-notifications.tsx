@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { PushNotificationToggle } from '@/components/pwa/push-notification-toggle';
 import { NOTIF_CARD, NOTIF_UNREAD, NOTIF_READ, NOTIF_TITLE, NOTIF_MSG, NOTIF_TIME, notifEmpty } from './mobile-layout-styles';
@@ -23,14 +23,20 @@ export default function NotificationsScreen() {
           const nb = n as Record<string, unknown>;
           return {
             id: String(nb.id),
-            title: String(nb.title ?? ''),
-            message: String(nb.message ?? ''),
+            title: (nb.title_vi as string) || (nb.title_en as string) || (nb.title as string) || '',
+            message: (nb.body_vi as string) || (nb.body_en as string) || (nb.message as string) || '',
             created_at: String(nb.created_at ?? ''),
-            read: (nb.read as boolean) ?? true,
+            read: nb.read_at != null ? true : ((nb.read as boolean) ?? false),
           };
         }));
       }
     }).catch(() => { /* silent */ });
+  }, []);
+
+  const markAsRead = useCallback((id: string, alreadyRead: boolean) => {
+    if (alreadyRead) return;
+    setNotifs((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)));
+    apiFetch(`/mobile/notifications/${id}/read`, { method: 'POST' }).catch(() => { /* silent */ });
   }, []);
 
   return (
@@ -44,7 +50,11 @@ export default function NotificationsScreen() {
           <div style={{ fontSize: 12 }}>No notifications</div>
         </div>
       ) : notifs.map((n) => (
-        <div key={n.id} style={{ ...NOTIF_CARD, ...(n.read ? NOTIF_READ : NOTIF_UNREAD) }}>
+        <div
+          key={n.id}
+          onClick={() => markAsRead(n.id, n.read)}
+          style={{ ...NOTIF_CARD, ...(n.read ? NOTIF_READ : NOTIF_UNREAD), cursor: n.read ? 'default' : 'pointer' }}
+        >
           <div style={NOTIF_TITLE}>{n.title}</div>
           <div style={NOTIF_MSG}>{n.message}</div>
           <div style={NOTIF_TIME}>{new Date(n.created_at).toLocaleString('vi-VN')}</div>

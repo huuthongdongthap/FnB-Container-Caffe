@@ -37,7 +37,7 @@ export function BroadcastResultView({ result, onReset }: ResultViewProps) {
           <CardBody>
             {result.pending ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 rounded-lg bg-amber-50 p-4 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                <div className="flex items-center gap-3 rounded-lg bg-amber-500/10 border border-amber-500/30 p-4 text-amber-300">
                   <Clock size={24} aria-hidden="true" />
                   <div>
                     <p className="font-medium">{t('broadcast.sendingBg')}</p>
@@ -47,7 +47,7 @@ export function BroadcastResultView({ result, onReset }: ResultViewProps) {
                   </div>
                 </div>
                 {Object.keys(result.skipped || {}).length > 0 && (
-                  <div className="rounded-lg bg-gray-50 p-3 text-sm text-muted dark:bg-gray-800">
+                  <div className="rounded-lg bg-surface border border-border p-3 text-sm text-muted">
                     <p className="font-medium">{t('broadcast.skippedChannels')}</p>
                     {Object.entries(result.skipped || {}).map(([ch, reason]) => (
                       <p key={ch} className="ml-2 text-xs">
@@ -59,8 +59,8 @@ export function BroadcastResultView({ result, onReset }: ResultViewProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 rounded-lg bg-green-50 p-4 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  <CheckCircle size={24} aria-hidden="true" className="text-green-500" />
+                <div className="flex items-center gap-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-4 text-emerald-300">
+                  <CheckCircle size={24} aria-hidden="true" className="text-emerald-400" />
                   <div>
                     <p className="font-medium">
                       {t('broadcast.sendSuccess')}
@@ -71,7 +71,7 @@ export function BroadcastResultView({ result, onReset }: ResultViewProps) {
                   </div>
                 </div>
                 {Object.keys(result.skipped || {}).length > 0 && (
-                  <div className="rounded-lg bg-gray-50 p-3 text-sm text-muted dark:bg-gray-800">
+                  <div className="rounded-lg bg-surface border border-border p-3 text-sm text-muted">
                     <p className="font-medium">{t('broadcast.skippedChannels')}</p>
                     {Object.entries(result.skipped || {}).map(([ch, reason]) => (
                       <p key={ch} className="ml-2 text-xs">

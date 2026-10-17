@@ -55,14 +55,14 @@ export function NewOrderModal({
               <input style={{ ...formInput, flex: 1 }} placeholder="Ghi chú / Note"
                 value={item.note} onChange={(e) => updateItem(idx, { note: e.target.value })} />
               {newOrderItems.length > 1 && (
-                <button style={btnRemove} onClick={() => removeItem(idx)}>{t('common.remove', 'Xóa')}</button>
+                <button type="button" style={btnRemove} onClick={() => removeItem(idx)}>{t('common.remove', 'Xóa')}</button>
               )}
             </div>
           </div>
         ))}
-        <button style={btnAdd} onClick={addItem}>+ {t('orders.addItem', 'Thêm món / Add item')}</button>
+        <button type="button" style={btnAdd} onClick={addItem}>+ {t('orders.addItem', 'Thêm món / Add item')}</button>
 
-        <button style={{ ...btnSubmit, opacity: submitting || !selectedTableId ? 0.6 : 1 }}
+        <button type="button" style={{ ...btnSubmit, opacity: submitting || !selectedTableId ? 0.6 : 1 }}
           disabled={submitting || !selectedTableId} onClick={submitOrder}>
           {submitting ? t('common.saving', 'Đang gửi...') : t('orders.submit', 'Gửi / Submit')}
         </button>

@@ -32,15 +32,15 @@ export function DevicesRegisterModal({
   return (
     <Modal open={open} onClose={onClose} title="Đăng ký thiết bị mới">
       <div className="space-y-4">
-        {registerError && <div className="text-red-600 text-xs">{registerError}</div>}
+        {registerError && <div className="text-red-400 text-xs">{registerError}</div>}
         <Input label="Tên thiết bị (lưu đăng nhập)" value={regDeviceToken} onChange={e => onDeviceTokenChange(e.target.value)} placeholder="VD: tablet-bep-01" />
         <Input label="Tên hiển thị" value={regDeviceName} onChange={e => onDeviceNameChange(e.target.value)} placeholder="VD: Tablet Bếp A" />
         {staffList.length === 0 ? (
-          <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700">Hãy thêm nhân viên ở trang <strong>Nhân viên</strong> trước khi đăng ký thiết bị.</div>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-300">Hãy thêm nhân viên ở trang <strong>Nhân viên</strong> trước khi đăng ký thiết bị.</div>
         ) : (
           <div>
             <label className="block text-sm font-medium mb-1.5">Chọn nhân viên</label>
-            <select value={regStaffId} onChange={e => onStaffIdChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-white text-sm">
+            <select value={regStaffId} onChange={e => onStaffIdChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-foreground text-sm">
               <option value="">-- Chọn nhân viên --</option>
               {staffList.map(s => (<option key={s.id} value={s.id}>{s.name} ({ROLE_LABEL[s.role] || s.role})</option>))}
             </select>
@@ -48,7 +48,7 @@ export function DevicesRegisterModal({
         )}
         <div>
           <label className="block text-sm font-medium mb-1.5">Vai trò trên thiết bị</label>
-          <select value={regRole} onChange={e => onRoleChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-white text-sm">
+          <select value={regRole} onChange={e => onRoleChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-foreground text-sm">
             <option value="staff">Nhân viên / Staff</option>
             <option value="waiter">Phục vụ / Waiter</option>
             <option value="kitchen">Bếp / Kitchen</option>

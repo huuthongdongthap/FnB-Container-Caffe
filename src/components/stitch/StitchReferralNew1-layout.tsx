@@ -52,7 +52,7 @@ export function ReferralBottomNav() {
       </a>
 
       <a
-        href="/referrals"
+        href="/referral"
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-bright)] rounded-xl px-3 py-1 active:scale-90 transition-transform"
         style={{
           backgroundColor: 'rgba(100, 66, 26, 0.2)',
@@ -66,7 +66,7 @@ export function ReferralBottomNav() {
       </a>
 
       <a
-        href="/rewards"
+        href="/loyalty"
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] opacity-60 hover:text-[var(--aura-chrome-bright)] transition-colors active:scale-90 transition-transform"
         aria-label={t('stitch.referral.navRewardsAria')}
       >
@@ -75,7 +75,7 @@ export function ReferralBottomNav() {
       </a>
 
       <a
-        href="/profile"
+        href="/account"
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] opacity-60 hover:text-[var(--aura-chrome-bright)] transition-colors active:scale-90 transition-transform"
         aria-label={t('stitch.referral.navProfileAria')}
       >

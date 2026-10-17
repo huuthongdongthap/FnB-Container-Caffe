@@ -21,7 +21,7 @@ export function CustomerModal({
 }: CustomerModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [tier, setTier] = useState('REGULAR');
+  const [tier, setTier] = useState('bronze');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,11 +29,11 @@ export function CustomerModal({
     if (customer) {
       setName(customer.name);
       setPhone(customer.phone);
-      setTier(customer.tier || 'REGULAR');
+      setTier((customer.tier || 'bronze').toLowerCase());
     } else {
       setName('');
       setPhone('');
-      setTier('REGULAR');
+      setTier('bronze');
     }
     setError(null);
   }, [customer, isOpen]);
@@ -69,7 +69,7 @@ export function CustomerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-border overflow-hidden">
+      <div className="w-full max-w-md bg-surface text-foreground rounded-2xl shadow-2xl border border-border overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border bg-muted/10">
           <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export function CustomerModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -117,7 +117,7 @@ export function CustomerModal({
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0901234567"
+              placeholder="0946013633"
               required
             />
           </div>
@@ -129,12 +129,12 @@ export function CustomerModal({
             <select
               value={tier}
               onChange={(e) => setTier(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
             >
-              <option value="REGULAR">REGULAR (Tiêu chuẩn)</option>
-              <option value="LOYAL">LOYAL (Thân thiết)</option>
-              <option value="VIP">VIP (Cao cấp)</option>
-              <option value="PLATINUM">PLATINUM (Thượng khách)</option>
+              <option value="bronze">Bronze (Tiêu chuẩn)</option>
+              <option value="silver">Silver (Thân thiết)</option>
+              <option value="gold">Gold / VIP (Cao cấp)</option>
+              <option value="platinum">Platinum (Thượng khách)</option>
             </select>
           </div>
 

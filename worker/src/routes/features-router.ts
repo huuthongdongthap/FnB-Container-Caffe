@@ -51,7 +51,13 @@ import { adminSalesRouter } from './admin-sales';
 import adminMetrics from './admin-metrics';
 import { registerAuditLogRoutes } from './admin-audit-logs';
 import { registerCronAdminRoutes } from './cron-admin';
-import { getAdminCustomers, getStuckPayments } from './admin-handlers';
+import {
+  getAdminCustomers,
+  createAdminCustomer,
+  updateAdminCustomer,
+  deleteAdminCustomer,
+  getStuckPayments,
+} from './admin-handlers';
 import { getPricing } from './saas-pricing';
 import { createTenantRoutes } from './saas-tenants';
 import { franchiseRouter } from './franchise-locations';
@@ -114,6 +120,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     return c.json({ success: true, id: orderId, status: 'completed', updated_at: now });
   });
   app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
+  app.post('/api/admin/customers', (c) => createAdminCustomer(c.req.raw, c.env));
+  app.patch('/api/admin/customers/:id', (c) => updateAdminCustomer(c.req.raw, c.env, c.req.param('id')));
+  app.delete('/api/admin/customers/:id', (c) => deleteAdminCustomer(c.env, c.req.param('id')));
   app.get('/api/admin/payments/stuck', requireAuth(['owner']), (c) => getStuckPayments(c.req.raw, c.env));
   app.route('/api/admin/dindin', dindinRouter);
   app.route('/api/admin/sales', adminSalesRouter);

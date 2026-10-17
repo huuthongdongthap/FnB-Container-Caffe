@@ -70,7 +70,7 @@ export function BroadcastForm({
             <select
               value={segment}
               onChange={(e) => setSegment(e.target.value)}
-              className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent dark:bg-gray-800"
+              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-base text-foreground transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
               aria-label={t('broadcast.selectSegment')}
             >
               <option value="">{t('broadcast.selectSegment')}</option>
@@ -95,7 +95,7 @@ export function BroadcastForm({
                 className={`flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
                   channel === opt.value
                     ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-white hover:bg-muted/10 dark:bg-gray-800'
+                    : 'border-border bg-surface text-foreground hover:bg-muted/10'
                 }`}
               >
                 <input
@@ -130,7 +130,7 @@ export function BroadcastForm({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={6}
-            className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground placeholder:text-muted transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent dark:bg-gray-800"
+            className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-base text-foreground placeholder:text-muted transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder={t('broadcast.messagePlaceholder')}
           />
           <p className="mt-1 text-xs text-muted">
@@ -140,7 +140,7 @@ export function BroadcastForm({
 
         {/* Preview */}
         {previewText && (
-          <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+          <div className="rounded-lg bg-sky-500/10 border border-sky-500/30 p-3 text-sm text-sky-300">
             <FileText size={20} aria-hidden="true" className="mr-1 inline-block" /> {previewText}
           </div>
         )}

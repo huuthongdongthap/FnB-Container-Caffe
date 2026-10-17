@@ -43,7 +43,7 @@ export default function CheckinPage() {
 
  {/* Error banner */}
  {error && (
- <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-200 text-red-700 text-sm">{error}</div>
+ <div className="mb-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-sm">{error}</div>
  )}
 
  {/* Step 1: Enter phone */}
@@ -61,7 +61,7 @@ export default function CheckinPage() {
  />
  <p className="text-center text-xs text-[color:var(--aura-chrome-bright)] mt-4">
  {t('checkin.notMember')}{' '}
- <a href="/signup" className="text-[color:var(--aura-forest-primary)] hover:underline">
+ <a href="/account" className="text-[color:var(--aura-forest-primary)] hover:underline">
  {t('checkin.registerNow')}
  </a>
  </p>
@@ -84,13 +84,13 @@ export default function CheckinPage() {
  <h2 className="font-display text-xl font-bold mb-2">{t('checkin.thanksCheckin')}</h2>
  {checkinResult.points > 0 && (
  <div>
- <p className="text-2xl font-bold text-green-600">+{checkinResult.points.toLocaleString()}đ</p>
+ <p className="text-2xl font-bold text-emerald-400">+{checkinResult.points.toLocaleString()}đ</p>
  <p className="text-sm text-[color:var(--aura-chrome-bright)]">{t('checkin.addedToWallet')}</p>
  </div>
  )}
  {checkinResult.reward && checkinResult.points === 0 && (
  <div>
- <p className="text-2xl font-bold text-green-600">{checkinResult.reward}</p>
+ <p className="text-2xl font-bold text-emerald-400">{checkinResult.reward}</p>
  </div>
  )}
  {checkinResult.points === 0 && !checkinResult.reward && (

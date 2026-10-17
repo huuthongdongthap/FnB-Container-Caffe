@@ -35,6 +35,15 @@ function buildNamespaces(data: Record<string, unknown>) {
         const ns = key.slice(0, dot);
         const k = key.slice(dot + 1);
         if (!namespaces[ns]) namespaces[ns] = {};
+        const existing = namespaces[ns][k];
+        const isRawKeyName =
+          value === k ||
+          value === key ||
+          value.toLowerCase() === k.toLowerCase() ||
+          value.toLowerCase() === key.toLowerCase();
+        if (typeof existing === 'string' && existing.length > 0 && isRawKeyName) {
+          continue;
+        }
         namespaces[ns][k] = value;
       }
     }

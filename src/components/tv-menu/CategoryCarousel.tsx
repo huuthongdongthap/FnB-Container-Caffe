@@ -12,7 +12,7 @@ export function CategoryCarousel({ menuGroups, onCategorySelect }: CategoryCarou
 
   if (menuGroups.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-400">
+      <div className="flex items-center justify-center py-8 text-muted">
         <p>Không có danh mục</p>
       </div>
     );
@@ -28,6 +28,8 @@ export function CategoryCarousel({ menuGroups, onCategorySelect }: CategoryCarou
     <div className="category-carousel">
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         <button
+          type="button"
+          aria-pressed={activeCategory === null}
           onClick={() => {
             setActiveCategory(null);
             onCategorySelect?.('');
@@ -36,7 +38,7 @@ export function CategoryCarousel({ menuGroups, onCategorySelect }: CategoryCarou
             'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
             activeCategory === null
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : 'bg-surface text-foreground border border-border hover:bg-surface/80'
           )}
         >
           Tất cả
@@ -44,12 +46,14 @@ export function CategoryCarousel({ menuGroups, onCategorySelect }: CategoryCarou
         {menuGroups.map((group) => (
           <button
             key={group.category}
+            type="button"
+            aria-pressed={activeCategory === group.category}
             onClick={() => handleCategoryClick(group.category)}
             className={cn(
               'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
               activeCategory === group.category
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-surface text-foreground border border-border hover:bg-surface/80'
             )}
           >
             {group.category}

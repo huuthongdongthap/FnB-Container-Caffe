@@ -39,7 +39,7 @@ export function BroadcastConfirmModal({
   return (
     <Modal open={open} onClose={onClose} title={t('broadcast.confirmTitle')}>
       <div className="space-y-4">
-        <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
+        <div className="rounded-lg bg-muted/10 border border-border p-4 text-sm">
           <p className="font-medium"><FileText size={20} aria-hidden="true" className="mr-1 inline-block" /> {t('broadcast.details')}</p>
           <ul className="mt-2 space-y-1 text-muted">
             <li>
@@ -55,14 +55,14 @@ export function BroadcastConfirmModal({
           </ul>
         </div>
 
-        <div className="rounded-lg border border-border bg-white p-3 text-sm dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-surface p-3 text-sm">
           <p className="mb-1 font-medium">{t('broadcast.messageContent')}</p>
           <p className="whitespace-pre-wrap text-muted">{message}</p>
         </div>
 
         {customerCount > 100 && (
-          <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-            <AlertTriangle size={20} aria-hidden="true" className="mr-1 inline-block text-amber-500" /> {t('broadcast.confirmWarning', { count: customerCount.toLocaleString('vi-VN') })}
+          <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-300">
+            <AlertTriangle size={20} aria-hidden="true" className="mr-1 inline-block text-amber-400" /> {t('broadcast.confirmWarning', { count: customerCount.toLocaleString('vi-VN') })}
           </div>
         )}
 

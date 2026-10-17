@@ -135,7 +135,7 @@ export default function TableManagementPage() {
 								{t("admin.tableManagement.bookAll", { fallback: "Book all" })}
 							</button>
 							<button onClick={loadTables}
-								className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">
+								className="px-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-foreground hover:bg-muted/20 transition-colors">
 								{t("admin.tableManagement.refresh", { fallback: "Refresh" })}
 							</button>
 						</div>
@@ -143,15 +143,15 @@ export default function TableManagementPage() {
 
 					{!loading && !ordersLoading && (
 						<div className="flex flex-wrap gap-3 mb-4 text-sm">
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
 								<span className="w-2 h-2 rounded-full bg-emerald-400" />
 								{tables.filter((tb) => tb.status === 'Available').length} {t('admin.tableManagement.availableShort')}
 							</span>
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
 								<span className="w-2 h-2 rounded-full bg-amber-400" />
 								{tables.filter((tb) => tb.status === 'Occupied').length} {t('admin.tableManagement.occupiedShort')}
 							</span>
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
 								<span className="w-2 h-2 rounded-full bg-sky-400" />
 								{Object.values(activeOrderCounts).reduce((s, v) => s + v, 0)} {t('admin.tableManagement.pendingOrdersShort')}
 							</span>

@@ -94,7 +94,7 @@ export default function OrderFailureNew() {
             </span>
             <div className="flex justify-center gap-4">
               <a
-                href="tel:0901234567"
+                href="tel:0946013633"
                 className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--aura-chrome-bright)] hover:underline"
               >
                 <Phone className="w-3.5 h-3.5" />

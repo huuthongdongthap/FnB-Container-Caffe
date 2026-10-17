@@ -1,5 +1,5 @@
 import { type ReactNode, lazy, Suspense } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { TABS, canAccess } from '@/pages/mobile/mobile-layout-constants';
 import type { MobileUser, Tab } from '@/pages/mobile/mobile-layout-types';
@@ -52,7 +52,7 @@ export function MobileStationHost({
   return (
     <div data-shell="ops" className="flex min-h-dvh flex-col bg-[var(--aura-noir-void,#050814)] text-[var(--aura-text-primary,#F5F5F5)]">
       <header className="flex h-12 items-center justify-between border-b border-[rgba(201,214,223,0.15)] bg-[var(--aura-noir-deep,#0A1A2E)] px-4">
-        <span className="font-bold text-[#F97316] text-sm">AURA Mobile</span>
+        <span className="font-bold text-[var(--md-sys-color-primary)] text-sm">AURA Mobile</span>
         {user?.name && (
           <div className="flex items-center gap-2 text-xs text-[var(--aura-text-secondary,#C9D6DF)]">
             <span>{user.name.split(' ').pop() ?? user.name}</span>
@@ -111,23 +111,32 @@ export function MobileOverlayHost({ children }: { children: ReactNode }) {
 /** Route page for the mobile notifications screen. */
 export function MobileNotificationsPage() {
   return (
-    <MobileOverlayHost>
-      <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--md-sys-color-on-surface-variant)]">Đang tải thông báo...</div>}>
-        <NotificationsScreen />
-      </Suspense>
-    </MobileOverlayHost>
+    <MobileStationHost title="Thông báo / Notifications">
+      <MobileOverlayHost>
+        <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--md-sys-color-on-surface-variant)]">Đang tải thông báo...</div>}>
+          <NotificationsScreen />
+        </Suspense>
+      </MobileOverlayHost>
+    </MobileStationHost>
   );
 }
 
 /** Route page for the mobile staff profile screen. */
 export function MobileProfilePage() {
   const { user, logout } = useSafeUser();
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logout();
+    navigate('/mobile/login', { replace: true });
+  };
   return (
-    <MobileOverlayHost>
-      <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--md-sys-color-on-surface-variant)]">Đang tải hồ sơ...</div>}>
-        <ProfileScreen user={user} onLogout={logout} />
-      </Suspense>
-    </MobileOverlayHost>
+    <MobileStationHost title="Hồ sơ / Profile">
+      <MobileOverlayHost>
+        <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--md-sys-color-on-surface-variant)]">Đang tải hồ sơ...</div>}>
+          <ProfileScreen user={user} onLogout={handleLogout} />
+        </Suspense>
+      </MobileOverlayHost>
+    </MobileStationHost>
   );
 }
 

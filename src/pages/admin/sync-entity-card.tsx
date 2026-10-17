@@ -18,7 +18,7 @@ export function SyncEntityCard({ entity, syncingEntity, syncLogs, onSync }: Sync
     : t('notSynced');
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-white">
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface">
       <div>
         <p className="text-sm font-medium">{entity}</p>
         <p className="text-xs text-muted">{statusLabel}</p>

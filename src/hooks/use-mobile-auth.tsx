@@ -62,10 +62,14 @@ function writeStorage<T>(key: string, value: T) {
 }
 
 function clearStorage() {
-  Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-  localStorage.removeItem('aura_auth_token');
-  localStorage.removeItem('aura_user_data');
-  localStorage.removeItem('aura_device_token');
+  try {
+    Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem('aura_auth_token');
+    localStorage.removeItem('aura_user_data');
+    localStorage.removeItem('aura_device_token');
+  } catch {
+    // ignore storage errors
+  }
 }
 
 function getStoredToken(): string | null {
@@ -114,7 +118,19 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         const data = await res.json();
         writeStorage(STORAGE_KEYS.token, data.token);
         writeStorage(STORAGE_KEYS.device, state.deviceToken);
-        setState(s => ({ ...s, token: data.token, deviceToken: state.deviceToken, error: null }));
+        writeStorage('aura_auth_token', data.token);
+        writeStorage('aura_device_token', state.deviceToken);
+        if (data.user) {
+          writeStorage(STORAGE_KEYS.user, data.user);
+          writeStorage('aura_user_data', data.user);
+        }
+        setState(s => ({
+          ...s,
+          user: data.user ?? s.user,
+          token: data.token,
+          deviceToken: state.deviceToken,
+          error: null,
+        }));
       } catch { /* network error or aborted */ }
     })();
     return () => controller.abort();
@@ -143,7 +159,19 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
       const data = await res.json();
       writeStorage(STORAGE_KEYS.token, data.token);
       writeStorage(STORAGE_KEYS.device, deviceToken);
-      setState(s => ({ ...s, token: data.token, deviceToken, error: null }));
+      writeStorage('aura_auth_token', data.token);
+      writeStorage('aura_device_token', deviceToken);
+      if (data.user) {
+        writeStorage(STORAGE_KEYS.user, data.user);
+        writeStorage('aura_user_data', data.user);
+      }
+      setState(s => ({
+        ...s,
+        user: data.user ?? s.user,
+        token: data.token,
+        deviceToken,
+        error: null,
+      }));
       return true;
     } catch {
       return false;
@@ -162,7 +190,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         }
       );
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success === false) {
         setState(s => ({ ...s, loading: false, error: data.error || 'Đăng nhập thất bại' }));
         return false;
       }
@@ -195,12 +223,19 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     setState({ user: null, token: null, deviceToken: null, loading: false, error: null });
   }, []);
 
+  const currentUser = state.user ?? getStoredUser();
+  const currentToken = state.token ?? getStoredToken();
+  const currentDeviceToken = state.deviceToken ?? getStoredDevice();
+
   const value: AuthContextType = {
     ...state,
+    user: currentUser,
+    token: currentToken,
+    deviceToken: currentDeviceToken,
     login,
     logout,
     refresh: refreshToken,
-    isAuthenticated: !!state.token && !!state.user,
+    isAuthenticated: !!currentToken && !!currentUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

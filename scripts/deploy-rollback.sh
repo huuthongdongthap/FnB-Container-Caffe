@@ -32,7 +32,7 @@ if [ -z "$ROLLBACK_ID" ]; then
   echo "  bash scripts/deploy-rollback.sh --target d1 <timestamp-iso-or-bookmark> [db-name]"
   echo ""
   echo "Listing recent Pages deployments:"
-  npx wrangler pages deployment list --project-name aura-cafe 2>/dev/null || \
+  npx wrangler pages deployment list --project-name fnb-caffe-container 2>/dev/null || \
     npx wrangler pages deployment list 2>/dev/null || true
   exit 0
 fi
@@ -41,12 +41,12 @@ if [ "$TARGET" = "worker" ]; then
   echo "=== [Tier 2] Rolling back Cloudflare Worker API: $ROLLBACK_ID ==="
   npx wrangler rollback "$ROLLBACK_ID"
 elif [ "$TARGET" = "d1" ]; then
-  DB_NAME="${2:-fnb-aura-db}"
+  DB_NAME="${2:-fnb-caffe-db}"
   echo "=== [Tier 3] Cloudflare D1 Point-In-Time Restore (Time Travel): $ROLLBACK_ID on $DB_NAME ==="
   npx wrangler d1 time-travel restore "$DB_NAME" --timestamp "$ROLLBACK_ID"
 else
   echo "=== [Tier 1] Rolling back Cloudflare Pages frontend: $ROLLBACK_ID ==="
-  npx wrangler pages rollback "$ROLLBACK_ID" --project-name aura-cafe 2>/dev/null || \
+  npx wrangler pages rollback "$ROLLBACK_ID" --project-name fnb-caffe-container 2>/dev/null || \
     npx wrangler pages rollback "$ROLLBACK_ID"
 fi
 

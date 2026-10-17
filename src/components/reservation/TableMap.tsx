@@ -20,7 +20,7 @@ export function TableMap({ tables, zone, selectedTable, onSelect }: TableMapProp
 
   if (zoneTables.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
+      <div className="flex items-center justify-center py-12 text-muted border border-dashed border-border rounded-lg">
         <p className="text-sm">Không có bàn trong khu vực này</p>
       </div>
     );
@@ -31,7 +31,7 @@ export function TableMap({ tables, zone, selectedTable, onSelect }: TableMapProp
   return (
     <div className="floor-plan">
       <h2 className="text-lg font-display font-semibold mb-2">{zoneTitle}</h2>
-      <div className="flex gap-2 mb-4 text-xs text-gray-500">
+      <div className="flex gap-2 mb-4 text-xs text-muted">
         <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Trống
         </span>
@@ -55,9 +55,9 @@ export function TableMap({ tables, zone, selectedTable, onSelect }: TableMapProp
                   onClick={() => onSelect(table.id)}
                   className={cn(
                     'w-16 h-16 rounded-lg border-2 flex flex-col items-center justify-center text-xs font-medium transition-all',
-                    table.available && !isSelected && 'border-green-500 bg-green-50 text-green-800 hover:bg-green-100 cursor-pointer',
-                    table.available && isSelected && 'border-blue-500 bg-blue-100 text-blue-800 ring-2 ring-blue-300',
-                    !table.available && 'border-red-300 bg-red-50 text-red-400 cursor-not-allowed opacity-60'
+                    table.available && !isSelected && 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 cursor-pointer',
+                    table.available && isSelected && 'border-sky-400 bg-sky-500/20 text-sky-200 ring-2 ring-sky-400/40',
+                    !table.available && 'border-red-500/30 bg-red-500/15 text-red-300 cursor-not-allowed opacity-60'
                   )}
                 >
                   <span className="font-mono text-sm font-bold">#{table.table_number}</span>

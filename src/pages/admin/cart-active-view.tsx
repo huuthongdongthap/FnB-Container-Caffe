@@ -6,7 +6,7 @@ interface CartActiveViewProps {
   itemQty: number;
   onItemIdChange: (id: string) => void;
   onItemQtyChange: (qty: number) => void;
-  onPatch: (op: 'add' | 'remove' | 'update') => void;
+  onPatch: (op: 'add' | 'remove' | 'update', overrideItemId?: string) => void;
   saving: boolean;
   t: (key: string, opts?: Record<string, string>) => string;
 }
@@ -34,8 +34,8 @@ export function CartActiveView({ cart, itemId, itemQty, onItemIdChange, onItemQt
               onChange={(e) => onItemQtyChange(Number(e.target.value))}
               className="w-12 rounded-lg px-2 py-1 text-xs bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-center"
             />
-            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('update'); }} className="text-xs text-blue-400">Cập nhật</button>
-            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('remove'); }} className="text-xs text-red-400">{t('delete', { defaultValue: 'Xoá' })}</button>
+            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('update', item.id); }} disabled={saving} className="text-xs text-blue-400 disabled:opacity-50">Cập nhật</button>
+            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('remove', item.id); }} disabled={saving} className="text-xs text-red-400 disabled:opacity-50">{t('delete', { defaultValue: 'Xoá' })}</button>
           </div>
         ))}
       </div>

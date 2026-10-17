@@ -24,9 +24,9 @@ export function TimeSlotPicker({ slots, selectedTime, onSelect, className }: Tim
             onClick={() => onSelect(slot.time)}
             className={cn(
               'px-3 py-2 rounded-lg text-sm font-medium border transition-all',
-              isDisabled && !isSelected && 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through',
+              isDisabled && !isSelected && 'bg-surface/40 text-muted border-border cursor-not-allowed line-through',
               isSelected && 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-300',
-              !isDisabled && !isSelected && 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+              !isDisabled && !isSelected && 'bg-surface text-foreground border-border hover:bg-sky-500/15 hover:border-sky-400/50 cursor-pointer'
             )}
           >
             {slot.time}

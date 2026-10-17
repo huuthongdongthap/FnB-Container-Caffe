@@ -8,7 +8,7 @@ import { CartListView } from './cart-list-view';
 
 export default function DinDinCart() {
   const {
-    carts, activeCart, loading, error, message, sessionInput, d02Alert, itemId, itemQty,
+    carts, activeCart, loading, saving, error, message, sessionInput, d02Alert, itemId, itemQty,
     setSessionInput, setItemId, setItemQty, loadOne, patchCart, t,
   } = useDinDinCart();
 
@@ -57,7 +57,7 @@ export default function DinDinCart() {
             onItemIdChange={setItemId}
             onItemQtyChange={setItemQty}
             onPatch={patchCart}
-            saving={false}
+            saving={saving}
             t={t}
           />
         )}

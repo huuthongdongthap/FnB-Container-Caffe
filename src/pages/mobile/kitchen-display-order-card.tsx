@@ -42,7 +42,7 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
             <span style={itemQty}>{qty}x</span>
             <div style={{ flex: 1 }}>
               <div style={itemName}>{name}</div>
-              {item.notes && <div style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 2 }}>{item.notes}</div>}
+              {item.notes && <div style={{ fontSize: 12, color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic', marginTop: 2 }}>{item.notes}</div>}
               {item.modifiers && item.modifiers.length > 0 && (
                 <div style={itemModifier}>{item.modifiers.join(', ')}</div>
               )}

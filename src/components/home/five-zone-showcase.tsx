@@ -101,7 +101,7 @@ export function FiveZoneShowcase() {
         {/* CTA */}
         <div className="mt-10 text-center">
           <Link
-            to="/about-us"
+            to="/about"
             className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-chrome-light transition-colors hover:text-chrome-bright"
           >
             Khám phá thêm về không gian <span>&rarr;</span>

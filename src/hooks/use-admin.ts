@@ -12,6 +12,7 @@ export interface AdminOrder {
   id: string;
   customer: string;
   items: number;
+  itemsList?: Array<{ name: string; quantity: number }>;
   total: number;
   status: string;
   payment: string;

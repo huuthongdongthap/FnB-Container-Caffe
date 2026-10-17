@@ -11,7 +11,7 @@ import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 
 export function StaffListTab() {
   const { t } = useTranslation();
-  const { staff, loading, error, fetchStaff, registerStaff } = useAdminStaffStore();
+  const { staff, loading, error, fetchStaff, registerStaff, toggleStaffActive } = useAdminStaffStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', role: '', phone: '', email: '', password: '' });
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -20,8 +20,8 @@ export function StaffListTab() {
     fetchStaff();
   }, [fetchStaff]);
 
-  const handleToggleActive = (_id: string) => {
-    // Placeholder for toggle active endpoint
+  const handleToggleActive = (id: string) => {
+    void toggleStaffActive(id);
   };
 
   const handleAdd = async () => {
@@ -129,7 +129,7 @@ export function StaffListTab() {
                 {inactiveStaff.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white border border-border opacity-60"
+                    className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border opacity-60"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-sm">{member.name}</span>

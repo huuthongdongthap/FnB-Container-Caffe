@@ -20,11 +20,7 @@ export function MenuItemCard({
   return (
     <div
       className="relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform glass-card"
-      role="button"
-      tabIndex={0}
-      aria-label={`${item.name} — ${formattedPrice}`}
       onClick={onAdd}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAdd(); } }}
     >
       {/* Background image (if provided) */}
       {item.image && (
@@ -37,7 +33,13 @@ export function MenuItemCard({
       <div className="absolute inset-0 bg-gradient-to-br from-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 5%,transparent)] to-[rgba(0,0,0,0.35)]" />
       <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-noir-void,#1a1008)]/95 via-transparent to-transparent" />
       <div className="mt-auto p-4 relative z-10">
-        <h3 className="text-[16px] text-[var(--aura-text-primary,var(--aura-chrome-bright,#eae1db))] font-medium leading-tight font-body">
+        <h3
+          role="button"
+          tabIndex={0}
+          aria-label={`${item.name} — ${formattedPrice}`}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onAdd(); } }}
+          className="text-[16px] text-[var(--aura-text-primary,var(--aura-chrome-bright,#eae1db))] font-medium leading-tight font-body"
+        >
           {item.name}
         </h3>
         <div className="flex items-center justify-between mt-2">

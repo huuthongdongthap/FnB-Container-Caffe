@@ -60,9 +60,28 @@ export function LoyaltyPage({
       : 'idle';
 
   /* ── Build dashboard data ──────────────────────────────────────── */
-  const TOTAL_POINTS = 15000;
-  const progressPct = Math.min(100, Math.round((points / TOTAL_POINTS) * 100));
-  const formattedTier = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Bronze';
+  const formatTierLabel = (name: string) => (name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Bronze');
+  const activeTierLadder = store.tierLadder.length > 0
+    ? store.tierLadder
+    : getDefaultLoyaltyData(t).tierLadder;
+  const normalizedTier = (tier || 'bronze').toLowerCase();
+  const sortedTiers = [...activeTierLadder].sort((a, b) => a.min_points - b.min_points);
+  const currentTierIdx = Math.max(
+    0,
+    sortedTiers.findIndex((item) => item.tier_name.toLowerCase() === normalizedTier),
+  );
+  const nextTierObj = sortedTiers[currentTierIdx + 1] ?? sortedTiers[sortedTiers.length - 1];
+  const targetPoints = nextTierObj && nextTierObj.min_points > 0 ? nextTierObj.min_points : 500;
+  const formattedTier = formatTierLabel(tier);
+  const nextTierName = currentTierIdx < sortedTiers.length - 1 && nextTierObj
+    ? formatTierLabel(nextTierObj.tier_name)
+    : 'Platinum';
+  const pointsRemaining = Math.max(0, targetPoints - points);
+  const progressPct = Math.min(100, Math.round((points / targetPoints) * 100));
+  const resolvedTierLadder = sortedTiers.map((item) => ({
+    ...item,
+    is_current: item.tier_name.toLowerCase() === normalizedTier,
+  }));
 
   const streakDays: LoyaltyStreakDay[] = WEEK_DAYS.map((day) => ({
     label: t(`loyalty.days.${day}`),
@@ -93,8 +112,8 @@ export function LoyaltyPage({
     tierName: formattedTier,
     memberSince: '2022',
     tierDescription: t('loyalty.heroDescription'),
-    nextTier: 'Black Tier',
-    pointsRemainingForNextTier: TOTAL_POINTS - points,
+    nextTier: nextTierName,
+    pointsRemainingForNextTier: pointsRemaining,
     progressPercent: progressPct,
     pointsBalance: points,
     streakCount: 12,
@@ -103,9 +122,7 @@ export function LoyaltyPage({
     pointsHistory: mappedHistory,
     streakDays: streakDays,
     tierBenefits: tierBenefits,
-    tierLadder: store.tierLadder.length > 0
-      ? store.tierLadder
-      : getDefaultLoyaltyData(t).tierLadder,
+    tierLadder: resolvedTierLadder,
   };
 
   return (
@@ -115,10 +132,8 @@ export function LoyaltyPage({
         description="AURA CAFE loyalty program with tiers, points and rewards. Chuong trinh khach hang than thiet voi hang, diem va qua tang."
       />
       <div
-        className="min-h-screen overflow-x-hidden"
+        className="min-h-screen overflow-x-hidden bg-background text-foreground"
         style={{
-          backgroundColor: '#051424',
-          color: '#d5e4fa',
           fontFamily: "var(--aura-font-body)",
         }}
       >

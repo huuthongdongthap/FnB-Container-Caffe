@@ -46,14 +46,15 @@ export function useDinDinCart() {
 
   useEffect(() => { void loadAll(); }, [loadAll]);
 
-  const patchCart = async (op: 'add' | 'remove' | 'update') => {
+  const patchCart = async (op: 'add' | 'remove' | 'update', overrideItemId?: string) => {
     if (!activeCart) return;
+    const targetItemId = overrideItemId ?? itemId;
     setSaving(true);
     setError(null);
     setMessage(null);
     setD02Alert(null);
     try {
-      const body: Record<string, unknown> = { sessionId: activeCart.sessionId, op, itemId, qty: itemQty };
+      const body: Record<string, unknown> = { sessionId: activeCart.sessionId, op, itemId: targetItemId, qty: itemQty };
       if (op === 'update') body.qty = itemQty;
       const result = (await apiFetch<Record<string, unknown>>(`/api/admin/dindin/cart/${encodeURIComponent(activeCart.sessionId)}`, {
         method: 'PATCH',

@@ -41,7 +41,7 @@ export function ReservationForm({
           id="reservation-guests"
           value={guests}
           onChange={(e) => onGuestsChange(Number(e.target.value))}
-          className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
         >
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
             <option key={n} value={n}>

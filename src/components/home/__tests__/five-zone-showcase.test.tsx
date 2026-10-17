@@ -39,12 +39,12 @@ describe('FiveZoneShowcase', () => {
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('each zone tab links to menu page via the CTA', () => {
+  it('each zone tab links to about page via the CTA', () => {
     render(<FiveZoneShowcase />);
     const exploreLink = screen.getByText(/khám phá thêm về không gian/i);
     expect(exploreLink).toBeInTheDocument();
     const link = exploreLink.closest('a');
-    expect(link).toHaveAttribute('href', '/about-us');
+    expect(link).toHaveAttribute('href', '/about');
   });
 
   it('shows correct zone when switching between tabs', () => {

@@ -810,7 +810,7 @@ exit 0
       writeFileSync(logFile, '');
       execFileSync('bash', [rollbackCopy], { cwd: tempDir, env, stdio: 'pipe' });
       const noArgCalls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
-      expect(noArgCalls).toEqual(['wrangler pages deployment list --project-name aura-cafe']);
+      expect(noArgCalls).toEqual(['wrangler pages deployment list --project-name fnb-caffe-container']);
 
       // 2. With deployment ID argument: executes Pages rollback only (no Worker rollback, no D1 rollback)
       writeFileSync(logFile, '');
@@ -821,7 +821,7 @@ exit 0
       });
       const argCalls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
       expect(argCalls).toEqual([
-        'wrangler pages rollback deploy-test-id-123 --project-name aura-cafe',
+        'wrangler pages rollback deploy-test-id-123 --project-name fnb-caffe-container',
         'sleep 3',
         'curl -s https://auraspace.cafe',
       ]);

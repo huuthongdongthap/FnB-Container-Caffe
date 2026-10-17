@@ -57,6 +57,7 @@ export function DateTimePicker({
               <button
                 key={day.id}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => onSelectDate(day.id)}
                 className={`py-3 px-2 min-h-[44px] rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-1 ${
                   isSelected
@@ -91,6 +92,7 @@ export function DateTimePicker({
               <button
                 key={t}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => onSelectTime(t)}
                 className={`py-3 min-h-[44px] inline-flex items-center justify-center rounded-xl text-center font-body text-xs font-bold tracking-wider transition-all cursor-pointer border ${
                   isSelected

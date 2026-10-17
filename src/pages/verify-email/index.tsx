@@ -43,7 +43,7 @@ const VerifyEmailPage: React.FC = () => {
       setSuccess('Xác thực email thành công!');
 
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        window.location.href = '/account';
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối');

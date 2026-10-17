@@ -49,12 +49,12 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 				</button>
 
 				{/* Quick actions dropdown */}
-				<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block group-focus-within:block bg-white dark:bg-gray-800 rounded-lg shadow-lg border py-1 min-w-[130px] z-10">
+				<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block group-focus-within:block bg-surface text-foreground rounded-lg shadow-lg border border-border py-1 min-w-[130px] z-10">
 					{STATUS_OPTIONS.map((s) => (
 						<button
 							key={s.value}
 							onClick={() => onSetStatus(table.id, s.value)}
-							className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted/20 flex items-center gap-2"
 						>
 							<span className={`w-2 h-2 rounded-full ${s.dot}`} />
 							{statusLabel(s.value)}
@@ -69,7 +69,7 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 				{activeCount > 0 && (
 					<button
 						onClick={() => { window.location.href = '/kds'; }}
-						className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium hover:bg-amber-200 transition-colors"
+						className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
 						title={t('admin.tableManagement.viewKDS')}
 					>
 						{activeCount}{' '}
@@ -78,7 +78,7 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 				)}
 				<button
 					onClick={() => { window.location.href = '/kds'; }}
-					className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium hover:bg-gray-200 transition-colors"
+					className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface border border-border text-foreground text-[11px] font-medium hover:bg-muted/20 transition-colors"
 					title={t('admin.tableManagement.openKDS')}
 				>
 					🍳 KDS

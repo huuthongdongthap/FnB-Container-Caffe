@@ -26,6 +26,7 @@ interface AdminStaffState {
   error: string | null;
   fetchStaff: () => Promise<void>;
   registerStaff: (data: RegisterStaffPayload) => Promise<void>;
+  toggleStaffActive: (id: string) => Promise<void>;
 }
 
 function normalizeStaffMember(raw: Record<string, unknown>): StaffMember {
@@ -88,6 +89,23 @@ export const useAdminStaffStore = create<AdminStaffState>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ error: message });
+    }
+  },
+
+  toggleStaffActive: async (id: string) => {
+    const target = get().staff.find((s) => s.id === id);
+    if (!target) return;
+    const nextActive = !target.isActive;
+    set((state) => ({
+      staff: state.staff.map((s) => (s.id === id ? { ...s, isActive: nextActive } : s)),
+    }));
+    try {
+      await apiFetch<any>(`/api/auth/staff/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: nextActive ? 1 : 0, active: nextActive }),
+      });
+    } catch {
+      // Optimistic state kept if endpoint is offline in demo mode
     }
   },
 }));

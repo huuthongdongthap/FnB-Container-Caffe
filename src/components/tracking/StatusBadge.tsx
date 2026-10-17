@@ -19,13 +19,13 @@ const STATUS_BADGE_KEYS: Record<OrderStatus, string> = {
 };
 
 const STATUS_VARIANTS: Record<OrderStatus, string> = {
-  pending: 'bg-amber-100 text-amber-800 border-amber-300',
-  confirmed: 'bg-blue-100 text-blue-800 border-blue-300',
-  preparing: 'bg-purple-100 text-purple-800 border-purple-300',
-  ready: 'bg-green-100 text-green-800 border-green-300',
-  delivering: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  delivered: 'bg-green-100 text-green-800 border-green-300',
-  cancelled: 'bg-red-100 text-red-800 border-red-300',
+  pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  confirmed: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  preparing: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  ready: 'bg-green-500/15 text-green-300 border-green-500/30',
+  delivering: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  delivered: 'bg-green-500/15 text-green-300 border-green-500/30',
+  cancelled: 'bg-red-500/15 text-red-300 border-red-500/30',
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
@@ -36,7 +36,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border',
-        STATUS_VARIANTS[status] || 'bg-gray-100 text-gray-800',
+        STATUS_VARIANTS[status] || 'bg-surface text-foreground border-border',
         className
       )}
     >

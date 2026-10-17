@@ -62,7 +62,7 @@ export function SubscriptionAddForm({ onAdd, onCancel }: Props) {
             onChange={(e) =>
               setRole(e.target.value as StaffSubscription['role'])
             }
-            className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent dark:bg-gray-800"
+            className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {ROLE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>

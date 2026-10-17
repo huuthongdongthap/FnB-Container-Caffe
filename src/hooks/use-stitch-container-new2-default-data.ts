@@ -92,7 +92,7 @@ export function useStitchContainerNew2DefaultData(): ContainerCafeNew2Data {
     }),
     footerLogo: t('containerNew2.brandName', { defaultValue: 'AURA CAFE' }),
     footerAddressLines: [
-      t('containerNew2.address1', { defaultValue: '123 Architectural Way, Sa Dec' }),
+      t('containerNew2.address1', { defaultValue: '29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp' }),
       t('containerNew2.address2', { defaultValue: 'Dong Thap, Vietnam' }),
     ],
     footerEmail: 'contact@auracafe.vn',

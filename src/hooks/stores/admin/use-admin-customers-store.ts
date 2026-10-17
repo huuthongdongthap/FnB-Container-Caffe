@@ -7,7 +7,7 @@ interface AdminCustomersState {
   totalCount: number;
   loading: boolean;
   error: string | null;
-  fetchCustomers: (page?: number, search?: string) => Promise<void>;
+  fetchCustomers: (page?: number, search?: string, tier?: string) => Promise<void>;
   addCustomer: (data: { name: string; phone: string; tier: string }) => Promise<boolean>;
   updateCustomer: (id: string, data: Partial<AdminCustomer>) => Promise<boolean>;
   deleteCustomer: (id: string) => Promise<boolean>;
@@ -39,11 +39,12 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
   loading: false,
   error: null,
 
-  fetchCustomers: async (page = 1, search?: string) => {
+  fetchCustomers: async (page = 1, search?: string, tier?: string) => {
     set({ loading: true, error: null });
     try {
       const params = new URLSearchParams({ page: String(page) });
       if (search) params.set('search', search);
+      if (tier) params.set('tier', tier);
 
       const body = await apiFetch<any>(`/api/admin/customers?${params}`);
       const rawList: Array<Record<string, unknown>> = body?.data || body?.customers || [];

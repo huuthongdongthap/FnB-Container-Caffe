@@ -8,6 +8,8 @@ export interface Promotion {
   maxDiscount: number;
   minOrder: number;
   expiresAt: string;
+  startsAt?: string;
+  isActive?: boolean;
   usageCount: number;
   usageLimit: number;
   icon: string;
@@ -24,6 +26,10 @@ interface RawPromotion {
   min_order?: number;
   expiresAt?: string;
   expires_at?: string;
+  startsAt?: string;
+  starts_at?: string;
+  isActive?: boolean | number;
+  is_active?: boolean | number;
   usageCount?: number;
   usage_count?: number;
   usageLimit?: number;
@@ -44,7 +50,36 @@ interface SinglePromotionResponse {
   promotion?: RawPromotion;
 }
 
-function mapRawPromotion(item: RawPromotion): Promotion {
+export function isPromotionActive(item: RawPromotion, now = Date.now()): boolean {
+  const activeFlag = item.isActive ?? item.is_active;
+  if (activeFlag !== undefined && (activeFlag === 0 || activeFlag === false)) {
+    return false;
+  }
+
+  const startsAt = item.startsAt ?? item.starts_at;
+  if (startsAt) {
+    const startMs = Date.parse(startsAt);
+    if (!Number.isNaN(startMs) && startMs > now) {
+      return false;
+    }
+  }
+
+  const expiresAt = item.expiresAt ?? item.expires_at;
+  if (expiresAt) {
+    const normalizedExpiry = /^\d{4}-\d{2}-\d{2}$/.test(expiresAt)
+      ? `${expiresAt}T23:59:59.999Z`
+      : expiresAt;
+    const expiryMs = Date.parse(normalizedExpiry);
+    if (!Number.isNaN(expiryMs) && expiryMs < now) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function mapRawPromotion(item: RawPromotion): Promotion {
+  const activeFlag = item.isActive ?? item.is_active;
   return {
     id: item.id || item.code,
     code: item.code,
@@ -52,6 +87,8 @@ function mapRawPromotion(item: RawPromotion): Promotion {
     maxDiscount: item.maxDiscount ?? item.max_discount ?? 0,
     minOrder: item.minOrder ?? item.min_order ?? 0,
     expiresAt: item.expiresAt ?? item.expires_at ?? '',
+    startsAt: item.startsAt ?? item.starts_at,
+    isActive: activeFlag === undefined ? isPromotionActive(item) : Boolean(activeFlag) && isPromotionActive(item),
     usageCount: item.usageCount ?? item.usage_count ?? 0,
     usageLimit: item.usageLimit ?? item.usage_limit ?? 0,
     icon: item.icon || 'Sparkles',
@@ -59,13 +96,15 @@ function mapRawPromotion(item: RawPromotion): Promotion {
   };
 }
 
-export function usePromotions() {
+export function usePromotions(options?: { activeOnly?: boolean }) {
+  const activeOnly = options?.activeOnly ?? true;
   return useQuery<Promotion[]>({
-    queryKey: ['promotions'],
+    queryKey: activeOnly ? ['promotions'] : ['promotions', { activeOnly: false }],
     queryFn: async () => {
       const res = await apiFetch<PromotionsResponse>('/api/promotions');
       const list = (Array.isArray(res?.data) ? res.data : res?.promotions) || [];
-      return list.map(mapRawPromotion);
+      const filtered = activeOnly ? list.filter((item) => isPromotionActive(item)) : list;
+      return filtered.map(mapRawPromotion);
     },
   });
 }
@@ -76,7 +115,7 @@ export function usePromotionByCode(code: string) {
     queryFn: async () => {
       const res = await apiFetch<SinglePromotionResponse>(`/api/promotions/${code}`);
       const item = res?.data || res?.promotion;
-      if (!item) return null;
+      if (!item || !isPromotionActive(item)) return null;
       return mapRawPromotion(item);
     },
     enabled: !!code,

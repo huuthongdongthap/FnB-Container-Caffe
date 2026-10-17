@@ -80,7 +80,7 @@ export function ChatDetailView({
           {t('back')}
         </button>
 
-        <div className="flex flex-col rounded-xl border border-border bg-white">
+        <div className="flex flex-col rounded-xl border border-border bg-surface">
           {/* Customer info header */}
           <div className="border-b border-border px-4 py-3">
             <h2 className="font-display font-bold text-foreground">{name}</h2>
@@ -96,7 +96,7 @@ export function ChatDetailView({
             )}
 
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                 {error}
               </div>
             )}
@@ -117,8 +117,8 @@ export function ChatDetailView({
                     <div
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                         msg.direction === 'customer'
-                          ? 'rounded-br-md bg-blue-500 text-white'
-                          : 'rounded-bl-md bg-gray-200 text-gray-800'
+                          ? 'rounded-br-md bg-blue-600 text-white'
+                          : 'rounded-bl-md bg-muted/20 text-foreground border border-border/60'
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">
@@ -128,7 +128,7 @@ export function ChatDetailView({
                         className={`mt-1 text-[10px] ${
                           msg.direction === 'customer'
                             ? 'text-blue-200'
-                            : 'text-gray-500'
+                            : 'text-muted'
                         }`}
                       >
                         {new Date(msg.created_at).toLocaleTimeString('vi-VN', {

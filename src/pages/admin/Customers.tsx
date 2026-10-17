@@ -28,18 +28,19 @@ export default function AdminCustomersPage() {
 
   const TIER_OPTIONS = [
     { value: '', label: t('allTiers') },
-    { value: 'VIP', label: 'VIP' },
-    { value: 'LOYAL', label: t('loyal') },
-    { value: 'REGULAR', label: t('regular') },
+    { value: 'platinum', label: 'Platinum' },
+    { value: 'gold', label: 'VIP / Gold' },
+    { value: 'silver', label: `${t('loyal')} / Silver` },
+    { value: 'bronze', label: `${t('regular')} / Bronze` },
   ];
 
   useEffect(() => {
-    fetchCustomers(1, search || undefined);
-  }, [fetchCustomers]);
+    fetchCustomers(1, search || undefined, tierFilter || undefined);
+  }, [fetchCustomers, tierFilter]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
-    fetchCustomers(1, value || undefined);
+    fetchCustomers(1, value || undefined, tierFilter || undefined);
   };
 
   const handleOpenAdd = () => {
@@ -93,10 +94,10 @@ export default function AdminCustomersPage() {
 
           {/* Error state */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 text-red-300 text-sm">
               {error}
               <button
-                onClick={() => fetchCustomers(1)}
+                onClick={() => fetchCustomers(1, search || undefined, tierFilter || undefined)}
                 className="ml-3 underline hover:no-underline"
               >
                 {t('retry')}
@@ -105,7 +106,7 @@ export default function AdminCustomersPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white rounded-xl border border-border p-4 mb-6 shadow-sm">
+          <div className="bg-surface rounded-xl border border-border p-4 mb-6 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-muted mb-1">{t('search')}</label>
@@ -120,7 +121,7 @@ export default function AdminCustomersPage() {
                 <select
                   value={tierFilter}
                   onChange={(e) => setTierFilter(e.target.value)}
-                  className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   {TIER_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -132,11 +133,11 @@ export default function AdminCustomersPage() {
 
           {/* Customer Table or Empty State */}
           {!loading && !error && customers.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-white/40 p-12 text-center">
+            <div className="rounded-xl border border-dashed border-border bg-surface/60 p-12 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/10">
                 <Users size={28} aria-hidden="true" className="text-muted" />
               </div>
-              <h3 className="mb-1 font-display text-lg font-semibold">{t('emptyTitle')}</h3>
+              <h3 className="mb-1 font-display text-lg font-semibold text-foreground">{t('emptyTitle')}</h3>
               <p className="mb-4 text-sm text-muted/60">
                 {search || tierFilter
                   ? t('emptyFiltered')
@@ -152,7 +153,7 @@ export default function AdminCustomersPage() {
               )}
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
               <CustomerTable
                 customers={customers}
                 tierFilter={tierFilter || undefined}

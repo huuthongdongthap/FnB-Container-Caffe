@@ -117,8 +117,9 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
 
   calculateCashback: (amount: number): number => {
     const { cashbackRate } = get();
-    if (amount <= 0) return 0;
-    return Math.round(amount * (cashbackRate / 100));
+    if (amount <= 0 || cashbackRate <= 0) return 0;
+    const rate = cashbackRate < 1 ? cashbackRate : cashbackRate / 100;
+    return Math.round(amount * rate);
   },
 
   phoneAuth: async (phone: string) => {

@@ -26,7 +26,7 @@ export function RangeSelector() {
           className={cn(
             'px-4 py-2 text-sm font-medium rounded-md transition-colors',
             range === r.key
-              ? 'bg-white text-foreground shadow-sm'
+              ? 'bg-surface text-foreground shadow-sm border border-border/60'
               : 'text-muted hover:text-foreground',
           )}
         >

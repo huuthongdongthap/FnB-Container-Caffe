@@ -26,22 +26,40 @@ const STATION_KEYWORDS: Record<Exclude<KitchenStation, 'all'>, string[]> = {
   cold: ['sinh tố', 'smoothie', 'nước ép', 'juice', 'soda', 'frappe', 'đá', 'ice', 'cold brew'],
 };
 
+function deriveItemStation(item: KitchenOrder['items'][number] & { product_name?: string }): KitchenStation | null {
+  if (item.station && item.station !== 'all') return item.station;
+  const itemName = (item.name || item.product_name || '').toLowerCase();
+  for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
+    if (keywords.some((kw) => itemName.includes(kw))) return station as KitchenStation;
+  }
+  return null;
+}
+
 function deriveStation(order: KitchenOrder): KitchenStation {
   if (order.station && order.station !== 'all') return order.station;
-  const firstItem = order.items[0] as (KitchenOrder['items'][number] & { product_name?: string }) | undefined;
-  const firstItemName = (firstItem?.name || firstItem?.product_name || '').toLowerCase();
-  for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
-    if (keywords.some((kw) => firstItemName.includes(kw))) return station as KitchenStation;
+  for (const rawItem of order.items) {
+    const matched = deriveItemStation(rawItem as KitchenOrder['items'][number] & { product_name?: string });
+    if (matched) return matched;
   }
   return 'espresso'; // default
 }
 
+function orderMatchesStation(order: KitchenOrder, station: KitchenStation): boolean {
+  if (station === 'all') return true;
+  if (order.station && order.station !== 'all') return order.station === station;
+  const matchedStations = order.items
+    .map((raw) => deriveItemStation(raw as KitchenOrder['items'][number] & { product_name?: string }))
+    .filter((s): s is KitchenStation => s !== null);
+  if (matchedStations.length === 0) return deriveStation(order) === station;
+  return matchedStations.includes(station);
+}
+
 const STATION_COLORS: Record<KitchenStation, string> = {
-  all: '#6b7280',
-  espresso: '#92400e',
-  food: '#166534',
-  pastry: '#9a3412',
-  cold: '#1e40af',
+  all: '#C9D6DF',
+  espresso: '#FBBF24',
+  food: '#4ADE80',
+  pastry: '#FB923C',
+  cold: '#60A5FA',
 };
 
 export default function KitchenDisplay() {
@@ -91,13 +109,13 @@ export default function KitchenDisplay() {
   const activeOrders = orders.filter((o) => o.status !== 'served');
   const filteredOrders = activeStation === 'all'
     ? activeOrders
-    : activeOrders.filter((o) => deriveStation(o) === activeStation);
+    : activeOrders.filter((o) => orderMatchesStation(o, activeStation));
   const pendingCount = activeOrders.filter((o) => o.status === 'pending').length;
   const preparingCount = activeOrders.filter((o) => o.status === 'preparing').length;
 
   // Count orders per station for badges
   const stationCounts = STATIONS.reduce((acc, s) => {
-    acc[s.key] = s.key === 'all' ? activeOrders.length : activeOrders.filter((o) => deriveStation(o) === s.key).length;
+    acc[s.key] = s.key === 'all' ? activeOrders.length : activeOrders.filter((o) => orderMatchesStation(o, s.key)).length;
     return acc;
   }, {} as Record<KitchenStation, number>);
 
@@ -124,9 +142,9 @@ export default function KitchenDisplay() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                border: `1.5px solid ${isActive ? STATION_COLORS[s.key] : '#374151'}`,
+                border: `1.5px solid ${isActive ? STATION_COLORS[s.key] : 'var(--md-sys-color-outline-variant)'}`,
                 background: isActive ? `${STATION_COLORS[s.key]}22` : 'transparent',
-                color: isActive ? STATION_COLORS[s.key] : '#9ca3af',
+                color: isActive ? STATION_COLORS[s.key] : 'var(--md-sys-color-on-surface-variant)',
                 cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
               }}
             >
@@ -137,8 +155,8 @@ export default function KitchenDisplay() {
                   minWidth: 18, height: 18, borderRadius: 9,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 10, fontWeight: 700,
-                  background: isActive ? STATION_COLORS[s.key] : '#4b5563',
-                  color: '#fff',
+                  background: isActive ? STATION_COLORS[s.key] : 'var(--aura-noir-steel)',
+                  color: isActive ? 'var(--aura-noir-void)' : 'var(--md-sys-color-on-surface)',
                 }}>
                   {count}
                 </span>

@@ -9,7 +9,7 @@ interface HelmetHeadProps {
 }
 
 const BASE_URL = 'https://auraspace.cafe';
-const DEFAULT_OG_IMAGE = '/photos/IMG_6691.webp';
+const DEFAULT_OG_IMAGE = '/photos/space-exterior-overview.webp';
 
 export function HelmetHead({
   title,

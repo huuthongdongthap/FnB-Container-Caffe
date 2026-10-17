@@ -6,10 +6,10 @@ export function formatVND(value: number): string {
 
 export function statusBadge(status: string) {
   const colors: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
-    paused: 'bg-amber-100 text-amber-800',
-    cancelled: 'bg-red-100 text-red-800',
-    pending: 'bg-blue-100 text-blue-800',
+    active: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    paused: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+    cancelled: 'bg-red-500/15 text-red-300 border border-red-500/30',
+    pending: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
   };
   const labels: Record<string, string> = {
     active: 'Đang hoạt động',
@@ -20,7 +20,7 @@ export function statusBadge(status: string) {
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        colors[status] || 'bg-gray-100 text-gray-800'
+        colors[status] || 'bg-surface text-foreground border border-border'
       }`}
     >
       {labels[status] || status}

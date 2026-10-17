@@ -62,19 +62,19 @@ export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
                 className={cn(
                   'h-4 w-4 rounded-full border-2',
                   isCancelled
-                    ? 'border-red-500 bg-red-100'
+                    ? 'border-red-500 bg-red-500/20'
                     : isCompleted
                       ? 'border-green-500 bg-green-500'
                       : isCurrent
                         ? 'border-blue-500 bg-blue-500'
-                        : 'border-gray-300 bg-white'
+                        : 'border-border bg-surface'
                 )}
               />
               {step !== steps[steps.length - 1] && (
                 <div
                   className={cn(
                     'mt-0.5 h-full w-0.5',
-                    isCompleted && !isCancelled ? 'bg-green-500' : 'bg-gray-200'
+                    isCompleted && !isCancelled ? 'bg-green-500' : 'bg-border'
                   )}
                 />
               )}
@@ -85,7 +85,7 @@ export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
                 {isCompleted && !isCurrent && !isCancelled && <span className="mr-1"><Check size={12} className="inline" /></span>}
                 {step.label}
               </h4>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-muted mt-0.5">
                 {step.status === 'pending' && t('tracking.statusPending')}
                 {step.status === 'confirmed' && t('tracking.statusConfirmed')}
                 {step.status === 'preparing' && t('tracking.statusPreparing')}
@@ -95,7 +95,7 @@ export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
                 {step.status === 'cancelled' && t('tracking.statusCancelled')}
               </p>
               {step.time && (
-                <span className="text-xs text-gray-400 mt-1 block">
+                <span className="text-xs text-muted mt-1 block">
                   {formatTime(step.time)}
                 </span>
               )}

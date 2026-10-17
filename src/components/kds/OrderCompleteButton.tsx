@@ -11,7 +11,7 @@ export function OrderCompleteButton({ orderId, onConfirm }: OrderCompleteButtonP
   if (showConfirm) {
     return (
       <div className="flex gap-2 items-center">
-        <span className="text-xs text-gray-600">Xác nhận hoàn thành?</span>
+        <span className="text-xs text-muted">Xác nhận hoàn thành?</span>
         <button
           onClick={() => {
             onConfirm(orderId);
@@ -23,7 +23,7 @@ export function OrderCompleteButton({ orderId, onConfirm }: OrderCompleteButtonP
         </button>
         <button
           onClick={() => setShowConfirm(false)}
-          className="px-3 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+          className="px-3 py-1 text-xs font-medium rounded bg-muted/20 text-foreground hover:bg-muted/30 transition-colors"
         >
           Hủy
         </button>

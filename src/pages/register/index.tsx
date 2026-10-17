@@ -108,7 +108,7 @@ const RegisterPage: React.FC<Props> = () => {
       )}
 
       <p style={{ marginTop: 16, fontSize: 14, color: '#666' }}>
-        Đã có tài khoản? <a href="/login">Đăng nhập</a>
+        Đã có tài khoản? <a href="/account">Đăng nhập</a>
       </p>
     </div>
   );

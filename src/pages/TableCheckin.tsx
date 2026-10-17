@@ -77,7 +77,7 @@ export default function TableCheckinPage() {
 
   return (
     <>
-      <HelmetHead title={`Check-in Bàn ${tableSlug}`} description="Xác nhận thông tin để bắt đầu đặt món" canonical={`/checkin?table=${tableSlug}`} />
+      <HelmetHead title={`Check-in Bàn ${tableSlug}`} description="Xác nhận thông tin để bắt đầu đặt món" canonical="/table-checkin" />
       <div className="min-h-screen bg-[color:var(--aura-noir-deep)] flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-sm">
           {/* Header */}
@@ -92,12 +92,12 @@ export default function TableCheckinPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs text-[color:var(--aura-chrome-bright)] mb-1.5 uppercase tracking-wider">Tên của bạn</label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nguyễn Văn A" disabled={loading} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
+              <label htmlFor="table-checkin-name" className="block text-xs text-[color:var(--aura-chrome-bright)] mb-1.5 uppercase tracking-wider">Tên của bạn</label>
+              <Input id="table-checkin-name" value={name} onChange={e => setName(e.target.value)} placeholder="Nguyễn Văn A" disabled={loading} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
             </div>
             <div>
-              <label className="block text-xs text-[color:var(--aura-chrome-bright)] mb-1.5 uppercase tracking-wider">Số điện thoại</label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0912 345 678" disabled={loading} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
+              <label htmlFor="table-checkin-phone" className="block text-xs text-[color:var(--aura-chrome-bright)] mb-1.5 uppercase tracking-wider">Số điện thoại</label>
+              <Input id="table-checkin-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="0912 345 678" disabled={loading} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
             </div>
             <Button type="submit" disabled={loading} className="w-full h-12 text-base">
               {loading ? <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin inline-block mr-2" /> : 'Xác nhận'}
