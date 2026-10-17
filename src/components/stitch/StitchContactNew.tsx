@@ -41,7 +41,7 @@ export function StitchContactNew({
     <>
       <HelmetHead
         title="Liên Hệ — AURA CAFE Sa Đéc"
-        description="Ghé thăm AURA CAFE tại 29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp. Liên hệ với chúng tôi qua điện thoại, email hoặc mạng xã hội."
+        description="Ghé thăm AURA CAFE tại 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2). Liên hệ với chúng tôi qua điện thoại, email hoặc mạng xã hội."
       />
 
       <Header onNavigate={onNavigate} />

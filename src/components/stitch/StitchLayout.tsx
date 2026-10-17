@@ -31,7 +31,7 @@ return (
   <img
     src="/images/aura-logo-256.png"
     alt="AURA CAFE Logo"
-    className="h-7 w-7 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover"
+    className="h-7 w-7 rounded-xl border border-[var(--aura-chrome-mid)]/40 object-contain p-0.5"
     onError={(e) => {
       (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
     }}

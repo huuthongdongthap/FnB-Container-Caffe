@@ -29,11 +29,32 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
       return errorResponse('Mã đã hết hạn', 410);
     }
 
+    const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    const attemptsKey = `verify_attempts:${email}`;
+
     if (record.code !== code) {
+      let attempts = 1;
+      try {
+        if (authKV) {
+          const prev = parseInt((await authKV.get(attemptsKey)) || '0', 10);
+          attempts = prev + 1;
+          await authKV.put(attemptsKey, String(attempts), { expirationTtl: 600 });
+        }
+      } catch {
+        // Ignore KV transient error on attempt tracking
+      }
+      if (attempts >= 5) {
+        await deleteVerifyCode(db, record.id);
+        return errorResponse('Quá nhiều lần thử sai. Vui lòng yêu cầu mã mới.', 429);
+      }
       return errorResponse('Mã xác thực không đúng', 401);
     }
 
-    const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    try {
+      await authKV?.delete?.(attemptsKey);
+    } catch {
+      // Ignore cleanup failure
+    }
     const userStr = await authKV.get(`user:${email}`);
     if (!userStr) {
       return errorResponse('Không tìm thấy tài khoản', 404);
@@ -62,6 +83,6 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     });
   } catch (error) {
     log.error('Verify error:', { message: (error as Error).message });
-    return errorResponse(`Xác thực thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Xác thực thất bại', 500);
   }
 }

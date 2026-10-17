@@ -280,4 +280,34 @@ describe('Order Snapshot Contract Integration', () => {
       expect(itemInsert.args.length).toBe(7);
     }
   });
+
+  it('resiliently resolves composite product IDs with modifier slugs from mobile clients', async () => {
+    const db = makeMockDb();
+    const env = makeEnv(db);
+
+    const res = await app.fetch(
+      new Request('https://test.aura/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          customer_name: 'Diner Mobile',
+          customer_phone: '0909000777',
+          order_type: 'takeaway',
+          payment_method: 'cod',
+          total: 25000,
+          items: [{
+            name: 'Espresso',
+            product_id: 'P1-Size Tiêu Chuẩn (M)_100% đường (chuẩn)_Đá đầy đủ (chuẩn)',
+            quantity: 1,
+          }],
+        }),
+      }),
+      env, { waitUntil: () => {} } as any
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json() as any;
+    expect(body.success).toBe(true);
+    expect(body.data.total).toBe(25000);
+  });
 });

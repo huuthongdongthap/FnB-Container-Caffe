@@ -32,7 +32,7 @@ describe('StitchAbout', () => {
     render(<StitchAbout />);
     expect(screen.getAllByText(/Container Bản Địa/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/AURA CAFE/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/39 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/29 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Câu chuyện/i)).toBeInTheDocument();
     expect(screen.getByText(/Hành trình/i)).toBeInTheDocument();
   });

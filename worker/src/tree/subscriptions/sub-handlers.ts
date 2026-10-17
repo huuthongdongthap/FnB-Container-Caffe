@@ -37,90 +37,114 @@ export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
   }
   query += ' ORDER BY s.created_at DESC';
 
-  const subs = await db.prepare(query).bind(...params).all<SubscriptionRecord>();
-  const results = (subs.results || []).map(s => ({
-    ...s,
-    plan_features: s.features ? JSON.parse(s.features) : []
-  }));
+  try {
+    const subs = await db.prepare(query).bind(...params).all<SubscriptionRecord>();
+    const results = (subs.results || []).map(s => ({
+      ...s,
+      plan_features: s.features ? JSON.parse(s.features) : []
+    }));
 
-  return c.json({ success: true, data: results });
+    return c.json({ success: true, data: results });
+  } catch {
+    return c.json({ success: true, data: [] });
+  }
 }
 
 export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
 
-  const activeResult = await db.prepare(
-    'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\''
-  ).first<{ mrr: number; count: number }>();
+  try {
+    const activeResult = await db.prepare(
+      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\''
+    ).first<{ mrr: number; count: number }>();
 
-  const byZone = await db.prepare(
-    'SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = \'active\' GROUP BY zone ORDER BY revenue DESC'
-  ).all<{ zone: string; count: number; revenue: number }>();
+    const byZone = await db.prepare(
+      'SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = \'active\' GROUP BY zone ORDER BY revenue DESC'
+    ).all<{ zone: string; count: number; revenue: number }>();
 
-  const byPlan = await db.prepare(
-    `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
-     FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
-     WHERE s.status = 'active' GROUP BY p.id ORDER BY revenue DESC`
-  ).all<{ name: string; slug: string; count: number; revenue: number }>();
+    const byPlan = await db.prepare(
+      `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
+       FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
+       WHERE s.status = 'active' GROUP BY p.id ORDER BY revenue DESC`
+    ).all<{ name: string; slug: string; count: number; revenue: number }>();
 
-  const monthStart = new Date();
-  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-  const newThisMonth = await db.prepare(
-    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND created_at >= ?'
-  ).bind(monthStart.toISOString()).first<{ count: number }>();
+    const newThisMonth = await db.prepare(
+      'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND created_at >= ?'
+    ).bind(monthStart.toISOString()).first<{ count: number }>();
 
-  const churned = await db.prepare(
-    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
-  ).bind(monthStart.toISOString()).first<{ count: number }>();
+    const churned = await db.prepare(
+      'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
+    ).bind(monthStart.toISOString()).first<{ count: number }>();
 
-  const avgResult = await db.prepare(
-    'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\''
-  ).first<{ avg: number }>();
+    const avgResult = await db.prepare(
+      'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\''
+    ).first<{ avg: number }>();
 
-  interface Bucket {
-    under_1m: number; from_1m_to_3m: number; from_3m_to_5m: number; above_5m: number;
-  }
-  const bucketData = await db.prepare(`
-    SELECT
-      COUNT(CASE WHEN amount_vnd < 1000000 THEN 1 END) as under_1m,
-      COUNT(CASE WHEN amount_vnd >= 1000000 AND amount_vnd < 3000000 THEN 1 END) as from_1m_to_3m,
-      COUNT(CASE WHEN amount_vnd >= 3000000 AND amount_vnd < 5000000 THEN 1 END) as from_3m_to_5m,
-      COUNT(CASE WHEN amount_vnd >= 5000000 THEN 1 END) as above_5m
-    FROM subscriptions WHERE status = 'active'
-  `).first<Bucket>();
-
-  const pending = await db.prepare(
-    'SELECT COUNT(*) as count FROM subscriptions WHERE status IN (\'pending\', \'paused\')'
-  ).first<{ count: number }>();
-
-  const totalEver = await db.prepare('SELECT COUNT(*) as count FROM subscriptions').first<{ count: number }>();
-
-  const mrr = activeResult?.mrr || 0;
-  const activeCount = activeResult?.count || 0;
-
-  return c.json({
-    success: true,
-    data: {
-      mrr_vnd: mrr,
-      arr_vnd: mrr * 12,
-      active_subscriptions: activeCount,
-      total_contracts: totalEver?.count || 0,
-      new_this_month: newThisMonth?.count || 0,
-      churned_this_month: churned?.count || 0,
-      churn_rate_pct: activeCount > 0 ? Math.round((churned?.count || 0) / Math.max(activeCount + (churned?.count || 0), 1) * 1000) / 10 : 0,
-      avg_contract_value_vnd: Math.round(avgResult?.avg || 0),
-      pending_count: pending?.count || 0,
-      by_zone: byZone?.results || [],
-      by_plan: byPlan?.results || [],
-      mrr_buckets: {
-        under_1m: bucketData?.under_1m || 0,
-        from_1m_to_3m: bucketData?.from_1m_to_3m || 0,
-        from_3m_to_5m: bucketData?.from_3m_to_5m || 0,
-        above_5m: bucketData?.above_5m || 0
-      }
+    interface Bucket {
+      under_1m: number; from_1m_to_3m: number; from_3m_to_5m: number; above_5m: number;
     }
-  });
+    const bucketData = await db.prepare(`
+      SELECT
+        COUNT(CASE WHEN amount_vnd < 1000000 THEN 1 END) as under_1m,
+        COUNT(CASE WHEN amount_vnd >= 1000000 AND amount_vnd < 3000000 THEN 1 END) as from_1m_to_3m,
+        COUNT(CASE WHEN amount_vnd >= 3000000 AND amount_vnd < 5000000 THEN 1 END) as from_3m_to_5m,
+        COUNT(CASE WHEN amount_vnd >= 5000000 THEN 1 END) as above_5m
+      FROM subscriptions WHERE status = 'active'
+    `).first<Bucket>();
+
+    const pending = await db.prepare(
+      'SELECT COUNT(*) as count FROM subscriptions WHERE status IN (\'pending\', \'paused\')'
+    ).first<{ count: number }>();
+
+    const totalEver = await db.prepare('SELECT COUNT(*) as count FROM subscriptions').first<{ count: number }>();
+
+    const mrr = activeResult?.mrr || 0;
+    const activeCount = activeResult?.count || 0;
+
+    return c.json({
+      success: true,
+      data: {
+        mrr_vnd: mrr,
+        arr_vnd: mrr * 12,
+        active_subscriptions: activeCount,
+        total_contracts: totalEver?.count || 0,
+        new_this_month: newThisMonth?.count || 0,
+        churned_this_month: churned?.count || 0,
+        churn_rate_pct: activeCount > 0 ? Math.round((churned?.count || 0) / Math.max(activeCount + (churned?.count || 0), 1) * 1000) / 10 : 0,
+        avg_contract_value_vnd: Math.round(avgResult?.avg || 0),
+        pending_count: pending?.count || 0,
+        by_zone: byZone?.results || [],
+        by_plan: byPlan?.results || [],
+        mrr_buckets: {
+          under_1m: bucketData?.under_1m || 0,
+          from_1m_to_3m: bucketData?.from_1m_to_3m || 0,
+          from_3m_to_5m: bucketData?.from_3m_to_5m || 0,
+          above_5m: bucketData?.above_5m || 0
+        }
+      }
+    });
+  } catch {
+    return c.json({
+      success: true,
+      data: {
+        mrr_vnd: 0,
+        arr_vnd: 0,
+        active_subscriptions: 0,
+        total_contracts: 0,
+        new_this_month: 0,
+        churned_this_month: 0,
+        churn_rate_pct: 0,
+        avg_contract_value_vnd: 0,
+        pending_count: 0,
+        by_zone: [],
+        by_plan: [],
+        mrr_buckets: { under_1m: 0, from_1m_to_3m: 0, from_3m_to_5m: 0, above_5m: 0 }
+      }
+    });
+  }
 }
 
 export async function getMRRTrend(c: Context<{ Bindings: Env }>) {

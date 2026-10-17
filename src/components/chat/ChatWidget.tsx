@@ -1,8 +1,9 @@
+import { useEffect } from 'react';
 import { type ChatWidgetProps } from './ChatWidget-types';
 import { useChatWidget } from './ChatWidget-hooks';
 import { ChatBubble } from './ChatBubble';
 
-export function ChatWidget({ baseUrl }: ChatWidgetProps) {
+export function ChatWidget({ baseUrl: _baseUrl }: ChatWidgetProps) {
   const {
     t, isOpen, setIsOpen, name, setName, phone, setPhone,
     showForm, inputText, setInputText, unreadCount, messages,
@@ -10,14 +11,26 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
     handleSaveInfo, handleSend, handleToggle,
   } = useChatWidget();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, setIsOpen]);
+
   return (
     <>
       {/* Floating toggle button */}
       <button
+        type="button"
         data-chat-toggle
         onClick={handleToggle}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
-        aria-label={isOpen ? t('chat.toggleClosed') : t('chat.toggleOpen')}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
+        aria-label={isOpen ? t('chat.toggleClosed', { defaultValue: 'Đóng chat' }) : t('chat.toggleOpen', { defaultValue: 'Mở chat hỗ trợ' })}
       >
         {isOpen ? (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -41,6 +54,9 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
       {isOpen && (
         <div
           ref={panelRef}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Hỗ trợ trực tuyến AURA CAFE"
           className="fixed bottom-24 right-6 z-50 flex w-[min(350px,calc(100vw-48px))] max-h-[500px] flex-col rounded-2xl border border-border bg-[#0A1628] shadow-2xl"
           style={{ maxHeight: 'min(500px, calc(100vh - 160px))' }}
         >
@@ -51,9 +67,10 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
               <p className="text-xs text-accent/80">Tra loi trong vai phut</p>
             </div>
             <button
+              type="button"
               onClick={() => setIsOpen(false)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-              aria-label={t('chat.close')}
+              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+              aria-label={t('chat.close', { defaultValue: 'Đóng hộp thoại chat' })}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -126,7 +143,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 type="submit"
                 aria-label="Gửi tin nhắn"
                 disabled={sendState.sending || !inputText.trim()}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-accent-warm to-wood text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-gradient-to-r from-accent-warm to-wood text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 {sendState.sending ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

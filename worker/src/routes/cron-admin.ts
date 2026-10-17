@@ -105,7 +105,8 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
       }
       return c.json({ ok: true, message: 'Telegram sent' });
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      log.error('telegram_sim_error', { message: (err as Error).message });
+      return c.json({ error: 'Failed to simulate Telegram notification' }, 500);
     }
   });
 
@@ -123,7 +124,8 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
       });
       return c.json(result);
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      log.error('zalo_zns_test_error', { message: (err as Error).message });
+      return c.json({ error: 'Failed to send test Zalo ZNS' }, 500);
     }
   });
 

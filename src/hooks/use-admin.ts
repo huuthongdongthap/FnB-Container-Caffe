@@ -55,7 +55,23 @@ export function useAdmin(): AdminResult {
     error: statsError,
   } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
-    queryFn: () => apiFetch<AdminStats>('/api/stats'),
+    queryFn: () =>
+      apiFetch<AdminStats & { stats?: Record<string, unknown> }>('/api/stats').then((raw) => {
+        if (typeof raw?.todayRevenue === 'number' && typeof raw?.todayOrders === 'number') {
+          return raw;
+        }
+        const s = (raw?.stats ?? raw ?? {}) as Record<string, unknown>;
+        const todayOrders = Number(s.todayOrders ?? s.orders_today ?? 0);
+        const todayRevenue = Number(s.todayRevenue ?? s.revenue_today ?? 0);
+        return {
+          todayRevenue,
+          todayOrders,
+          avgOrderValue: Number(
+            s.avgOrderValue ?? (todayOrders > 0 ? Math.round(todayRevenue / todayOrders) : 0),
+          ),
+          activeCustomers: Number(s.activeCustomers ?? s.active_subscribers ?? 0),
+        };
+      }),
     refetchInterval: 30_000,
     staleTime: 25_000,
   });
@@ -67,7 +83,45 @@ export function useAdmin(): AdminResult {
   } = useQuery<AdminOrder[]>({
     queryKey: ['admin-orders'],
     queryFn: () =>
-      apiFetch<{ orders: AdminOrder[] }>('/api/admin/orders').then((r) => r.orders),
+      apiFetch<{ orders?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/orders').then(
+        (r) =>
+          (r.orders || r.data || []).map((raw: Record<string, unknown>) => {
+            if (typeof raw?.customer === 'string' && typeof raw?.items === 'number' && typeof raw?.payment === 'string') {
+              return raw as unknown as AdminOrder;
+            }
+            let itemCount = 0;
+            if (typeof raw?.items === 'number') {
+              itemCount = raw.items;
+            } else if (Array.isArray(raw?.items)) {
+              itemCount = raw.items.reduce(
+                (sum: number, i: Record<string, unknown>) => sum + Number(i?.qty ?? i?.quantity ?? 1),
+                0,
+              );
+            } else if (typeof raw?.items === 'string' && raw.items.trim()) {
+              try {
+                const parsed = JSON.parse(raw.items);
+                if (Array.isArray(parsed)) {
+                  itemCount = parsed.reduce(
+                    (sum: number, i: Record<string, unknown>) => sum + Number(i?.qty ?? i?.quantity ?? 1),
+                    0,
+                  );
+                }
+              } catch {
+                itemCount = 0;
+              }
+            }
+            return {
+              ...raw,
+              id: String(raw?.id ?? ''),
+              customer: String(raw?.customer ?? raw?.customer_name ?? 'Khách lẻ'),
+              items: itemCount,
+              total: Number(raw?.total ?? 0),
+              status: String(raw?.status ?? 'pending'),
+              payment: String(raw?.payment ?? raw?.payment_method ?? 'cash'),
+              createdAt: String(raw?.createdAt ?? raw?.created_at ?? ''),
+            } as AdminOrder;
+          }),
+      ),
     refetchInterval: 15_000,
     staleTime: 10_000,
   });
@@ -78,7 +132,23 @@ export function useAdmin(): AdminResult {
   } = useQuery<AdminCustomer[]>({
     queryKey: ['admin-customers'],
     queryFn: () =>
-      apiFetch<{ customers: AdminCustomer[] }>('/api/admin/customers').then((r) => r.customers),
+      apiFetch<{ customers?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/customers').then(
+        (r) =>
+          (r.customers || r.data || []).map((raw: Record<string, unknown>) =>
+            typeof raw?.totalOrders === 'number' && typeof raw?.totalSpent === 'number'
+              ? (raw as unknown as AdminCustomer)
+              : ({
+                  ...raw,
+                  id: String(raw?.id ?? ''),
+                  name: String(raw?.name ?? ''),
+                  phone: String(raw?.phone ?? ''),
+                  tier: String(raw?.tier ?? 'bronze'),
+                  totalOrders: Number(raw?.totalOrders ?? raw?.visit_count ?? 0),
+                  totalSpent: Number(raw?.totalSpent ?? raw?.total_spent ?? 0),
+                  lastVisit: String(raw?.lastVisit ?? raw?.updated_at ?? raw?.created_at ?? ''),
+                } as AdminCustomer)
+          )
+      ),
     staleTime: 60_000,
   });
 

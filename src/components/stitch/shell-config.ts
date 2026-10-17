@@ -20,10 +20,12 @@ export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
   // Story & Brand pages — LandingNav + LandingFooter, no mobile bottom nav
   { match: '/about', title: 'Về AURA CAFE', variant: 'small', showNav: false, showTop: false },
   { match: '/gallery', title: 'Không gian & Góc ảnh', variant: 'small', showNav: false, showTop: false },
+  { match: '/reviews', title: 'Đánh giá khách hàng', variant: 'small', showNav: false, showTop: false },
   { match: '/contact', title: 'Liên hệ', variant: 'small', showNav: false, showTop: false },
 
   // Functional customer pages — TopAppBar only, KHÔNG Bottom Nav
   { match: '/checkout', title: 'Thanh toán đơn hàng', variant: 'small', showNav: false, showTop: true },
+  { match: '/order-success', title: 'Đặt hàng thành công', variant: 'small', showNav: false, showTop: false },
   { match: '/order', title: 'Gọi món tại bàn', variant: 'small', showNav: false, showTop: false },
   { match: '/checkin', title: 'Check-in tại quán', variant: 'small', showNav: false, showTop: true },
   { match: '/track-order', title: 'Tra cứu đơn hàng', variant: 'small', showNav: false, showTop: true },
@@ -41,5 +43,6 @@ export function getShellConfig(pathname: string): ShellRouteConfig | undefined {
 
 /** True when the MD3 bottom NavigationBar is mounted (cart bar must float above it) */
 export function hasM3NavBar(pathname: string): boolean {
-  return getShellConfig(pathname)?.showNav ?? false;
+  const entry = getShellConfig(pathname);
+  return entry?.showNav ?? false;
 }

@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { apiFetch } from '@/lib/api-client';
 
 export default function TableCheckinPage() {
   const { t } = useTranslation();
@@ -45,21 +46,20 @@ export default function TableCheckinPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/orders/guest-checkin', {
+      const body = await apiFetch<{ success: boolean; data?: { id?: string }; error?: string }>('/api/orders/guest-checkin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customer_name: name.trim(), customer_phone: phone.trim(), table_id: tableSlug }),
       });
-      const body = await res.json();
-      if (!res.ok || !body.success) {
+      if (!body.success) {
         setError(body.error || 'Không thể xác nhận. Vui lòng thử lại.');
         setLoading(false);
         return;
       }
       const orderId = body.data?.id;
       navigate(`/order?table=${encodeURIComponent(tableSlug)}${orderId ? '&orderId=' + encodeURIComponent(orderId) : ''}`);
-    } catch {
-      setError('Lỗi kết nối. Vui lòng thử lại.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối. Vui lòng thử lại.';
+      setError(message);
       setLoading(false);
     }
   };

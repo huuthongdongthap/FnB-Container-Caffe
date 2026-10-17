@@ -8,7 +8,7 @@ interface ZoneGroupsProps {
 }
 
 export function ZoneGroups({ grouped, onDownload }: ZoneGroupsProps) {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 
 	return (
 		<div className="mt-8 print:mt-12 section-break">

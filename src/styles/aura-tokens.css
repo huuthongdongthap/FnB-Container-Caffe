@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
    AURA Industrial Luxury · M3 System Token Mapping
-   Navy (#0A1128) + Chrome/Silver + Bronze (#D4AF37) + Noir Void + Pearl
+   Navy (#0A1128) + Chrome/Silver + Forest (#4A7C59) + Noir Void + Pearl
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -22,7 +22,7 @@
   --aura-chrome-600: #5A8FB0;    /* Chrome hover */
   --aura-chrome-700: #4A7FA8;    /* Chrome active */
 
-  --aura-bronze-500: #C9D6DF;    /* BAZI v5.0 Kim (Bạc) thay thế Gold #D4AF37 (Kim sinh Thủy) */
+  --aura-bronze-500: #C9D6DF;    /* BAZI v5.0 Kim (Bạc) thay thế Gold (Kim sinh Thủy) */
   --aura-bronze-400: #E8EEF3;    /* BAZI v5.0 Bạc sáng */
   --aura-bronze-600: #8898A4;    /* BAZI v5.0 Chrome active */
 
@@ -113,18 +113,18 @@
   --md-sys-color-error-container: #7F1D1D;
   --md-sys-color-on-error-container: #FECACA;
 
-  --md-sys-color-background: var(--aura-pearl-50);
-  --md-sys-color-on-background: var(--aura-navy-900);
+  --md-sys-color-background: var(--aura-noir-900);
+  --md-sys-color-on-background: var(--aura-pearl-100);
   --md-sys-color-surface: var(--aura-noir-deep);
   --md-sys-color-on-surface: var(--aura-text-primary);
-  --md-sys-color-surface-variant: var(--aura-chrome-100);
-  --md-sys-color-on-surface-variant: var(--aura-chrome-300); /* WCAG AA: #A8B8C4 on #0D1B2A = 8.4:1 PASS */
+  --md-sys-color-surface-variant: var(--aura-noir-700);
+  --md-sys-color-on-surface-variant: var(--aura-chrome-200); /* WCAG AA: #C9D6DF on #16213E / #0D1B2A > 9:1 PASS */
 
   --md-sys-color-outline: var(--aura-chrome-400);
   --md-sys-color-outline-variant: var(--aura-navy-500);
 
-  --md-sys-color-inverse-surface: var(--aura-noir-void);
-  --md-sys-color-inverse-on-surface: var(--aura-chrome-50);
+  --md-sys-color-inverse-surface: var(--aura-pearl-100);
+  --md-sys-color-inverse-on-surface: var(--aura-noir-900);
   --md-sys-color-inverse-primary: var(--aura-chrome-300);
 
   --md-sys-color-shadow: #000000;
@@ -239,7 +239,25 @@
   --aura-glow-silver-strong: var(--aura-glow-chrome-strong);
   --glow-gold:               0 4px 20px rgba(107, 159, 184, 0.15);
 
+  --aura-duration-fast: var(--md-sys-motion-duration-short2);
+  --aura-duration-base: var(--md-sys-motion-duration-medium1);
   --aura-duration-slow: 600ms;
+
+  /* ── AURA Bridge Aliases (for global.css, drawer, SkeletonAdapter, brand-tokens) ── */
+  --aura-on-primary: var(--md-sys-color-on-primary);
+  --aura-bg-elevated: var(--md-sys-color-surface-container-high);
+  --aura-bg-high: var(--md-sys-color-surface-container-highest);
+  --aura-border-glass: rgba(201, 214, 223, 0.18);
+  --aura-glass-blur: 16px;
+  --aura-glass-border: var(--aura-border-glass);
+  --aura-radius-sm: var(--md-sys-shape-corner-small);
+  --aura-radius-md: var(--md-sys-shape-corner-medium);
+  --aura-radius-lg: var(--md-sys-shape-corner-large);
+  --aura-radius-xl: var(--md-sys-shape-corner-extra-large);
+  --aura-radius-2xl: 24px;
+  --aura-radius-pill: var(--md-sys-shape-corner-full);
+  --aura-shadow-md: var(--md-sys-elevation-level2);
+  --aura-shadow-lg: var(--md-sys-elevation-level3);
 
   /* ── Glass morphism ── */
   --glass-bg:       rgba(10, 26, 46, 0.65);

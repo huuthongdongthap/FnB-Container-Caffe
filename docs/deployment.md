@@ -32,7 +32,9 @@ npx wrangler secret put PAYOS_CHECKSUM_KEY
 
 ## Database Migrations
 ```bash
-cd worker && npx wrangler d1 execute fnb-caffe-db --file=../db/migrations/YYYYMMDD_NN_description.sql
+bash worker/scripts/apply-migrations.sh --file YYYYMMDD_NN_description.sql
+# Or directly from worker/:
+cd worker && npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/YYYYMMDD_NN_description.sql
 ```
 
 ## Notes

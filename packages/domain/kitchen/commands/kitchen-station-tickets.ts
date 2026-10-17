@@ -31,7 +31,9 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
   const { results: assignedItems } = await db.prepare(
     'SELECT order_item_id FROM order_item_stations WHERE station_id = ?'
   ).bind(stationId).all<{ order_item_id: string }>();
-  const assignedOrderIds = new Set(assignedItems?.map((r) => r.order_item_id) || []);
+  const assignedOrderIds = new Set(
+    assignedItems?.map((r) => String(r.order_item_id).split(':')[0]) || []
+  );
 
   const tickets: Array<Record<string, unknown>> = [];
   for (const order of activeOrders || []) {
@@ -69,15 +71,20 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
 
   const now = new Date().toISOString();
+  const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
   await db.prepare(
     'INSERT OR REPLACE INTO order_item_stations (order_item_id, station_id, started_at, ready_at) VALUES (?, ?, ?, NULL)'
-  ).bind(itemId, stationId, now).run();
+  ).bind(compositeItemId, stationId, now).run();
 
-  if (order.status === 'confirmed') {
+  if (order.status === 'confirmed' || order.status === 'pending') {
     await executeKdsStatusTransition(db, orderId, 'preparing', 'staff');
   }
 
-  return c.json({ success: true, started_at: now, order_status: order.status === 'confirmed' ? 'preparing' : order.status });
+  return c.json({
+    success: true,
+    started_at: now,
+    order_status: order.status === 'confirmed' || order.status === 'pending' ? 'preparing' : order.status,
+  });
 });
 
 stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => {
@@ -91,9 +98,10 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
 
   const now = new Date().toISOString();
+  const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
   await db.prepare(
     'UPDATE order_item_stations SET ready_at = ? WHERE order_item_id = ? AND station_id = ?'
-  ).bind(now, itemId, stationId).run();
+  ).bind(now, compositeItemId, stationId).run();
 
   const items = parseOrderItems(order.items);
   let allReady = items.length > 0;

@@ -7,7 +7,7 @@ interface LocationMapProps {
 
 const ADDRESS = {
   street: '29 Nguyễn Tất Thành',
-  ward: 'Phường Sa Đéc',
+  ward: 'Phường 1, TP. Sa Đéc (Đối diện Khách sạn Thảo Trâm 2)',
   city: 'Đồng Tháp, Việt Nam',
 };
 

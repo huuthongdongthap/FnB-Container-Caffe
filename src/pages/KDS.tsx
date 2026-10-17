@@ -83,7 +83,7 @@ export default function KDSPage() {
       .map((o): Ticket => {
         const elapsedSeconds = calcElapsedSeconds(o.createdAt);
         const status: TicketStatus =
-          o.status === 'pending' &&
+          (o.status === 'pending' || o.status === 'preparing') &&
           elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60
             ? 'overdue'
             : (o.status as TicketStatus);

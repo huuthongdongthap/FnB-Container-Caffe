@@ -28,7 +28,8 @@ const STATION_KEYWORDS: Record<Exclude<KitchenStation, 'all'>, string[]> = {
 
 function deriveStation(order: KitchenOrder): KitchenStation {
   if (order.station && order.station !== 'all') return order.station;
-  const firstItemName = order.items[0]?.name?.toLowerCase() ?? '';
+  const firstItem = order.items[0] as (KitchenOrder['items'][number] & { product_name?: string }) | undefined;
+  const firstItemName = (firstItem?.name || firstItem?.product_name || '').toLowerCase();
   for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
     if (keywords.some((kw) => firstItemName.includes(kw))) return station as KitchenStation;
   }

@@ -28,6 +28,31 @@ interface AdminStaffState {
   registerStaff: (data: RegisterStaffPayload) => Promise<void>;
 }
 
+function normalizeStaffMember(raw: Record<string, unknown>): StaffMember {
+  if (typeof raw.isActive === 'boolean' && typeof raw.startedAt === 'string') {
+    return raw as unknown as StaffMember;
+  }
+  const isActive =
+    typeof raw.isActive === 'boolean'
+      ? raw.isActive
+      : raw.active !== undefined
+        ? Boolean(raw.active)
+        : raw.is_active !== undefined
+          ? Boolean(raw.is_active)
+          : true;
+  const startedAt = String(raw.startedAt ?? raw.created_at ?? raw.hire_date ?? raw.createdAt ?? '');
+  return {
+    ...(raw as unknown as StaffMember),
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    role: String(raw.position ?? raw.role ?? 'staff'),
+    phone: String(raw.phone ?? ''),
+    email: String(raw.email ?? ''),
+    isActive,
+    startedAt,
+  };
+}
+
 export const useAdminStaffStore = create<AdminStaffState>((set, get) => ({
   staff: [],
   loading: false,
@@ -37,8 +62,11 @@ export const useAdminStaffStore = create<AdminStaffState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<any>('/api/auth/staff');
+      const rawList: Array<Record<string, unknown>> = Array.isArray(body)
+        ? body
+        : body?.staff || body?.users || body?.data?.staff || [];
       set({
-        staff: Array.isArray(body) ? body : body.staff || [],
+        staff: rawList.map(normalizeStaffMember),
         loading: false,
         error: null,
       });

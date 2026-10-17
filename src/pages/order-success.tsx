@@ -58,11 +58,12 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     cashback_earned?: number;
   } | null>(null);
 
-  // Load cached pending order from localStorage and clean up state
+  // Load cached pending order from localStorage/sessionStorage and clean up state
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('pendingOrder');
+      const raw = localStorage.getItem('pendingOrder') || sessionStorage.getItem('aura_last_order');
       if (raw) {
+        sessionStorage.setItem('aura_last_order', raw);
         const parsed = JSON.parse(raw) as Record<string, unknown>;
         setPendingOrder({
           id: String(parsed.id ?? ''),
@@ -78,6 +79,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     } finally {
       localStorage.removeItem('pendingOrder');
       localStorage.removeItem('aura_active_booking');
+      localStorage.removeItem('aura_checkout_form');
     }
     // Ensure cart is cleared after completed order checkout
     useCartStore.getState().clearCart();

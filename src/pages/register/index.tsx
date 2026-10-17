@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 
 interface Props {
   onRegistered?: () => void;
@@ -25,25 +26,22 @@ const RegisterPage: React.FC<Props> = () => {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      await apiFetch<{ success: boolean; data?: unknown }>('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, phone })
+        body: JSON.stringify({ email, password, name, phone }),
       });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || data.error || 'Đăng ký thất bại');
-        return;
-      }
 
       setSuccess('Đăng ký thành công! Vui lòng kiểm tra email để xác thực.');
       setEmail('');
       setPassword('');
       setName('');
       setPhone('');
-    } catch {
-      setError('Lỗi kết nối');
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        setError(err.message);
+      } else {
+        setError('Lỗi kết nối');
+      }
     } finally {
       setLoading(false);
     }

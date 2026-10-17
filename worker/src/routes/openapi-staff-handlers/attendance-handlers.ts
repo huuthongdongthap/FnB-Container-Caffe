@@ -147,7 +147,17 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      date: 'sa.date',
+      check_in: 'sa.check_in',
+      checkIn: 'sa.check_in',
+      created_at: 'sa.created_at',
+      createdAt: 'sa.created_at',
+      status: 'sa.status',
+    };
+    const sortCol = allowedSorts[sort] || 'sa.date';
+    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = (await db.prepare(
       `SELECT sa.*, u.name as staff_name, ss.start_time as scheduled_start, ss.end_time as scheduled_end
        FROM staff_attendance sa

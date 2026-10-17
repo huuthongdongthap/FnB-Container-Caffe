@@ -242,12 +242,16 @@ export const PaymentRoutes = {
     path: '/api/payments/payment-request',
     summary: 'Process Apple Pay / Google Pay payment token',
     tags: ['Payments'],
+    security: [{ BearerAuth: [] }],
     request: { body: { content: { 'application/json': { schema: WebPaymentRequestSchema } } } },
     responses: {
       200: { description: 'Payment processed successfully', content: { 'application/json': { schema: SuccessResponseSchema(WebPaymentResponseSchema) } } },
       400: { description: 'Validation or payment error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      401: { description: 'Authentication required', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      403: { description: 'Forbidden — order does not belong to user', content: { 'application/json': { schema: ErrorResponseSchema } } },
       404: { description: 'Order not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       409: { description: 'Order already paid', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      422: { description: 'Payment token verification failed (fail-closed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   webhook: {

@@ -40,7 +40,17 @@ export function registerShiftHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      date: 'ss.date',
+      start_time: 'ss.start_time',
+      startTime: 'ss.start_time',
+      created_at: 'ss.created_at',
+      createdAt: 'ss.created_at',
+      status: 'ss.status',
+    };
+    const sortCol = allowedSorts[sort] || 'ss.date';
+    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = (await db.prepare(
       `SELECT ss.*, u.name as staff_name, z.name as zone_name
        FROM staff_shifts ss

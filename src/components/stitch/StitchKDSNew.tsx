@@ -120,7 +120,7 @@ export function StitchKDSNew({
       />
 
       <main
-        className="ml-64 h-screen overflow-y-auto px-8 pb-8 pt-24"
+        className="ml-0 md:ml-64 h-screen overflow-y-auto px-4 md:px-8 pb-8 pt-24"
         aria-label={t('kds.mainContent', 'Main order grid')}
       >
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/10 pb-4">

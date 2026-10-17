@@ -35,8 +35,8 @@ export function useDevices() {
 
   async function fetchStaff(): Promise<void> {
     try {
-      const body = await apiFetch<{ staff?: StaffOption[] }>('/api/auth/staff');
-      setStaffList(body.staff || []);
+      const body = await apiFetch<{ staff?: StaffOption[]; users?: StaffOption[] }>('/api/auth/staff');
+      setStaffList(body.staff || body.users || []);
     } catch { /* non-critical */ }
   }
 
@@ -67,10 +67,12 @@ export function useDevices() {
   const handleRegister = async (): Promise<void> => {
     if (!regStaffId || !regPin) { setRegisterError('Vui lòng chọn nhân viên và nhập PIN'); return; }
     setActionLoading(true); setRegisterError(null);
+    const effectiveToken = regDeviceToken.trim() || `dev-${crypto.randomUUID().slice(0, 12)}`;
+    const effectiveRole = regRole === 'kitchen' ? 'staff' : regRole;
     try {
       await apiFetch('/mobile/devices/register', {
         method: 'POST',
-        body: JSON.stringify({ device_token: regDeviceToken || undefined, device_name: regDeviceName || undefined, staff_id: regStaffId, role: regRole, pin: regPin }),
+        body: JSON.stringify({ device_token: effectiveToken, device_name: regDeviceName || undefined, staff_id: regStaffId, role: effectiveRole, pin: regPin }),
       });
       setShowRegister(false);
       refresh();

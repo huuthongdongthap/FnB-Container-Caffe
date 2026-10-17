@@ -15,9 +15,12 @@ export function injectBrandTheme(): void {
     })();
   metaDesc.content = brandConfig.seo.description;
 
-  // Set CSS custom properties on :root
+  // Set CSS custom properties on :root (preserve Quicksand priority for display font)
   const root = document.documentElement;
-  root.style.setProperty('--aura-font-display', brandConfig.theme.fonts.display);
+  const displayFont = brandConfig.theme.fonts.display.includes('Quicksand')
+    ? brandConfig.theme.fonts.display
+    : `'Quicksand', ${brandConfig.theme.fonts.display}`;
+  root.style.setProperty('--aura-font-display', displayFont);
   root.style.setProperty('--aura-font-body', brandConfig.theme.fonts.body);
   root.style.setProperty('--aura-font-mono', brandConfig.theme.fonts.mono);
 }

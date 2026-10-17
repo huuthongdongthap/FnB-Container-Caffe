@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route } from 'react-router-dom';
+import { Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AdminShell from '@/components/stitch/AdminShell';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
@@ -71,6 +71,14 @@ export const adminRoutes = [
       <Route path="/admin/dindin/checkout" element={guarded(<AdminDinDinCheckoutPage />)} />
       <Route path="/admin/dindin/success" element={guarded(<AdminDinDinOrderSuccessPage />)} />
       <Route path="/admin/devices" element={guarded(<AdminDevicesPage />)} />
+      {/* Short route aliases */}
+      <Route path="/admin/menu" element={<Navigate to="/admin/manage-menu" replace />} />
+      <Route path="/admin/tables" element={<Navigate to="/admin/table-management" replace />} />
+      <Route path="/admin/analytics" element={<Navigate to="/admin/metrics" replace />} />
+      <Route path="/admin/finance" element={<Navigate to="/admin/sales-reports" replace />} />
+      <Route path="/admin/marketing" element={<Navigate to="/admin/campaigns" replace />} />
+      <Route path="/admin/qr" element={<Navigate to="/admin/generate-qr" replace />} />
+      <Route path="/admin/settings" element={<Navigate to="/admin/notification-settings" replace />} />
     </Route>
   </Route>,
 ];

@@ -26,7 +26,7 @@ import { posCustomerRouter } from './pos-customer';
 import { promotionsRouter } from './promotions';
 import { signageRouter } from './signage';
 import { pretixRouter } from './pretix';
-import { shiftsRouter } from '@aura/domain-shift';
+import { shiftsRouter, reconciliationRoutes } from '@aura/domain-shift';
 import { getInvoiceReceipt } from './subscription-receipt';
 import { campaignsRouter } from './campaigns';
 import { broadcastRouter } from './broadcast';
@@ -35,6 +35,7 @@ import { analyticsRouter } from './analytics-hono';
 import { registerVitalsRoute } from './vitals';
 import { reviewsRouter } from './reviews';
 import { contactRouter } from './contact';
+import { recruitmentRouter } from './recruitment';
 import { calBookingWebhookRouter } from './cal-booking-webhook';
 import { loyaltyRouter } from './loyalty';
 import { referralRouter } from './referrals';
@@ -66,13 +67,51 @@ import { handleOverview } from './reports-handlers/grouped-sales-handlers';
 import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
-  // Admin Protected
-  app.use('/api/admin/*', requireAuth(['owner', 'staff']));
+  // Admin Protected (Kitchen/Barista/Chef scoped strictly to /api/admin/orders*)
+  const adminOrderAuth = requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']);
+  const adminGeneralAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
+  app.use('/api/admin/*', async (c, next) => {
+    if (c.req.path === '/api/admin/orders' || c.req.path.startsWith('/api/admin/orders/')) {
+      return adminOrderAuth(c, next);
+    }
+    return adminGeneralAuth(c, next);
+  });
   app.get('/api/admin/orders', (c) => {
     const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
     const isHQ = user?.role === 'owner' && (!user?.tenantId || user?.tenantId === 'default' || user?.tenantId === 'hq');
     const effectiveTenant = isHQ ? (c.req.query('tenant_id') || undefined) : user?.tenantId;
     return getAdminOrders(c.req.raw, c.env, effectiveTenant);
+  });
+  app.patch('/api/admin/orders/:id/status', async (c) => {
+    const orderId = c.req.param('id');
+    const body = (await c.req.json().catch(() => ({}))) as { status?: string };
+    const status = String(body.status || '').trim();
+    const validStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivering', 'delivered', 'completed', 'cancelled']);
+    if (!orderId || !status || !validStatuses.has(status)) {
+      return c.json({ success: false, error: 'valid order id and status are required' }, 400);
+    }
+    const now = new Date().toISOString();
+    await c.env.AURA_DB
+      .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
+      .bind(status, now, orderId)
+      .run();
+    await c.env.AUTH_KV?.put('latest_order_ts', now, { expirationTtl: 86400 }).catch(() => {});
+    await c.env.AUTH_KV?.put('orders:latest_updated_at', now, { expirationTtl: 86400 }).catch(() => {});
+    return c.json({ success: true, id: orderId, status, updated_at: now });
+  });
+  app.post('/api/admin/orders/:id/complete', async (c) => {
+    const orderId = c.req.param('id');
+    if (!orderId) {
+      return c.json({ success: false, error: 'order id is required' }, 400);
+    }
+    const now = new Date().toISOString();
+    await c.env.AURA_DB
+      .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
+      .bind('completed', now, orderId)
+      .run();
+    await c.env.AUTH_KV?.put('latest_order_ts', now, { expirationTtl: 86400 }).catch(() => {});
+    await c.env.AUTH_KV?.put('orders:latest_updated_at', now, { expirationTtl: 86400 }).catch(() => {});
+    return c.json({ success: true, id: orderId, status: 'completed', updated_at: now });
   });
   app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
   app.get('/api/admin/payments/stuck', requireAuth(['owner']), (c) => getStuckPayments(c.req.raw, c.env));
@@ -83,9 +122,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   registerCronAdminRoutes(app);
 
   // Stats & Dashboard Overview
-  app.use('/api/stats', requireAuth(['owner', 'staff']));
+  app.use('/api/stats', requireAuth(['owner', 'manager', 'staff']));
   app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
-  app.use('/api/dashboard/*', requireAuth(['owner', 'staff']));
+  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'staff']));
   app.get('/api/dashboard/overview', handleOverview);
 
   // Payment & Refunds
@@ -105,6 +144,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/kitchen-stations', kitchenStationsRouter);
   app.route('/api/floor-plan', floorPlanRouter);
   app.route('/api/client-error', clientErrorsRouter);
+  app.route('/api/errors', clientErrorsRouter);
   app.route('/api/staff-tips', staffTipsRouter);
   app.route('/api/qr', qrRouter);
   app.route('/api/admin/qr', adminQRRouter);
@@ -118,37 +158,77 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/promotions', promotionsRouter);
   app.route('/api/signage', signageRouter);
   app.route('/api/pretix', pretixRouter);
+  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'staff']));
+  reconciliationRoutes(app as any);
   app.route('/api/shifts', shiftsRouter);
   app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'customer']), (c) => getInvoiceReceipt(c));
   app.route('/api/campaigns', campaignsRouter);
-  app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
+  app.use('/api/broadcast/*', requireAuth(['owner', 'manager', 'staff']));
   app.route('/api/broadcast', broadcastRouter);
   app.route('/api/chat', chatRouter);
 
   // Analytics & Observability
-  app.use('/api/analytics/*', requireAuth(['owner', 'staff']));
+  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'staff']));
   app.route('/api/analytics', analyticsRouter);
   registerVitalsRoute(app);
 
   // External Service Proxies & Webhooks
   app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));
-  app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env));
-  app.all('/api/webhooks/cal-booking/*', (c) => calBookingWebhookRouter.fetch(new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), c.req.raw), c.env, c.executionCtx));
+  app.all('/api/contact', (c) => contactRouter.fetch(c.req.raw, c.env));
+  app.all('/api/contact/*', (c) => contactRouter.fetch(c.req.raw, c.env));
+  app.route('/api/recruitment', recruitmentRouter);
+  app.route('/api/webhooks/cal-booking', calBookingWebhookRouter);
+  app.route('/api/cal-booking-webhook', calBookingWebhookRouter);
   app.post('/api/webhooks/nowpayments', (c) => nowPaymentsIPN(c.req.raw, c.env));
-  app.post('/api/webhooks/cal-booking', (c) => calBookingWebhookRouter.fetch(new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), { method: c.req.raw.method, headers: c.req.raw.headers, body: c.req.raw.body }), c.env, c.executionCtx));
 
   // Loyalty & Reports
   app.route('/api/loyalty/referral', referralRouter);
   app.route('/api/loyalty/birthday', birthdayRouter);
+  app.route('/api/admin/birthday', birthdayRouter);
   app.route('/api/loyalty/checkin', checkinRouter);
+  app.route('/api/checkin', checkinRouter);
+  app.route('/api/admin/checkins', checkinRouter);
   app.route('/api/loyalty', loyaltyRouter);
   app.route('/api/admin/loyalty', adminLoyaltyRouter);
-  app.use('/api/reports/*', requireAuth(['owner', 'staff']));
+  app.route('/api/admin-loyalty', adminLoyaltyRouter);
+  app.get('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+    const raw = await c.env.AUTH_KV?.get('config:notification_settings');
+    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    return c.json({
+      autoNotifyNewOrder: Boolean(parsed.autoNotifyNewOrder),
+      soundAlerts: Boolean(parsed.soundAlerts),
+    });
+  });
+  app.patch('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const raw = await c.env.AUTH_KV?.get('config:notification_settings');
+    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const next = {
+      autoNotifyNewOrder: typeof body.autoNotifyNewOrder === 'boolean' ? body.autoNotifyNewOrder : Boolean(prev.autoNotifyNewOrder),
+      soundAlerts: typeof body.soundAlerts === 'boolean' ? body.soundAlerts : Boolean(prev.soundAlerts),
+    };
+    await c.env.AUTH_KV?.put('config:notification_settings', JSON.stringify(next));
+    return c.json({ success: true, ...next });
+  });
+  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'admin', 'staff']), async (c) => {
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const user = (c as unknown as { get: (k: string) => { id?: string } | undefined }).get('user');
+    const key = `config:staff_notification_settings:${user?.id || 'default'}`;
+    const raw = await c.env.AUTH_KV?.get(key);
+    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const next = {
+      orderAlertsEnabled: typeof body.orderAlertsEnabled === 'boolean' ? body.orderAlertsEnabled : Boolean(prev.orderAlertsEnabled ?? true),
+      shiftRemindersEnabled: typeof body.shiftRemindersEnabled === 'boolean' ? body.shiftRemindersEnabled : Boolean(prev.shiftRemindersEnabled ?? true),
+    };
+    await c.env.AUTH_KV?.put(key, JSON.stringify(next));
+    return c.json({ success: true, ...next });
+  });
+  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'staff']));
   app.route('/api/reports', reportsRouter);
 
   // Inventory Items (domain-inventory)
   const inventoryItemsApp = new Hono<{ Bindings: Env }>();
-  inventoryItemsApp.use('/*', requireAuth(['owner', 'staff', 'customer']));
+  inventoryItemsApp.use('/*', requireAuth(['owner', 'manager', 'staff']));
   inventoryCRUD(inventoryItemsApp as any);
   inventoryTransactions(inventoryItemsApp as any);
   inventorySnapshots(inventoryItemsApp as any);
@@ -156,9 +236,11 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
 
   // Health & System
   app.get('/api/health', async (c) => {
-    const checkDb = c.req.query('db') === '1';
-    const result = await getHealth(c.env, checkDb);
-    return c.json(result, (result.status === 'degraded' ? 503 : 200) as 200 | 503);
+    const checkDeps = c.req.query('db') === '1' || c.req.query('ready') === '1' || c.req.query('deep') === '1';
+    const result = await getHealth(c.env, checkDeps);
+    const isHealthy = result.status === 'ok' && (!checkDeps || result.readiness);
+    const httpStatus = isHealthy ? 200 : 503;
+    return c.json(result, httpStatus as 200 | 503);
   });
   app.get('/api/version', (c) => c.json(getVersion(c.env)));
 

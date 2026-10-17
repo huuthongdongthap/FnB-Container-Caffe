@@ -3,7 +3,10 @@ import { guestCheckinSchema, zodErrorResponse } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../../middleware/rate-limit';
+import { createLogger } from '../../middleware/logger';
 import { makeOrderId } from './types';
+
+const log = createLogger({ route: 'guest-orders' });
 
 export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
@@ -97,6 +100,17 @@ export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Items required' }, 400);
     }
 
+    for (const item of body.items) {
+      const qty = Number(item?.qty ?? 1);
+      const price = Number(item?.price ?? 0);
+      if (!Number.isFinite(qty) || qty <= 0 || qty > 100) {
+        return c.json({ success: false, error: 'Invalid item quantity' }, 400);
+      }
+      if (!Number.isFinite(price) || price < 0) {
+        return c.json({ success: false, error: 'Invalid item price' }, 400);
+      }
+    }
+
     const fulfillment = (body.fulfillment_type || 'DINE_IN').toUpperCase();
     if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(fulfillment)) {
       return c.json({ success: false, error: 'Invalid fulfillment_type' }, 400);
@@ -145,11 +159,12 @@ export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
 
     return c.json({ success: true, order_id: orderId, total, fulfillment_type: fulfillment }, 201);
   } catch (err) {
-    return c.json({ success: false, error: (err as Error).message }, 500);
+    log.error('Guest checkout error:', { message: (err as Error).message });
+    return c.json({ success: false, error: 'Failed to create guest order' }, 500);
   }
 }
 
 export function registerGuestHandlers(app: Hono<{ Bindings: Env }>) {
   app.post('/guest-checkin', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckin);
-  app.post('/guest-checkout', handleGuestCheckout);
+  app.post('/guest-checkout', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckout);
 }

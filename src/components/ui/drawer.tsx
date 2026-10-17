@@ -15,9 +15,18 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleKeyDown);
+      };
     }
-  }, [open]);
+  }, [open, onClose]);
 
   return (
     <>
@@ -33,7 +42,7 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 z-50 w-80 max-w-[90vw] border-[var(--aura-border-subtle)] bg-[var(--aura-bg-elevated)] shadow-[var(--aura-shadow-lg)] transition-transform duration-300',
+          'fixed inset-y-0 z-50 w-80 max-w-[90vw] border-[var(--aura-border-subtle)] bg-[var(--aura-bg-elevated,#162F4D)] shadow-[var(--aura-shadow-lg)] transition-transform duration-300',
           side === 'right' ? 'right-0 border-l' : 'left-0 border-r',
           side === 'right'
             ? (open ? 'translate-x-0' : 'translate-x-full')
@@ -42,6 +51,8 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
         )}
         role="dialog"
         aria-modal="true"
+        aria-hidden={!open}
+        inert={!open || undefined}
         aria-label={title || 'Drawer'}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">

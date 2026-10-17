@@ -221,4 +221,32 @@ describe('MoMo webhook smoke', () => {
     const body = await res.json();
     expect(body.error).toBe(0);
   });
+
+  // ─── [4] Fail closed: missing MOMO_SECRET_KEY → 500 ─────────────────────
+  it('fails closed with 500 when MOMO_SECRET_KEY is not configured', async() => {
+    const { Hono } = await import('hono');
+    const { momoWebhook } = await import('../../routes/webhooks/momo.js');
+
+    const app = new Hono();
+    momoWebhook(app);
+
+    const payload = await buildPayload();
+    const req = new Request('https://test.aura/momo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const res = await app.fetch(req, {
+      ...createMockEnv(),
+      AURA_DB: mockDB() as unknown as D1Database,
+      MOMO_SECRET_KEY: undefined,
+      MOMO_ACCESS_KEY: 'MOMO_KEY',
+    } as never);
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: number; message: string };
+    expect(body.error).toBe(-1);
+    expect(body.message).toBe('Server configuration error');
+  });
 });

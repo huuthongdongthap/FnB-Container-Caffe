@@ -375,7 +375,8 @@ describe('createOrder', () => {
     expect(res.status).toBe(500);
     const data: Record<string, unknown> = await res.json();
     expect(data.success).toBe(false);
-    expect((data.error as string).includes('Simulated DB failure')).toBe(true);
+    expect(data.error).toBe('Failed to create order');
+    expect((data.error as string).includes('Simulated DB failure')).toBe(false);
   });
 
   // Test 9: Items preserve fields (qty, price, name)
@@ -444,6 +445,58 @@ describe('createOrder', () => {
     const order = data.data as Record<string, unknown>;
     expect(order.shipping_fee).toBe(5000);
     expect(order.discount).toBe(2000);
+  });
+
+  // Test 13: Mobile composite cart ID (e.g. bt001-Size Tiêu Chuẩn (M)_...) resolves base product bt001 in D1
+  it('resolves composite mobile cart item ID to base product ID in D1', async() => {
+    const db = createMockDB();
+    db.prepare = ((_sql: string) => {
+      const stmt: Record<string, unknown> = {
+        _sql,
+        _binds: [] as unknown[],
+        bind(this: typeof stmt, ...args: unknown[]) {
+          this._binds = args;
+          return this;
+        },
+        async first<T = unknown>() {
+          const sql = stmt._sql as string;
+          const arg0 = stmt._binds[0];
+          if (sql.includes('FROM products WHERE id = ?') && arg0 === 'bt001') {
+            return { id: 'bt001', name: 'Nước suối', price: 10000, available: 1 } as T;
+          }
+          return null as T;
+        },
+        async run() {
+          return { success: true, changes: 1, lastRowId: 1 } as unknown;
+        },
+        all: async() => ({ results: [], success: true } as never),
+        raw: async() => []
+      };
+      return stmt as never;
+    }) as typeof db.prepare;
+
+    const env = createMockEnv({ AURA_DB: db });
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(makeBody({
+        items: [{
+          id: 'bt001-Size Tiêu Chuẩn (M)_100% đường (chuẩn)_Đá đầy đủ (chuẩn)',
+          name: 'Nước suối',
+          quantity: 1,
+          price: 10000,
+        } as unknown as OrderBase['items'][0]],
+        total: 25000,
+        shipping_fee: 15000,
+      }))
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(201);
+    const data: Record<string, unknown> = await res.json();
+    const order = data.data as Record<string, unknown>;
+    expect(order.total).toBe(25000);
+    const items = order.items as Array<Record<string, unknown>>;
+    expect(items[0].menuItemId).toBe('bt001');
   });
 });
 

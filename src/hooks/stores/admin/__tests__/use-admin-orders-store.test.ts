@@ -44,6 +44,38 @@ describe('useAdminOrdersStore', () => {
     expect(s.error).toBeNull();
   });
 
+  it('fetchOrders(): normalizes D1 snake_case orders and pagination.total from /api/admin/orders', async () => {
+    mockSuccess({
+      success: true,
+      orders: [
+        {
+          id: 'ORD-D1-1',
+          customer_name: 'Le Van C',
+          items: [{ name: 'Latte', quantity: 2 }, { name: 'Croissant', quantity: 1 }],
+          total: 145000,
+          status: 'preparing',
+          payment_method: 'payos',
+          created_at: '2026-10-14T10:00:00Z',
+        },
+      ],
+      pagination: { total: 17, limit: 50, offset: 0 },
+    });
+
+    await useAdminOrdersStore.getState().fetchOrders();
+
+    const s = useAdminOrdersStore.getState();
+    expect(s.totalCount).toBe(17);
+    expect(s.orders[0]).toMatchObject({
+      id: 'ORD-D1-1',
+      customer: 'Le Van C',
+      items: 3,
+      total: 145000,
+      status: 'preparing',
+      payment: 'payos',
+      createdAt: '2026-10-14T10:00:00Z',
+    });
+  });
+
   it('fetchOrders(): sets error on failure', async () => {
     mockError('Không thể tải danh sách đơn hàng');
 

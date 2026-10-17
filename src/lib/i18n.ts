@@ -11,8 +11,23 @@ function buildNamespaces(data: Record<string, unknown>) {
   const namespaces: Record<string, Record<string, unknown>> = {};
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Nested object → promote to top-level namespace
-      namespaces[key] = value as Record<string, unknown>;
+      // Nested object → merge into namespace to preserve flat entries
+      namespaces[key] = {
+        ...(namespaces[key] || {}),
+        ...(value as Record<string, unknown>),
+      };
+      // Promote known admin sub-objects (e.g. dindin, tableManagement) to namespaces
+      if (key === 'admin') {
+        const adminObj = value as Record<string, unknown>;
+        for (const [subKey, subVal] of Object.entries(adminObj)) {
+          if (typeof subVal === 'object' && subVal !== null && !Array.isArray(subVal)) {
+            namespaces[subKey] = {
+              ...(namespaces[subKey] || {}),
+              ...(subVal as Record<string, unknown>),
+            };
+          }
+        }
+      }
     } else if (typeof value === 'string') {
       // Flat key with dot → extract as namespace entry
       const dot = key.indexOf('.');

@@ -36,6 +36,72 @@ export type {
   OrderType,
 } from './StitchCheckoutNew-types';
 
+function getInitialCheckoutForm(): {
+  form: CheckoutNewFormData;
+  booking: { fullName?: string; phone?: string; tableNumber?: string; zone?: string; time?: string } | null;
+} {
+  const defaultForm: CheckoutNewFormData = {
+    fullName: '',
+    phone: '',
+    address: '',
+    notes: '',
+    paymentMethod: 'payos',
+    orderType: 'delivery',
+    tableNumber: '',
+  };
+
+  if (typeof window === 'undefined') {
+    return { form: defaultForm, booking: null };
+  }
+
+  try {
+    let booking: { fullName?: string; phone?: string; tableNumber?: string; zone?: string; time?: string } | null = null;
+    const activeBookingRaw = localStorage.getItem('aura_active_booking');
+    if (activeBookingRaw) {
+      booking = JSON.parse(activeBookingRaw);
+    }
+
+    const savedFormRaw = localStorage.getItem('aura_checkout_form');
+    const savedForm = savedFormRaw ? JSON.parse(savedFormRaw) : null;
+
+    const savedProfileRaw = localStorage.getItem('aura_saved_customer');
+    const savedProfile = savedProfileRaw ? JSON.parse(savedProfileRaw) : null;
+
+    const params = new URLSearchParams(window.location.search);
+    const urlTable = params.get('table');
+
+    const merged: CheckoutNewFormData = {
+      ...defaultForm,
+      ...(savedProfile ? {
+        fullName: savedProfile.fullName || '',
+        phone: savedProfile.phone || '',
+        address: savedProfile.address || '',
+      } : {}),
+      ...(savedForm ? savedForm : {}),
+    };
+
+    if (booking) {
+      const table = booking.tableNumber || '';
+      merged.orderType = 'dine_in';
+      if (booking.fullName) merged.fullName = booking.fullName;
+      if (booking.phone) merged.phone = booking.phone;
+      if (table) merged.tableNumber = table;
+      if (!merged.notes && booking.zone) {
+        merged.notes = `[Đặt trước bàn: ${table} - ${booking.zone}]`;
+      }
+    }
+
+    if (urlTable) {
+      merged.orderType = 'dine_in';
+      merged.tableNumber = urlTable;
+    }
+
+    return { form: merged, booking };
+  } catch {
+    return { form: defaultForm, booking: null };
+  }
+}
+
 export function StitchCheckoutNew({
   summary,
   isLoading = false,
@@ -48,24 +114,11 @@ export function StitchCheckoutNew({
   onClearCart,
 }: Readonly<StitchCheckoutNewProps>) {
   const { t } = useTranslation();
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
-  const [orderType, setOrderType] = useState<OrderType>('delivery');
-  const [form, setForm] = useState<CheckoutNewFormData>({
-    fullName: '',
-    phone: '',
-    address: '',
-    notes: '',
-    paymentMethod: 'payos',
-    orderType: 'delivery',
-    tableNumber: '',
-  });
-  const [activeBooking, setActiveBooking] = useState<{
-    fullName?: string;
-    phone?: string;
-    tableNumber?: string;
-    zone?: string;
-    time?: string;
-  } | null>(null);
+  const [initialState] = useState(() => getInitialCheckoutForm());
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(initialState.form.paymentMethod || 'payos');
+  const [orderType, setOrderType] = useState<OrderType>(initialState.form.orderType || 'delivery');
+  const [form, setForm] = useState<CheckoutNewFormData>(initialState.form);
+  const [activeBooking, setActiveBooking] = useState(initialState.booking);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
@@ -100,51 +153,29 @@ export function StitchCheckoutNew({
     };
   }, [form.phone, lookupLoyalty]);
 
+  // Keep localStorage updated on every form change to prevent loss on navigation
   useEffect(() => {
-    // Auto-populate from active booking or saved customer profile
     try {
-      const activeBookingRaw = localStorage.getItem('aura_active_booking');
-      if (activeBookingRaw) {
-        const booking = JSON.parse(activeBookingRaw) as {
-          fullName?: string;
-          phone?: string;
-          tableNumber?: string;
-          zone?: string;
-        };
-        setActiveBooking(booking);
-        const table = booking.tableNumber || '';
-        setOrderType('dine_in');
-        setForm((prev) => ({
-          ...prev,
-          orderType: 'dine_in',
-          fullName: prev.fullName || booking.fullName || '',
-          phone: prev.phone || booking.phone || '',
-          tableNumber: prev.tableNumber || table || '',
-          notes: prev.notes || (booking.zone ? `[Đặt trước bàn: ${table} - ${booking.zone}]` : ''),
-        }));
-        return;
-      }
-
-      // Fallback: check saved customer profile or table param in URL
-      const savedProfileRaw = localStorage.getItem('aura_saved_customer');
-      const params = new URLSearchParams(window.location.search);
-      const urlTable = params.get('table');
-
-      if (savedProfileRaw || urlTable) {
-        const profile = savedProfileRaw ? JSON.parse(savedProfileRaw) : {};
-        if (urlTable) setOrderType('dine_in');
-        setForm((prev) => ({
-          ...prev,
-          orderType: urlTable ? 'dine_in' : prev.orderType,
-          fullName: prev.fullName || profile.fullName || '',
-          phone: prev.phone || profile.phone || '',
-          tableNumber: prev.tableNumber || urlTable || '',
-        }));
+      const payloadToSave: CheckoutNewFormData = {
+        ...form,
+        paymentMethod,
+        orderType,
+      };
+      localStorage.setItem('aura_checkout_form', JSON.stringify(payloadToSave));
+      if (form.fullName || form.phone || form.address) {
+        localStorage.setItem(
+          'aura_saved_customer',
+          JSON.stringify({
+            fullName: form.fullName,
+            phone: form.phone,
+            address: form.address,
+          })
+        );
       }
     } catch {
-      /* ignore parse error */
+      /* ignore storage quota */
     }
-  }, []);
+  }, [form, paymentMethod, orderType]);
 
   useEffect(() => {
     return () => {

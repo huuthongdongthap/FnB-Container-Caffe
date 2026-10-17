@@ -7,8 +7,8 @@ import { executeKdsStatusTransition } from './kds-status-transition';
 const log = createLogger({ route: 'kds-mobile' });
 
 // Allowed roles per action
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
 
 // GET /mobile/kds/orders — list active kitchen orders
 export async function getKdsMobile(
@@ -48,7 +48,7 @@ export async function getKdsMobile(
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('getKdsMobile error:', { message: errMsg });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể tải danh sách đơn bếp', 500);
   }
 }
 
@@ -104,6 +104,6 @@ export async function updateKdsStatus(
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('updateKdsStatus error:', { message: errMsg });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể cập nhật trạng thái đơn bếp', 500);
   }
 }

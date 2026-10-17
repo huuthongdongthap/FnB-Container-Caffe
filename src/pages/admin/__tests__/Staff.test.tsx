@@ -17,8 +17,13 @@ vi.mock('@/hooks/stores/admin/use-admin-shifts-store', () => ({
   useAdminShiftsStore: vi.fn(),
 }));
 
+vi.mock('@/hooks/stores/admin/use-admin-recruitment-store', () => ({
+  useAdminRecruitmentStore: vi.fn(),
+}));
+
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { useAdminShiftsStore } from '@/hooks/stores/admin/use-admin-shifts-store';
+import { useAdminRecruitmentStore } from '@/hooks/stores/admin/use-admin-recruitment-store';
 import StaffPage from '@/pages/admin/Staff';
 
 const MOCK_STAFF = [
@@ -46,6 +51,16 @@ function setupStores(overrides: { staff?: any[]; staffLoading?: boolean; staffEr
     clockOut: vi.fn(),
     reset: vi.fn(),
   } as any);
+
+  vi.mocked(useAdminRecruitmentStore).mockReturnValue({
+    applications: [],
+    loading: false,
+    error: null,
+    fetchApplications: vi.fn(),
+    updateStatus: vi.fn(),
+    deleteApplication: vi.fn(),
+    addCandidate: vi.fn(),
+  } as any);
 }
 
 describe('StaffPage', () => {
@@ -72,6 +87,13 @@ describe('StaffPage', () => {
     const shiftsTab = screen.getByText('adminStaff.shifts');
     fireEvent.click(shiftsTab);
     expect(shiftsTab).toBeTruthy();
+  });
+
+  it('switches to recruitment tab on click', async () => {
+    renderWithProviders(<StaffPage />);
+    const recruitmentTab = screen.getByText('adminStaff.recruitment');
+    fireEvent.click(recruitmentTab);
+    expect(recruitmentTab).toBeTruthy();
   });
 
   it('shows add staff button', () => {

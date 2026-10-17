@@ -7,6 +7,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
+import { canAccessOrder } from '@aura/domain-order';
 
 export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments/payment-request — Apple Pay / Google Pay
@@ -20,6 +21,11 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
     };
 
     try {
+      const user = c.get('user') as { id?: string; role?: string } | undefined;
+      if (!user?.id) {
+        return c.json({ success: false, error: 'Authentication required' }, 401);
+      }
+
       const { order_id, payment_token, amount, currency } = body;
 
       if (!order_id || !payment_token || !amount || amount < 1000) {
@@ -32,11 +38,19 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
 
       // Fetch order
       const orderRow = (await db.prepare(
-        'SELECT id, total, payment_status FROM orders WHERE id = ?'
-      ).bind(order_id).first()) as { id: string; total: number; payment_status: string } | null;
+        'SELECT id, customer_id, total, payment_status FROM orders WHERE id = ?'
+      ).bind(order_id).first()) as { id: string; customer_id?: string | null; total: number; payment_status: string } | null;
 
       if (!orderRow) {
         return c.json({ success: false, error: 'Order not found' }, 404);
+      }
+
+      const isStaffOrOwner = user.role === 'owner' || user.role === 'manager' || user.role === 'staff';
+      if (
+        !canAccessOrder(user, orderRow).allowed ||
+        (!isStaffOrOwner && (!orderRow.customer_id || orderRow.customer_id !== user.id))
+      ) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
       }
 
       // Check if already paid
@@ -58,44 +72,43 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
         return c.json({ success: false, error: 'Invalid payment token structure' }, 400);
       }
 
-      // In production, verify the token with Apple/Google payment processors here.
-      // TODO: Implement actual merchant verification for Apple Pay / Google Pay
+      if (isApplePay) {
+        const paymentData = payment_token.paymentData as Record<string, unknown> | undefined;
+        if (
+          !paymentData ||
+          typeof paymentData.data !== 'string' ||
+          !paymentData.data.trim() ||
+          typeof paymentData.signature !== 'string' ||
+          !paymentData.signature.trim() ||
+          typeof payment_token.transactionIdentifier !== 'string' ||
+          !payment_token.transactionIdentifier.trim()
+        ) {
+          return c.json({ success: false, error: 'Invalid payment token structure' }, 400);
+        }
+      }
 
-      const paymentId = `wp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const now = new Date().toISOString();
+      if (isGooglePay) {
+        if (
+          typeof payment_token.signature !== 'string' ||
+          !payment_token.signature.trim() ||
+          typeof payment_token.signedMessage !== 'string' ||
+          !payment_token.signedMessage.trim()
+        ) {
+          return c.json({ success: false, error: 'Invalid payment token structure' }, 400);
+        }
+      }
 
-      // Record payment into canonical payments table
-      await db.prepare(`
-        INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'completed', ?, NULL, ?, ?)
-      `).bind(
-        paymentId,
-        order_id,
-        isApplePay ? 'apple_pay' : 'google_pay',
-        amount,
-        transactionId,
-        now,
-        now
-      ).run();
-
-      // Update order status
-      await db.prepare(`
-        UPDATE orders
-        SET payment_status = 'paid', updated_at = ?
-        WHERE id = ?
-      `).bind(now, order_id).run();
-
-      return c.json({
-        success: true,
-        data: {
-          transaction_id: transactionId,
-          status: 'succeeded',
-          payment_method: isApplePay ? 'apple_pay' : 'google_pay',
-          amount,
-          currency,
+      // Fail-closed: Apple Pay / Google Pay cryptographic merchant token verification
+      // and payment processor settlement are not configured. Never mark an order as paid
+      // or insert a completed payment record based solely on client-supplied token fields.
+      return c.json(
+        {
+          success: false,
+          error: 'Token verification failed: Apple Pay / Google Pay provider verification is not configured',
+          code: 'PAYMENT_VERIFICATION_UNAVAILABLE',
         },
-      });
+        422
+      );
     } catch (err) {
       console.error('Web payment processing error:', (err as Error).message);
       return c.json({ success: false, error: 'Internal error' }, 500);

@@ -58,6 +58,6 @@ export async function resetPassword(request: Request, env: Record<string, unknow
     });
   } catch (error) {
     log.error('ResetPassword error:', { message: (error as Error).message });
-    return errorResponse(`Reset mật khẩu thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Reset mật khẩu thất bại', 500);
   }
 }

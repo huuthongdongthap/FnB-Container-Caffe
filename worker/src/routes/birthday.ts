@@ -10,6 +10,47 @@ import type { Env } from '../types/env';
 
 export const birthdayRouter = new Hono<{ Bindings: Env }>();
 
+const DEFAULT_BIRTHDAY_CONFIG = {
+  discountPercent: 15,
+  freeItemEnabled: true,
+  earlyWindowDays: 3,
+  lateWindowDays: 3,
+  autoSendEnabled: true,
+};
+
+// GET /api/admin/birthday/config — fetch birthday campaign configuration
+birthdayRouter.get('/config', async (c) => {
+  try {
+    const raw = await c.env.AUTH_KV?.get('config:birthday');
+    const parsed = raw ? (JSON.parse(raw) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>) : {};
+    return c.json({
+      discountPercent: Number(parsed.discountPercent ?? DEFAULT_BIRTHDAY_CONFIG.discountPercent),
+      freeItemEnabled: typeof parsed.freeItemEnabled === 'boolean' ? parsed.freeItemEnabled : DEFAULT_BIRTHDAY_CONFIG.freeItemEnabled,
+      earlyWindowDays: Number(parsed.earlyWindowDays ?? DEFAULT_BIRTHDAY_CONFIG.earlyWindowDays),
+      lateWindowDays: Number(parsed.lateWindowDays ?? DEFAULT_BIRTHDAY_CONFIG.lateWindowDays),
+      autoSendEnabled: typeof parsed.autoSendEnabled === 'boolean' ? parsed.autoSendEnabled : DEFAULT_BIRTHDAY_CONFIG.autoSendEnabled,
+    });
+  } catch {
+    return c.json(DEFAULT_BIRTHDAY_CONFIG);
+  }
+});
+
+// PUT /api/admin/birthday/config — update birthday campaign configuration
+birthdayRouter.put('/config', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>;
+  const raw = await c.env.AUTH_KV?.get('config:birthday');
+  const prev = raw ? (JSON.parse(raw) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>) : {};
+  const next = {
+    discountPercent: typeof body.discountPercent === 'number' ? body.discountPercent : Number(prev.discountPercent ?? DEFAULT_BIRTHDAY_CONFIG.discountPercent),
+    freeItemEnabled: typeof body.freeItemEnabled === 'boolean' ? body.freeItemEnabled : Boolean(prev.freeItemEnabled ?? DEFAULT_BIRTHDAY_CONFIG.freeItemEnabled),
+    earlyWindowDays: typeof body.earlyWindowDays === 'number' ? body.earlyWindowDays : Number(prev.earlyWindowDays ?? DEFAULT_BIRTHDAY_CONFIG.earlyWindowDays),
+    lateWindowDays: typeof body.lateWindowDays === 'number' ? body.lateWindowDays : Number(prev.lateWindowDays ?? DEFAULT_BIRTHDAY_CONFIG.lateWindowDays),
+    autoSendEnabled: typeof body.autoSendEnabled === 'boolean' ? body.autoSendEnabled : Boolean(prev.autoSendEnabled ?? DEFAULT_BIRTHDAY_CONFIG.autoSendEnabled),
+  };
+  await c.env.AUTH_KV?.put('config:birthday', JSON.stringify(next));
+  return c.json(next);
+});
+
 // GET /api/birthday/check — check eligibility
 birthdayRouter.get('/check', async(c) => {
   const db = c.env.AURA_DB;

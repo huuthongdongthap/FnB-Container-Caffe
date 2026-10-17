@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StaffListTab } from './staff-list-tab';
 import { ShiftsTab } from './staff-shifts-tab';
+import { RecruitmentTab } from './staff-recruitment-tab';
 
-export type { StaffTab } from './staff-types';
+export type { StaffTab, RecruitmentApplication } from './staff-types';
 export { StaffListTab } from './staff-list-tab';
 export { ShiftsTab } from './staff-shifts-tab';
+export { RecruitmentTab } from './staff-recruitment-tab';
 export { formatTime, formatDate, formatHours } from './staff-utils';
 
 import type { StaffTab } from './staff-types';
@@ -40,9 +42,21 @@ export default function StaffPage() {
         >
           {t('adminStaff.shifts')}
         </button>
+        <button
+          onClick={() => setTab('recruitment')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            tab === 'recruitment'
+              ? 'bg-surface text-foreground border-b-2 border-primary'
+              : 'text-muted hover:text-foreground'
+          }`}
+        >
+          {t('adminStaff.recruitment', 'Tuyển dụng')}
+        </button>
       </div>
 
-      {tab === 'list' ? <StaffListTab /> : <ShiftsTab />}
+      {tab === 'list' && <StaffListTab />}
+      {tab === 'shifts' && <ShiftsTab />}
+      {tab === 'recruitment' && <RecruitmentTab />}
     </div>
   );
 }

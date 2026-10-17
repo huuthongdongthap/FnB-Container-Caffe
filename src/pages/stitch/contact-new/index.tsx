@@ -18,7 +18,7 @@ export default function ContactNew() {
     <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E]">
       <HelmetHead
         title="Liên Hệ &amp; Vị Trí — AURA CAFE"
-        description="Thông tin liên hệ, hotline, địa chỉ và bản đồ chỉ đường đến AURA CAFE tại 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp."
+        description="Thông tin liên hệ, hotline, địa chỉ và bản đồ chỉ đường đến AURA CAFE tại 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2)."
         canonical="/contact"
       />
       {/* Top Navigation */}
@@ -52,8 +52,8 @@ export default function ContactNew() {
                 <div>
                   <h3 className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-chrome-mid)] mb-1">ĐỊA CHỈ</h3>
                   <p className="font-body text-sm text-[var(--aura-chrome-bright)] leading-relaxed">
-                    39 Nguyễn Tất Thành, Phường 1,<br />
-                    TP. Sa Đéc, Đồng Tháp
+                    29 Nguyễn Tất Thành, Phường 1,<br />
+                    TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2)
                   </p>
                 </div>
               </div>

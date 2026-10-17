@@ -148,5 +148,5 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerCheckoutHandlers(app: Hono<{ Bindings: Env }>) {
-  app.post('/checkout', requireAuth(['owner', 'staff']), audit('order_create_checkout'), handlePosCheckout);
+  app.post('/checkout', requireAuth(['owner', 'manager', 'staff']), audit('order_create_checkout'), handlePosCheckout);
 }

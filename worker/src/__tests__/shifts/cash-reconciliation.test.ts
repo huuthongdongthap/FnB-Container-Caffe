@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { Hono } from 'hono';
 import { createMockDB, createMockEnv } from '../test-utils';
 import {
   reconcileShiftCash,
   getReconciliationForShift,
+  reconciliationRoutes,
 } from '@aura/domain-shift';
 
 interface Denomination {
@@ -216,5 +218,59 @@ describe('cash reconciliation', () => {
     expect(result.expected_cash).toBe(250_000);
     expect(result.actual_cash).toBe(250_000);
     expect(result.variance_status).toBe('balanced');
+  });
+
+  it('enforces RBAC on GET and POST reconciliation routes and scrubs 500 error details', async () => {
+    const app = new Hono<any>();
+    let mockUser: { sub?: string; role: string } | undefined;
+    app.use('*', async (c, next) => {
+      if (mockUser) c.set('user', mockUser);
+      await next();
+    });
+    reconciliationRoutes(app);
+
+    const { db } = makeReconciliationMockDB({ shift: null });
+
+    // Unauthenticated GET -> 401
+    mockUser = undefined;
+    const unauthGet = await app.request('/api/shifts/shift_1/reconciliation', { method: 'GET' }, { AURA_DB: db });
+    expect(unauthGet.status).toBe(401);
+
+    // Customer role GET -> 403
+    mockUser = { sub: 'cust_1', role: 'customer' };
+    const custGet = await app.request('/api/shifts/shift_1/reconciliation', { method: 'GET' }, { AURA_DB: db });
+    expect(custGet.status).toBe(403);
+
+    // Customer role POST -> 403
+    const custPost = await app.request(
+      '/api/shifts/shift_1/reconcile',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_float: 100000, denominations: [] }),
+      },
+      { AURA_DB: db }
+    );
+    expect(custPost.status).toBe(403);
+
+    // Manager role POST with DB failure -> sanitized 500 without raw internal message
+    mockUser = { sub: 'mgr_1', role: 'manager' };
+    const brokenDb = {
+      prepare: () => {
+        throw new Error('INTERNAL_SHIFT_SQL_ERROR');
+      },
+    };
+    const mgrPost = await app.request(
+      '/api/shifts/shift_missing/reconcile',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_float: 100000, denominations: [] }),
+      },
+      { AURA_DB: brokenDb }
+    );
+    expect(mgrPost.status).toBe(500);
+    const body = await mgrPost.json() as { error: string };
+    expect(body.error).toBe('Cash reconciliation failed');
   });
 });

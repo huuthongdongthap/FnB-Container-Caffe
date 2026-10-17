@@ -39,4 +39,29 @@ describe('contact smoke', () => {
     const data = await res.json() as Record<string, unknown>;
     expect(data.success).toBe(true);
   });
+
+  it('POST /api/contact — sanitizes internal D1 errors on HTTP 500 without leaking SQLite details', async() => {
+    const env = makeEnv();
+    env.AURA_DB.prepare = vi.fn().mockReturnValue({
+      bind: () => ({
+        run: () => Promise.reject(new Error('SQLITE_ERROR: table contact_messages has no column named internal_col'))
+      })
+    });
+
+    const req = new Request('https://test.aura/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Test User',
+        phone: '0909123456',
+        content: 'Hello this is a test message'
+      })
+    });
+
+    const res = await contactRouter.fetch(req, env);
+    expect(res.status).toBe(500);
+    const bodyText = await res.text();
+    expect(bodyText).not.toContain('SQLITE_ERROR');
+    expect(bodyText).not.toContain('internal_col');
+  });
 });

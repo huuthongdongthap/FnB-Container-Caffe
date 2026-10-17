@@ -85,4 +85,38 @@ describe('getHealth', () => {
     const parsed = new Date(result.timestamp);
     expect(parsed.toISOString()).toBe(result.timestamp);
   });
+
+  it('marks readiness false when D1 fails deep check', async () => {
+    const mockDb = {
+      prepare: vi.fn().mockReturnValue({
+        first: vi.fn().mockRejectedValue(new Error('D1 unreachable'))
+      }),
+      batch: vi.fn(),
+      exec: vi.fn(),
+      dump: vi.fn()
+    };
+    const env = { ...createMockEnv(), AURA_DB: mockDb } as unknown as Parameters<typeof getHealth>[0];
+
+    const result = await getHealth(env, true);
+    expect(result.readiness).toBe(false);
+    expect(result.status).toBe('degraded');
+  });
+
+  it('sanitizes error message in production environment to prevent internal leakage', async () => {
+    const mockDb = {
+      prepare: vi.fn().mockReturnValue({
+        first: vi.fn().mockRejectedValue(new Error('D1 internal fatal syntax or connection error at line 42'))
+      }),
+      batch: vi.fn(),
+      exec: vi.fn(),
+      dump: vi.fn()
+    };
+    const env = { ...createMockEnv(), AURA_DB: mockDb, ENVIRONMENT: 'production' } as unknown as Parameters<typeof getHealth>[0];
+
+    const result = await getHealth(env, true);
+    expect(result.status).toBe('degraded');
+    expect(result.d1).toBe('error');
+    expect(result.error).toBe('Database connectivity probe failed');
+    expect(result.dependencies?.d1_database.error).toBe('d1_database connectivity probe failed');
+  });
 });

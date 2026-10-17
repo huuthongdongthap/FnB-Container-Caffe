@@ -10,7 +10,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import type { POSNewCartItem } from './StitchPOSNew-types';
+import { formatPosPrice, type POSNewCartItem } from './StitchPOSNew-types';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { CustomerLookup } from './StitchPOSNew-customer-lookup';
 
@@ -103,7 +103,7 @@ export function CartSidebar({
                     {item.name}
                   </h4>
                   <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
-                    ${(item.price * item.quantity).toFixed(2)}
+                    {`${item.quantity} × ${formatPosPrice(item.price * item.quantity)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -137,18 +137,21 @@ export function CartSidebar({
       <div className="px-6 py-4 bg-[rgba(var(--aura-noir-void),0.5)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex flex-col gap-2">
         <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
           <span>{t('posNew.subtotal')}</span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span aria-label={formatPosPrice(subtotal)}>
+            <span>{formatPosPrice(subtotal).slice(0, 1)}</span>
+            <span>{formatPosPrice(subtotal).slice(1)}</span>
+          </span>
         </div>
         <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
           <span>{t('posNew.tax')}</span>
-          <span>${tax.toFixed(2)}</span>
+          <span>{formatPosPrice(tax)}</span>
         </div>
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(var(--aura-chrome-light),0.12)]">
           <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
             {t('posNew.total')}
           </span>
           <span className="text-[22px] text-[var(--aura-primary, #f2c08d)] font-bold font-body">
-            ${total.toFixed(2)}
+            {formatPosPrice(total)}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">

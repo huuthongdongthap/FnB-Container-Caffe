@@ -40,7 +40,17 @@ function ZoneCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      aria-label={`${zone.name} - ${zone.subtitle}`}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={`group cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 border flex flex-col justify-between relative bg-white/5 backdrop-blur-[8px] ${
         isSelected
           ? 'border-[var(--aura-chrome-bright)] ring-2 ring-[var(--aura-chrome-bright)]/40 shadow-xl scale-[1.02]'

@@ -68,8 +68,8 @@ describe('stitch-track-order-new', () => {
     fireEvent.click(screen.getByText('nav.menu'));
     expect(onNavigate).toHaveBeenCalledWith('/menu');
     fireEvent.click(screen.getByText('nav.orders'));
-    expect(onNavigate).toHaveBeenCalledWith('/orders');
+    expect(onNavigate).toHaveBeenCalledWith('/track-order');
     fireEvent.click(screen.getByText('nav.profile'));
-    expect(onNavigate).toHaveBeenCalledWith('/profile');
+    expect(onNavigate).toHaveBeenCalledWith('/account');
   });
 });

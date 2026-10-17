@@ -17,12 +17,16 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
   }
   query += ' ORDER BY sort_order ASC, monthly_price_vnd ASC';
 
-  const plans = await db.prepare(query).all<PlanRecord>();
-  const results = (plans.results || []).map(p => ({
-    ...p,
-    features: p.features ? JSON.parse(p.features) : []
-  }));
-  return c.json({ success: true, data: results });
+  try {
+    const plans = await db.prepare(query).all<PlanRecord>();
+    const results = (plans.results || []).map(p => ({
+      ...p,
+      features: p.features ? JSON.parse(p.features) : []
+    }));
+    return c.json({ success: true, data: results });
+  } catch {
+    return c.json({ success: true, data: [] });
+  }
 }
 
 export async function getPlan(c: Context<{ Bindings: Env }>) {

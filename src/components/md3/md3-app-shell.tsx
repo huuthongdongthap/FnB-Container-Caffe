@@ -82,7 +82,7 @@ function AuraLogo() {
       <img
         src="/images/logo.svg"
         alt="AURA CAFE"
-        className="h-9 w-9 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover shadow-[0_0_10px_rgba(201,214,223,0.3)] transition-transform hover:scale-105"
+        className="h-9 w-9 rounded-xl border border-[var(--aura-chrome-mid)]/40 object-contain p-0.5 shadow-[0_0_10px_rgba(201,214,223,0.3)] transition-transform hover:scale-105"
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
         }}

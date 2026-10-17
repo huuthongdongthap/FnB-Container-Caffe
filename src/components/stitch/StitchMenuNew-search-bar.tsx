@@ -30,10 +30,11 @@ export function StitchMenuNewSearchBar({
         style={{ fontFamily: 'var(--aura-font-body)' }}
       />
       {searchQuery !== '' && (
-        <button type="button"
+        <button
+          type="button"
           onClick={() => onSearchChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors hover:text-[var(--aura-text-body,#c6c6c7)]"
-          aria-label={t('stitch.clearSearchAriaLabel')}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-chrome-dim)] transition-colors hover:text-[var(--aura-text-body,#c6c6c7)]"
+          aria-label={t('stitch.clearSearchAriaLabel', { defaultValue: 'Xóa tìm kiếm' })}
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>

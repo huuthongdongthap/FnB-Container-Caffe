@@ -26,9 +26,9 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
       <div className="flex items-center gap-4 md:gap-8">
         {/* Mobile hamburger */}
         <button type="button"
-          className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
           onClick={onOpenSidebar}
-          aria-label={tTerminal('openSidebar')}
+          aria-label={tTerminal('openSidebar') || 'Open sidebar'}
         >
           <Menu size={24} />
         </button>
@@ -58,14 +58,14 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
 
         {/* Icon buttons */}
         <button type="button"
-          className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
-          aria-label={tTerminal('notifications')}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
+          aria-label={tTerminal('notifications') || 'Notifications'}
         >
           <Bell size={20} />
         </button>
         <button type="button"
-          className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
-          aria-label={tTerminal('help')}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
+          aria-label={tTerminal('help') || 'Help'}
         >
           <HelpCircle size={20} />
         </button>

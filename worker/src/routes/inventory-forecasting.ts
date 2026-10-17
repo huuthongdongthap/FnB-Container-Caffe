@@ -25,7 +25,7 @@ interface InventoryRow {
 
 // GET /api/inventory/forecasting/run-rate
 inventoryForecastingRouter.get('/run-rate', async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = getTenantId(c);
   const days = Math.max(1, Math.min(30, parseInt(c.req.query('days') || '7', 10)));
   const leadTimeDays = Math.max(1, Math.min(14, parseInt(c.req.query('lead_time_days') || '2', 10)));
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
@@ -169,7 +169,7 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
 
 // GET /api/inventory/forecasting/history
 inventoryForecastingRouter.get('/history', async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = getTenantId(c);
   const sku = c.req.query('item_sku');
   const limit = Math.min(60, parseInt(c.req.query('limit') || '30', 10));
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;

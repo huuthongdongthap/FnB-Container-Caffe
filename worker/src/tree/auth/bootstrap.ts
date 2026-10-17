@@ -20,7 +20,6 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       return jsonResponse({
         success: false,
         error: 'Owner đã tồn tại — bootstrap chỉ chạy được khi chưa có owner nào.',
-        existing_owner: existingOwner,
         hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/reset-password'
       }, 409);
     }
@@ -70,6 +69,6 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
     }, 201);
   } catch (error) {
     log.error('BootstrapOwner error:', { message: (error as Error).message });
-    return errorResponse(`Bootstrap owner thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Bootstrap owner thất bại', 500);
   }
 }

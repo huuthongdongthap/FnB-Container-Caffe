@@ -20,6 +20,47 @@ interface MenuResponse {
   };
 }
 
+interface RawMenuItemPayload {
+  id: string;
+  name: string;
+  description?: string;
+  priceCents?: number;
+  price?: number | string;
+  category: string;
+  imageUrl?: string;
+  image_url?: string;
+  available?: boolean;
+  tags?: string[];
+}
+
+interface RawMenuListResponse {
+  success?: boolean;
+  items?: MenuItem[];
+  data?: {
+    categories?: Array<{ items?: RawMenuItemPayload[] }>;
+  };
+  pagination?: MenuResponse['pagination'];
+}
+
+interface RawMenuItemResponse {
+  success?: boolean;
+  item?: RawMenuItemPayload;
+  data?: RawMenuItemPayload;
+}
+
+function mapRawMenuItem(item: RawMenuItemPayload): MenuItem {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description ?? '',
+    price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
+    category: item.category,
+    image_url: item.imageUrl ?? item.image_url ?? '',
+    available: Boolean(item.available),
+    tags: Array.isArray(item.tags) ? item.tags : [],
+  };
+}
+
 export function useMenu(params?: {
   category?: string;
   available?: boolean;
@@ -38,21 +79,12 @@ export function useMenu(params?: {
       if (params?.offset) searchParams.set('offset', String(params.offset));
 
       const qs = searchParams.toString();
-      const res = await apiFetch<any>(`/api/menu${qs ? `?${qs}` : ''}`);
+      const res = await apiFetch<RawMenuListResponse>(`/api/menu${qs ? `?${qs}` : ''}`);
       let items: MenuItem[] = [];
       if (Array.isArray(res?.items)) {
         items = res.items;
       } else if (Array.isArray(res?.data?.categories)) {
-        items = res.data.categories.flatMap((cat: any) => (cat.items || []).map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description ?? '',
-          price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
-          category: item.category,
-          image_url: item.imageUrl ?? item.image_url ?? '',
-          available: Boolean(item.available),
-          tags: Array.isArray(item.tags) ? item.tags : [],
-        })));
+        items = res.data.categories.flatMap((cat) => (cat.items || []).map(mapRawMenuItem));
       }
       return {
         success: res?.success ?? true,
@@ -68,24 +100,15 @@ export function useFeaturedMenu() {
 }
 
 export function useMenuItem(id: string) {
-  return useQuery<{ success: boolean; item: MenuItem }>({
+  return useQuery<{ success: boolean; item?: MenuItem }>({
     queryKey: ['menu', id],
     queryFn: async () => {
-      const res = await apiFetch<any>(`/api/menu/${id}`);
+      const res = await apiFetch<RawMenuItemResponse>(`/api/menu/${id}`);
       const raw = res?.item ?? res?.data;
-      if (!raw) return { success: false, item: undefined as any };
+      if (!raw) return { success: false, item: undefined };
       return {
         success: res?.success ?? true,
-        item: {
-          id: raw.id,
-          name: raw.name,
-          description: raw.description ?? '',
-          price: raw.priceCents ?? (typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price) ?? 0,
-          category: raw.category,
-          image_url: raw.imageUrl ?? raw.image_url ?? '',
-          available: Boolean(raw.available),
-          tags: Array.isArray(raw.tags) ? raw.tags : [],
-        },
+        item: mapRawMenuItem(raw),
       };
     },
     enabled: !!id,

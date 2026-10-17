@@ -35,8 +35,10 @@ export default function SalesReportsPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [groupBy, setGroupBy] = useState<GroupBy | null>(null);
 
-  const from = period === '24h' ? new Date().toISOString().slice(0, 10) : customStart || '2026-08-14';
-  const to = period === '24h' ? new Date().toISOString().slice(0, 10) : customEnd || '2026-08-14';
+  const { from, to } = useMemo(
+    () => periodDates(period, customStart, customEnd),
+    [period, customStart, customEnd],
+  );
 
   const overviewQ = useQuery<{ success: boolean; data: RevenueOverview }>({
     queryKey: ['admin-dashboard-overview', from, to],

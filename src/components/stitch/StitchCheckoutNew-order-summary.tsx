@@ -44,8 +44,9 @@ export function OrderSummaryPanel({
             <button
               type="button"
               onClick={onClearCart}
-              className="text-xs text-[var(--aura-chrome-mid)] hover:text-rose-400 font-body flex items-center gap-1.5 transition-colors p-1.5 rounded-lg hover:bg-rose-500/10 cursor-pointer"
+              className="min-h-[44px] min-w-[44px] text-xs text-[var(--aura-chrome-mid)] hover:text-rose-400 font-body flex items-center justify-center gap-1.5 transition-colors p-1.5 rounded-lg hover:bg-rose-500/10 cursor-pointer"
               title="Xóa toàn bộ món khỏi giỏ hàng"
+              aria-label="Xóa toàn bộ món khỏi giỏ hàng"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Xóa tất cả</span>
@@ -98,7 +99,7 @@ export function OrderSummaryPanel({
                       ? onRemoveItem(item.id)
                       : onUpdateQuantity?.(item.id, 0)
                   }
-                  className="p-1.5 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer shrink-0"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center p-1.5 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer shrink-0"
                   title="Xóa món này"
                   aria-label={`Xóa ${item.name}`}
                 >
@@ -117,7 +118,7 @@ export function OrderSummaryPanel({
                           ? onRemoveItem(item.id)
                           : onUpdateQuantity?.(item.id, 0)
                       }
-                      className="min-w-[36px] min-h-[36px] w-9 h-9 rounded-md bg-white/5 hover:bg-rose-500/20 text-white/50 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-md bg-white/5 hover:bg-rose-500/20 text-white/50 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
                       title="Xóa món"
                       aria-label="Xóa món"
                     >
@@ -129,7 +130,7 @@ export function OrderSummaryPanel({
                       onClick={() =>
                         onUpdateQuantity?.(item.id, item.quantity - 1)
                       }
-                      className="min-w-[36px] min-h-[36px] w-9 h-9 rounded-md bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                      className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-md bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
                       title="Giảm 1"
                       aria-label="Giảm 1"
                     >
@@ -149,7 +150,7 @@ export function OrderSummaryPanel({
                     onClick={() =>
                       onUpdateQuantity?.(item.id, item.quantity + 1)
                     }
-                    className="min-w-[36px] min-h-[36px] w-9 h-9 rounded-md bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                    className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-md bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
                     title="Tăng 1"
                     aria-label="Tăng 1"
                   >

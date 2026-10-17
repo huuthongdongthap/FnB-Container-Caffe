@@ -121,7 +121,18 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      started_at: 'started_at',
+      startedAt: 'started_at',
+      completed_at: 'completed_at',
+      completedAt: 'completed_at',
+      duration_ms: 'duration_ms',
+      durationMs: 'duration_ms',
+      status: 'status',
+    };
+    const sortCol = allowedSorts[sort] || 'started_at';
+    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = (await db.prepare(
       `SELECT * FROM cron_runs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all()) as { results: any[] };

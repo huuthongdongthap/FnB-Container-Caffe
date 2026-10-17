@@ -200,9 +200,9 @@ describe('staffMobileLogin', () => {
     expect([200, 401]).toContain(res.status);
   });
 
-  it('returns 500 on unexpected error', async () => {
+  it('returns 500 on unexpected error without leaking internal message', async () => {
     const badDb: any = {
-      prepare: () => ({ first: async () => { throw new Error('DB down'); } }),
+      prepare: () => ({ bind: () => ({ first: async () => { throw new Error('DB_INTERNAL_SECRET_DOWN'); } }), first: async () => { throw new Error('DB_INTERNAL_SECRET_DOWN'); } }),
     };
     const ctx: any = {
       req: {
@@ -223,6 +223,30 @@ describe('staffMobileLogin', () => {
     };
     const res = await staffMobileLogin(ctx);
     expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(String(body.error)).not.toContain('DB_INTERNAL_SECRET_DOWN');
+  });
+
+  it('locks out device_token with 429 after 5 failed PIN attempts', async () => {
+    const pinHash = makePinHash('1234', btoa('testsalt'));
+    const sharedKv = createMockKV();
+    for (let i = 1; i <= 4; i++) {
+      const ctx: any = mockContext({
+        body: { device_token: 'tok_known', pin: '0000' },
+        deviceByToken: deviceWithPin(pinHash),
+        kv: sharedKv,
+      });
+      const res = await staffMobileLogin(ctx);
+      expect(res.status).toBe(401);
+    }
+
+    const ctx5: any = mockContext({
+      body: { device_token: 'tok_known', pin: '0000' },
+      deviceByToken: deviceWithPin(pinHash),
+      kv: sharedKv,
+    });
+    const res5 = await staffMobileLogin(ctx5);
+    expect(res5.status).toBe(429);
   });
 });
 
@@ -258,6 +282,18 @@ describe('staffTokenRefresh', () => {
     expect(body.token).toBeTruthy();
     expect(typeof body.token).toBe('string');
     expect(body.expires_in).toBe(3600);
+  });
+
+  it('returns 429 when device_token is currently locked out', async () => {
+    const lockedKv = createMockKV();
+    await lockedKv.put('pin_lockout:tok_known', '5');
+    const ctx: any = mockContext({
+      body: { device_token: 'tok_known' },
+      deviceByToken: deviceWithPin(''),
+      kv: lockedKv,
+    });
+    const res = await staffTokenRefresh(ctx);
+    expect(res.status).toBe(429);
   });
 });
 
@@ -354,6 +390,20 @@ describe('registerStaffDevice', () => {
     });
     const res = await registerStaffDevice(ctx);
     expect(res.status).toBe(403);
+  });
+
+  it('normalizes kitchen UI role to staff when registering a device', async () => {
+    const kv = createMockKV({ 'user:USR_2': JSON.stringify({ id: 'USR_2', name: 'Kitchen Staff' }) });
+    const ctx: any = mockContext({
+      user: { id: 'USR_1', role: 'manager' },
+      body: { device_token: 'tok_kitchen_01', staff_id: 'USR_2', role: 'kitchen', pin: '1234' },
+      kv,
+    });
+    const res = await registerStaffDevice(ctx);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.user.role).toBe('staff');
   });
 });
 
@@ -461,6 +511,7 @@ describe('listStaffDevices', () => {
     expect(body.success).toBe(true);
     expect(body.devices).toHaveLength(2);
     expect(body.devices[0].id).toBe('DEV_1');
+    expect(body.devices[0].staff_id).toBe('USR_1');
   });
 
   it('returns 200 + empty array for owner with no devices', async () => {

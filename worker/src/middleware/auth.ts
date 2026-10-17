@@ -31,9 +31,13 @@ declare module 'hono' {
  */
 export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import('hono').MiddlewareHandler<{ Bindings: Env }> {
   return async(c, next) => {
-    const isPlaywright = (typeof c?.req?.header === 'function' ? c.req.header('x-playwright-test') : null)
+    const env = c.env as Env;
+    const isProd = env?.ENVIRONMENT === 'production' || (env as Record<string, unknown>)?.NODE_ENV === 'production';
+    const testHeader = (typeof c?.req?.header === 'function' ? c.req.header('x-playwright-test') : null)
       ?? (c?.req?.raw?.headers?.get?.('x-playwright-test') ?? null);
-    if (isPlaywright === 'true') {
+    const isPlaywright = !isProd && testHeader === 'true';
+
+    if (isPlaywright) {
       c.set('user', {
         id: 'staff-e2e-smoke',
         email: 'smoke@auraspace.cafe',
@@ -73,7 +77,7 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
     // Preserve tenant claims from the signed JWT — downstream tenant
     // middleware must resolve tenancy from here, never from client headers.
     c.set('user', {
-      id: payload.id,
+      id: payload.id || (payload as { sub?: string }).sub || '',
       email: payload.email,
       name: payload.name,
       role: userRole as AuthUser['role'],

@@ -78,7 +78,7 @@
     "descriptionEn": "AURA CAFE — 5 unique zones in one destination: Coffee, Milk Tea, Beer & Lounge, Garden, and Photo Spots. Industrial container architecture meets green space in the heart of Sa Dec City.",
     "services": "Services",
     "contact": "Contact",
-    "address": "39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp",
+    "address": "29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap (Opposite Thao Tram 2 Hotel)",
     "trackOrder": "Track Order",
     "reviews": "Reviews",
     "subscriptions": "Rent Container",
@@ -92,7 +92,7 @@
     "facebook": "Facebook",
     "instagram": "Instagram",
     "tiktok": "TikTok",
-    "copyright": "© {{year}} AURA CAFE · 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp"
+    "copyright": "© {{year}} AURA CAFE · 29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -151,7 +151,12 @@
       "clickCycleStatus": "Click to cycle status",
       "releaseTable": "Release table",
       "capacity": "Seats",
-      "updating": "..."
+      "updating": "...",
+      "statusAvailable": "Available",
+      "statusOccupied": "Occupied",
+      "statusReserved": "Reserved",
+      "statusOverdue": "Overdue",
+      "viewKDS": "View KDS screen"
     },
     "dindin": {
       "actions": "Actions",
@@ -348,7 +353,22 @@
     "terms": "Terms",
     "security": "Security",
     "validationRequired": "Please fill in all required fields.",
-    "loginFailed": "Login failed"
+    "loginFailed": "Login failed",
+    "pageAriaLabel": "Admin Login Page",
+    "emailAriaLabel": "Operator email or ID",
+    "passwordAriaLabel": "Security key",
+    "showPasswordAriaLabel": "Show password",
+    "hidePasswordAriaLabel": "Hide password",
+    "submitAriaLabel": "Submit login",
+    "guestAriaLabel": "Enter as guest",
+    "contactSupportAriaLabel": "Contact system support",
+    "forgotPasswordAriaLabel": "Forgot password",
+    "privacyAriaLabel": "Privacy policy",
+    "termsAriaLabel": "Terms of service",
+    "securityAriaLabel": "Security compliance",
+    "supportAriaLabel": "Support help",
+    "darkModeAriaLabel": "Toggle theme",
+    "authorized": "Authorized"
   },
   "referral": {
     "cashbackReceived": "Cashback received",
@@ -609,7 +629,7 @@
     "breadcrumbHome": "Home",
     "breadcrumbContact": "Contact",
     "seoTitle": "Contact | AURA CAFE",
-    "seoDescription": "Contact AURA CAFE to share feedback or get support. 29 Nguyen Tat Thanh, Sa Dec, Dong Thap.",
+    "seoDescription": "Contact AURA CAFE to share feedback or get support. 29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap (Opposite Thao Tram 2 Hotel).",
     "ogTitle": "Contact | AURA CAFE",
     "ogDescription": "Contact AURA CAFE — share feedback or get support",
     "subtitle": "Contact & Feedback",
@@ -1043,7 +1063,9 @@
     "confirmCancel": "Confirm Cancel"
   },
   "adminMetrics": {
-    "title": "Metrics Dashboard"
+    "title": "Metrics Dashboard",
+    "retry": "Retry",
+    "refreshing": "Refreshing metrics..."
   },
   "kds": {
     "title": "HEARTH & STEEL KDS",
@@ -1345,14 +1367,14 @@
     "zone4Desc": "Rattan chairs and cushioned seats — breezy, relaxed, surrounded by greenery",
     "zone5Name": "Private Room",
     "zone5Desc": "AC room — group meetings, focused work",
-    "address": "39 Nguyễn Tất Thành",
+    "address": "29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap (Opposite Thao Tram 2 Hotel)",
     "timelineTitle": "Our Journey",
     "timelineDesc": "From Vision to Reality",
     "spacesTitle": "Our Spaces",
     "spacesDesc": "Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.",
     "visitTitle": "Visit AURA CAFE",
     "exploreNow": "Explore Now",
-    "grandOpeningAlt": "AURA CAFE grand opening at 39 Nguyễn Tất Thành"
+    "grandOpeningAlt": "AURA CAFE grand opening at 29 Nguyen Tat Thanh, Ward 1, Sa Dec"
   },
   "tracking": {
     "ariaLabel": "Order status",
@@ -1433,7 +1455,7 @@
     "galleryBullet2Title": "Emotional Lighting",
     "galleryBullet2Desc": "Lighting system designed by experts, optimized for evening experiences.",
     "locationTitle": "Visit Us in Sa Dec",
-    "locationAddress": "29 Nguyen Tat Thanh, Ward 2, Sa Dec, Dong Thap",
+    "locationAddress": "29 Nguyen Tat Thanh, Ward 1, Sa Dec, Dong Thap (Opposite Thao Tram 2 Hotel)",
     "locationHours": "Open: 07:00 - 23:00 daily",
     "locationPhone": "+84 277 123 456",
     "locationMapAlt": "Map showing AURA CAFE location in Sa Dec, Dong Thap",
@@ -1925,6 +1947,7 @@
     "noQR": "No QR",
     "pageSubtitle": "Generate and print QR codes for tables",
     "zoneFilter": "Zone:",
+    "allZones": "All zones",
     "staffAccess": "Staff Access",
     "displayOnKDS": "Display on KDS",
     "printHeaderTitle": "QR codes for staff — scan to open ordering page",
@@ -1991,6 +2014,7 @@
     "subtitle": "Configure birthday discounts and free items for loyal customers",
     "configTitle": "Birthday Config",
     "enabledLabel": "Enabled",
+    "disabledLabel": "Disabled",
     "autoSendLabel": "Auto-send birthday messages",
     "autoSendHint": "Automatically send a birthday message to customers on their birthday",
     "discountPercentLabel": "Discount Percent",
@@ -2067,7 +2091,16 @@
     "recentShifts": "Recent Shifts",
     "noRecentShifts": "No recent shifts",
     "fieldPassword": "Password",
-    "fieldRolePlaceholder": "e.g. Pha che, Phuc vu, Thu ngan"
+    "fieldRolePlaceholder": "e.g. Pha che, Phuc vu, Thu ngan",
+    "recruitment": "Recruitment",
+    "recruitmentTitle": "Staff Recruitment",
+    "recruitmentSubtitle": "Manage job candidate applications for AURA CAFE",
+    "addCandidateBtn": "+ Add Candidate",
+    "totalApplications": "Total Applications",
+    "baristaApplicants": "Barista",
+    "serviceApplicants": "Cashier & Service",
+    "pendingAction": "Pending Contact",
+    "addCandidate": "Add Candidate"
   },
   "adminReservations": {
     "title": "Reservations",
@@ -2193,5 +2226,185 @@
     "justNow": "Just now",
     "minutesAgo": "{{count}} min ago",
     "hoursAgo": "{{count}}h ago"
+  },
+  "terminal": {
+    "sidebar": "Sidebar Navigation",
+    "mainNavigation": "Main Navigation",
+    "generateReport": "Generate Report",
+    "adminAvatar": "Admin Avatar",
+    "logout": "Log Out",
+    "topBar": "Top Bar",
+    "openSidebar": "Open Sidebar",
+    "closeSidebar": "Close Sidebar",
+    "managementTitle": "Operations Management",
+    "searchPlaceholder": "Search orders, tables, customers...",
+    "search": "Search",
+    "notifications": "Notifications",
+    "help": "Help",
+    "mainContent": "Main Content",
+    "orderCard": "Order #{id}",
+    "items": "Items",
+    "orderVoided": "Order Voided",
+    "total": "Total",
+    "viewLog": "View Log",
+    "details": "Details",
+    "pagination": "Pagination",
+    "showingOrders": "Showing {current} of {total} orders",
+    "prevPage": "Previous Page",
+    "nextPage": "Next Page",
+    "page": "Page {n}",
+    "newOrder": "New Order",
+    "settings": "Settings",
+    "searchFilters": "Search Filters",
+    "noOrders": "No orders found",
+    "orderList": "Order List",
+    "loading": "Loading...",
+    "error": "Error",
+    "errorTitle": "Unable to load data",
+    "retry": "Retry",
+    "statOverview": "Stats Overview",
+    "stat": {
+      "clock": "Pending Orders",
+      "flame": "Preparing Orders",
+      "check": "Ready Orders",
+      "package": "Served Orders"
+    }
+  },
+  "orderMgmt": {
+    "all": "All Orders",
+    "pending": "Pending",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "served": "Served",
+    "cancelled": "Cancelled"
+  },
+  "salesReports": {
+    "title": "Sales Reports",
+    "exporting": "Exporting...",
+    "exportCsv": "Export CSV",
+    "csvExportError": "CSV export error",
+    "retry": "Retry",
+    "recentOrders": "Recent Orders",
+    "loading": "Loading...",
+    "orderCount": "{{count}} orders",
+    "revenueToday": "Today's Revenue",
+    "yesterday": "Yesterday",
+    "ordersLabel": "Total Orders",
+    "avgOrderValue": "Average Order Value",
+    "compareMode": "Compare Previous Period",
+    "empty": {
+      "noOrders": "No orders found in this period"
+    },
+    "period": {
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "custom": "Custom"
+    },
+    "groupBy": {
+      "hour": "By Hour",
+      "day": "By Day",
+      "category": "By Category",
+      "payment": "By Payment Method"
+    },
+    "periodSummary": {
+      "today": "Today (from {{from}})",
+      "range": "From {{from}} to {{to}}",
+      "compare": "Compared to previous period ({{from}} - {{to}})"
+    }
+  },
+  "invoices": {
+    "pageTitle": "Invoice History",
+    "loading": "Loading...",
+    "reload": "Reload",
+    "listTitle": "Invoice List",
+    "retry": "Retry",
+    "guestCustomer": "Guest Customer",
+    "error": {
+      "loadFailed": "Failed to load invoices",
+      "connectionError": "Server connection error"
+    },
+    "empty": {
+      "title": "No invoices found",
+      "description": "Invoices will appear here once orders are completed"
+    },
+    "table": {
+      "orderId": "Order ID",
+      "customer": "Customer",
+      "total": "Total",
+      "status": "Status",
+      "date": "Date",
+      "download": "Download"
+    },
+    "status": {
+      "synced": "Synced",
+      "failed": "Failed",
+      "pending": "Pending"
+    }
+  },
+  "audit": {
+    "title": "Audit Logs",
+    "subtitle": "Track all system activities and security events",
+    "refresh": "Refresh",
+    "exportCsv": "Export CSV",
+    "dateRangeWarning": "Invalid date range selected",
+    "filterTitle": "Filter Logs",
+    "dateFrom": "From Date",
+    "dateTo": "To Date",
+    "actionLabel": "Action",
+    "resourceLabel": "Resource",
+    "actorLabel": "Actor",
+    "actorPlaceholder": "Enter name or email...",
+    "search": "Search",
+    "reset": "Reset",
+    "pagination": {
+      "info": "Page {{page}} of {{totalPages}} ({{total}} total records)",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "tableHeader": {
+      "time": "Time",
+      "actor": "Actor",
+      "action": "Action",
+      "resourceType": "Resource Type",
+      "resourceId": "Resource ID",
+      "ip": "IP Address"
+    },
+    "error": {
+      "loadFailed": "Failed to load audit logs",
+      "retry": "Retry"
+    },
+    "empty": {
+      "noLogs": "No audit logs found",
+      "noLogsDescription": "Try adjusting your search filters",
+      "resetFilters": "Reset Filters"
+    },
+    "csv": {
+      "time": "Time",
+      "actor": "Actor",
+      "action": "Action",
+      "resourceType": "Resource Type",
+      "resourceId": "Resource ID",
+      "ip": "IP Address"
+    },
+    "actionFilter": {
+      "all": "All Actions",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "login": "Login",
+      "logout": "Logout",
+      "export": "Export"
+    },
+    "resourceFilter": {
+      "all": "All Resources",
+      "order": "Order",
+      "customer": "Customer",
+      "menu": "Menu",
+      "promotion": "Promotion",
+      "campaign": "Campaign",
+      "staff": "Staff",
+      "payment": "Payment",
+      "reservation": "Reservation"
+    }
   }
 }

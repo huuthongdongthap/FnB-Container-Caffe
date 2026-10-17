@@ -18,7 +18,7 @@ const ExpenseSyncSchema = z.object({
 });
 
 
-const allow = requireAuth(['owner', 'staff']);
+const allow = requireAuth(['owner', 'manager', 'staff']);
 
 export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/expenses — list expenses with date filter

@@ -14,14 +14,19 @@ import type { Customer, ReferralCode } from '../types/models';
 export const referralRouter = new Hono<{ Bindings: Env }>();
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + hex.slice(0, 4);
 }
 
 function genReferralCode(length = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
   let code = 'FNB-';
   for (let i = 0; i < length; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[bytes[i] % chars.length];
   }
   return code;
 }

@@ -37,4 +37,36 @@ describe('API versioning', () => {
     expect(legacy.status).toBe(200);
     expect(v1.status).toBe(200);
   });
+
+  it('returns HTTP 503 when readiness probe fails on /api/health?ready=1', async() => {
+    const failingEnv = {
+      ...env(),
+      AURA_DB: {
+        prepare: () => ({
+          bind: () => ({ first: async () => { throw new Error('DB outage'); } }),
+          first: async () => { throw new Error('DB outage'); },
+        }),
+      },
+    };
+    const res = await app.fetch(new Request('https://test.aura/api/health?ready=1'), failingEnv as any, { waitUntil: () => {} } as any);
+    expect(res.status).toBe(503);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.readiness).toBe(false);
+  });
+
+  it('returns HTTP 200 when readiness probe succeeds on /api/health?ready=1', async() => {
+    const passingEnv = {
+      ...env(),
+      AURA_DB: {
+        prepare: () => ({
+          bind: () => ({ first: async () => ({ '1': 1 }) }),
+          first: async () => ({ '1': 1 }),
+        }),
+      },
+    };
+    const res = await app.fetch(new Request('https://test.aura/api/health?ready=1'), passingEnv as any, { waitUntil: () => {} } as any);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.readiness).toBe(true);
+  });
 });

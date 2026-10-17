@@ -28,6 +28,6 @@ export async function logoutUser(request: Request, env: Record<string, unknown>)
     }, 200, { 'Set-Cookie': clearCookie });
   } catch (error) {
     log.error('Logout error:', { message: (error as Error).message });
-    return errorResponse(`Đăng xuất thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Đăng xuất thất bại', 500);
   }
 }

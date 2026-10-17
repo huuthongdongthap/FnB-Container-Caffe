@@ -38,6 +38,6 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
     return jsonResponse({ success: true, order });
   } catch (error) {
     log.error('GetOrder error:', { message: (error as Error).message });
-    return errorResponse(`Failed to fetch order: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to fetch order', 500);
   }
 }

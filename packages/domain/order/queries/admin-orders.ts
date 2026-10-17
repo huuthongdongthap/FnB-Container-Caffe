@@ -30,7 +30,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     if (status) filters.push(['o.status', status]);
     if (paymentStatus) filters.push(['o.payment_status', paymentStatus]);
 
-    let query = `SELECT o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+    let query = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
        o.items, o.shipping_fee, o.discount,
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
      FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
@@ -74,6 +74,6 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     });
   } catch (error) {
     log.error('GetAdminOrders error:', { message: (error as Error).message });
-    return errorResponse(`Failed to fetch orders: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to fetch orders', 500);
   }
 }

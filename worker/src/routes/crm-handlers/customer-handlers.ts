@@ -13,9 +13,9 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
   /**
    * GET /api/crm/customers/:id/events
    * Returns chronological event feed for a customer.
-   * Auth: owner or staff only.
+   * Auth: owner, manager or staff only.
    */
-  router.get('/customers/:id/events', requireAuth(['owner', 'staff']), async (c) => {
+  router.get('/customers/:id/events', requireAuth(['owner', 'manager', 'staff']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 
@@ -35,7 +35,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * GET /api/crm/customers/:id/profile
    * Unified CRM profile view (recent activity summary).
    */
-  router.get('/customers/:id/profile', requireAuth(['owner', 'staff']), async (c) => {
+  router.get('/customers/:id/profile', requireAuth(['owner', 'manager', 'staff']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 
@@ -50,9 +50,9 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
   /**
    * GET /api/crm/customers/:id/360
    * Unified CRM view — account + tier + band + preferences + recent events.
-   * Auth: owner or staff only.
+   * Auth: owner, manager or staff only.
    */
-  router.get('/customers/:id/360', requireAuth(['owner', 'staff']), async (c) => {
+  router.get('/customers/:id/360', requireAuth(['owner', 'manager', 'staff']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 

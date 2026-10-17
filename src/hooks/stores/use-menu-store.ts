@@ -56,6 +56,44 @@ interface MenuState {
   searchMenu: (query: string) => void;
 }
 
+interface RawStoreMenuItem {
+  id: string;
+  name: string;
+  description?: string;
+  priceCents?: number;
+  price?: number | string;
+  category: string;
+  imageUrl?: string;
+  image_url?: string;
+  available?: boolean;
+  tags?: string[];
+}
+
+interface RawMenuStoreResponse {
+  items?: RawStoreMenuItem[];
+  data?: {
+    categories?: Array<{ items?: RawStoreMenuItem[] }>;
+  };
+}
+
+interface RawSingleMenuStoreResponse {
+  item?: RawStoreMenuItem;
+  data?: RawStoreMenuItem;
+}
+
+function mapRawStoreMenuItem(item: RawStoreMenuItem): MenuItem {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description ?? '',
+    price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
+    category: item.category,
+    image_url: item.imageUrl ?? item.image_url ?? '',
+    available: Boolean(item.available),
+    tags: Array.isArray(item.tags) ? item.tags : [],
+  };
+}
+
 function extractCategories(items: MenuItem[]): MenuCategory[] {
   const seen = new Set<string>();
   const cats: MenuCategory[] = [];
@@ -109,25 +147,16 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
     // Online: normal fetch
     try {
-      const body = await apiFetch<any>('/api/menu?available=true');
+      const body = await apiFetch<RawMenuStoreResponse>('/api/menu?available=true');
 
-      let rawList: any[] = [];
+      let rawList: RawStoreMenuItem[] = [];
       if (Array.isArray(body?.items) && body.items.length > 0) {
         rawList = body.items;
       } else if (Array.isArray(body?.data?.categories)) {
-        rawList = body.data.categories.flatMap((cat: any) => cat.items || []);
+        rawList = body.data.categories.flatMap((cat) => cat.items || []);
       }
 
-      const items: MenuItem[] = rawList.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description ?? '',
-        price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
-        category: item.category,
-        image_url: item.imageUrl ?? item.image_url ?? '',
-        available: Boolean(item.available),
-        tags: Array.isArray(item.tags) ? item.tags : [],
-      }));
+      const items: MenuItem[] = rawList.map(mapRawStoreMenuItem);
 
       const categories = extractCategories(items);
       set({ items, categories, loading: false, error: null, searchResults: null });
@@ -150,19 +179,10 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
   fetchMenuItem: async (id: string) => {
     try {
-      const body = await apiFetch<any>(`/api/menu/${id}`);
+      const body = await apiFetch<RawSingleMenuStoreResponse>(`/api/menu/${id}`);
       const raw = body?.item ?? body?.data;
       if (!raw) return null;
-      return {
-        id: raw.id,
-        name: raw.name,
-        description: raw.description ?? '',
-        price: raw.priceCents ?? (typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price) ?? 0,
-        category: raw.category,
-        image_url: raw.imageUrl ?? raw.image_url ?? '',
-        available: Boolean(raw.available),
-        tags: Array.isArray(raw.tags) ? raw.tags : [],
-      } as MenuItem;
+      return mapRawStoreMenuItem(raw);
     } catch {
       return null;
     }

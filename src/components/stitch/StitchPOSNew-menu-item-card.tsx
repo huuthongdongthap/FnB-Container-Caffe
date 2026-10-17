@@ -2,7 +2,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { Plus, Minus } from 'lucide-react';
-import type { POSNewMenuItem } from './StitchPOSNew-types';
+import { formatPosPrice, type POSNewMenuItem } from './StitchPOSNew-types';
 
 export function MenuItemCard({
   item,
@@ -16,12 +16,14 @@ export function MenuItemCard({
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const formattedPrice = formatPosPrice(item.price);
   return (
     <div
       className="relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform glass-card"
       role="button"
       tabIndex={0}
-      aria-label={`${item.name} — $${item.price.toFixed(2)}`}
+      aria-label={`${item.name} — ${formattedPrice}`}
+      onClick={onAdd}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAdd(); } }}
     >
       {/* Background image (if provided) */}
@@ -40,10 +42,13 @@ export function MenuItemCard({
         </h3>
         <div className="flex items-center justify-between mt-2">
           <p className="text-[14px] text-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] font-semibold font-body">
-            ${item.price.toFixed(2)}
+            {formattedPrice}
           </p>
           {quantity > 0 ? (
-            <div className="flex items-center gap-1 bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 10%,transparent)] rounded-lg px-1.5 py-1">
+            <div
+              className="flex items-center gap-1 bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 10%,transparent)] rounded-lg px-1.5 py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                type="button"
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -68,7 +73,7 @@ export function MenuItemCard({
             <button
              type="button"
               onClick={(e) => { e.stopPropagation(); onAdd(); }}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 8%,transparent)] text-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] hover:bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] transition-all active:scale-90"
+              className="min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-lg bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 8%,transparent)] text-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] hover:bg-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] transition-all active:scale-90"
               aria-label={t('posNew.addToCart')}
             >
               <Plus className="w-4 h-4" />

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, X } from 'lucide-react';
 import { useSWRegistration } from '@/hooks/use-sw-registration';
@@ -10,8 +11,9 @@ Calls skipWaiting() then reloads when the new SW takes control.
 export default function SWUpdatePrompt() {
   const { isUpdateAvailable, skipWaiting } = useSWRegistration();
   const { t } = useTranslation('pwa');
+  const [dismissed, setDismissed] = useState(false);
 
-  if (!isUpdateAvailable) return null;
+  if (!isUpdateAvailable || dismissed) return null;
 
   const handleReload = () => {
     skipWaiting();
@@ -39,14 +41,14 @@ export default function SWUpdatePrompt() {
         <button
           type="button"
           onClick={handleReload}
-          className="text-xs font-medium text-[#CD7F32] hover:underline"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-xs font-medium text-[#CD7F32] hover:underline"
         >
           {t('pwa.swUpdateReload', 'Tải lại ngay')}
         </button>
         <button
           type="button"
-          onClick={() => window.location.reload()}
-          className="text-[#5A6270] hover:text-[#C9D6DF] transition-colors"
+          onClick={() => setDismissed(true)}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[#5A6270] hover:text-[#C9D6DF] transition-colors"
           aria-label={t('pwa.swUpdateLater', 'Để sau')}
         >
           <X className="h-4 w-4" />

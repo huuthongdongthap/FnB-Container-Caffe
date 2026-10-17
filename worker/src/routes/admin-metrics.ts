@@ -38,9 +38,10 @@ adminMetrics.get('/', async(c) => {
   // If filter param is provided, query by metric name prefix using getMetricSummary
   if (filter) {
     try {
+      const likePattern = filter.includes('*') ? filter.replace(/\*/g, '%') : `${filter}%`;
       const nameRows = await db.prepare(
         'SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ? ORDER BY name'
-      ).bind(`${filter}%`, since).all<{ name: string }>();
+      ).bind(likePattern, since).all<{ name: string }>();
 
       const names = (nameRows.results || []).map(r => r.name);
       const summaries = await Promise.all(
@@ -48,6 +49,82 @@ adminMetrics.get('/', async(c) => {
       );
 
       const filtered = summaries.filter(Boolean);
+
+      if (filter.startsWith('web_vital')) {
+        const vitalRows = await db.prepare(
+          'SELECT name, json_extract(tags, \'$.rating\') as rating, COUNT(*) as cnt FROM _metrics WHERE name LIKE ? AND created_at >= ? GROUP BY name, rating'
+        ).bind(likePattern, since).all<{ name: string; rating: string | null; cnt: number }>();
+
+        const vitals: Record<string, { good: number; needsImprovement: number; poor: number }> = {};
+        for (const row of vitalRows.results || []) {
+          const metricName = String(row.name || '').replace(/^web_vital_/, '');
+          if (!metricName) continue;
+          if (!vitals[metricName]) {
+            vitals[metricName] = { good: 0, needsImprovement: 0, poor: 0 };
+          }
+          const count = Number(row.cnt ?? 0);
+          if (row.rating === 'good') {
+            vitals[metricName].good += count;
+          } else if (row.rating === 'needs-improvement' || row.rating === 'needsImprovement') {
+            vitals[metricName].needsImprovement += count;
+          } else if (row.rating === 'poor') {
+            vitals[metricName].poor += count;
+          }
+        }
+
+        const targets: Record<string, { good: number; poor: number }> = {
+          CLS: { good: 0.1, poor: 0.25 },
+          FCP: { good: 1800, poor: 3000 },
+          LCP: { good: 2500, poor: 4000 },
+          INP: { good: 200, poor: 500 },
+          TTFB: { good: 800, poor: 1800 },
+        };
+
+        return c.json({
+          range,
+          filter,
+          generated_at: new Date().toISOString(),
+          vitals,
+          targets,
+          metrics: filtered,
+          total: filtered.length
+        });
+      }
+
+      if (filter === 'request_duration_ms') {
+        const durationRows = await db.prepare(
+          'SELECT COALESCE(CAST(json_extract(tags, \'$.duration\') AS REAL), value) as duration FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ? ORDER BY duration'
+        ).bind(since).all<LatencyRow>();
+
+        const durations = (durationRows.results || [])
+          .map((r) => Number(r.duration))
+          .filter((d) => Number.isFinite(d) && d >= 0)
+          .sort((a, b) => a - b);
+
+        const p50 = durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
+        const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
+        const p99 = durations.length > 0 ? durations[Math.floor(durations.length * 0.99)] : 0;
+
+        const dailyRows = await db.prepare(
+          'SELECT substr(created_at, 1, 10) as date, COUNT(*) as count FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ? GROUP BY substr(created_at, 1, 10) ORDER BY date DESC LIMIT 30'
+        ).bind(since).all<{ date: string; count: number }>();
+
+        return c.json({
+          range,
+          filter,
+          generated_at: new Date().toISOString(),
+          p50,
+          p95,
+          p99,
+          requestCounts: (dailyRows.results || []).map((r) => ({
+            date: String(r.date || ''),
+            count: Number(r.count ?? 0),
+          })),
+          metrics: filtered,
+          total: filtered.length
+        });
+      }
+
       return c.json({
         range,
         filter,

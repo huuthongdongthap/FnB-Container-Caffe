@@ -74,7 +74,7 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
     });
   } catch (error) {
     log.error('GetMenu error:', { message: (error as Error).message });
-    return errorResponse(`Failed to fetch menu: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to fetch menu', 500);
   }
 }
 
@@ -98,6 +98,6 @@ export async function getMenuItem(request: Request, env: Record<string, unknown>
     return jsonResponse({ success: true, item });
   } catch (error) {
     log.error('GetMenuItem error:', { message: (error as Error).message });
-    return errorResponse(`Failed to fetch menu item: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to fetch menu item', 500);
   }
 }

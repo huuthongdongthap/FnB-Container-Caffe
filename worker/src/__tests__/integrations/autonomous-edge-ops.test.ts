@@ -310,6 +310,66 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       expect(json.simulation).toBe(true);
       expect(json.data.reply).toContain('Cà phê muối Sa Đéc');
     });
+
+    it('enforces staff/manager/owner auth on /api/webhooks/zalo/simulate in production', async () => {
+      const prodEnv = { ...mockEnv, ENVIRONMENT: 'production' };
+      const simPayload = { text: 'Menu có món gì đặc sản?' };
+
+      const unauthReq = await authRequest('POST', '/api/webhooks/zalo/simulate', undefined, 'default', simPayload);
+      const unauthRes = await app.fetch(unauthReq, prodEnv);
+      expect(unauthRes.status).toBe(401);
+
+      const customerReq = await authRequest('POST', '/api/webhooks/zalo/simulate', 'customer', 'default', simPayload);
+      const customerRes = await app.fetch(customerReq, prodEnv);
+      expect(customerRes.status).toBe(403);
+
+      const managerReq = await authRequest('POST', '/api/webhooks/zalo/simulate', 'manager', 'default', simPayload);
+      const managerRes = await app.fetch(managerReq, prodEnv);
+      expect(managerRes.status).toBe(200);
+    });
+
+    it('routes /api/webhooks/cal-booking properly, guards /bookings RBAC, and sanitizes 500 errors', async () => {
+      const unauthBookings = await authRequest('GET', '/api/webhooks/cal-booking/bookings');
+      const unauthBookingsRes = await app.fetch(unauthBookings, mockEnv);
+      expect(unauthBookingsRes.status).toBe(401);
+
+      const customerBookings = await authRequest('GET', '/api/webhooks/cal-booking/bookings', 'customer');
+      const customerBookingsRes = await app.fetch(customerBookings, mockEnv);
+      expect(customerBookingsRes.status).toBe(403);
+
+      mockEnv.CAL_WEBHOOK_SECRET = 'cal_sec_test';
+      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+        bind: () => ({
+          run: () => Promise.reject(new Error('SQLITE_ERROR: table bookings has no column secret_col'))
+        })
+      });
+
+      const webhookReq = new Request('https://test.aura/api/webhooks/cal-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cal-webhook-secret': 'cal_sec_test'
+        },
+        body: JSON.stringify({
+          triggerEvent: 'BOOKING_CREATED',
+          createdAt: '2026-10-14T09:00:00Z',
+          payload: {
+            uid: 'cal_uid_123',
+            title: 'Table Booking',
+            startTime: '2026-10-14T10:00:00Z',
+            endTime: '2026-10-14T11:00:00Z',
+            attendees: [{ name: 'Test Guest', email: 'guest@test.aura', timeZone: 'Asia/Ho_Chi_Minh' }],
+            organizer: { name: 'AURA Cafe', email: 'host@test.aura' },
+            location: 'Sa Dec'
+          }
+        })
+      });
+      const webhookRes = await app.fetch(webhookReq, mockEnv);
+      expect(webhookRes.status).toBe(500);
+      const text = await webhookRes.text();
+      expect(text).not.toContain('SQLITE_ERROR');
+      expect(text).not.toContain('secret_col');
+    });
   });
 
   describe('4. Container Edge IoT Telemetry & Autonomous Watchdog', () => {
@@ -415,6 +475,41 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       expect(json.count).toBe(1);
       expect(json.data[0].container_id).toBe('container-sadec-01');
       expect(json.data[0].operational_status).toBe('NORMAL');
+    });
+
+    it('requires shared secret or staff JWT on /api/edge/telemetry/heartbeat in production', async () => {
+      const prodEnv = {
+        ...mockEnv,
+        ENVIRONMENT: 'production',
+        EDGE_TELEMETRY_SECRET: 'edge_sec_prod_99'
+      };
+      prodEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          run: vi.fn().mockResolvedValue({})
+        })
+      });
+
+      const heartbeat = {
+        container_id: 'container-sadec-01',
+        power_source: 'grid',
+        ambient_temp_celsius: 28.0,
+        kds_online: true
+      };
+
+      const unauthReq = await authRequest('POST', '/api/edge/telemetry/heartbeat', undefined, 'default', heartbeat);
+      const unauthRes = await app.fetch(unauthReq, prodEnv);
+      expect(unauthRes.status).toBe(401);
+
+      const secretReq = new Request('https://test.aura/api/edge/telemetry/heartbeat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-edge-telemetry-secret': 'edge_sec_prod_99'
+        },
+        body: JSON.stringify(heartbeat)
+      });
+      const secretRes = await app.fetch(secretReq, prodEnv);
+      expect(secretRes.status).toBe(200);
     });
   });
 });

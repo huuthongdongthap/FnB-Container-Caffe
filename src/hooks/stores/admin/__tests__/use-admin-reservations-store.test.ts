@@ -43,6 +43,42 @@ describe('useAdminReservationsStore', () => {
     expect(s.error).toBeNull();
   });
 
+  it('fetchReservations(): normalizes D1 snake_case rows from /api/reservations', async () => {
+    mockSuccess({
+      success: true,
+      data: [
+        {
+          id: 'rsv_1',
+          customer_name: 'Hoang E',
+          customer_phone: '0987654321',
+          table_number: 'T05',
+          table_zone: 'Outdoor',
+          date: '2026-10-15',
+          time: '18:30',
+          guest_count: 6,
+          status: 'pending',
+          created_at: '2026-10-14T15:00:00Z',
+        },
+      ],
+    });
+
+    await useAdminReservationsStore.getState().fetchReservations();
+
+    const s = useAdminReservationsStore.getState();
+    expect(s.reservations[0]).toMatchObject({
+      id: 'rsv_1',
+      customerName: 'Hoang E',
+      customerPhone: '0987654321',
+      tableNumber: 'T05',
+      zone: 'Outdoor',
+      date: '2026-10-15',
+      time: '18:30',
+      guests: 6,
+      status: 'pending',
+      createdAt: '2026-10-14T15:00:00Z',
+    });
+  });
+
   it('fetchReservations(): sets error on failure', async () => {
     mockError('Không thể tải danh sách đặt bàn');
 

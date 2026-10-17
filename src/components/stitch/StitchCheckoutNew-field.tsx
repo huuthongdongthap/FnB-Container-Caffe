@@ -9,6 +9,7 @@ interface FieldProps {
   type?: string;
   multiline?: boolean;
   rows?: number;
+  error?: string | boolean;
 }
 
 export function Field({
@@ -19,6 +20,7 @@ export function Field({
   type = 'text',
   multiline = false,
   rows = 3,
+  error,
 }: Readonly<FieldProps>) {
   const fieldId = `checkout-field-${label.toLowerCase().replace(/\s+/g, '-')}`;
   const sharedClasses = cn(
@@ -44,6 +46,7 @@ export function Field({
           rows={rows}
           className={cn('resize-none', sharedClasses)}
           aria-label={label}
+          aria-invalid={Boolean(error)}
         />
       ) : (
         <input
@@ -54,6 +57,7 @@ export function Field({
           onChange={(e) => onChange(e.target.value)}
           className={sharedClasses}
           aria-label={label}
+          aria-invalid={Boolean(error)}
         />
       )}
     </div>

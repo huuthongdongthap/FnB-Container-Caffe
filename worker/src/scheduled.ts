@@ -3,6 +3,7 @@
  */
 
 import { pruneOldMetrics } from './lib/metrics-collector';
+import { dispatchAlerts } from './lib/alert-dispatcher';
 import type { Env } from './types/env';
 import {
   checkOverdueOrders,
@@ -41,4 +42,5 @@ export async function handleScheduled(
   ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
   ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
   ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(dispatchAlerts(env));
 }

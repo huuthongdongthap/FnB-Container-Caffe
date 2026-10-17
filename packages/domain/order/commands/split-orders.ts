@@ -28,9 +28,9 @@ const splitOrderEntrySchema = z.object({
   payment_method: z.string().optional(),
   notes: z.string().optional(),
   delivery_time: z.string().optional(),
-  shipping_fee: z.number().optional(),
-  discount: z.number().optional(),
-  tip: z.number().optional(),
+  shipping_fee: z.number().nonnegative().optional(),
+  discount: z.number().nonnegative().optional(),
+  tip: z.number().nonnegative().optional(),
   table_id: z.string().optional()
 });
 
@@ -145,6 +145,6 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     }, 201);
   } catch (error) {
     log.error('SplitOrders error:', { message: (error as Error).message });
-    return errorResponse(`Failed to create split orders: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to create split orders', 500);
   }
 }

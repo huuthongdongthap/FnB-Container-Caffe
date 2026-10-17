@@ -62,27 +62,28 @@ momoWebhookRouter.post('/', async(c) => {
     // ── Verify signature ────────────────────────────────────────────────────
     const secretKey = String(c.env.MOMO_SECRET_KEY || '');
     if (!secretKey) {
-      log.warn('MoMo webhook: MOMO_SECRET_KEY not configured — skipping signature check');
-    } else {
-      const signParams: Record<string, string> = {
-        accessKey: String(c.env.MOMO_ACCESS_KEY || ''),
-        amount: String(payload.amount),
-        extraData: String(payload.extraData || ''),
-        message: String(payload.message || ''),
-        orderId: String(payload.orderId),
-        orderType: String(payload.orderType || 'momo_wallet'),
-        partnerCode: String(payload.partnerCode),
-        payType: String(payload.payType || ''),
-        requestId: String(payload.requestId),
-        responseTime: String((payload.responseTime as number | string) || Date.now()),
-        resultCode: String(payload.resultCode),
-        transId: String(payload.transId || '')
-      };
+      log.error('MoMo webhook: MOMO_SECRET_KEY not configured — rejecting webhook request');
+      return c.json({ error: -1, message: 'Server configuration error' }, 500);
+    }
 
-      const computedSig = await verifySignature(signParams, secretKey);
-      if (computedSig !== String(payload.signature)) {
-        return c.json({ error: -1, message: 'Invalid signature', message_en: 'Invalid signature' }, 400);
-      }
+    const signParams: Record<string, string> = {
+      accessKey: String(c.env.MOMO_ACCESS_KEY || ''),
+      amount: String(payload.amount),
+      extraData: String(payload.extraData || ''),
+      message: String(payload.message || ''),
+      orderId: String(payload.orderId),
+      orderType: String(payload.orderType || 'momo_wallet'),
+      partnerCode: String(payload.partnerCode),
+      payType: String(payload.payType || ''),
+      requestId: String(payload.requestId),
+      responseTime: String((payload.responseTime as number | string) || Date.now()),
+      resultCode: String(payload.resultCode),
+      transId: String(payload.transId || '')
+    };
+
+    const computedSig = await verifySignature(signParams, secretKey);
+    if (computedSig !== String(payload.signature)) {
+      return c.json({ error: -1, message: 'Invalid signature', message_en: 'Invalid signature' }, 400);
     }
 
     // ── Parse outcome ───────────────────────────────────────────────────────

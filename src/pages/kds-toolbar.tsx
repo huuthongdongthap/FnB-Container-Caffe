@@ -18,16 +18,18 @@ export function KdsToolbar({
       <button
         onClick={onToggleSound}
         type="button"
-        className="rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
         title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+        aria-label={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
       >
         {soundEnabled ? <Bell size={16} /> : <BellOff size={16} />}
       </button>
       <button
         onClick={onToggleFullscreen}
         type="button"
-        className="rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
         title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
       >
         {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
       </button>

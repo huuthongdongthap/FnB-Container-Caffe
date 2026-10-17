@@ -21,10 +21,11 @@ Arguments:
   domain         Custom domain for this instance (e.g. "auraspace.cafe")
 
 Options:
-  --skip-tests       Skip test gate before deploy
-  --skip-migrations  Skip D1 migration auto-apply
-  --skip-verify      Skip post-deploy health + SHA verification
-  --help             Show this help message
+  --skip-tests                 Skip test gate before deploy
+  --skip-migrations            Explicitly skip D1 migrations (default behavior)
+  --migration-file <name.sql>  Explicitly apply a single forward migration from worker/db/migrations/
+  --skip-verify                Skip post-deploy health + SHA verification
+  --help                       Show this help message
 
 Example:
   bash scripts/deploy-branded.sh my-cafe mybrand.com
@@ -39,6 +40,67 @@ DOMAIN=""
 SKIP_TESTS=false
 SKIP_MIGRATIONS=false
 SKIP_VERIFY=false
+REQUESTED_BULK_MIGRATIONS=false
+MIGRATION_FILES=()
+MIGRATIONS_DIR="$WORKER_DIR/db/migrations"
+
+validate_migration_target() {
+  local raw_target="$1"
+  if [[ -z "${raw_target}" ]]; then
+    echo "ERROR: Empty migration filename passed to --migration-file." >&2
+    exit 1
+  fi
+  if [[ "${raw_target}" == *"*"* || "${raw_target}" == *"?"* || "${raw_target}" == *"["* ]]; then
+    echo "ERROR: Wildcard/glob migration selection is forbidden (fail-closed): ${raw_target}" >&2
+    exit 1
+  fi
+  if [[ "${raw_target}" == *".."* ]]; then
+    echo "ERROR: Path traversal is forbidden in --migration-file: ${raw_target}" >&2
+    exit 1
+  fi
+
+  local normalized="${raw_target#./}"
+  if [[ "${normalized}" == worker/db/migrations/* ]]; then
+    normalized="${normalized#worker/db/migrations/}"
+  elif [[ "${normalized}" == db/migrations/* ]]; then
+    normalized="${normalized#db/migrations/}"
+  fi
+
+  if [[ "${normalized}" == *"/"* ]]; then
+    echo "ERROR: Migration file must reside directly in worker/db/migrations/: ${raw_target}" >&2
+    exit 1
+  fi
+  if [[ "${normalized}" == *.down.sql ]]; then
+    echo "ERROR: Refusing to apply rollback migration (.down.sql) during forward deploy: ${normalized}" >&2
+    exit 1
+  fi
+  if [[ "${normalized}" != *.sql ]]; then
+    echo "ERROR: Migration file must end with .sql: ${normalized}" >&2
+    exit 1
+  fi
+  if [[ ! "${normalized}" =~ ^[0-9]{8}_[0-9]{2}_[a-z0-9_]+\.sql$ ]]; then
+    echo "ERROR: Invalid canonical migration filename format (expected YYYYMMDD_NN_slug.sql): ${normalized}" >&2
+    exit 1
+  fi
+  if [[ "${normalized}" == "20260706_11_notifications_push_loyalty.sql" || "${normalized}" == "20260824_02_users_table.sql" ]]; then
+    echo "ERROR: Refusing to apply superseded migration per worker/db/migrations/README.md: ${normalized}" >&2
+    exit 1
+  fi
+  if [[ ! -f "${MIGRATIONS_DIR}/${normalized}" ]]; then
+    echo "ERROR: Migration file not found in ${MIGRATIONS_DIR}: ${normalized}" >&2
+    exit 1
+  fi
+
+  local existing
+  for existing in "${MIGRATION_FILES[@]+"${MIGRATION_FILES[@]}"}"; do
+    if [[ "${existing}" == "${normalized}" ]]; then
+      echo "ERROR: Duplicate migration file specified in single invocation (fail-closed): ${normalized}" >&2
+      exit 1
+    fi
+  done
+
+  MIGRATION_FILES+=("${normalized}")
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,6 +113,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-migrations)
       SKIP_MIGRATIONS=true
+      shift
+      ;;
+    --migration-file)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: Missing filename argument after --migration-file" >&2
+        exit 1
+      fi
+      validate_migration_target "$2"
+      shift 2
+      ;;
+    --migration-file=*)
+      validate_migration_target "${1#*=}"
+      shift
+      ;;
+    --apply-migrations|--run-migrations|--all-migrations)
+      REQUESTED_BULK_MIGRATIONS=true
       shift
       ;;
     --skip-verify)
@@ -79,6 +157,16 @@ if [[ -z "$CLIENT_NAME" || -z "$DOMAIN" ]]; then
   echo "ERROR: Missing required arguments <client-name> and <domain>"
   echo ""
   show_help
+fi
+
+if [[ "$REQUESTED_BULK_MIGRATIONS" == "true" && ${#MIGRATION_FILES[@]} -eq 0 ]]; then
+  echo "ERROR: Fail-closed guard — refusing bulk historical D1 migration execution without explicit --migration-file=<name.sql>." >&2
+  exit 1
+fi
+
+if [[ "$SKIP_MIGRATIONS" == "true" && ${#MIGRATION_FILES[@]} -gt 0 ]]; then
+  echo "ERROR: Cannot combine --skip-migrations with --migration-file." >&2
+  exit 1
 fi
 
 PROJECT_NAME="fnb-container-${CLIENT_NAME}"
@@ -225,28 +313,19 @@ npx wrangler pages deploy dist \
 
 echo "  OK"
 
-# ── 6. (Optional) D1 Migrations ─────────────────────────────────────────
-if [[ "$SKIP_MIGRATIONS" == "false" ]]; then
-  MIGRATIONS_DIR="$PROJECT_DIR/scripts/migrations"
-  if [[ -d "$MIGRATIONS_DIR" ]] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null 2>&1; then
-    echo ""
-    echo "[6/6] Applying D1 migrations..."
-    cd "$WORKER_DIR"
-    for migration in "$MIGRATIONS_DIR"/*.sql; do
-      migration_name="$(basename "$migration")"
-      echo "  Applying: $migration_name"
-      npx wrangler d1 execute fnb-caffe-db --file="$migration" --remote 2>&1 | tail -3
-      echo "    OK: $migration_name"
-    done
-    cd "$PROJECT_DIR"
-    echo "  OK"
-  else
-    echo ""
-    echo "[6/6] No D1 migrations found — skipping"
-  fi
+# ── 6. (Optional) D1 Migrations (Fail-closed: explicit --migration-file only) ─
+if [[ ${#MIGRATION_FILES[@]} -gt 0 ]]; then
+  echo ""
+  echo "[6/6] Applying explicitly selected D1 migration(s)..."
+  APPLY_ARGS=()
+  for migration_name in "${MIGRATION_FILES[@]}"; do
+    APPLY_ARGS+=(--file "$migration_name")
+  done
+  bash "$WORKER_DIR/scripts/apply-migrations.sh" "${APPLY_ARGS[@]}"
+  echo "  OK"
 else
   echo ""
-  echo "[6/6] Skipping D1 migrations (--skip-migrations)"
+  echo "[6/6] Skipping D1 migrations by default (fail-closed: pass --migration-file=<name.sql> to apply an explicit migration)"
 fi
 
 # ── Post-deploy verification ─────────────────────────────────────────────

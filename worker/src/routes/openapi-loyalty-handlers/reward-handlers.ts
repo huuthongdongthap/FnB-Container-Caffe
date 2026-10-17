@@ -83,6 +83,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.rewards.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    if (user?.role !== 'owner' && user?.role !== 'manager') {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
@@ -136,6 +139,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.rewards.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    if (user?.role !== 'owner' && user?.role !== 'manager') {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -193,12 +199,12 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 
-  // POST /api/loyalty/rewards/{id}/redeem - Redeem reward
+  // POST /api/loyalty/rewards/redeem - Redeem reward
   app.openapi(LoyaltyRoutes.rewards.redeem as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    const { id } = c.req.valid('param');
     const body = c.req.valid('json');
+    const id = body.rewardId || c.req.param?.('id');
     const now = new Date().toISOString();
 
     const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
@@ -217,10 +223,8 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
     }
 
-    // Check tier requirement
-    const tierConfig = (await db.prepare('SELECT min_points FROM loyalty_tier_configs WHERE tier = ?')
-      .bind(account.tier).first()) as any;
-    if (tierConfig && account.current_points < reward.points_cost) {
+    // Always verify customer has sufficient points to redeem the reward
+    if (account.current_points < reward.points_cost) {
       return c.json({ success: false, error: 'Insufficient points' }, 400);
     }
 

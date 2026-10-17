@@ -54,6 +54,38 @@ describe('useAdminStaffStore', () => {
     expect(useAdminStaffStore.getState().staff).toEqual(fakeStaff);
   });
 
+  it('fetchStaff(): normalizes Worker /api/auth/staff { users: [...] } snake_case response', async () => {
+    mockSuccess({
+      success: true,
+      users: [
+        {
+          id: 'USR_01',
+          email: 'barista@aura.vn',
+          name: 'Tran Thi B',
+          phone: '0909888777',
+          role: 'staff',
+          position: 'Barista',
+          active: true,
+          created_at: '2026-10-01T08:00:00Z',
+        },
+      ],
+    });
+
+    await useAdminStaffStore.getState().fetchStaff();
+
+    const s = useAdminStaffStore.getState();
+    expect(s.staff).toHaveLength(1);
+    expect(s.staff[0]).toMatchObject({
+      id: 'USR_01',
+      name: 'Tran Thi B',
+      role: 'Barista',
+      phone: '0909888777',
+      email: 'barista@aura.vn',
+      isActive: true,
+      startedAt: '2026-10-01T08:00:00Z',
+    });
+  });
+
   it('fetchStaff(): sets error on failure', async () => {
     mockError('Không thể tải danh sách nhân viên');
 

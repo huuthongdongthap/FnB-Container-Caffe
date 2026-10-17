@@ -1,11 +1,14 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { createLogger } from '../../middleware/logger';
 import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
 import { getZoneStats } from '../../tree/analytics/zone-analytics';
 import { topProductsSchema, peakHoursSchema, zoneSchema, buildCacheKey, getCached, setCache } from './helpers';
+
+const log = createLogger({ route: 'analytics-metrics' });
 
 export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/top-products
@@ -147,7 +150,8 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
         },
       });
     } catch (err) {
-      return c.json({ success: false, error: (err as Error).message }, 500);
+      log.error('Analytics payout query error:', { message: (err as Error).message });
+      return c.json({ success: false, error: 'Failed to retrieve payout analytics' }, 500);
     }
   });
 }

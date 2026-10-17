@@ -6,7 +6,7 @@ describe('OurStoryPage', () => {
   it('renders hero title and authentic Sa Đéc address', () => {
     renderWithProviders(<OurStoryPage />);
     expect(screen.getByRole('heading', { level: 1, name: /Câu Chuyện/i })).toBeInTheDocument();
-    expect(screen.getByText(/39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp/i)).toBeInTheDocument();
+    expect(screen.getByText(/29 Nguyễn Tất Thành, Phường 1, TP\. Sa Đéc, Đồng Tháp/i)).toBeInTheDocument();
   });
 
   it('renders architectural narrative describing 3 containers and 5 zones', () => {

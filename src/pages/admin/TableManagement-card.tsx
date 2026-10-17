@@ -12,7 +12,7 @@ interface TableCardProps {
 }
 
 export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, onRelease }: TableCardProps) {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 
 	const statusLabel = (status: CafeTableRow['status']) =>
 		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { fallback: status });

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 export function PrintHeader() {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 	return (
 		<div className="hidden print:block mb-4 pb-3 border-b-2 border-black">
 			<h2 className="text-sm font-semibold uppercase text-gray-520 mb-1">

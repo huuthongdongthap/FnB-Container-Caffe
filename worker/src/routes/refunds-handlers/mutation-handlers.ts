@@ -14,7 +14,7 @@ import {
 
 export function registerRefundMutationHandlers(router: Hono<{ Bindings: Env }>): void {
   // POST /api/payments/refund
-  router.post('/refund', requireAuth(['owner', 'staff']), audit('refund_create'), async (c) => {
+  router.post('/refund', requireAuth(['owner', 'manager', 'staff']), audit('refund_create'), async (c) => {
     const db = c.env.AURA_DB;
     const mc = createMetricsCollector(db);
 

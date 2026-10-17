@@ -30,6 +30,11 @@ export async function changePassword(request: Request, env: Record<string, unkno
     }
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    const revoked = await authKV.get(`revoked:${token}`);
+    if (revoked) {
+      return errorResponse('Token đã bị thu hồi (logout)', 401);
+    }
+
     const userStr = await authKV.get(`user:${payload.email}`);
     if (!userStr) {
       return errorResponse('User không tồn tại', 404);
@@ -54,6 +59,6 @@ export async function changePassword(request: Request, env: Record<string, unkno
     });
   } catch (error) {
     log.error('ChangePassword error:', { message: (error as Error).message });
-    return errorResponse(`Đổi mật khẩu thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Đổi mật khẩu thất bại', 500);
   }
 }

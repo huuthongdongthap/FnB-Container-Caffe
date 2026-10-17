@@ -105,6 +105,8 @@ export interface Env {
   // General
   ENVIRONMENT?: string;
   AURA_KV?: import('@cloudflare/workers-types').KVNamespace;
+  KV_CACHE?: import('@cloudflare/workers-types').KVNamespace;
+  GIT_COMMIT_SHA?: string;
 
   // Cloudflare Workers AI
   AI?: unknown;

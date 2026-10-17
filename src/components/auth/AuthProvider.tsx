@@ -15,8 +15,9 @@ export function AuthProvider({ children }: Props) {
   const fetchMe = useAuthStore((s) => s.fetchMe);
 
   useEffect(() => {
-    if (user) {
-      fetchMe();
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('aura_auth_token');
+    if (user || hasToken) {
+      void fetchMe();
     }
   }, []); // run once on mount
 

@@ -78,7 +78,7 @@
     "descriptionEn": "AURA CAFE — 5 unique zones in one destination: Coffee, Milk Tea, Beer & Lounge, Garden, and Photo Spots. Industrial container architecture meets green space in the heart of Sa Dec City.",
     "services": "Dịch vụ",
     "contact": "Liên hệ",
-    "address": "39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp",
+    "address": "29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — Đối diện Khách sạn Thảo Trâm 2",
     "trackOrder": "Tra cứu đơn",
     "reviews": "Đánh giá",
     "subscriptions": "Thuê Container",
@@ -92,7 +92,7 @@
     "facebook": "Facebook",
     "instagram": "Instagram",
     "tiktok": "TikTok",
-    "copyright": "© 2026 AURA CAFE SA ĐÉC · 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp"
+    "copyright": "© 2026 AURA CAFE SA ĐÉC · 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp"
   },
   "admin": {
     "dashboard": "Bảng điều khiển",
@@ -151,7 +151,12 @@
       "clickCycleStatus": "Chuyển trạng thái",
       "releaseTable": "Trả bàn",
       "capacity": "chỗ",
-      "updating": "..."
+      "updating": "...",
+      "statusAvailable": "Trống",
+      "statusOccupied": "Có khách",
+      "statusReserved": "Đã đặt",
+      "statusOverdue": "Quá giờ",
+      "viewKDS": "Xem màn hình bếp KDS"
     },
     "dindin": {
       "actions": "Thao tác",
@@ -348,7 +353,22 @@
     "terms": "Điều khoản",
     "security": "An ninh",
     "validationRequired": "Vui lòng nhập đầy đủ thông tin.",
-    "loginFailed": "Đăng nhập thất bại"
+    "loginFailed": "Đăng nhập thất bại",
+    "pageAriaLabel": "Trang đăng nhập quản trị",
+    "emailAriaLabel": "Email hoặc mã nhân viên",
+    "passwordAriaLabel": "Mật khẩu",
+    "showPasswordAriaLabel": "Hiện mật khẩu",
+    "hidePasswordAriaLabel": "Ẩn mật khẩu",
+    "submitAriaLabel": "Xác nhận đăng nhập",
+    "guestAriaLabel": "Đăng nhập nhanh với quyền khách",
+    "contactSupportAriaLabel": "Liên hệ bộ phận hỗ trợ",
+    "forgotPasswordAriaLabel": "Khôi phục mật khẩu",
+    "privacyAriaLabel": "Chính sách bảo mật",
+    "termsAriaLabel": "Điều khoản dịch vụ",
+    "securityAriaLabel": "Tiêu chuẩn an ninh",
+    "supportAriaLabel": "Trợ giúp hỗ trợ",
+    "darkModeAriaLabel": "Chuyển giao diện sáng tối",
+    "authorized": "Đăng nhập thành công"
   },
   "chat": {
     "enterInfo": "Nhập thông tin của bạn để bắt đầu trò chuyện",
@@ -609,7 +629,7 @@
     "breadcrumbHome": "Trang chủ",
     "breadcrumbContact": "Liên hệ",
     "seoTitle": "Liên Hệ | AURA CAFE",
-    "seoDescription": "Liên hệ với AURA CAFE để đóng góp ý kiến hoặc nhận hỗ trợ nhanh nhất. 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp.",
+    "seoDescription": "Liên hệ với AURA CAFE để đóng góp ý kiến hoặc nhận hỗ trợ nhanh nhất. 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — Đối diện Khách sạn Thảo Trâm 2.",
     "ogTitle": "Liên Hệ | AURA CAFE",
     "ogDescription": "Liên hệ với AURA CAFE — góp ý hoặc nhận hỗ trợ",
     "subtitle": "Liên Hệ & Góp Ý",
@@ -1043,7 +1063,9 @@
     "confirmCancel": "Xác nhận hủy"
   },
   "adminMetrics": {
-    "title": "Bảng chỉ số"
+    "title": "Bảng chỉ số",
+    "retry": "Thử lại",
+    "refreshing": "Đang làm mới dữ liệu..."
   },
   "kds": {
     "title": "KDS",
@@ -1324,7 +1346,7 @@
     "phase1Title": "Khởi nguồn ý tưởng",
     "phase1Desc": "Ý tưởng quán cà phê container tái chế, mộc mạc, gần gũi ra đời.",
     "phase2Title": "Kiến thiết không gian",
-    "phase2Desc": "3 khối container được cải tạo tại 39 Nguyễn Tất Thành, Sa Đéc — kết hợp gỗ, thép và cây xanh.",
+    "phase2Desc": "3 khối container được cải tạo tại 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — kết hợp gỗ, thép và cây xanh.",
     "phase3Title": "Khai trương & Vận hành",
     "phase3Desc": "AURA CAFE chính thức mở cửa đón khách với không gian container bản địa độc đáo.",
     "phase4Title": "Chuyển đổi số F&B",
@@ -1347,14 +1369,14 @@
     "zone4Desc": "Ghế mây và ghế nệm êm ái — thoáng gió, thư giãn cùng cây xanh",
     "zone5Name": "Phòng Container",
     "zone5Desc": "Phòng máy lạnh — họp nhóm, làm việc yên tĩnh",
-    "address": "39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp",
+    "address": "29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — Đối diện Khách sạn Thảo Trâm 2",
     "timelineTitle": "Hành trình kiến tạo",
     "timelineDesc": "Từ ý tưởng sơ khởi đến không gian cà phê container độc bản",
     "spacesTitle": "Không gian đa trải nghiệm",
     "spacesDesc": "Năm khu vực, năm cá tính riêng — mỗi góc nhỏ tại AURA CAFE đều mang một trải nghiệm độc đáo.",
     "visitTitle": "Ghé thăm AURA CAFE",
     "exploreNow": "Khám phá ngay",
-    "grandOpeningAlt": "AURA CAFE tại 39 Nguyễn Tất Thành, Sa Đéc"
+    "grandOpeningAlt": "AURA CAFE tại 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc"
   },
   "tracking": {
     "ariaLabel": "Trạng thái đơn hàng",
@@ -1435,7 +1457,7 @@
     "galleryBullet2Title": "Ánh Sáng Cảm Xúc",
     "galleryBullet2Desc": "Hệ thống chiếu sáng được thiết kế bởi chuyên gia, tối ưu cho trải nghiệm buổi tối.",
     "locationTitle": "Ghé Thăm Chúng Tôi Tại Sa Đéc",
-    "locationAddress": "39 Nguyễn Tất Thành, Phường 1, Sa Đéc, Đồng Tháp",
+    "locationAddress": "29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — Đối diện Khách sạn Thảo Trâm 2",
     "locationHours": "Mở cửa: 07:00 - 23:00 mỗi ngày",
     "locationPhone": "+84 277 123 456",
     "locationMapAlt": "Bản đồ vị trí AURA CAFE tại Sa Đéc, Đồng Tháp",
@@ -1612,8 +1634,8 @@
     "item3Name": "Bronze Latte",
     "item3Desc": "Nghệ & mật ong, sữa yến mạch, kết thúc với bụi đồng",
     "menuImageAlt": "Lựa chọn thực đơn đồ uống cà phê đặc biệt",
-    "address1": "39 Nguyễn Tất Thành",
-    "address2": "Sa Đéc, Đồng Tháp, Việt Nam",
+    "address1": "29 Nguyễn Tất Thành",
+    "address2": "Phường 1, TP. Sa Đéc, Đồng Tháp, Việt Nam",
     "exploreHeading": "Khám phá",
     "exploreMenu": "Thực đơn",
     "ourStory": "Câu chuyện",
@@ -1919,6 +1941,7 @@
     "noQR": "Chưa có mã QR",
     "pageSubtitle": "Tạo và in mã QR cho các bàn",
     "zoneFilter": "Khu vực:",
+    "allZones": "Tất cả khu vực",
     "staffAccess": "Truy cập nhân viên",
     "displayOnKDS": "Hiển thị trên KDS",
     "printHeaderTitle": "Mã QR cho nhân viên — quét để mở trang đặt món",
@@ -1985,6 +2008,7 @@
     "subtitle": "Cấu hình giảm giá và quà tặng sinh nhật cho khách hàng thân thiết",
     "configTitle": "Cấu hình sinh nhật",
     "enabledLabel": "Bật",
+    "disabledLabel": "Tắt",
     "autoSendLabel": "Tự động gửi tin nhắn sinh nhật",
     "autoSendHint": "Tự động gửi tin nhắn chúc mừng sinh nhật cho khách hàng",
     "discountPercentLabel": "Phần trăm giảm giá",
@@ -2061,7 +2085,16 @@
     "recentShifts": "Ca gần đây",
     "noRecentShifts": "Chưa có ca nào",
     "fieldPassword": "Mật khẩu",
-    "fieldRolePlaceholder": "VD: Pha chế, Phục vụ, Thu ngân"
+    "fieldRolePlaceholder": "VD: Pha chế, Phục vụ, Thu ngân",
+    "recruitment": "Tuyển dụng",
+    "recruitmentTitle": "Tuyển dụng nhân sự",
+    "recruitmentSubtitle": "Quản lý danh sách hồ sơ ứng viên AURA CAFE",
+    "addCandidateBtn": "+ Nhập hồ sơ ứng viên",
+    "totalApplications": "Tổng hồ sơ",
+    "baristaApplicants": "Barista (Pha chế)",
+    "serviceApplicants": "Thu ngân & Phục vụ",
+    "pendingAction": "Chờ liên hệ",
+    "addCandidate": "Tiếp nhận hồ sơ ứng viên"
   },
   "adminReservations": {
     "title": "Quản lý đặt bàn",
@@ -2187,5 +2220,185 @@
     "justNow": "Vừa xong",
     "minutesAgo": "{{count}} phút trước",
     "hoursAgo": "{{count}} giờ trước"
+  },
+  "terminal": {
+    "sidebar": "Thanh điều hướng",
+    "mainNavigation": "Điều hướng chính",
+    "generateReport": "Tạo báo cáo",
+    "adminAvatar": "Ảnh đại diện quản trị",
+    "logout": "Đăng xuất",
+    "topBar": "Thanh công cụ",
+    "openSidebar": "Mở thanh điều hướng",
+    "closeSidebar": "Đóng thanh điều hướng",
+    "managementTitle": "Quản lý vận hành",
+    "searchPlaceholder": "Tìm kiếm đơn, bàn, khách hàng...",
+    "search": "Tìm kiếm",
+    "notifications": "Thông báo",
+    "help": "Trợ giúp",
+    "mainContent": "Nội dung chính",
+    "orderCard": "Đơn hàng #{id}",
+    "items": "Món",
+    "orderVoided": "Đơn đã hủy",
+    "total": "Tổng tiền",
+    "viewLog": "Xem nhật ký",
+    "details": "Chi tiết",
+    "pagination": "Phân trang",
+    "showingOrders": "Hiển thị {current} trên {total} đơn",
+    "prevPage": "Trang trước",
+    "nextPage": "Trang sau",
+    "page": "Trang {n}",
+    "newOrder": "Đơn mới",
+    "settings": "Cài đặt",
+    "searchFilters": "Bộ lọc tìm kiếm",
+    "noOrders": "Không tìm thấy đơn hàng",
+    "orderList": "Danh sách đơn hàng",
+    "loading": "Đang tải...",
+    "error": "Lỗi",
+    "errorTitle": "Không thể tải dữ liệu",
+    "retry": "Thử lại",
+    "statOverview": "Tổng quan chỉ số",
+    "stat": {
+      "clock": "Đang chờ xử lý",
+      "flame": "Đang pha chế",
+      "check": "Đã sẵn sàng",
+      "package": "Đã giao / Phục vụ"
+    }
+  },
+  "orderMgmt": {
+    "all": "Tất cả",
+    "pending": "Chờ xử lý",
+    "preparing": "Đang pha chế",
+    "ready": "Sẵn sàng",
+    "served": "Đã phục vụ",
+    "cancelled": "Đã hủy"
+  },
+  "salesReports": {
+    "title": "Báo cáo doanh thu",
+    "exporting": "Đang xuất...",
+    "exportCsv": "Xuất CSV",
+    "csvExportError": "Lỗi xuất file CSV",
+    "retry": "Thử lại",
+    "recentOrders": "Đơn hàng gần đây",
+    "loading": "Đang tải...",
+    "orderCount": "{{count}} đơn hàng",
+    "revenueToday": "Doanh thu hôm nay",
+    "yesterday": "Hôm qua",
+    "ordersLabel": "Tổng số đơn",
+    "avgOrderValue": "Giá trị trung bình",
+    "compareMode": "So sánh kỳ trước",
+    "empty": {
+      "noOrders": "Chưa có đơn hàng nào trong khoảng thời gian này"
+    },
+    "period": {
+      "7d": "7 ngày qua",
+      "30d": "30 ngày qua",
+      "custom": "Tùy chỉnh"
+    },
+    "groupBy": {
+      "hour": "Theo giờ",
+      "day": "Theo ngày",
+      "category": "Theo danh mục",
+      "payment": "Theo thanh toán"
+    },
+    "periodSummary": {
+      "today": "Hôm nay (từ {{from}})",
+      "range": "Từ {{from}} đến {{to}}",
+      "compare": "So sánh với kỳ trước ({{from}} - {{to}})"
+    }
+  },
+  "invoices": {
+    "pageTitle": "Lịch sử hóa đơn",
+    "loading": "Đang tải...",
+    "reload": "Tải lại",
+    "listTitle": "Danh sách hóa đơn",
+    "retry": "Thử lại",
+    "guestCustomer": "Khách vãng lai",
+    "error": {
+      "loadFailed": "Không thể tải danh sách hóa đơn",
+      "connectionError": "Lỗi kết nối máy chủ"
+    },
+    "empty": {
+      "title": "Chưa có hóa đơn nào",
+      "description": "Các hóa đơn thanh toán sẽ xuất hiện ở đây sau khi hoàn tất"
+    },
+    "table": {
+      "orderId": "Mã đơn",
+      "customer": "Khách hàng",
+      "total": "Tổng tiền",
+      "status": "Trạng thái",
+      "date": "Ngày tạo",
+      "download": "Tải về"
+    },
+    "status": {
+      "synced": "Đã đồng bộ",
+      "failed": "Lỗi",
+      "pending": "Chờ xử lý"
+    }
+  },
+  "audit": {
+    "title": "Nhật ký kiểm toán",
+    "subtitle": "Theo dõi mọi hoạt động trong hệ thống",
+    "refresh": "Làm mới",
+    "exportCsv": "Xuất CSV",
+    "dateRangeWarning": "Khoảng thời gian không hợp lệ",
+    "filterTitle": "Bộ lọc tìm kiếm",
+    "dateFrom": "Từ ngày",
+    "dateTo": "Đến ngày",
+    "actionLabel": "Hành động",
+    "resourceLabel": "Tài nguyên",
+    "actorLabel": "Người thực hiện",
+    "actorPlaceholder": "Nhập tên hoặc email...",
+    "search": "Tìm kiếm",
+    "reset": "Đặt lại",
+    "pagination": {
+      "info": "Trang {{page}} / {{totalPages}} (Tổng {{total}} bản ghi)",
+      "prev": "Trang trước",
+      "next": "Trang sau"
+    },
+    "tableHeader": {
+      "time": "Thời gian",
+      "actor": "Người thực hiện",
+      "action": "Hành động",
+      "resourceType": "Loại tài nguyên",
+      "resourceId": "ID tài nguyên",
+      "ip": "Địa chỉ IP"
+    },
+    "error": {
+      "loadFailed": "Không thể tải nhật ký",
+      "retry": "Thử lại"
+    },
+    "empty": {
+      "noLogs": "Không có nhật ký nào",
+      "noLogsDescription": "Thử thay đổi bộ lọc tìm kiếm",
+      "resetFilters": "Xóa bộ lọc"
+    },
+    "csv": {
+      "time": "Thời gian",
+      "actor": "Người thực hiện",
+      "action": "Hành động",
+      "resourceType": "Loại tài nguyên",
+      "resourceId": "ID tài nguyên",
+      "ip": "IP"
+    },
+    "actionFilter": {
+      "all": "Tất cả hành động",
+      "create": "Tạo mới (CREATE)",
+      "update": "Cập nhật (UPDATE)",
+      "delete": "Xóa (DELETE)",
+      "login": "Đăng nhập (LOGIN)",
+      "logout": "Đăng xuất (LOGOUT)",
+      "export": "Xuất dữ liệu (EXPORT)"
+    },
+    "resourceFilter": {
+      "all": "Tất cả tài nguyên",
+      "order": "Đơn hàng",
+      "customer": "Khách hàng",
+      "menu": "Thực đơn",
+      "promotion": "Khuyến mãi",
+      "campaign": "Chiến dịch",
+      "staff": "Nhân viên",
+      "payment": "Thanh toán",
+      "reservation": "Đặt bàn"
+    }
   }
 }

@@ -39,6 +39,18 @@ const FORBIDDEN = [
   'Cam/đỏ rực (Hỏa hao Thủy)',
 ];
 
+function renderWithHexBadges(text: string) {
+  return text.split(/(#[\dA-Fa-f]{3,8})/g).map((part, idx) =>
+    /^#[\dA-Fa-f]{3,8}$/.test(part) ? (
+      <code key={idx} className="rounded bg-accent/10 px-1 font-mono text-xs text-accent">
+        {part}
+      </code>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function BaziExplanation({ className }: BaziExplanationProps) {
   return (
     <section className={cn('space-y-8', className)}>
@@ -85,12 +97,7 @@ export function BaziExplanation({ className }: BaziExplanationProps) {
             {ALLOWED.map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
                 <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
-                <span dangerouslySetInnerHTML={{
-                  __html: item.replace(
-                    /(#[\dA-Fa-f]{3,8})/g,
-                    '<code class="rounded bg-accent/10 px-1 font-mono text-xs text-accent">$1</code>',
-                  ),
-                }} />
+                <span>{renderWithHexBadges(item)}</span>
               </li>
             ))}
           </ul>
@@ -104,12 +111,7 @@ export function BaziExplanation({ className }: BaziExplanationProps) {
             {FORBIDDEN.map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
                 <span className="mt-0.5 shrink-0 text-destructive" aria-hidden="true"><X size={16} className="inline text-destructive" /></span>
-                <span dangerouslySetInnerHTML={{
-                  __html: item.replace(
-                    /(#[\dA-Fa-f]{3,8})/g,
-                    '<code class="rounded bg-accent/10 px-1 font-mono text-xs text-accent">$1</code>',
-                  ),
-                }} />
+                <span>{renderWithHexBadges(item)}</span>
               </li>
             ))}
           </ul>

@@ -36,6 +36,7 @@ const defaultProps = {
 describe('StitchCheckoutNew', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('renders loading skeleton when summary is null', () => {
@@ -139,7 +140,7 @@ describe('StitchCheckoutNew', () => {
     });
     expect(defaultProps.onPlaceOrder).not.toHaveBeenCalled();
     // Fill address → error clears
-    await user.type(screen.getByPlaceholderText(/Số nhà, tên đường/), '39 Nguyễn Tất Thành');
+    await user.type(screen.getByPlaceholderText(/Số nhà, tên đường/), '29 Nguyễn Tất Thành');
     await waitFor(() => {
       expect(screen.queryByTestId('address-error')).not.toBeInTheDocument();
     });

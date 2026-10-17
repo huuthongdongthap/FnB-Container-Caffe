@@ -14,7 +14,7 @@ authRoutes.use('/api/auth/*', async (c, next) => {
   if (publicPaths.some(p => path.endsWith(p))) {
     return next();
   }
-  return requireAuth(['owner', 'manager', 'staff'])(c, next);
+  return requireAuth(['owner', 'manager', 'staff', 'customer'])(c, next);
 });
 
 // Register all handler groups

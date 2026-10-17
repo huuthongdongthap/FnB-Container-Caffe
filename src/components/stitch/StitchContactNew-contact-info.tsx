@@ -19,8 +19,8 @@ export function ContactInfoCard({ onNavigate }: { onNavigate?: (path: string) =>
           {t('contact.address', 'ADDRESS')}
         </h3>
         <p className="font-body text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
-          29 Nguyen Tat Than, Sa Dec,<br />
-          Dong Thap, Vietnam
+          29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc,<br />
+          Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2)
         </p>
       </div>
 
@@ -31,7 +31,7 @@ export function ContactInfoCard({ onNavigate }: { onNavigate?: (path: string) =>
           {t('contact.phone', 'DIRECT LINE')}
         </h3>
         <p className="font-body text-[18px] leading-relaxed text-[var(--aura-text-primary)]">
-          (000) 000-0000
+          0909 29 8686
         </p>
       </div>
 

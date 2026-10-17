@@ -1,51 +1,54 @@
-# Deployment Execution Log
+# Deployment Execution Log — AURA OS
 
-**Execution Target**: Cloudflare Edge Infrastructure  
-**Date**: 2026-10-09  
-**Strategy**: Zero-downtime Canary & Immutable Edge Deployment  
-**Commit**: `0d59c546`
+## Build & Deployment Execution Summary
+
+- **Timestamp**: 2026-10-16T02:14:23Z
+- **Trigger**: `/deploy`
+- **Target Environments**:
+  - Cloudflare Pages (`fnb-caffe-container.pages.dev`, `https://auraspace.cafe`, deployment `https://50e54168.fnb-caffe-container.pages.dev`)
+  - Cloudflare Worker (`aura-space-worker.sadec-marketing-hub.workers.dev`)
+  - Cloudflare D1 Database (`fnb-caffe-db`)
+- **Worker Version ID**: `62239ad0-a40e-4a33-8c44-b6a4fbfbfb4c`
+- **Pages Deployment**: `50e54168`
 
 ---
 
-## 1. Pipeline Execution Plan
+## 1. Production Bundle Artifacts
 
 ```
-[0/3] Pre-Flight Tests & Static Analysis
-   ├── Vitest Integration Tests (3,855 passed across 426 files)
-   └── Full TypeScript & ESLint Verification (0 errors)
-[1/3] Frontend Build & Static Asset Generation
-   ├── Vite production bundle minification (Terser)
-   ├── Cache-busting version.json generation (SHA: 0d59c546)
-   └── Wrangler Pages Deployment: fnb-caffe-container (branch: main)
-[2/3] Cloudflare Worker Edge Gateway Deployment
-   ├── Wrangler Worker deploy: aura-space-worker
-   └── GIT_COMMIT_SHA variable injection: 0d59c546
-[3/3] D1 Migrations Auto-Reconciliation
-   ├── 20261007_02_catalog_modifiers_contract.sql
-   ├── 20261009_01_audit_trail_canonical_contract.sql
-   ├── 20261009_02_notification_canonical_contract.sql
-   └── 20261009_03_integration_boundary_contract.sql
+vite v8.0.3 building client environment for production...
+✓ 2,602 modules transformed.
+dist/index.html                                        3.13 kB │ gzip:  1.24 kB
+dist/assets/index-DZtkqtTE.css                       386.25 kB │ gzip: 48.43 kB
+dist/assets/vendor-i18n-Bgok8guR.js                   64.72 kB │ gzip: 21.51 kB
+dist/assets/vendor-react-CbndDHB-.js                 181.39 kB │ gzip: 57.53 kB
+dist/assets/index-b5r_UXmA.js                        293.97 kB │ gzip: 90.22 kB
+✓ built in 4.49s
 ```
 
----
-
-## 2. Deployment Commands & Artifacts
-
-- **Deploy Script**: `bash deploy-cloudflare.sh`
-- **Frontend Project**: `fnb-caffe-container` on Cloudflare Pages (`https://2f6c32c4.fnb-caffe-container.pages.dev`)
-- **Custom Domain**: `https://auraspace.cafe` (SHA: `0d59c546`)
-- **Worker Project**: `aura-space-worker` on Cloudflare Workers (`https://aura-space-worker.sadec-marketing-hub.workers.dev`)
-- **Database**: `fnb-caffe-db` on Cloudflare D1
-- **Health Verification Endpoint**: `https://aura-space-worker.sadec-marketing-hub.workers.dev/api/health` (HTTP 200)
-- **Version Endpoint**: `https://aura-space-worker.sadec-marketing-hub.workers.dev/api/version` (`0d59c546`)
+### Static Artifact Invariants:
+- `_redirects`: Cloudflare Pages SPA rewrite rule (`/* /index.html 200`) uploaded.
+- `_headers`: Content Security Policy updated with Google Fonts whitelisting (`https://fonts.googleapis.com` in `style-src`, `https://fonts.gstatic.com` in `font-src`).
+- `sw.js`: Service Worker static cache version bumped to `aura-static-v4`.
+- `version.json`: Git commit SHA (`a8190d5a`) and build timestamp (`2026-10-16T02:14:23Z`) fingerprint.
 
 ---
 
-## 3. Execution Status
+## 2. Worker Compilation & Deployment
 
-- **Pre-Flight Tests**: COMPLETED (0 errors, 3,855 passed)
-- **Production Asset Build**: COMPLETED (`dist/` directory deployed)
-- **Cloudflare Pages**: DEPLOYED & LIVE (`https://auraspace.cafe`)
-- **Cloudflare Worker**: DEPLOYED & LIVE (`v33d9e23b`)
-- **D1 Migrations**: RECONCILED (All 4 contract migrations applied)
-- **Deployment Readiness**: 100% GREEN
+- **Entrypoint**: `worker/src/index.ts`
+- **Deploy Command**: `npx wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:a8190d5a`
+- **Triggers**:
+  - Worker URL: `https://aura-space-worker.sadec-marketing-hub.workers.dev`
+  - Cron Trigger: `*/5 * * * *`
+- **Current Version ID**: `62239ad0-a40e-4a33-8c44-b6a4fbfbfb4c`
+- **Database Migrations**: Preserved fail-closed state (no destructive migrations applied).
+
+---
+
+## 3. Post-Deploy Automated Probes
+
+- Health Endpoint (`/api/health`): HTTP 200 OK
+- Worker SHA Match: `a8190d5a == a8190d5a`
+- Custom Domain SHA Match (`https://auraspace.cafe/version.json`): `a8190d5a == a8190d5a (HTTP 200)`
+- Status: **DEPLOYMENT SUCCESSFUL**

@@ -25,7 +25,7 @@ function DashBottomNavItem({
     <Tag
       type={href ? undefined : 'button'}
       className={clsx(
-        'flex flex-col items-center justify-center',
+        'flex flex-col items-center justify-center min-h-[44px] min-w-[44px]',
         active
           ? 'text-[var(--aura-chrome-bright)] font-bold active:scale-90 transition-transform'
           : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors active:scale-90 transition-transform',
@@ -50,23 +50,23 @@ export function DashBottomNav() {
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 bg-[var(--aura-surface-dim)]/90 backdrop-blur-[8px] border-t border-white/10 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 pb-[env(safe-area-inset-bottom)] bg-[var(--aura-surface-dim)]/90 backdrop-blur-[8px] border-t border-white/10 md:hidden"
       aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}
     >
       <DashBottomNavItem
         icon={<Armchair className="w-6 h-6" />}
         label={t('stitch.accountDashboard.navReserve', 'Reserve')}
-        href="/menu"
+        href="/table-reservation"
       />
       <DashBottomNavItem
         icon={<ReceiptText className="w-6 h-6" />}
         label={t('stitch.accountDashboard.navOrders', 'Orders')}
-        href="/menu"
+        href="/track-order"
       />
       <DashBottomNavItem
         icon={<Medal className="w-6 h-6" />}
         label={t('stitch.accountDashboard.navLoyalty', 'Loyalty')}
-        href="/menu"
+        href="/loyalty"
       />
       <DashBottomNavItem
         icon={<User className="w-6 h-6" />}

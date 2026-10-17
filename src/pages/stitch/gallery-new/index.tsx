@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -107,6 +107,17 @@ export default function GalleryNew() {
   const [activeFilter, setActiveFilter] = useState<ZoneFilter>('TẤT CẢ');
   const [modalImage, setModalImage] = useState<GalleryItem | null>(null);
 
+  useEffect(() => {
+    if (!modalImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setModalImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalImage]);
+
   const filteredItems =
     activeFilter === 'TẤT CẢ'
       ? GALLERY_ITEMS
@@ -206,7 +217,16 @@ export default function GalleryNew() {
           {filteredItems.map((item) => (
             <div
               key={item.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Xem ảnh ${item.title}`}
               onClick={() => setModalImage(item)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setModalImage(item);
+                }
+              }}
               className="group cursor-pointer rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-[var(--aura-chrome-mid)]/60 transition-all duration-300 shadow-xl flex flex-col"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-black/40">

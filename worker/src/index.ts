@@ -8,6 +8,7 @@ import { cors } from 'hono/cors';
 import { errorHandler } from './middleware/error-handler';
 import { correlationId } from './middleware/correlation-id';
 import { requestMetrics } from './middleware/request-metrics';
+import { securityHeaders } from './middleware/security-headers';
 import { requireAuth } from './middleware/auth';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { handleScheduled } from './scheduled';
@@ -62,6 +63,7 @@ app.use('/*', cors({
 
 // ── Global Middleware ──
 app.use('*', correlationId());
+app.use('*', securityHeaders());
 app.use('*', requestMetrics());
 app.onError(errorHandler);
 
@@ -70,7 +72,7 @@ app.route('/api/menu', customerMenuRouter);
 app.route('/api/orders', ordersUnifiedRouter);
 
 // ── Orders KDS & Realtime ──
-app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
+app.use('/api/kds/orders/*', requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']));
 app.route('/api/kds/orders', ordersUnifiedRouter);
 app.route('/api/kds/orders', kdsStreamRouter);
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));

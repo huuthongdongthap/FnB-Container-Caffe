@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockDB, createMockEnv } from '../test-utils';
 
 vi.mock('../../middleware/auth', () => ({
-  optionalAuth: () => (_c: any, next: any) => next()
+  optionalAuth: () => (_c: any, next: any) => next(),
+  requireAuth: () => (_c: any, next: any) => next()
 }));
 
 describe('Payments MoMo smoke', () => {
@@ -67,5 +68,40 @@ describe('Payments MoMo smoke', () => {
 
     const res = await app.fetch(req, env);
     expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    expect(body.checkoutUrl).toBe('https://pay.momo.vn/abc123');
+    expect(typeof body.orderCode).toBe('string');
+  });
+
+  it('rejects MoMo payment creation with 403 when authenticated user does not own the order', async() => {
+    const { Hono } = await import('hono');
+    const { momoCreate } = await import('@aura/domain-payment');
+
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      (c.set as any)('user', { id: 'OTHER_USER', role: 'customer' });
+      await next();
+    });
+    momoCreate(app);
+
+    const req = new Request('https://test.aura/momo/create/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: '550e8400-e29b-41d4-a716-446655440000' })
+    });
+
+    const env = {
+      ...createMockEnv(),
+      AURA_DB: makeDB(),
+      MOMO_PARTNER_CODE: 'test-partner',
+      MOMO_ACCESS_KEY: 'test-access',
+      MOMO_SECRET_KEY: 'test-secret',
+    };
+
+    const res = await app.fetch(req, env);
+    expect(res.status).toBe(403);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.success).toBe(false);
   });
 });

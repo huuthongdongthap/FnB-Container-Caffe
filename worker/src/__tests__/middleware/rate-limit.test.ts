@@ -69,4 +69,31 @@ describe('rateLimitMiddleware', () => {
     expect(c.json).toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('rejects spoofed localhost Origin and x-playwright-test bypass headers in production', async() => {
+    const kv = createMockKV();
+    const headers: Record<string, string> = {
+      origin: 'http://localhost:5173',
+      'x-playwright-test': 'true',
+      'cf-connecting-ip': '203.0.113.50'
+    };
+    const c = {
+      env: { AUTH_KV: kv, ENVIRONMENT: 'production' },
+      req: {
+        raw: new Request('https://auraspace.cafe/api/recruitment/apply'),
+        header: (name: string) => headers[name.toLowerCase()]
+      },
+      json: vi.fn().mockReturnValue(new Response('', { status: 429 }))
+    } as any;
+    const next = vi.fn();
+    const config = { max: 2, windowSec: 60, keyPrefix: 'prod-test', errorMessage: 'Rate limited' };
+
+    await rateLimitMiddleware(config)(c, vi.fn());
+    await rateLimitMiddleware(config)(c, vi.fn());
+    await rateLimitMiddleware(config)(c, next);
+
+    expect(c.json).toHaveBeenCalledWith({ ok: false, error: 'Rate limited' }, 429);
+    expect(next).not.toHaveBeenCalled();
+  });
 });
+

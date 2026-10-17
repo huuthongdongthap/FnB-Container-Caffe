@@ -23,7 +23,9 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
   // ERPNext Integration
   app.use('/api/erpnext/*', requireAuth(['owner']));
   app.all('/api/erpnext/*', (c) => handleErpnextRequest(c.req.raw, c.env as unknown as Record<string, unknown>));
+  app.use('/api/erpnext-pos/*', requireAuth(['owner', 'manager', 'staff']));
   app.all('/api/erpnext-pos/*', (c) => handleErpnextPosRequest(c.req.raw, c.env as unknown as Record<string, unknown>));
+  app.use('/api/erpnext-invoices/*', requireAuth(['owner', 'manager', 'staff']));
   app.all('/api/erpnext-invoices/*', (c) => handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>));
   app.get('/api/public/products/:productId/availability', (c) =>
     handleErpnextPosRequest(new Request(`https://internal/api/erpnext-pos/products/${c.req.param('productId')}/availability`, c.req.raw), c.env as unknown as Record<string, unknown>)
@@ -34,7 +36,7 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
   expenseRoutes(app);
 
   // Mixpost, Mautic, Zalo, Integrations
-  app.use('/api/mixpost/*', requireAuth(['owner', 'staff']));
+  app.use('/api/mixpost/*', requireAuth(['owner', 'manager', 'staff']));
   app.all('/api/mixpost/*', (c) => handleMixpostRequest(c.req.raw, c.env as unknown as Record<string, unknown>));
   app.use('/api/mautic-bridge/*', requireAuth(['owner']));
   app.all('/api/mautic-bridge/*', (c) => handleMauticBridgeRequest(c.req.raw, c.env as unknown as Record<string, unknown>));
@@ -44,7 +46,7 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
   });
   app.route('/api/ha', createHARouter());
   app.route('/api/integrations/tastyigniter', createTIRoutes());
-  app.use('/api/integrations/frigate/*', requireAuth(['owner', 'staff']));
+  app.use('/api/integrations/frigate/*', requireAuth(['owner', 'manager', 'staff']));
   app.route('/api/integrations/frigate', createFrigateRoutes());
   app.route('/api/wifi', createWifiRoutes());
 }

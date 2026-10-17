@@ -93,6 +93,6 @@ const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     }, 201);
   } catch (error) {
     log.error('Register error:', { message: (error as Error).message });
-    return errorResponse(`Đăng ký thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Đăng ký thất bại', 500);
   }
 }

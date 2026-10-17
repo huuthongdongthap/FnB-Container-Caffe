@@ -51,7 +51,7 @@ describe('CheckoutForm', () => {
 
     fireEvent.change(screen.getByLabelText(/họ và tên/i), { target: { value: 'Nguyễn Văn A' } });
     fireEvent.change(screen.getByLabelText(/số điện thoại/i), { target: { value: '0912345678' } });
-    fireEvent.change(screen.getByLabelText(/địa chỉ giao hàng/i), { target: { value: '39 Nguyễn Tất Thành' } });
+    fireEvent.change(screen.getByLabelText(/địa chỉ giao hàng/i), { target: { value: '29 Nguyễn Tất Thành' } });
 
     fireEvent.click(screen.getByText(/Đặt hàng/));
 
@@ -65,7 +65,7 @@ describe('CheckoutForm', () => {
 
     fireEvent.change(screen.getByLabelText(/họ và tên/i), { target: { value: 'Nguyễn Văn A' } });
     fireEvent.change(screen.getByLabelText(/số điện thoại/i), { target: { value: '123' } });
-    fireEvent.change(screen.getByLabelText(/địa chỉ giao hàng/i), { target: { value: '39 Nguyễn Tất Thành' } });
+    fireEvent.change(screen.getByLabelText(/địa chỉ giao hàng/i), { target: { value: '29 Nguyễn Tất Thành' } });
 
     fireEvent.click(screen.getByText(/Đặt hàng/));
 

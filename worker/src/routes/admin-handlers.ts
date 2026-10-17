@@ -27,7 +27,16 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   const { results } = await db.prepare(query).bind(...params, limit, offset).all();
   const totalRow = await db.prepare(countQuery).bind(...params).first<{ total: number }>();
   const total = totalRow?.total ?? 0;
-  return Response.json({ success: true, data: results, pagination: { page, limit, total } });
+  const customers = (results || []).map((row) => {
+    const r = row as Record<string, unknown>;
+    return {
+      ...r,
+      totalOrders: Number(r.totalOrders ?? r.visit_count ?? 0),
+      totalSpent: Number(r.totalSpent ?? r.total_spent ?? 0),
+      lastVisit: String(r.lastVisit ?? r.updated_at ?? r.created_at ?? ''),
+    };
+  });
+  return Response.json({ success: true, data: customers, customers, pagination: { page, limit, total } });
 }
 
 export async function getStuckPayments(request: Request, env: Record<string, unknown>) {

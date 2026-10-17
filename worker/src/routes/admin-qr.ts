@@ -14,7 +14,7 @@ import type { CafeTable, QrCodeRow } from '@aura/domain-table';
 export const adminQRRouter = new Hono<{ Bindings: Env }>();
 
 // ── Auth gate ──────────────────────────────────────────────────────
-adminQRRouter.use('*', requireAuth(['owner', 'staff']));
+adminQRRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
 
 // ── GET /api/admin/qr/tables — list all tables with QR data ──────
 adminQRRouter.get('/tables', async(c) => {

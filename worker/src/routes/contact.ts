@@ -59,7 +59,7 @@ export async function submitContact(request: Request, env: Record<string, unknow
     }, 201);
   } catch (error) {
     log.error('Contact submit error:', { message: (error as Error).message });
-    return errorResponse(`Failed to submit contact message: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to submit contact message', 500);
   }
 }
 

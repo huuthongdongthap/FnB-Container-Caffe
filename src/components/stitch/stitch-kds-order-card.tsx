@@ -45,6 +45,10 @@ export function TicketCard({
   const [elapsed, setElapsed] = useState(ticket.elapsedSeconds);
 
   useEffect(() => {
+    setElapsed(ticket.elapsedSeconds);
+  }, [ticket.elapsedSeconds]);
+
+  useEffect(() => {
     if (ticket.status === 'ready') {
       setElapsed(ticket.totalTimeSeconds ?? ticket.elapsedSeconds);
       return;
@@ -172,8 +176,11 @@ export function TicketCard({
             {t('kds.orderPickedUp', 'ORDER PICKED UP')}
           </ActionButton>
         )}
-        {isOverdue && onStart && (
-          <ActionButton onClick={() => onStart(ticket.id)} className="bg-error">
+        {isOverdue && (onComplete || onStart) && (
+          <ActionButton
+            onClick={() => (onComplete ? onComplete(ticket.id) : onStart?.(ticket.id))}
+            className="bg-error"
+          >
             {t('kds.priorityComplete', 'PRIORITY COMPLETE')}
           </ActionButton>
         )}

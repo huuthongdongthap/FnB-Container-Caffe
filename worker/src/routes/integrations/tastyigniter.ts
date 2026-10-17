@@ -41,8 +41,8 @@ const SyncOrderSchema = z.object({
 export function createTIRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  // Middleware: owner+staff only
-  const allow = requireAuth(['owner', 'staff']);
+  // Middleware: owner, manager, staff only
+  const allow = requireAuth(['owner', 'manager', 'staff']);
 
   // POST /api/integrations/tastyigniter/sync/menu
   // Pull menu from TI and cache locally (fire-and-forget).
@@ -52,7 +52,7 @@ export function createTIRoutes() {
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('ti_sync_menu_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message, mock: false }, 500);
+      return c.json({ success: false, error: 'Failed to sync TastyIgniter menu', mock: false }, 500);
     }
   });
 
@@ -72,7 +72,7 @@ export function createTIRoutes() {
       return c.json({ success: true, result });
     } catch (err) {
       log.error('ti_bridge_order_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message, mock: false }, 500);
+      return c.json({ success: false, error: 'Failed to bridge order to TastyIgniter', mock: false }, 500);
     }
   });
 
@@ -93,10 +93,14 @@ export function createTIRoutes() {
   // Inbound webhook from TastyIgniter (order status updates).
   app.post('/webhook', async(c) => {
     try {
+      const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
       const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
+      if (isProd && !secret) {
+        return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
+      }
       if (secret) {
         const sig = c.req.header('x-tastyigniter-signature') ?? c.req.query('secret') ?? c.req.query('token');
-        if (sig !== secret) {
+        if (!sig || sig !== secret) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
       }
@@ -110,7 +114,7 @@ export function createTIRoutes() {
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('ti_webhook_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message }, 500);
+      return c.json({ success: false, error: 'Failed to process TastyIgniter webhook' }, 500);
     }
   });
 

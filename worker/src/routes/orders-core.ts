@@ -12,20 +12,31 @@ import type { Env } from '../types/env';
 export const ordersCoreRouter = new Hono<{ Bindings: Env }>();
 
 export const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
-  const origin = c.req.header('origin') || c.req.header('referer') || '';
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-    return next();
+  const isProd = c.env?.ENVIRONMENT === 'production' || (c.env as Record<string, unknown>)?.NODE_ENV === 'production';
+  if (!isProd) {
+    const origin = c.req.header('origin') || c.req.header('referer') || '';
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return next();
+    }
   }
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost' || ip === 'unknown') {
+  if (!isProd && (ip === '127.0.0.1' || ip === 'localhost' || ip === 'unknown')) {
+    return next();
+  }
+  const kv = c.env?.AUTH_KV;
+  if (!kv) {
     return next();
   }
   const key = `rate:order:${ip}`;
-  const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 60) {
-    return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+  try {
+    const count = Number((await kv.get(key)) || 0);
+    if (count >= 60) {
+      return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+    }
+    await kv.put(key, String(count + 1), { expirationTtl: 600 });
+  } catch {
+    // Fail open on transient KV errors
   }
-  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 600 });
   await next();
 };
 
@@ -126,7 +137,7 @@ export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) 
 };
 
 ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);
-ordersCoreRouter.post('/sync', handleSyncOrders);
-ordersCoreRouter.post('/split', handleSplitOrders);
+ordersCoreRouter.post('/sync', orderRateLimit, handleSyncOrders);
+ordersCoreRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersCoreRouter.get('/latest', handleLatestOrderTimestamp);
-ordersCoreRouter.patch('/:id', requireAuth(['owner', 'staff']), handleUpdateOrder);
+ordersCoreRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff']), handleUpdateOrder);

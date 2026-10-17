@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
 import { previousPeriodDates } from './date-helpers';
 import type { GroupedSalesData } from '@/components/admin/GroupedSalesChart';
 import type { PeriodDataPoint } from './sales-report-types';
@@ -64,7 +64,9 @@ export function useExportCsv(from: string, to: string) {
     setExporting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports/export?from=${from}&to=${to}&type=sales`);
+      const res = await fetch(`${API_BASE}/api/reports/export?from=${from}&to=${to}&type=sales`, {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
 
       const blob = await res.blob();

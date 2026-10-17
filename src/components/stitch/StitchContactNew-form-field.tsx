@@ -45,7 +45,7 @@ export function FormField({
           placeholder={placeholder}
           rows={4}
           className={cn(inputClasses, 'resize-none')}
-          style={{ borderBottomColor: showBronze ? 'var(--aura-bronze-shimmer)' : 'var(--aura-chrome-bright)/30' }}
+          style={{ borderBottomColor: showBronze ? 'var(--aura-bronze-shimmer)' : 'color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}
         />
       ) : (
         <input
@@ -56,7 +56,7 @@ export function FormField({
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           className={inputClasses}
-          style={{ borderBottomColor: showBronze ? 'var(--aura-bronze-shimmer)' : 'var(--aura-chrome-bright)/30' }}
+          style={{ borderBottomColor: showBronze ? 'var(--aura-bronze-shimmer)' : 'color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}
         />
       )}
     </div>

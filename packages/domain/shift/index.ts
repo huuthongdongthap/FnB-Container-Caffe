@@ -10,6 +10,7 @@ export type {
 } from './src/model/reconciliation-types';
 // commands
 export { shiftsRouter } from './commands/shifts';
+export { reconciliationRoutes } from './src/routes/reconciliation';
 // policies
 export { reconcileShiftCash, getReconciliationForShift } from './src/policies/cash-reconciliation-policy';
 export {

@@ -70,15 +70,20 @@ export interface ReferralResult {
 const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 function generateCode(length = 6): string {
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
   let result = '';
   for (let i = 0; i < length; i++) {
-    result += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    result += CODE_CHARS[bytes[i] % CODE_CHARS.length];
   }
   return result;
 }
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + hex.slice(0, 4);
 }
 
 function nowIso(): string {

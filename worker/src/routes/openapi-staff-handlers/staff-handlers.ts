@@ -2,14 +2,9 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
 import { getDatabase } from '../../lib/db';
+import { hashPassword } from '../../lib/jwt';
 
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'aura_salt_' + crypto.randomUUID());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+export { hashPassword };
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
@@ -40,7 +35,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      name: 'name',
+      email: 'email',
+      role: 'role',
+      hire_date: 'hire_date',
+      hireDate: 'hire_date',
+      created_at: 'created_at',
+      createdAt: 'created_at',
+    };
+    const sortCol = allowedSorts[sort] || 'name';
+    const sortDir = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
        FROM users ${whereClause}
@@ -111,6 +117,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
+    if (body.role === 'owner' && user?.role !== 'owner') {
+      return c.json({ success: false, error: 'Only owners can create owner accounts' }, 403);
+    }
+
     // Check if email exists
     const existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
     if (existing) {
@@ -138,11 +148,12 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       now
     ).run();
 
-    // Audit log
+    // Audit log (redact password)
+    const { password: _redactedPassword, ...auditCreateBody } = body;
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'staff_create', 'user', id, JSON.stringify(body), now).run();
+    ).bind(`audit_${Date.now()}`, user.id, 'staff_create', 'user', id, JSON.stringify(auditCreateBody), now).run();
 
     const created = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
@@ -171,9 +182,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
+
+    if ((existing.role === 'owner' || body.role === 'owner') && user?.role !== 'owner') {
+      return c.json({ success: false, error: 'Only owners can modify or assign owner accounts' }, 403);
     }
 
     const updates: string[] = [];
@@ -202,11 +217,12 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
     }
 
-    // Audit log
+    // Audit log (redact password if present)
+    const { password: _redactedUpdatePw, ...auditUpdateBody } = body;
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'staff_update', 'user', id, JSON.stringify(body), now).run();
+    ).bind(`audit_${Date.now()}`, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now).run();
 
     const updated = (await db.prepare(
       `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
@@ -237,6 +253,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const existing = (await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first()) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
+
+    if (existing.role === 'owner' && user?.role !== 'owner') {
+      return c.json({ success: false, error: 'Only owners can delete owner accounts' }, 403);
     }
 
     // Check for related records

@@ -22,6 +22,16 @@ export function ThreeRingOverlay() {
 
     let animId = 0;
     let rendererInstance: THREE.WebGLRenderer | null = null;
+    let cameraInstance: THREE.PerspectiveCamera | null = null;
+
+    function onWindowResize() {
+      if (!cnt || !cameraInstance || !rendererInstance) return;
+      const w = cnt.clientWidth || window.innerWidth;
+      const h = cnt.clientHeight || window.innerHeight;
+      cameraInstance.aspect = w / h;
+      cameraInstance.updateProjectionMatrix();
+      rendererInstance.setSize(w, h);
+    }
 
     const script = document.createElement('script');
     script.src =
@@ -37,6 +47,7 @@ export function ThreeRingOverlay() {
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
       camera.position.z = 5;
+      cameraInstance = camera;
 
       const renderer = new THREE.WebGLRenderer({
         alpha: true,
@@ -68,14 +79,6 @@ export function ThreeRingOverlay() {
       ring2.rotation.x = Math.PI / 2;
       scene.add(ring2);
 
-      const c = cnt;
-      function onWindowResize() {
-        const w = c.clientWidth || window.innerWidth;
-        const h = c.clientHeight || window.innerHeight;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer!.setSize(w, h);
-      }
       window.addEventListener('resize', onWindowResize);
 
       function animate() {
@@ -96,7 +99,7 @@ export function ThreeRingOverlay() {
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener('resize', () => {});
+      window.removeEventListener('resize', onWindowResize);
       if (
         rendererInstance &&
         cnt.contains(rendererInstance.domElement)

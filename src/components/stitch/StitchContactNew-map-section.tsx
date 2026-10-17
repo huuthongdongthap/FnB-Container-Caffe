@@ -21,7 +21,7 @@ export function MapSection() {
           {t('contact.mapLabel', 'BẢN ĐỒ ĐIỀU HƯỚNG')}
         </p>
         <p className="font-body text-[14px] leading-relaxed text-[var(--aura-chrome-bright)]">
-          {t('contact.mapLocation', '29 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp')}
+          {t('contact.mapLocation', '29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp — Đối diện Khách sạn Thảo Trâm 2')}
         </p>
       </div>
 

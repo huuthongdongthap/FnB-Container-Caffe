@@ -8,8 +8,10 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/table-zones - List table zones
   app.openapi(TableZoneRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const query = c.req.valid('query');
-    const { page = 1, limit = 20, sort = 'sort_order', order = 'asc', locationId, isActive, search } = query;
+    const query = (typeof c.req.valid === 'function' ? c.req.valid('query') : undefined) || c.req.query() || {};
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const { sort = 'sort_order', order = 'asc', locationId, isActive, search } = query;
 
     let whereClause = 'WHERE 1=1';
     const params: (string | number)[] = [];
@@ -35,7 +37,16 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Get zones
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      sort_order: 'sort_order',
+      sortOrder: 'sort_order',
+      name: 'name',
+      created_at: 'created_at',
+      createdAt: 'created_at',
+    };
+    const sortCol = allowedSorts[sort] || 'sort_order';
+    const sortDir = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = (await db.prepare(
       `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all()) as { results: any[] };

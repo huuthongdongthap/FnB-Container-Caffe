@@ -10,7 +10,7 @@ export function LocationMap() {
             Tìm Chúng Tôi
           </h2>
           <p className="mx-auto mt-3 text-chrome-light/60">
-            29 Nguyễn Tất Thành, Phường 1, Sa Đéc, Đồng Tháp
+            29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2)
           </p>
         </div>
 

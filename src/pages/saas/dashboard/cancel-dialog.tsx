@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
+import { API_BASE } from '@/lib/api-client';
 
 interface Props {
   subscriptionId: string;
@@ -17,8 +18,9 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
 
   const cancel = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/subscriptions/${subscriptionId}/cancel`, {
+      const res = await fetch(`${API_BASE}/api/subscriptions/${subscriptionId}/cancel`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason || 'Customer requested cancellation' }),
       });

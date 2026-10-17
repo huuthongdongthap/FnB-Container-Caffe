@@ -25,10 +25,8 @@ describe('apiFetch — auth integration', () => {
     vi.restoreAllMocks();
   });
 
-  it('attaches Authorization header when token exists', async () => {
-    // We need to control what useAuthStore.getState() returns
-    // This requires module mocking — let's test via integration instead
-    // For unit test, we verify the apiFetch function exists and works
+  it('attaches Authorization header when token exists in localStorage', async () => {
+    localStorage.setItem('aura_auth_token', 'test-jwt-token-xyz');
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -38,6 +36,9 @@ describe('apiFetch — auth integration', () => {
 
     const result = await apiFetch('/test');
     expect(result).toEqual({ data: 'ok' });
+    const callHeaders = mockFetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(callHeaders['Authorization']).toBe('Bearer test-jwt-token-xyz');
+    localStorage.removeItem('aura_auth_token');
   });
 
   it('returns JSON on 200 response', async () => {

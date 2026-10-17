@@ -123,6 +123,9 @@ export async function sendPushToStaff(
   const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
   let subscriptions: Subscription[] = results || [];
 
+  // Exclude manual placeholder entries that have not yet paired a browser WebPush endpoint
+  subscriptions = subscriptions.filter(s => s.endpoint && !s.endpoint.startsWith('https://manual.auraspace.local/'));
+
   // Exclude specific customer_ids if provided
   if (excludeCustomerIds && excludeCustomerIds.length > 0) {
     subscriptions = subscriptions.filter(s => !s.customer_id || !excludeCustomerIds.includes(s.customer_id));

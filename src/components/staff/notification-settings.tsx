@@ -66,12 +66,12 @@ export function StaffNotificationSettings() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'omit' });
+        const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
         if (!res.ok) return;
-        const json = (await res.json().catch(() => ({}))) as { role?: string };
+        const json = (await res.json().catch(() => ({}))) as { role?: string; user?: { role?: string } };
         if (cancelled) return;
         // Normalize: backend uses staff-kitchen / staff-cashier / staff-* prefixes
-        setStaffRole(json.role ?? 'staff-kitchen');
+        setStaffRole(json.role ?? json.user?.role ?? 'staff-kitchen');
       } catch {
         // best-effort role
       }
@@ -114,6 +114,7 @@ export function StaffNotificationSettings() {
         await applySubscriptions(next);
         await fetch(`${API_BASE}/api/staff/notification-settings`, {
           method: 'PATCH',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [key]: next[key] }),
         }).catch(() => undefined);

@@ -60,7 +60,7 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
   if (recommendations.length === 0) return null;
 
   const handleAddToCart = (item: RecommendationItem) => {
-    addItem({ id: item.id, name: item.name, price: item.price });
+    addItem({ id: item.id, productId: item.id, name: item.name, price: item.price });
     showToast(`Đã thêm ${item.name}`, 'success');
   };
 

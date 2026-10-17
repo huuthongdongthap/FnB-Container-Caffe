@@ -71,7 +71,7 @@ export function LandingNav() {
           <img
             src="/images/aura-emblem.png"
             alt="AURA CAFE Logo"
-            className="h-10 w-10 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover filter drop-shadow-[0_0_10px_rgba(201,214,223,0.35)] transition-transform group-hover:scale-105"
+            className="h-10 w-10 rounded-xl border border-[var(--aura-chrome-mid)]/40 object-contain p-0.5 filter drop-shadow-[0_0_10px_rgba(201,214,223,0.35)] transition-transform group-hover:scale-105"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
             }}
@@ -118,7 +118,8 @@ export function LandingNav() {
           <a
             href="/portal"
             title="Dành cho nhân viên AURA CAFE"
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-full border border-[var(--aura-chrome-mid)]/50 text-[var(--aura-chrome-soft)] text-[11px] font-medium hover:border-[var(--aura-chrome-bright)]/70 hover:text-[var(--aura-chrome-bright)] transition-all"
+            aria-label="Cổng nhân viên AURA CAFE"
+            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-full border border-[var(--aura-chrome-mid)]/50 text-[var(--aura-chrome-soft)] text-[11px] font-medium hover:border-[var(--aura-chrome-bright)]/70 hover:text-[var(--aura-chrome-bright)] transition-all"
           >
             <Lock className="w-3 h-3" aria-hidden="true" />
             <span>Staff</span>
@@ -127,7 +128,8 @@ export function LandingNav() {
           {/* Desktop CTA pill */}
           <a
             href="/menu"
-            className="hidden md:inline-flex px-6 py-2.5 min-h-[44px] rounded-full active:opacity-80 active:scale-95 transition-all duration-300 items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(201,214,223,0.2)] bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-semibold tracking-wider uppercase font-body"
+            aria-label={t('landing.orderNow', 'Gọi món ngay')}
+            className="hidden md:inline-flex px-6 py-2.5 min-h-[44px] min-w-[44px] rounded-full active:opacity-80 active:scale-95 transition-all duration-300 items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(201,214,223,0.2)] bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-semibold tracking-wider uppercase font-body"
           >
             {t('landing.orderNow', 'Gọi món ngay')}
           </a>
@@ -166,6 +168,8 @@ export function LandingNav() {
         role="dialog"
         aria-label="Menu điều hướng"
         aria-modal="true"
+        aria-hidden={!drawerOpen}
+        inert={!drawerOpen || undefined}
         className={`fixed top-[72px] inset-x-0 z-40 md:hidden transition-all duration-300 ease-out ${
           drawerOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'

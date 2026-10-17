@@ -6,7 +6,8 @@ export function fmtDate(iso: string | null): string {
   });
 }
 
-export function fmtDeviceId(sid: string): string {
+export function fmtDeviceId(sid: string | null | undefined): string {
+  if (!sid) return '--';
   if (sid.startsWith('staff-')) return sid.slice(0, 18) + '…';
   return sid.slice(0, 10) + '…';
 }

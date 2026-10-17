@@ -3,11 +3,13 @@
 const CODE_TTL_MINUTES = 10;
 
 export function generateVerifyToken(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return String(100000 + (buf[0] % 900000));
 }
 
 export function expiresAtFromNow(): string {
-  return new Date(Date.now() + CODE_TTL_MINUTES * 60_1000).toISOString();
+  return new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString();
 }
 
 export function isExpired(expiresAt: string): boolean {

@@ -1,8 +1,9 @@
 import { forwardRef, type Ref } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { SECTIONS } from './StitchAdminTerminalNew-constants';
 import type { NavSectionData } from './StitchAdminTerminalNew-types';
 
@@ -30,6 +31,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
   ) => {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
+    const isPosRoute = location.pathname.startsWith('/admin/pos');
     const tNav = (key: string) => t(`nav.${key}`);
     const tTerminal = (key: string) => t(`terminal.${key}`);
 
@@ -37,14 +40,15 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
       <aside
         ref={ref}
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--st-outline-variant, #44474d)]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-[8px] shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--st-outline-variant, #44474d)]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/95 md:bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-xl shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300',
+          !isPosRoute && 'md:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
         aria-label={tTerminal('sidebar')}
       >
         {/* Brand header */}
         <div className="mb-6 px-6" aria-label={brandName}>
-          <Link to="/admin">
+          <Link to="/admin" onClick={onClose}>
             <h1 className="font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
               {t('hero.title') || brandName}
             </h1>
@@ -90,6 +94,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
         {/* Bottom section */}
         <div className="mt-auto px-6">
           <button type="button"
+            onClick={() => {
+              navigate('/admin/sales-reports');
+              onClose();
+            }}
             className="mb-6 w-full rounded-lg bg-[var(--aura-chrome-mid, #6B9FB8)] py-3 font-bold text-white transition-transform active:scale-95"
             aria-label={tTerminal('generateReport')}
           >
@@ -121,7 +129,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
 
             {/* Logout */}
             <Link
-              to="/"
+              to="/admin/login"
+              onClick={() => {
+                void useAuthStore.getState().logout();
+              }}
               className="flex items-center gap-4 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-error, #FFB4AB)]"
               aria-label={tTerminal('logout')}
             >

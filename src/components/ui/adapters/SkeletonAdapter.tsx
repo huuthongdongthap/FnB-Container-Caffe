@@ -22,7 +22,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonAdapterProps>(
     return (
       <div
         ref={ref}
-        className={`${variantClasses[variant]} bg-[var(--aura-bg-high)]/30 ${className}`}
+        className={`${variantClasses[variant]} bg-[var(--aura-bg-high,#334155)]/30 ${className ?? ''}`.trim()}
         style={style}
         aria-hidden="true"
         {...rest}

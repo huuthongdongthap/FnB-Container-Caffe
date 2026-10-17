@@ -11,7 +11,7 @@ export async function getLatestOrderTimestamp(request: Request, env: Record<stri
       ? await (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace).get('latest_order_ts')
       : null;
     return jsonResponse({ success: true, ts });
-  } catch (error) {
-    return errorResponse(`Failed to get latest timestamp: ${(error as Error).message}`, 500);
+  } catch {
+    return errorResponse('Failed to get latest timestamp', 500);
   }
 }

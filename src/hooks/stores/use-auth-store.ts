@@ -1,17 +1,31 @@
 import { create } from 'zustand';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
-   Auth store — httpOnly cookie auth (no token in client).
-   Backend sets access_token cookie on login/register.
-   Pattern: matches use-cart-store.ts — manual state, no middleware.
+   Auth store — dual-mode auth (Bearer token in localStorage + cookie fallback).
+   Backend sets access_token cookie AND returns { user, token } in JSON.
+   Persisting token in localStorage guarantees Safari ITP & cross-origin resilience.
    ═══════════════════════════════════════════════════════════════════ */
+
+export const AUTH_TOKEN_KEY = 'aura_auth_token';
+export const AUTH_USER_KEY = 'aura_auth_user';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'customer' | 'staff' | 'owner';
+  role: 'customer' | 'staff' | 'manager' | 'owner';
+  phone?: string;
+}
+
+interface AuthResponse {
+  success?: boolean;
+  user?: AuthUser;
+  token?: string;
+  message?: string;
+  data?: {
+    user?: AuthUser;
+  };
 }
 
 interface AuthState {
@@ -26,20 +40,46 @@ interface AuthState {
   clearError: () => void;
 }
 
+function getInitialUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
+  user: getInitialUser(),
   loading: false,
   error: null,
 
   login: async (email, password) => {
     set({ loading: true, error: null });
     try {
-      await apiFetch('/api/auth/login', {
+      const res = await apiFetch<AuthResponse>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      // Backend sets httpOnly cookie — just fetch the user
-      await get().fetchMe();
+
+      if (res?.token && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        } catch { /* storage quota or restricted */ }
+      }
+
+      const resolvedUser = res?.user || res?.data?.user;
+      if (resolvedUser) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
+          } catch { /* storage quota or restricted */ }
+        }
+        set({ user: resolvedUser, loading: false, error: null });
+      } else {
+        await get().fetchMe();
+      }
     } catch (err) {
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
     }
@@ -48,31 +88,73 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (name, email, phone, password) => {
     set({ loading: true, error: null });
     try {
-      await apiFetch('/api/auth/register', {
+      const res = await apiFetch<AuthResponse>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ name, email, phone, password }),
       });
-      // Backend sets httpOnly cookie — just fetch the user
-      await get().fetchMe();
+
+      if (res?.token && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        } catch { /* storage quota or restricted */ }
+      }
+
+      const resolvedUser = res?.user || res?.data?.user;
+      if (resolvedUser) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
+          } catch { /* storage quota or restricted */ }
+        }
+        set({ user: resolvedUser, loading: false, error: null });
+      } else {
+        await get().fetchMe();
+      }
     } catch (err) {
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
     }
   },
 
   logout: async () => {
-    // Hit backend to clear httpOnly cookie, then clear client state
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     } catch { /* best-effort */ }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_USER_KEY);
+      } catch { /* restricted */ }
+    }
     set({ user: null, loading: false, error: null });
   },
 
   fetchMe: async () => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<{ user: AuthUser }>('/api/auth/me');
-      set({ user: body.user, loading: false, error: null });
+      const body = await apiFetch<AuthResponse>('/api/auth/me');
+      const resolvedUser = body?.user || body?.data?.user;
+      if (resolvedUser) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
+          } catch { /* restricted */ }
+        }
+        set({ user: resolvedUser, loading: false, error: null });
+      } else {
+        set({ loading: false, error: null });
+      }
     } catch (err) {
+      if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(AUTH_USER_KEY);
+          } catch { /* restricted */ }
+        }
+        set({ user: null, loading: false, error: err.message });
+        return;
+      }
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error', user: null });
     }
   },

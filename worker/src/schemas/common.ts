@@ -195,6 +195,7 @@ export const ProductStatusEnum = z.enum(['active', 'inactive', 'archived', 'out_
 export const StaffRoleEnum = z.enum([
   'owner',
   'manager',
+  'staff',
   'barista',
   'cashier',
   'waiter',

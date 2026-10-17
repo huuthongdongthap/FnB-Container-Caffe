@@ -13,13 +13,13 @@ export function segmentSQL(segment: string): { sql: string; params?: string[] } 
   case 'all':
     return { sql: 'SELECT id, name, phone, email FROM customers' };
   case 'loyalty_bronze':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'bronze\'' };
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'bronze\'' };
   case 'loyalty_silver':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'silver\'' };
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'silver\'' };
   case 'loyalty_gold':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'gold\'' };
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'gold\'' };
   case 'loyalty_platinum':
-    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'platinum\'' };
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE loyalty_tier = \'platinum\'' };
   case 'active_30d':
     return {
       sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email
@@ -38,7 +38,7 @@ export function segmentSQL(segment: string): { sql: string; params?: string[] } 
   case 'birthday_this_month': {
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
     return {
-      sql: 'SELECT id, name, phone, email FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?',
+      sql: 'SELECT id, name, phone, email FROM customers WHERE date_of_birth IS NOT NULL AND substr(date_of_birth, 6, 2) = ?',
       params: [month]
     };
   }

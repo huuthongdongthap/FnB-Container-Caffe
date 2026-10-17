@@ -66,8 +66,7 @@ export default function MobileLogin() {
   const pinRef1 = useRef<HTMLInputElement>(null);
   const pinRef2 = useRef<HTMLInputElement>(null);
   const pinRef3 = useRef<HTMLInputElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const refs = [pinRef0, pinRef1, pinRef2, pinRef3] as any;
+  const refs: Array<React.RefObject<HTMLInputElement | null>> = [pinRef0, pinRef1, pinRef2, pinRef3];
 
   const [deviceToken, setDeviceToken] = useState<string>('');
   const [pin, setPin] = useState<[string, string, string, string]>(['', '', '', '']);
@@ -87,7 +86,7 @@ export default function MobileLogin() {
     setPin(next);
     setError(null);
     if (digit && idx < 3) {
-      setTimeout(() => { refs[idx + 1].current?.focus(); }, 50);
+      setTimeout(() => { refs[idx + 1]?.current?.focus(); }, 50);
     }
   // cast safe: refs is a fixed-length tuple of exactly 4 non-nullable RefObjects
   // eslint-disable-next-line react-hooks/exhaustive-deps -- refs is a stable tuple
@@ -95,13 +94,13 @@ export default function MobileLogin() {
 
   const handlePinKeyDown = useCallback((idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace' && !pin[idx] && idx > 0) {
-      refs[idx - 1].current?.focus();
+      refs[idx - 1]?.current?.focus();
     }
     if (e.key === 'ArrowLeft' && idx > 0) {
-      refs[idx - 1].current?.focus();
+      refs[idx - 1]?.current?.focus();
     }
     if (e.key === 'ArrowRight' && idx < 3) {
-      refs[idx + 1].current?.focus();
+      refs[idx + 1]?.current?.focus();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- refs is a stable tuple
   }, [pin]);

@@ -210,6 +210,40 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       // Root returns 200 or defined root response, not a 500 error from inventory queries
       expect(resRoot.status).not.toBe(500);
     });
+
+    it('enforces RBAC on /api/inventory/items (rejects customer with 403, allows manager with 200)', async () => {
+      const chain = {
+        bind: vi.fn().mockReturnThis(),
+        first: vi.fn().mockResolvedValue(null),
+        all: vi.fn().mockResolvedValue({ results: [] }),
+        run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 0 } })
+      };
+      const env = createMockEnv({ AURA_DB: { prepare: vi.fn().mockReturnValue(chain) } });
+
+      const customerReq = await mockRequestWithRole('GET', '/api/inventory/items', 'customer');
+      const customerRes = await app.fetch(customerReq, env as any);
+      expect(customerRes.status).toBe(403);
+
+      const managerReq = await mockRequestWithRole('GET', '/api/inventory/items', 'manager' as any);
+      const managerRes = await app.fetch(managerReq, env as any);
+      expect(managerRes.status).toBe(200);
+    });
+
+    it('enforces requireAuth on /api/erpnext-pos/* and /api/erpnext-invoices/*', async () => {
+      const env = createMockEnv();
+
+      const unauthPos = new Request('https://test.aura/api/erpnext-pos/products/changed');
+      const unauthPosRes = await app.fetch(unauthPos, env as any);
+      expect(unauthPosRes.status).toBe(401);
+
+      const unauthInv = new Request('https://test.aura/api/erpnext-invoices/list');
+      const unauthInvRes = await app.fetch(unauthInv, env as any);
+      expect(unauthInvRes.status).toBe(401);
+
+      const customerInv = await mockRequestWithRole('GET', '/api/erpnext-invoices/list', 'customer');
+      const customerInvRes = await app.fetch(customerInv, env as any);
+      expect(customerInvRes.status).toBe(403);
+    });
   });
 
   describe('5. Observability Metrics & Alerts Endpoint', () => {

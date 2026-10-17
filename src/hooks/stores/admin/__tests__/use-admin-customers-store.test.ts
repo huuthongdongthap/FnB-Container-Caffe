@@ -44,6 +44,38 @@ describe('useAdminCustomersStore', () => {
     expect(s.error).toBeNull();
   });
 
+  it('fetchCustomers(): normalizes D1 snake_case rows from /api/admin/customers', async () => {
+    mockSuccess({
+      success: true,
+      data: [
+        {
+          id: 'CUST_1',
+          name: 'Pham Minh D',
+          phone: '0912345678',
+          tier: 'VIP',
+          visit_count: 8,
+          total_spent: 920000,
+          created_at: '2026-10-10T12:00:00Z',
+        },
+      ],
+      pagination: { page: 1, limit: 50, total: 9 },
+    });
+
+    await useAdminCustomersStore.getState().fetchCustomers();
+
+    const s = useAdminCustomersStore.getState();
+    expect(s.totalCount).toBe(9);
+    expect(s.customers[0]).toMatchObject({
+      id: 'CUST_1',
+      name: 'Pham Minh D',
+      phone: '0912345678',
+      tier: 'VIP',
+      totalOrders: 8,
+      totalSpent: 920000,
+      lastVisit: '2026-10-10T12:00:00Z',
+    });
+  });
+
   it('fetchCustomers(): sets error on failure', async () => {
     mockError('Không thể tải danh sách khách hàng');
 

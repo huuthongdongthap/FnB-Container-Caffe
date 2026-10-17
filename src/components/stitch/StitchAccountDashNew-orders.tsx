@@ -47,25 +47,28 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
 
 /* ─── Reorder Logic ────────────────────────────────────────── */
 function useReorder() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (order: DashOrderItem) => {
     // Canonical order lines carry no menu id; resolve by name when the cart is
     // pushed to checkout, which re-prices against the live server menu anyway.
-    const items = order.items ?? [];
+    const parsedRawItems: NonNullable<DashOrderItem['items']> =
+      typeof order.rawItems === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(order.rawItems);
+              return Array.isArray(parsed) ? (parsed as NonNullable<DashOrderItem['items']>) : [];
+            } catch {
+              return [];
+            }
+          })()
+        : Array.isArray(order.rawItems)
+          ? order.rawItems
+          : [];
+    const items = order.items?.length ? order.items : parsedRawItems;
     if (items.length === 0) return;
 
     const { clearCart, addItem } = useCartStore.getState();
-    const currentItems = useCartStore.getState().items;
-    if (currentItems.length > 0) {
-      // TODO: replace with styled dialog component
-      if (true) {
-        // proceed with reorder — confirmation disabled until dialog exists
-      } else {
-        return;
-      }
-    }
 
     clearCart();
     for (const item of items) {
@@ -73,7 +76,7 @@ function useReorder() {
         addItem({
           id: crypto.randomUUID(),
           name: item.name || 'Item',
-          price: item.unitPriceCents / 100,
+          price: item.unitPriceCents >= 1000 ? item.unitPriceCents : item.unitPriceCents / 100,
         });
       }
     }
@@ -89,6 +92,7 @@ interface DashOrdersSectionProps {
 
 export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSectionProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const handleReorder = useReorder();
 
   return (
@@ -101,8 +105,9 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
           {t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}
         </h3>
         <button
-         type="button"
-          className="text-[11px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)] border-b border-[var(--aura-chrome-bright)]/30"
+          type="button"
+          onClick={() => navigate('/track-order')}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[11px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)] border-b border-[var(--aura-chrome-bright)]/30"
           style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
           aria-label={t('stitch.accountDashboard.viewAll', 'View All')}
         >
@@ -152,16 +157,16 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <OrderDashStatusBadge status={order.status} />
-                {order.rawItems && (() => {
+                {(Boolean(order.items?.length) || (order.rawItems && (() => {
                   try {
                     const p = JSON.parse(order.rawItems);
                     return Array.isArray(p) && p.length > 0;
                   } catch { return false; }
-                })() && (
+                })())) && (
                   <button
-                   type="button"
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); handleReorder(order); }}
-                    className="flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 px-2 py-0.5 rounded border border-[rgba(148,163,184,0.2)]"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center gap-1 text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 px-2.5 py-1.5 rounded border border-[rgba(148,163,184,0.2)]"
                     style={{ fontFamily: BODY_FONT }}
                     aria-label={t('stitch.accountDashboard.reorder', 'Reorder')}
                   >

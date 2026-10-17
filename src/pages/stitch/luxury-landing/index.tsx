@@ -109,7 +109,7 @@ export default function LuxuryContainerLanding() {
               <h2 className="font-display text-2xl text-[var(--aura-chrome-bright)] mb-6">Ghé thăm chúng tôi tại Sa Đéc</h2>
               <div className="space-y-4">
                 {[
-                  { icon: '📍', text: 'Đường Nguyễn Sinh Sắc, Phường 2, Sa Đéc, Đồng Tháp' },
+                  { icon: '📍', text: '29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp' },
                   { icon: '🕐', text: 'Mở cửa: 07:00 - 23:00 mỗi ngày' },
                   { icon: '📞', text: '+84 277 123 456' },
                 ].map((c, i) => (

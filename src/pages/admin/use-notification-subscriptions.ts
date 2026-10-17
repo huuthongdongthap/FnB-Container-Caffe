@@ -88,7 +88,7 @@ export function useNotificationSubscriptions() {
       ...prev,
       [name]: {
         ok: false,
-        msg: t('notificationSettings.testing') || 'Testing...',
+        msg: t('notificationSettings.testing', isVi ? 'Đang gửi thử...' : 'Testing...'),
       },
     }));
     try {

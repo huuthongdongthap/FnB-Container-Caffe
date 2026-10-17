@@ -1,14 +1,22 @@
 # D1 Migrations — Canonical Index
 
-D1 migrations are applied **manually** (no wrangler `migrations_dir`, no CI step):
+D1 migrations are applied **manually** with explicit file selection (no wrangler `migrations_dir`, no CI auto-migration step, and no bulk replay during normal deploy):
 
 ```bash
+# Fail-closed runner from repo root (recommended — blocks *.down.sql & superseded files):
+bash worker/scripts/apply-migrations.sh --file <file>.sql
+
+# Or direct Wrangler invocation from worker/:
 cd worker
-npx wrangler d1 execute AURA_DB --file=db/migrations/<file>.sql --remote
+npx wrangler d1 execute fnb-caffe-db --file=db/migrations/<file>.sql --remote
 ```
 
 Rules:
-- Apply files in name order, once each. There is no applied-migrations tracking table.
+- Apply files in name order, once each. There is currently no verified applied-migrations tracking table in D1.
+- **Never bulk-replay all historical migrations against an existing database.** Both `deploy-cloudflare.sh` and `scripts/deploy-branded.sh` skip D1 migrations by default unless `--migration-file=<file>.sql` is explicitly provided, and `worker/scripts/apply-migrations.sh` fails closed unless `--file <file>.sql` is passed.
+- **Historical table-rebuild hazards (do not re-run on live D1):**
+  - `20260710_02_notifications_fixed.sql` (`:24-45`) rebuilds `push_subscriptions` via `push_subscriptions_new` and overwrites `role = 'customer'`, `last_used_at = NULL`, and `device_id = NULL` on every existing row.
+  - `20261003_02_admin_metrics_and_inventory.sql` (`:27-47`) rebuilds `audit_logs` via `audit_logs_new`, copying only 9 of 13 columns (resetting `user_id`, `entity_type`, `entity_id`, `metadata` to `NULL`/`'{}'`) and dropping the 4 columns added later by `20261009_01_audit_trail_canonical_contract.sql` (`:4-7`: `operating_unit_id`, `tenant_id`, `status`, `correlation_id`).
 - New tables use `CREATE TABLE IF NOT EXISTS` (re-run safe). `ALTER TABLE ADD COLUMN` is one-shot (SQLite has no IF NOT EXISTS variant).
 - Down-migrations live beside their up-file as `<same-stem>.down.sql`. They are a rollback tool — never applied as part of normal forward flow.
 - All new DDL goes in `worker/db/migrations/` (date-numbered). `worker/migrations/` (004–014) is legacy — do not add files there.

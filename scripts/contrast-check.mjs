@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * WCAG AA Contrast Checker for Aura Cafe M3 design tokens.
- * Reads brand-tokens.css, resolves var(--aura-*) aliases to hex,
- * then checks 8 required foreground/background pairs.
+ * Reads aura-tokens.css, resolves var(--aura-*) aliases to hex,
+ * then checks 11 required foreground/background pairs.
  *
  * Usage: node scripts/contrast-check.mjs
  * Exit 0 = all pass, Exit 1 = any fail.
@@ -132,6 +132,9 @@ function main() {
     ["on-tertiary → tertiary",           "var(--md-sys-color-on-tertiary)",       "var(--md-sys-color-tertiary)",             4.5],
     ["on-error-container → error-cont",  "var(--md-sys-color-on-error-container)", "var(--md-sys-color-error-container)",     4.5],
     ["text-muted → surface",             "var(--aura-text-muted)",                "var(--md-sys-color-surface)",              4.5],
+    ["on-background → background",       "var(--md-sys-color-on-background)",     "var(--md-sys-color-background)",           4.5],
+    ["on-surface-variant → surface-var", "var(--md-sys-color-on-surface-variant)", "var(--md-sys-color-surface-variant)",    4.5],
+    ["inverse-on-surface → inverse-surf", "var(--md-sys-color-inverse-on-surface)", "var(--md-sys-color-inverse-surface)",   4.5],
   ];
 
   let allPass = true;
@@ -192,7 +195,7 @@ function main() {
 
   console.log(
     allPass
-      ? "\n  RESULT: ALL 8 pairs PASS — WCAG AA compliant.\n"
+      ? `\n  RESULT: ALL ${pairs.length} pairs PASS — WCAG AA compliant.\n`
       : "\n  RESULT: SOME pairs FAIL — see table above.\n"
   );
 

@@ -19,7 +19,7 @@ export function GalleryCard({ item, isSelected, onClick }: GalleryCardProps) {
       style={{
         border: isSelected
           ? '1px solid var(--aura-bronze-shimmer)'
-          : '1px solid var(--aura-chrome-soft)/20',
+          : '1px solid color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)',
         boxShadow: isSelected ? '0 0 15px rgba(212, 165, 116, 0.1)' : 'none',
         opacity: '0',
         transform: 'translateY(20px)',

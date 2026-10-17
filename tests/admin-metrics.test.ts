@@ -186,5 +186,90 @@ describe('Admin Metrics Routes', () => {
       expect(body.latency.p50).toBe(0);
       expect(body.latency.p95).toBe(0);
     });
+
+    test('aggregates Web Vitals rating distribution when filter=web_vital_*', async () => {
+      env.AURA_DB = {
+        prepare: vi.fn((sql: string) => {
+          const stmt: any = {
+            bind: vi.fn(() => stmt),
+            first: vi.fn(async () => ({ avg: 1800, max: 2400, min: 1100, count: 6 })),
+            all: vi.fn(async () => {
+              if (sql.includes('SELECT DISTINCT name')) {
+                return { results: [{ name: 'web_vital_LCP' }, { name: 'web_vital_CLS' }] };
+              }
+              if (sql.includes("json_extract(tags, '$.rating')")) {
+                return {
+                  results: [
+                    { name: 'web_vital_LCP', rating: 'good', cnt: 4 },
+                    { name: 'web_vital_LCP', rating: 'needs-improvement', cnt: 1 },
+                    { name: 'web_vital_LCP', rating: 'poor', cnt: 1 },
+                    { name: 'web_vital_CLS', rating: 'good', cnt: 5 },
+                  ],
+                };
+              }
+              return { results: [] };
+            }),
+          };
+          return stmt;
+        }),
+      } as any;
+
+      const res = await adminMetrics.request('/?filter=web_vital_*&range=7d', { method: 'GET' }, env);
+      expect(res.status).toBe(200);
+      const body = await res.json() as {
+        vitals: Record<string, { good: number; needsImprovement: number; poor: number }>;
+        targets: Record<string, { good: number; poor: number }>;
+      };
+      expect(body.vitals.LCP).toEqual({ good: 4, needsImprovement: 1, poor: 1 });
+      expect(body.vitals.CLS).toEqual({ good: 5, needsImprovement: 0, poor: 0 });
+      expect(body.targets.LCP).toEqual({ good: 2500, poor: 4000 });
+    });
+
+    test('returns p50, p95, p99 and daily requestCounts when filter=request_duration_ms', async () => {
+      env.AURA_DB = {
+        prepare: vi.fn((sql: string) => {
+          const stmt: any = {
+            bind: vi.fn(() => stmt),
+            first: vi.fn(async () => ({ avg: 55, max: 100, min: 10, count: 10 })),
+            all: vi.fn(async () => {
+              if (sql.includes('SELECT DISTINCT name')) {
+                return { results: [{ name: 'request_duration_ms' }] };
+              }
+              if (sql.includes('ORDER BY duration')) {
+                return {
+                  results: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((duration) => ({ duration })),
+                };
+              }
+              if (sql.includes('substr(created_at, 1, 10)')) {
+                return {
+                  results: [
+                    { date: '2026-10-14', count: 42 },
+                    { date: '2026-10-13', count: 31 },
+                  ],
+                };
+              }
+              return { results: [] };
+            }),
+          };
+          return stmt;
+        }),
+      } as any;
+
+      const res = await adminMetrics.request('/?filter=request_duration_ms&range=7d', { method: 'GET' }, env);
+      expect(res.status).toBe(200);
+      const body = await res.json() as {
+        p50: number;
+        p95: number;
+        p99: number;
+        requestCounts: Array<{ date: string; count: number }>;
+      };
+      expect(body.p50).toBe(60);
+      expect(body.p95).toBe(100);
+      expect(body.p99).toBe(100);
+      expect(body.requestCounts).toEqual([
+        { date: '2026-10-14', count: 42 },
+        { date: '2026-10-13', count: 31 },
+      ]);
+    });
   });
 });

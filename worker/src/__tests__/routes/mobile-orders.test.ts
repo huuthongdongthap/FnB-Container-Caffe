@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getOrdersMobile, createOrderMobile, getOrderDetail } from '../../routes/orders-mobile';
+import { staffMobileRouter } from '../../routes/staff-mobile';
+import { generateJWT } from '../../lib/jwt';
 import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -434,5 +436,33 @@ describe('getOrderDetail', () => {
     };
     const res = await getOrderDetail(ctx);
     expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).not.toContain('DB error');
+  });
+
+  it('authenticates GET /orders/:id and GET /tables via staffMobileRouter with Bearer JWT and blocks unauthenticated calls', async () => {
+    const db = buildOrdersMockDb([fullOrder]);
+    const env: any = { AURA_DB: db, AUTH_KV: createMockKV(), JWT_SECRET: TEST_JWT_SECRET };
+    const unauthRes = await staffMobileRouter.fetch(
+      new Request('https://test.aura/orders/ORD_1', { method: 'GET' }),
+      env
+    );
+    expect(unauthRes.status).toBe(401);
+
+    const token = await generateJWT(
+      { id: 'USR_1', email: 'waiter@aura.cafe', name: 'Waiter', role: 'waiter' },
+      TEST_JWT_SECRET,
+      '1h'
+    );
+    const authRes = await staffMobileRouter.fetch(
+      new Request('https://test.aura/orders/ORD_1', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+    expect(authRes.status).toBe(200);
+    const body: any = await authRes.json();
+    expect(body.order.id).toBe('ORD_1');
   });
 });

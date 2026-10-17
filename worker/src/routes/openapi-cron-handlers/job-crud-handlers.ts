@@ -32,7 +32,19 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const total = countResult?.total || 0;
 
     const offset = (page - 1) * limit;
-    const orderClause = `${sort} ${order.toUpperCase()}`;
+    const allowedSorts: Record<string, string> = {
+      name: 'name',
+      next_run_at: 'next_run_at',
+      nextRunAt: 'next_run_at',
+      last_run_at: 'last_run_at',
+      lastRunAt: 'last_run_at',
+      created_at: 'created_at',
+      createdAt: 'created_at',
+      status: 'status',
+    };
+    const sortCol = allowedSorts[sort] || 'created_at';
+    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const orderClause = `${sortCol} ${sortDir}`;
     const rows = await db.prepare(
       `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all();

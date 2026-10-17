@@ -254,7 +254,7 @@ describe('getCustomer360 (integration)', async () => {
           status: 'paid',
           channel: 'pickup',
           payment_method: 'cod',
-          created_at: new Date().toISOString(),
+          created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
         },
       ],
       consents: [{ purpose: 'marketing', granted: 1, granted_at: '2026-09-01T00:00:00Z' }],

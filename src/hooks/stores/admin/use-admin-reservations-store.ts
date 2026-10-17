@@ -24,6 +24,30 @@ interface AdminReservationsState {
   rejectReservation: (id: string) => Promise<void>;
 }
 
+function normalizeReservation(raw: Record<string, unknown>): AdminReservation {
+  if (
+    typeof raw.customerName === 'string' &&
+    typeof raw.tableNumber === 'string' &&
+    typeof raw.guests === 'number' &&
+    typeof raw.createdAt === 'string'
+  ) {
+    return raw as unknown as AdminReservation;
+  }
+  return {
+    ...(raw as unknown as AdminReservation),
+    id: String(raw.id ?? ''),
+    customerName: String(raw.customerName ?? raw.customer_name ?? ''),
+    customerPhone: String(raw.customerPhone ?? raw.customer_phone ?? ''),
+    tableNumber: String(raw.tableNumber ?? raw.table_number ?? raw.table_id ?? ''),
+    zone: String(raw.zone ?? raw.table_zone ?? ''),
+    date: String(raw.date ?? ''),
+    time: String(raw.time ?? ''),
+    guests: Number(raw.guests ?? raw.guest_count ?? 2),
+    status: (raw.status as AdminReservation['status']) || 'pending',
+    createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
+  };
+}
+
 export const useAdminReservationsStore = create<AdminReservationsState>((set, get) => ({
   reservations: [],
   loading: false,
@@ -33,8 +57,9 @@ export const useAdminReservationsStore = create<AdminReservationsState>((set, ge
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<any>('/api/reservations');
+      const rawList: Array<Record<string, unknown>> = body?.reservations || body?.data || [];
       set({
-        reservations: body.reservations || body.data || [],
+        reservations: rawList.map(normalizeReservation),
         loading: false,
         error: null,
       });

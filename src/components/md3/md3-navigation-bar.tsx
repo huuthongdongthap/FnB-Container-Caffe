@@ -44,7 +44,7 @@ export function MD3NavigationBar({
         aria-label="Main navigation"
         className={cn(
           'fixed bottom-0 inset-x-0 z-50 flex items-center justify-around md:hidden',
-          'h-20 bg-md-surface-container',
+          'h-20 pb-[env(safe-area-inset-bottom)] bg-md-surface-container',
           'shadow-[0_-2px_6px_rgba(0,0,0,0.08)]',
           className,
         )}
@@ -81,7 +81,7 @@ export function MD3NavigationBarItem({
       onClick={() => onChange(value)}
       className={cn(
         'relative flex flex-col items-center justify-center gap-1',
-        'w-16 min-h-12 cursor-pointer select-none',
+        'w-16 min-h-12 min-h-[44px] min-w-[44px] cursor-pointer select-none',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',
         'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
       )}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_BASE } from '@/lib/api-client';
 
 interface Props {
   invoiceId: string;
@@ -8,7 +9,9 @@ interface Props {
 export default function ReceiptDownloadButton({ invoiceId, invoiceNumber }: Props) {
   async function handleDownload() {
     try {
-      const res = await fetch(`/api/subscriptions/invoices/${invoiceId}/receipt`);
+      const res = await fetch(`${API_BASE}/api/subscriptions/invoices/${invoiceId}/receipt`, {
+        credentials: 'include',
+      });
       if (!res.ok) {
         alert('Không thể tải hóa đơn');
         return;

@@ -23,7 +23,7 @@ const log = createLogger({ route: 'frigate-gateway' });
 export function createFrigateRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  const allow = requireAuth(['owner', 'staff']);
+  const allow = requireAuth(['owner', 'manager', 'staff']);
 
   // POST /api/integrations/frigate/events/sync
   app.post('/events/sync', allow, async(c) => {
@@ -36,7 +36,7 @@ export function createFrigateRoutes() {
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message, mock: false }, 500);
+      return c.json({ success: false, error: 'Failed to sync Frigate events', mock: false }, 500);
     }
   });
 

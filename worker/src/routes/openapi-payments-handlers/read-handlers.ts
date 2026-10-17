@@ -2,6 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
+import { canAccessOrder } from '@aura/domain-order';
 
 interface PaymentRow {
   id: string;
@@ -119,6 +120,15 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
 
     if (!payment) {
       return c.json({ success: false, error: 'Payment not found' }, 404);
+    }
+
+    const order = (await db.prepare(
+      'SELECT id, customer_id FROM orders WHERE id = ?'
+    ).bind(payment.order_id).first()) as { id: string; customer_id?: string | null } | null;
+
+    const user = c.get('user') as { id?: string; role?: string } | undefined;
+    if (order && !canAccessOrder(user, order).allowed) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     return c.json({

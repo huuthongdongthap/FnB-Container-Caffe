@@ -12,7 +12,7 @@ import { TableFilters } from './TableManagement-filters';
 export type { CafeTableRow, OrderRow };
 
 export default function TableManagementPage() {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 	const statusLabel = (status: CafeTableRow['status']) =>
 		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { fallback: status });
 

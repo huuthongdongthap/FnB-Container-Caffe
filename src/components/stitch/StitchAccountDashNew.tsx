@@ -14,6 +14,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Coffee } from 'lucide-react';
 import { useFavoritesStore } from '@/hooks/stores/use-favorites-store';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
@@ -37,6 +38,7 @@ export function StitchAccountDashNew({
   orders: ordersProp,
 }: Readonly<StitchAccountDashNewProps>) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,8 +81,9 @@ export function StitchAccountDashNew({
         {/* Quick Order Button */}
         <section>
           <button
-           type="button"
-            className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)]"
+            type="button"
+            onClick={() => navigate('/menu')}
+            className="w-full h-16 min-h-[44px] rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)]"
             aria-label={t('stitch.accountDashboard.quickOrder', 'QUICK ORDER')}
           >
             <Coffee className="w-6 h-6 text-[var(--aura-noir-deep)] group-hover:rotate-12 transition-transform" />

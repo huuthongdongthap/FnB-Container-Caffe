@@ -2,6 +2,10 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { createReservationFromBooking } from '../../tree/cal-booking/process-booking';
 import { calBookingPayloadSchema, type CalBookingPayloadInput } from './types';
+import { timingSafeEqual } from '@aura/domain-security';
+import { createLogger } from '../../middleware/logger';
+
+const log = createLogger({ route: 'cal-booking-webhook' });
 
 export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
   // POST /api/cal-booking-webhook — requires x-cal-webhook-secret
@@ -10,7 +14,8 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
     if (!c.env.CAL_WEBHOOK_SECRET) {
       return c.json({ success: false, error: 'Server misconfigured: CAL_WEBHOOK_SECRET not set' }, 500);
     }
-    if (!secret || secret !== c.env.CAL_WEBHOOK_SECRET) {
+    const isValid = secret ? await timingSafeEqual(secret, c.env.CAL_WEBHOOK_SECRET) : false;
+    if (!isValid) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
     const db = c.env.AURA_DB;
@@ -67,7 +72,8 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: true, message: `${triggerEvent} processed` });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      return c.json({ success: false, error: msg }, 500);
+      log.error('Cal booking webhook processing error:', { message: msg, triggerEvent });
+      return c.json({ success: false, error: 'Failed to process booking webhook' }, 500);
     }
   });
 }
@@ -82,7 +88,8 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
 
   // Auth
   const secret = request.headers.get('x-cal-webhook-secret');
-  if (!secret || secret !== env.CAL_WEBHOOK_SECRET) {
+  const isValid = secret && env.CAL_WEBHOOK_SECRET ? await timingSafeEqual(secret, env.CAL_WEBHOOK_SECRET) : false;
+  if (!isValid) {
     return json({ success: false, error: 'Unauthorized' }, 401);
   }
 

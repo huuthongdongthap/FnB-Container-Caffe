@@ -16,7 +16,9 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: true, data: { success: true } });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const randomBuf = new Uint32Array(1);
+    crypto.getRandomValues(randomBuf);
+    const code = (100000 + (randomBuf[0] % 900000)).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     await db.prepare(
@@ -25,7 +27,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).bind(crypto.randomUUID(), body.email, code, 'password_reset', expiresAt, 0, now).run();
 
     const log = createLogger({ route: 'auth.reset-password' });
-    log.info('password_reset_code_generated', { email: body.email, code });
+    log.info('password_reset_code_generated', { email: body.email });
 
     return c.json({ success: true, data: { success: true } });
   });

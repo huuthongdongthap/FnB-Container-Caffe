@@ -33,3 +33,6 @@ assets/ảnh*/
 
 # runtime db backups (contain customer PII)
 worker/backups/
+checkpoint*.sql
+*.dump.sql
+*.sql.bak

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { calculateOrderSnapshot } from '@aura/domain-order';
 import { resolveServerProductPrice, resolveItemPrice } from '@aura/domain-catalog';
 import { createPricingMockDB } from './server-pricing-test-helpers';
@@ -6,6 +6,16 @@ import { createPricingMockDB } from './server-pricing-test-helpers';
 describe('Server-Side Pricing Contract Integration', () => {
   const { db } = createPricingMockDB();
   const channelDeltas = { dine_in: 0, takeaway: 2000, online: 5000, delivery: 5000 };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Deterministic baseline outside Wednesday 14:00-16:00 Happy Hour window
+    vi.setSystemTime(new Date('2026-10-07T10:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('evaluates dine_in canonical base price strictly from products.price', async () => {
     const res = await resolveServerProductPrice(db, {
@@ -125,5 +135,47 @@ describe('Server-Side Pricing Contract Integration', () => {
     });
     // Base 30000 + online 5000 + modifier 5000 = 40000 -> 20% discount = 32000
     expect(price).toBe(32000);
+  });
+
+  it('correctly resolves item with hyphenated id when legacy client omits productId', async () => {
+    // Regression test: legacy cart payload might pass id: 'prod-coffee' without productId
+    const snapshot = await calculateOrderSnapshot(db, {
+      items: [
+        {
+          id: 'prod-coffee', // has hyphen in ID, no productId field
+          name: 'Cà phê sữa',
+          price: 9999, // tampered client price
+          quantity: 1,
+        },
+      ],
+      channel: 'dine_in',
+      channelDeltas,
+    });
+
+    expect(snapshot.rejected).toBeNull();
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.items[0].menuItemId).toBe('prod-coffee');
+    expect(snapshot.items[0].unitPriceCents).toBe(30000);
+    expect(snapshot.total).toBe(30000);
+  });
+
+  it('rejects uncataloged item with hyphenated id and does not dangerously fall back to prefix', async () => {
+    // Verifies that a nonexistent item like 'prod-coffee-special' does not fall back to 'prod-coffee'
+    const snapshot = await calculateOrderSnapshot(db, {
+      items: [
+        {
+          id: 'prod-coffee-special',
+          name: 'Cà phê đặc biệt',
+          price: 50000,
+          quantity: 1,
+        },
+      ],
+      channel: 'dine_in',
+      channelDeltas,
+    });
+
+    expect(snapshot.rejected).not.toBeNull();
+    expect(snapshot.rejected?.code).toBe('item_not_found');
+    expect(snapshot.total).toBe(0);
   });
 });

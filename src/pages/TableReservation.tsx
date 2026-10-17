@@ -92,7 +92,7 @@ export default function TableReservationPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-display font-bold mb-2">{t('title')}</h1>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-[var(--md-sys-color-primary-container,#1A2D1F)] text-[var(--md-sys-color-on-primary-container,#A8C5A0)] text-xs font-medium">
               <Circle size={8} className="inline text-accent align-middle" /> {t('realTime')}
             </span>
           </div>

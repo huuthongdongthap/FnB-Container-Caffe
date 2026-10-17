@@ -9,7 +9,7 @@ import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validator
 import { generateId, parseJSON } from '../model/helpers';
 import { calculateOrderSnapshot } from '../policies/order-snapshot';
 import { runPostOrderSideEffects } from './create-order-side-effects';
-import { verifyJWT } from 'worker/src/lib/jwt';
+import { verifyJWT, getAuthToken } from 'worker/src/lib/jwt';
 import { resolveServerOrderOwnership } from '../../customer/policies/order-ownership-policy';
 
 const log = createLogger({ route: 'orders' });
@@ -90,10 +90,10 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
     // ── Server-authoritative Customer Ownership Resolution ────────
     let actor: { id?: string; role?: string } | null = null;
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ') && env.JWT_SECRET) {
+    const token = getAuthToken(request);
+    if (token && env.JWT_SECRET) {
       try {
-        const payload = await verifyJWT(authHeader.substring(7), env.JWT_SECRET as string);
+        const payload = await verifyJWT(token, env.JWT_SECRET as string);
         if (payload) actor = { id: payload.id || (payload as any).sub, role: payload.role };
       } catch { /* guest */ }
     }
@@ -186,6 +186,6 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     return jsonResponse(idemBody, 201);
   } catch (error) {
     log.error('CreateOrder error:', { message: (error as Error).message });
-    return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to create order', 500);
   }
 }

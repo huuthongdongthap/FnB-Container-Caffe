@@ -35,7 +35,7 @@ export function Toggle({
         />
       </button>
       <span className="text-xs font-medium text-[var(--aura-chrome-mid)] min-w-[2rem] text-right self-center">
-        {checked ? t('adminBirthday.enabledLabel') : t('adminLogin.cancelButton') || 'Tắt'}
+        {checked ? t('adminBirthday.enabledLabel') : t('adminBirthday.disabledLabel')}
       </span>
     </div>
   );

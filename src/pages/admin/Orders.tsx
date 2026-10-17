@@ -19,7 +19,9 @@ const STORE_TO_STITCH: Record<string, OrderStatus> = {
   preparing: 'preparing',
   ready: 'ready',
   delivering: 'ready',
+  served: 'served',
   delivered: 'served',
+  completed: 'served',
   cancelled: 'cancelled',
 };
 
@@ -50,10 +52,12 @@ function formatCurrency(amount: number): string {
 }
 
 function mapAdminOrder(ao: AdminOrder): OrderData {
+  const rawRecord = ao as unknown as Record<string, unknown>;
+  const tableVal = rawRecord.table ?? rawRecord.table_id ?? rawRecord.table_number ?? '';
   return {
     id: ao.id,
     customer: ao.customer || 'Guest',
-    table: '',
+    table: String(tableVal || ''),
     timeAgo: formatTimeAgo(ao.createdAt),
     status: STORE_TO_STITCH[ao.status] ?? 'pending',
     items: [{ name: `${ao.items} items`, quantity: 1 }],

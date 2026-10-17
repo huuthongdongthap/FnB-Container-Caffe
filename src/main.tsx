@@ -9,13 +9,15 @@ import './styles/global.css';
 import './lib/i18n';
 import { injectBrandTheme } from './config/brand-theme';
 import { onLCP, onCLS, onINP, onTTFB, onFCP } from 'web-vitals';
+import { API_BASE } from './lib/api-client';
 
 function sendToAnalytics(metric: { name: string, value: number, rating: string }) {
   const body = JSON.stringify({ name: metric.name, value: metric.value, rating: metric.rating });
+  const url = `${API_BASE}/api/vitals`;
   if (navigator.sendBeacon) {
-    navigator.sendBeacon('/api/vitals', body);
+    navigator.sendBeacon(url, body);
   } else {
-    fetch('/api/vitals', { method: 'POST', body, keepalive: true });
+    fetch(url, { method: 'POST', body, keepalive: true }).catch(() => {});
   }
 }
 

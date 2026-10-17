@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useId } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { X, Plus, Minus, Sparkles, Check } from 'lucide-react';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew-types';
+import { isReadyToServeItem } from '@/lib/menu-customization';
 
 interface DrinkCustomizerModalProps {
   item: MenuItemData | null;
@@ -44,8 +45,28 @@ export function DrinkCustomizerModal({
   const [notes, setNotes] = useState('');
   const [quantity, setQuantity] = useState(1);
 
-  // Guard: render nothing when modal is closed or no item selected
-  if (!isOpen || !item) return null;
+  useEffect(() => {
+    setSweetness(SWEETNESS_OPTIONS[0] ?? '100% đường (chuẩn)');
+    setIce(ICE_OPTIONS[0] ?? 'Đá đầy đủ (chuẩn)');
+    setSize(SIZE_OPTIONS[0] ?? { label: 'Size Tiêu Chuẩn (M)', extra: 0 });
+    setSelectedToppings([]);
+    setNotes('');
+    setQuantity(1);
+  }, [item?.id, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Guard: render nothing when modal is closed, no item selected, or item is packaged/ready-to-serve
+  if (!isOpen || !item || isReadyToServeItem(item)) return null;
 
   const basePrice = parseInt(item.price.replace(/\D/g, ''), 10) || 25000;
 
@@ -82,7 +103,12 @@ export function DrinkCustomizerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="drink-customizer-title"
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+    >
       <div
         className="w-full max-w-lg bg-[#0A1A2E] border border-white/10 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
         style={{ fontFamily: 'var(--aura-font-body)' }}
@@ -101,6 +127,7 @@ export function DrinkCustomizerModal({
               {item.category} • Tùy chỉnh vị
             </span>
             <h3
+              id="drink-customizer-title"
               className="text-lg font-bold text-white truncate"
               style={{ fontFamily: 'var(--aura-font-display)' }}
             >
@@ -114,7 +141,7 @@ export function DrinkCustomizerModal({
             type="button"
             onClick={onClose}
             aria-label="Đóng bảng tùy chọn"
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+            className="absolute top-4 right-4 min-h-[44px] min-w-[44px] p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -272,7 +299,7 @@ export function DrinkCustomizerModal({
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
               disabled={quantity <= 1}
               aria-label="Giảm số lượng"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white disabled:opacity-30 cursor-pointer"
+              className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-full flex items-center justify-center text-white/70 hover:text-white disabled:opacity-30 cursor-pointer"
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
@@ -283,7 +310,7 @@ export function DrinkCustomizerModal({
               type="button"
               onClick={() => setQuantity((q) => q + 1)}
               aria-label="Tăng số lượng"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white cursor-pointer"
+              className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-full flex items-center justify-center text-white/70 hover:text-white cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -292,7 +319,7 @@ export function DrinkCustomizerModal({
           <button
             type="button"
             onClick={handleConfirm}
-            className="flex-1 py-3 px-5 rounded-full bg-gradient-to-r from-[var(--aura-chrome-light)] to-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider flex items-center justify-between shadow-lg hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+            className="flex-1 min-h-[44px] py-3 px-5 rounded-full bg-gradient-to-r from-[var(--aura-chrome-light)] to-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider flex items-center justify-between shadow-lg hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
           >
             <span>Thêm vào giỏ</span>
             <span>{totalPrice.toLocaleString('vi-VN')}₫</span>

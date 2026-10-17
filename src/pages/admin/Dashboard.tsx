@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
@@ -24,6 +24,11 @@ export default function AdminDashboardPage() {
   const { customers, isLoadingCustomers } = useAdmin();
   const [period, setPeriod] = useState<Period>('daily');
   const { t } = useTranslation('admin');
+
+  useEffect(() => {
+    fetchDashboard?.();
+    fetchOrders?.();
+  }, [fetchDashboard, fetchOrders]);
 
   const {
     topProducts, peakHours, customerMetrics, dailyRevenue, zoneStats,

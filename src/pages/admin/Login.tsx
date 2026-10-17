@@ -27,22 +27,11 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
       if (onSubmit) {
         await onSubmit(email, password);
       } else {
-        try {
-          await useAuthStore.getState().login(email, password);
-        } catch {
-          // Dev / offline fallback
-        }
-        if (!useAuthStore.getState().user) {
-          useAuthStore.setState({
-            user: {
-              id: 'admin-01',
-              name: 'Aura Administrator',
-              email: email || 'admin@auracafe.vn',
-              role: 'owner',
-            },
-            loading: false,
-            error: null,
-          });
+        await useAuthStore.getState().login(email, password);
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser) {
+          const authError = useAuthStore.getState().error || t('adminLogin.loginFailed');
+          throw new Error(authError);
         }
       }
       onSuccess ? onSuccess() : navigate('/admin');
@@ -55,6 +44,11 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
   }, [onSubmit, onSuccess, navigate, t]);
 
   const handleGuestLogin = useCallback(() => {
+    if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+      setLastError(t('adminLogin.loginFailed'));
+      setStatus('error');
+      return;
+    }
     useAuthStore.setState({
       user: {
         id: 'guest-admin',
@@ -70,12 +64,12 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
     } else {
       navigate('/admin');
     }
-  }, [navigate, onSuccess]);
+  }, [navigate, onSuccess, t]);
 
   return (
     <StitchAdminLoginNew
       onLogin={handleLogin}
-      onGuestLogin={handleGuestLogin}
+      onGuestLogin={import.meta.env.DEV || import.meta.env.MODE === 'test' ? handleGuestLogin : undefined}
       status={status}
       errorMessage={lastError ?? externalError ?? undefined}
       brandName={brandConfig.brand.nameShort}

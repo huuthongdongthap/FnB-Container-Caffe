@@ -119,12 +119,12 @@ export function HeroSection() {
         {/* Logo */}
         <div className="mb-8 flex justify-center">
           <div className="relative group">
-            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-chrome-light/25 to-chrome-dark/25 p-2 shadow-[0_0_30px_rgba(201,214,223,0.2)]">
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0A1A2E] overflow-hidden p-1">
+            <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-chrome-light/25 to-chrome-dark/25 p-2 shadow-[0_0_30px_rgba(201,214,223,0.2)]">
+              <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[#0A1A2E] overflow-hidden p-1">
                 <img
                   src="/images/aura-emblem.png"
                   alt="AURA CAFE Logo"
-                  className="h-full w-full object-cover filter drop-shadow-[0_0_12px_rgba(201,214,223,0.4)]"
+                  className="h-full w-full object-contain p-1.5 filter drop-shadow-[0_0_12px_rgba(201,214,223,0.4)]"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
                   }}

@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 import type { StitchPOSNewProps, POSNewCartItem } from './StitchPOSNew-types';
-import { DEFAULT_MENU_ITEMS, DEFAULT_ADDONS } from './StitchPOSNew-types';
+import { DEFAULT_MENU_ITEMS, DEFAULT_ADDONS, MENU_CATEGORIES } from './StitchPOSNew-types';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { POSHeader } from './StitchPOSNew-header';
 import { MenuSection } from './StitchPOSNew-menu-section';
@@ -45,9 +45,24 @@ export function StitchPOSNew({
   const [cart, setCart] = useState<POSNewCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(true);
 
+  const categories = Array.from(
+    new Set([
+      ...MENU_CATEGORIES,
+      ...menuItems.map((i) => i.category?.trim()).filter((c): c is string => Boolean(c)),
+    ])
+  );
+
+  const hasCategoryMatch =
+    activeCategory === 'All' ||
+    menuItems.some(
+      (item) => item.category?.toLowerCase() === activeCategory.toLowerCase()
+    );
+
   const filteredItems = menuItems.filter((item) => {
     const matchesCategory =
-      activeCategory === 'All' || item.category === activeCategory;
+      activeCategory === 'All' ||
+      !hasCategoryMatch ||
+      item.category?.toLowerCase() === activeCategory.toLowerCase();
     const matchesSearch = item.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
@@ -88,6 +103,11 @@ export function StitchPOSNew({
   const tax = subtotal * taxRate;
   const total = subtotal + tax;
   const cartItemCount = cart.reduce((a, c) => a + c.quantity, 0);
+
+  const handleCompleteOrder = (completedCart: POSNewCartItem[], completedTotal: number) => {
+    onCompleteOrder?.(completedCart, completedTotal);
+    setCart([]);
+  };
 
   /* ─── Loading State ─────────────────────────────────────────────── */
   if (loading) {
@@ -142,6 +162,7 @@ export function StitchPOSNew({
           onSearchChange={setSearchQuery}
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
+          categories={categories}
           filteredItems={filteredItems}
           addOns={addOns}
           getQuantity={getQuantity}
@@ -179,7 +200,7 @@ export function StitchPOSNew({
           orderNumber={orderNumber}
           cartOpen={cartOpen}
           setCartOpen={setCartOpen}
-          onCompleteOrder={onCompleteOrder}
+          onCompleteOrder={handleCompleteOrder}
           onPayment={onPayment}
           customer={customer}
           onCustomerFound={onCustomerFound}

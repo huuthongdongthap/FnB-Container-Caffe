@@ -13,6 +13,26 @@ interface AdminCustomersState {
   deleteCustomer: (id: string) => Promise<boolean>;
 }
 
+function normalizeCustomer(raw: Record<string, unknown>): AdminCustomer {
+  if (
+    typeof raw.totalOrders === 'number' &&
+    typeof raw.totalSpent === 'number' &&
+    typeof raw.lastVisit === 'string'
+  ) {
+    return raw as unknown as AdminCustomer;
+  }
+  return {
+    ...(raw as unknown as AdminCustomer),
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    phone: String(raw.phone ?? ''),
+    tier: String(raw.tier ?? 'bronze'),
+    totalOrders: Number(raw.totalOrders ?? raw.visit_count ?? 0),
+    totalSpent: Number(raw.totalSpent ?? raw.total_spent ?? 0),
+    lastVisit: String(raw.lastVisit ?? raw.updated_at ?? raw.created_at ?? ''),
+  };
+}
+
 export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => ({
   customers: [],
   totalCount: 0,
@@ -26,9 +46,10 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
       if (search) params.set('search', search);
 
       const body = await apiFetch<any>(`/api/admin/customers?${params}`);
+      const rawList: Array<Record<string, unknown>> = body?.data || body?.customers || [];
       set({
-        customers: body.data || body.customers || [],
-        totalCount: body.pagination?.total ?? body.totalCount ?? body.data?.length ?? 0,
+        customers: rawList.map(normalizeCustomer),
+        totalCount: body?.pagination?.total ?? body?.totalCount ?? rawList.length ?? 0,
         loading: false,
         error: null,
       });

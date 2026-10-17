@@ -36,6 +36,7 @@ export const registerStaffSchema = z.object({
   password: passwordSchema,
   name: z.string().max(100).optional(),
   phone: phoneSchema.optional(),
+  role: z.string().max(50).optional(),
   // Durable tenant binding — set once at provisioning by an owner-authed caller,
   // never accepted from request-time headers.
   tenant_id: z.string().max(64).optional()

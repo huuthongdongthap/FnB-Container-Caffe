@@ -16,7 +16,7 @@ export function QrCard({
 	const statusStyle = (TABLE_STATUS_STYLES[normalizedStatus] ?? TABLE_STATUS_STYLES.available)!;
 
 	const statusKey = STATUS_LABEL_KEY[normalizedStatus] ?? STATUS_LABEL_KEY.available;
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 	const statusLabel = t(statusKey ?? 'qrCodes.status.available');
 
 	return (

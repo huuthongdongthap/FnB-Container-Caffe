@@ -2,6 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
+import { canAccessOrder } from '@aura/domain-order';
 
 export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments - Create payment
@@ -15,18 +16,23 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
       providerReference?: string;
       metadata?: Record<string, unknown>;
     };
-    const user = c.get('user') as { id: string } | undefined;
+    const user = c.get('user') as { id?: string; role?: string } | undefined;
     const now = new Date().toISOString();
 
     // Verify order exists
-    const order = (await db.prepare('SELECT id, total, payment_status FROM orders WHERE id = ?').bind(body.orderId).first()) as {
+    const order = (await db.prepare('SELECT id, customer_id, total, payment_status FROM orders WHERE id = ?').bind(body.orderId).first()) as {
       id: string;
+      customer_id?: string | null;
       total: number;
       payment_status: string;
     } | null;
 
     if (!order) {
       return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+
+    if (!canAccessOrder(user, order).allowed) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     if (order.payment_status === 'paid') {
@@ -62,7 +68,10 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
     }
 
     const id = crypto.randomUUID();
-    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const randBytes = new Uint8Array(4);
+    crypto.getRandomValues(randBytes);
+    const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const transactionId = `txn_${Date.now()}_${randHex}`;
 
     // Create payment record in canonical payments table
     await db.prepare(
@@ -101,9 +110,13 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
   router.openapi(PaymentRoutes.refund as any, async (c: any) => {
     const db = getDatabase(c);
     const body = c.req.valid('json' as never) as { paymentId?: string; amount?: number; reason?: string };
-    const user = c.get('user') as { id: string } | undefined;
+    const user = c.get('user') as { id?: string; role?: string } | undefined;
     const now = new Date().toISOString();
     const targetId = body.paymentId || c.req.param?.('id');
+
+    if (user?.role && !['owner', 'manager', 'staff'].includes(user.role)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
     if (!targetId) {
       return c.json({ success: false, error: 'Missing paymentId' }, 400);

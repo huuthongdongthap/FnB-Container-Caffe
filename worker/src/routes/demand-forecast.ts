@@ -16,7 +16,7 @@ const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ 
 
 // GET /api/admin/metrics/forecast
 demandForecastRouter.get('/forecast', async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = getTenantId(c);
   const forecastDays = Math.max(1, Math.min(14, parseInt(c.req.query('days') || '7', 10)));
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
@@ -113,7 +113,7 @@ demandForecastRouter.get('/forecast', async (c) => {
 
 // GET /api/admin/metrics/forecast/hourly
 demandForecastRouter.get('/forecast/hourly', async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 

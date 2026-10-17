@@ -27,20 +27,27 @@ bash scripts/deploy.sh --skip-smoke
 
 ### List Recent Deployments
 ```bash
-npx wrangler deployments list
-# or for Pages
-npx wrangler pages deployment list --project-name aura-cafe
+# Worker deployments
+npx wrangler deployments list --config worker/wrangler.toml
+
+# Pages deployments (production project: fnb-caffe-container)
+npx wrangler pages deployment list --project-name=fnb-caffe-container --environment=production
 ```
 
-### Rollback Worker
+### Rollback Worker (`aura-space-worker`)
 ```bash
-# Get deployment ID from `wrangler deployments list`
-bash scripts/deploy-rollback.sh <deployment-id>
+# Get version ID from `npx wrangler deployments list --config worker/wrangler.toml`
+npx wrangler rollback <VERSION_ID> --config worker/wrangler.toml --message "Emergency rollback"
 ```
 
-### Rollback Pages (Frontend)
+### Rollback Pages Frontend (`fnb-caffe-container`)
+> **Note:** Wrangler's `pages` command suite (`wrangler pages deployment list|create|tail`) does not provide a native `wrangler pages rollback` subcommand. Roll back via the Cloudflare Pages REST API or Cloudflare Dashboard (`Workers & Pages -> fnb-caffe-container -> Deployments -> Rollback to this deployment`).
+
 ```bash
-npx wrangler pages rollback <deployment-id> --project-name aura-cafe
+curl -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/fnb-caffe-container/deployments/${DEPLOYMENT_ID}/rollback" \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+  -H "Content-Type: application/json"
 ```
 
 ## Preflight Checks (Automated in deploy.sh)
@@ -91,17 +98,21 @@ curl -sS https://api.auraspace.cafe/api/health?db=1
 
 1. **Identify last good deployment**:
    ```bash
-   npx wrangler deployments list
+   npx wrangler deployments list --config worker/wrangler.toml
+   npx wrangler pages deployment list --project-name=fnb-caffe-container --environment=production
    ```
 
 2. **Rollback Worker**:
    ```bash
-   bash scripts/deploy-rollback.sh <deployment-id>
+   npx wrangler rollback <VERSION_ID> --config worker/wrangler.toml --message "Emergency rollback"
    ```
 
 3. **Rollback Pages (if frontend changed)**:
    ```bash
-   npx wrangler pages rollback <deployment-id> --project-name aura-cafe
+   curl -X POST \
+     "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/fnb-caffe-container/deployments/${DEPLOYMENT_ID}/rollback" \
+     -H "Authorization: Bearer ${CF_API_TOKEN}" \
+     -H "Content-Type: application/json"
    ```
 
 4. **Verify rollback**:
@@ -112,12 +123,17 @@ curl -sS https://api.auraspace.cafe/api/health?db=1
 
 5. **Notify team**: Post to Telegram with deployment ID and reason.
 
-## Schema Compatibility
+## Schema Compatibility & D1 Recovery
 
-- Migrations are **forward-only** (no down migrations)
-- Rollback does NOT revert D1 schema
-- Only rollback if code is compatible with current schema
-- If schema incompatible: restore D1 from backup + rollback code
+- Canonical D1 migrations live in `worker/db/migrations/` and are applied explicitly via `bash worker/scripts/apply-migrations.sh --file <migration.sql>` (bulk replay is disabled fail-closed).
+- Code rollback does NOT revert D1 schema. Only roll back Worker/Pages code directly if the previous version is compatible with the current D1 schema.
+- If a migration corrupted D1 schema or data, restore D1 using Cloudflare D1 Time Travel (PITR) or SQL backup before/with code rollback:
+  ```bash
+  npx wrangler d1 time-travel info fnb-caffe-db
+  npx wrangler d1 time-travel restore fnb-caffe-db --bookmark="<BOOKMARK_ID>"
+  # Or restore from SQL dump:
+  bash worker/scripts/restore-d1.sh worker/backups/fnb-caffe-db-YYYYMMDD-HHMMSS.sql --target-db fnb-caffe-db-staging
+  ```
 
 ## Post-Deploy Monitoring (10 min minimum)
 

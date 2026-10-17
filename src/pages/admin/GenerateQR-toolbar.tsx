@@ -19,7 +19,7 @@ export function FilterToolbar({
 	onRegenerate,
 	onPrint,
 }: FilterToolbarProps) {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3 mb-4 no-print">

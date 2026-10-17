@@ -394,16 +394,17 @@ describe('Auth Handlers', () => {
       expect(body.token).toBe('mock-jwt-token');
     });
 
-    test('returns 409 when owner already exists', async () => {
+    test('returns 409 when owner already exists without leaking existing_owner PII', async () => {
       const kv = createKvStore({ 'user:owner@test.com': OWNER_USER });
       const env = { ...BASE_ENV, AUTH_KV: kv };
       const req = createPostRequest({ email: 'another@test.com', password: 'ownerpass123' });
 
       const res = await bootstrapOwner(req, env);
       expect(res.status).toBe(409);
-      const body = await res.json() as { error?: string; success?: boolean };
-      // Returns success: false with error when owner exists
+      const body = await res.json() as { error?: string; success?: boolean; existing_owner?: unknown };
+      // Returns success: false with error when owner exists and omits owner PII
       expect(body.success).toBe(false);
+      expect(body.existing_owner).toBeUndefined();
     });
   });
 
@@ -504,6 +505,27 @@ describe('Auth Handlers', () => {
       expect(res.status).toBe(400);
       const body = await res.json() as { error: string };
       expect(body.error).toMatch(/mật khẩu/i);
+    });
+
+    test('returns 401 when token is revoked on changePassword and scrubs 500 errors', async () => {
+      const kv = createKvStore({ 'user:test@test.com': DEFAULT_USER, 'revoked:valid-token': '1' });
+      const env = { ...BASE_ENV, AUTH_KV: kv, AURA_DB: createMockD1() };
+      const req = createAuthRequest('valid-token', { currentPassword: 'password123', newPassword: 'newpass456' });
+
+      const res = await changePassword(req, env);
+      expect(res.status).toBe(401);
+
+      const brokenKv = {
+        get: vi.fn(async () => { throw new Error('KV_INTERNAL_AUTH_SECRET'); }),
+      };
+      const errRes = await changePassword(
+        createAuthRequest('valid-token', { currentPassword: 'password123', newPassword: 'newpass456' }),
+        { ...BASE_ENV, AUTH_KV: brokenKv }
+      );
+      expect(errRes.status).toBe(500);
+      const errBody = await errRes.json() as { error: string };
+      expect(errBody.error).toBe('Đổi mật khẩu thất bại');
+      expect(errBody.error).not.toContain('KV_INTERNAL_AUTH_SECRET');
     });
   });
 

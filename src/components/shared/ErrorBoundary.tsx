@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react';
 import { logger } from '@/lib/logger';
+import { API_BASE } from '@/lib/api-client';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -37,10 +38,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         url: window.location.href,
         timestamp: new Date().toISOString(),
       });
+      const errorUrl = `${API_BASE}/api/client-error`;
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/errors', body);
+        navigator.sendBeacon(errorUrl, body);
       } else {
-        fetch('/api/errors', { method: 'POST', body, keepalive: true }).catch(() => {});
+        fetch(errorUrl, { method: 'POST', body, keepalive: true }).catch(() => {});
       }
     } catch {
       // Silently fail — do not re-enter error state from reporting

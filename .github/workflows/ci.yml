@@ -24,6 +24,9 @@ jobs:
     - name: Run ESLint
       run: npm run lint
 
+    - name: Validate D1 Migration Sequence
+      run: npm run lint:migrations
+
     - name: Type check (frontend & root)
       run: npm run typecheck
 
@@ -32,6 +35,9 @@ jobs:
 
     - name: Run tests
       run: npm run test:ci
+
+    - name: Production Bundle Build
+      run: npm run build
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4

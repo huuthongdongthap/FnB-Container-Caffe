@@ -12,6 +12,8 @@
   "scripts": {
     "lint": "eslint worker/src/ --ext .ts",
     "lint:fix": "eslint worker/src/ --ext .ts --fix",
+    "lint:migrations": "node scripts/lint-d1-migrations.mjs",
+    "verify:gates": "node scripts/verify-staging-gates.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:worker": "tsc --project worker/tsconfig.json --noEmit",
     "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit",

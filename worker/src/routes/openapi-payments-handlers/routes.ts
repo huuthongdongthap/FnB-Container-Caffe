@@ -8,14 +8,21 @@ import { registerWebPaymentHandlers } from './web-payment-handlers';
 
 export const openApiPaymentsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Apply auth middleware to all routes except webhook and guest payment-request
-openApiPaymentsRouter.use('/api/payments/*', async (c, next) => {
+const authMiddleware = async (c: any, next: any) => {
   const path = c.req.path;
-  if (path.endsWith('/webhook/payos') || path.endsWith('/payment-request')) {
+  if (path.endsWith('/webhook/payos')) {
     return next();
   }
-  return requireAuth(['owner', 'manager', 'staff'])(c, next);
-});
+  // Listing all payments or processing refunds is restricted to staff & management
+  if (path.endsWith('/refund') || (c.req.method === 'GET' && (path === '/api/payments' || path === '/api/payments/'))) {
+    return requireAuth(['owner', 'manager', 'staff'])(c, next);
+  }
+  return requireAuth(['owner', 'manager', 'staff', 'customer'])(c, next);
+};
+
+// Apply auth middleware to all routes except verified provider webhooks
+openApiPaymentsRouter.use('/api/payments', authMiddleware);
+openApiPaymentsRouter.use('/api/payments/*', authMiddleware);
 
 registerPaymentReadHandlers(openApiPaymentsRouter);
 registerPaymentMutationHandlers(openApiPaymentsRouter);

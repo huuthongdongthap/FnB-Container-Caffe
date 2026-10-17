@@ -271,4 +271,80 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(metrics.net_franchisee_payout).toBe(9350000); // 10,000,000 - 650,000
     });
   });
+
+  describe('6. JWT-Bound Tenant Confinement on Protected Forecasting, Pricing & Edge Routes', () => {
+    it('prevents non-HQ franchise manager from spoofing ?tenant_id=default across protected routers', async () => {
+      const boundTenants: string[] = [];
+      const mockDb = {
+        prepare: vi.fn(() => ({
+          bind: vi.fn((...args: unknown[]) => {
+            if (typeof args[0] === 'string') {
+              boundTenants.push(args[0]);
+            }
+            return {
+              all: vi.fn().mockResolvedValue({ results: [] }),
+              first: vi.fn().mockResolvedValue(null),
+              run: vi.fn().mockResolvedValue({ success: true })
+            };
+          })
+        }))
+      };
+
+      const env = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any
+      });
+
+      const endpoints = [
+        '/api/edge/containers/status?tenant_id=default',
+        '/api/pricing/dynamic/rules?tenant_id=default',
+        '/api/inventory/forecasting/run-rate?tenant_id=default',
+        '/api/admin/metrics/forecast?tenant_id=default'
+      ];
+
+      for (const ep of endpoints) {
+        const req = await authRequest('GET', ep, 'manager', 'tenant_sadec_02');
+        const res = await app.fetch(req, env);
+        expect(res.status).toBe(200);
+      }
+
+      expect(boundTenants).toEqual([
+        'tenant_sadec_02',
+        'tenant_sadec_02',
+        'tenant_sadec_02',
+        'tenant_sadec_02'
+      ]);
+    });
+
+    it('binds franchise manager writes in dynamic pricing rules to their JWT tenantId', async () => {
+      let insertedArgs: unknown[] = [];
+      const mockDb = {
+        prepare: vi.fn(() => ({
+          bind: vi.fn((...args: unknown[]) => {
+            insertedArgs = args;
+            return {
+              run: vi.fn().mockResolvedValue({ success: true })
+            };
+          })
+        }))
+      };
+
+      const env = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any
+      });
+
+      const req = await authRequest('POST', '/api/pricing/dynamic/rules', 'manager', 'tenant_sadec_02', {
+        name: 'Franchise Happy Hour',
+        rule_type: 'happy_hour',
+        discount_percent: 15,
+        start_time: '14:00',
+        end_time: '16:00'
+      });
+
+      const res = await app.fetch(req, env);
+      expect(res.status).toBe(201);
+      expect(insertedArgs[1]).toBe('tenant_sadec_02');
+    });
+  });
 });

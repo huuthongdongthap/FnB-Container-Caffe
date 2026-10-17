@@ -75,6 +75,7 @@ export function GuestInfoForm({
           value={guestName}
           onChange={(e) => onNameChange(e.target.value)}
           placeholder={t('guestName', { defaultValue: 'Tên của bạn' })}
+          aria-label={t('guestName', { defaultValue: 'Tên của bạn' })}
           disabled={isSubmitting}
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl text-[13px] font-body bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[var(--aura-text-primary, #e8e8e8)] placeholder:text-[var(--aura-text-secondary, #a0a8b0)] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all disabled:opacity-50"
         />
@@ -84,6 +85,7 @@ export function GuestInfoForm({
           value={guestPhone}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder={t('guestPhone', { defaultValue: 'Số điện thoại' })}
+          aria-label={t('guestPhone', { defaultValue: 'Số điện thoại' })}
           disabled={isSubmitting}
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl text-[13px] font-body bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[var(--aura-text-primary, #e8e8e8)] placeholder:text-[var(--aura-text-secondary, #a0a8b0)] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all disabled:opacity-50"
         />

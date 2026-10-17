@@ -153,7 +153,7 @@ dynamicPricingRouter.post('/calculate', async (c) => {
 
 // GET /api/pricing/dynamic/rules
 dynamicPricingRouter.get('/rules', requireAuth(['owner', 'manager']), async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const { results } = await db.prepare(
     'SELECT * FROM dynamic_pricing_rules WHERE tenant_id = ? ORDER BY created_at DESC'

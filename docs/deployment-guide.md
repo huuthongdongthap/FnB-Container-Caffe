@@ -71,14 +71,18 @@ Chay tu repo root. Script se: (Run from repo root. It will:)
 |------|-------------------|
 | `--worker-only` | Chi deploy Worker, bo qua Pages (Deploy Worker only, skip Pages) |
 | `--pages-only` | Chi deploy Pages, bo qua Worker (Deploy Pages only, skip Worker) |
+| `--skip-tests` | Bo qua buoc chay test truoc khi deploy (Skip pre-deploy test gate) |
+| `--skip-migrations` | Bo qua D1 migrations — day la hanh vi mac dinh (Skip D1 migrations — default fail-closed behavior) |
+| `--migration-file=<name.sql>` | Chi ap dung 1 file forward migration cu the trong `worker/db/migrations/` (Apply a single explicit forward migration) |
+| `--skip-verify` | Bo qua kiem tra health/SHA sau deploy (Skip post-deploy verification) |
 
 **Vi du / Example:**
 ```bash
 bash deploy-cloudflare.sh --worker-only
+bash deploy-cloudflare.sh --worker-only --migration-file=20261010_01_modifier_option_contract_columns.sql
 ```
 
-> **Ghi chu:** Cac co `--skip-tests`, `--skip-migrations`, `--skip-verify` duoc len ke hoach nhung chua duoc cai dat. Lien he dev neu can.
-> (Flags `--skip-tests`, `--skip-migrations`, `--skip-verify` are planned but not yet implemented. Contact dev if needed.)
+> **Ghi chu:** Deploy mac dinh KHONG tu dong chay lai toan bo migration lich su (fail-closed) de bao ve du lieu live tren D1.
 
 ---
 
@@ -128,12 +132,16 @@ So sanh `shortSha` voi commit vua push de xac nhan ban dung dang duoc deploy.
 
 ## 5. Database Migrations (D1)
 
-Cloudflare D1 migration duoc ap dung thu cong.
-(Cloudflare D1 migrations are applied manually.)
+Cloudflare D1 migration duoc ap dung thu cong voi ten file tuong minh (fail-closed, khong chay hang loat):
+(Cloudflare D1 migrations are applied manually with an explicit filename — fail-closed, never bulk-replayed:)
 
 ```bash
+# Tu repo root (From repo root):
+bash worker/scripts/apply-migrations.sh --file YYYYMMDD_NN_description.sql
+
+# Hoac truc tiep voi Wrangler tu thu muc worker/ (Or directly via Wrangler from worker/):
 cd worker
-npx wrangler d1 execute fnb-caffe-db --file=../db/migrations/YYYYMMDD_NN_description.sql
+npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/YYYYMMDD_NN_description.sql
 ```
 
 **Luu y:** Chay migration truoc hoac sau deploy -- khong anh huong toi availability vi Worker xu-ly gracefully.

@@ -411,7 +411,7 @@ export default function SystemHubPage() {
                 <img
                   src="/images/aura-emblem.png"
                   alt="AURA CAFE"
-                  className="h-10 w-10 rounded-full border border-[#6B9FB8]/40 object-cover drop-shadow-[0_0_12px_rgba(107,159,184,0.3)] transition-transform group-hover:scale-105"
+                  className="h-10 w-10 rounded-xl border border-[#6B9FB8]/40 object-contain p-0.5 drop-shadow-[0_0_12px_rgba(107,159,184,0.3)] transition-transform group-hover:scale-105"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
                   }}

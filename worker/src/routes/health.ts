@@ -1,38 +1,106 @@
 /**
- * Health Route -- /api/health
- * Returns worker status, uptime, and optional D1 connectivity check.
+ * Canonical Health Route — /api/health
+ * Distinguishes liveness from deep dependency readiness in Cloudflare Workers.
  */
 
 import type { Env } from '../types/env';
+import {
+  executeHealthCheckProbe,
+  evaluateSystemHealth,
+  type DependencyHealth,
+  type HealthStatus
+} from '@aura/domain-observability';
 
-// Capture cold-start time once at module load
 const START_TIME = Date.now();
 
 export interface HealthResponse {
-  status: 'ok' | 'degraded';
+  status: 'ok' | 'degraded' | 'unhealthy';
   timestamp: string;
   uptime: number; // milliseconds since cold-start
+  version?: string;
+  liveness: boolean;
+  readiness: boolean;
   d1?: 'connected' | 'error';
   error?: string;
+  dependencies?: Record<string, DependencyHealth>;
 }
 
-export async function getHealth(env: Env, checkDb = false): Promise<HealthResponse> {
-  const response: HealthResponse = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: Date.now() - START_TIME
-  };
+export async function getHealth(env: Env, checkDependencies = false): Promise<HealthResponse> {
+  const uptime = Date.now() - START_TIME;
+  const version = env.GIT_COMMIT_SHA?.slice(0, 8) || 'unknown';
 
-  if (checkDb) {
-    try {
+  // Fast Liveness Probe
+  if (!checkDependencies) {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime,
+      version,
+      liveness: true,
+      readiness: true
+    };
+  }
+
+  // Deep Readiness Probe
+  const dependencies: Record<string, DependencyHealth> = {};
+
+  // Probe D1 Database
+  const d1Probe = await executeHealthCheckProbe(
+    'd1_database',
+    'database',
+    true, // Critical dependency
+    async () => {
+      if (!env.AURA_DB) throw new Error('AURA_DB binding not configured');
       await env.AURA_DB.prepare('SELECT 1').first();
-      response.d1 = 'connected';
-    } catch (err) {
-      response.d1 = 'error';
-      response.error = (err as Error).message;
-      response.status = 'degraded';
+    },
+    2000
+  );
+  dependencies.d1_database = d1Probe;
+
+  // Probe KV Cache (if bound)
+  if (env.KV_CACHE) {
+    const kvProbe = await executeHealthCheckProbe(
+      'kv_cache',
+      'cache',
+      false, // Non-critical
+      async () => {
+        await env.KV_CACHE.get('__health_probe__');
+      },
+      1500
+    );
+    dependencies.kv_cache = kvProbe;
+  }
+
+  const evaluation = evaluateSystemHealth(dependencies, uptime, version);
+
+  const mappedStatus: HealthStatus = evaluation.status;
+  const legacyStatus = d1Probe.status === 'unhealthy' ? 'degraded' : (mappedStatus === 'healthy' ? 'ok' : mappedStatus);
+
+  const isProd = env.ENVIRONMENT === 'production';
+  const exposedError = isProd
+    ? (d1Probe.error ? 'Database connectivity probe failed' : undefined)
+    : (d1Probe.error || undefined);
+
+  let sanitizedDeps = dependencies;
+  if (isProd && dependencies) {
+    sanitizedDeps = {};
+    for (const [key, dep] of Object.entries(dependencies)) {
+      sanitizedDeps[key] = {
+        ...dep,
+        error: dep.error ? `${dep.name} connectivity probe failed` : undefined,
+      };
     }
   }
 
-  return response;
+  return {
+    status: legacyStatus,
+    timestamp: evaluation.timestamp,
+    uptime,
+    version,
+    liveness: evaluation.liveness,
+    readiness: evaluation.readiness,
+    d1: d1Probe.status === 'healthy' ? 'connected' : 'error',
+    error: exposedError,
+    dependencies: sanitizedDeps
+  };
 }

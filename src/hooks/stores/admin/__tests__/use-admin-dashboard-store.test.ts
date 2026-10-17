@@ -46,6 +46,27 @@ describe('useAdminDashboardStore', () => {
     expect(s.error).toBeNull();
   });
 
+  it('fetchDashboard(): normalizes Worker /api/stats { stats: { orders_today, revenue_today } } response', async () => {
+    mockSuccess({
+      success: true,
+      stats: {
+        orders_today: 20,
+        revenue_today: 1600000,
+        orders_by_status: { completed: 20 },
+      },
+    });
+
+    await useAdminDashboardStore.getState().fetchDashboard();
+
+    const s = useAdminDashboardStore.getState();
+    expect(s.stats).toEqual({
+      todayRevenue: 1600000,
+      todayOrders: 20,
+      avgOrderValue: 80000,
+      activeCustomers: 20,
+    });
+  });
+
   it('fetchDashboard(): sets error on failure', async () => {
     mockError('Không thể tải thống kê');
 

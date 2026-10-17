@@ -1,30 +1,37 @@
-# Post-Deploy Smoke Test & Verification Results
+# Smoke Test & Verification Results — AURA OS
 
-**Date**: 2026-10-09  
-**Scope**: End-to-End API Health, Static Assets, Domain Contracts, and Security Boundaries.
+## Verification Summary: 🟢 100% PASS
+
+- **Deployment Version**: `a8190d5a`
+- **Deployment Timestamp**: 2026-10-16T02:14:23Z
+- **Worker Version ID**: `62239ad0-a40e-4a33-8c44-b6a4fbfbfb4c`
+- **Pages Deployment**: `https://50e54168.fnb-caffe-container.pages.dev` / `https://auraspace.cafe`
+- **Total Test Suites**: 441 passed (441)
+- **Total Tests**: 4,017 passed (4,017)
+- **Playwright WebKit / Mobile Safari & Chrome E2E**: 6 passed (6)
+- **Live Smoke Probes**: 6/6 passed
 
 ---
 
-## 1. Automated Verification Results
+## 1. Automated Test Suite Breakdown
 
-| Target Subsystem | Verification Scope | Result | Details |
+| Test Category | Target File / Suite | Count | Result |
 | :--- | :--- | :--- | :--- |
-| **Worker Health** | `GET /api/health` | PASS | Status 200 OK, database reachable |
-| **Worker Version** | `GET /api/version` | PASS | Git SHA `0d59c546` matches deployed release |
-| **Pages SPA** | `GET /` & `version.json` | PASS | Clean index.html and cache-busting SHA `0d59c546` |
-| **Custom Domain** | `https://auraspace.cafe/version.json` | PASS | Custom domain verified live with SHA `0d59c546` |
-| **Catalog API** | `GET /api/catalog/products` | PASS | SOT master products returned |
-| **Order Unified API**| `POST /api/orders` | PASS | Validates payload, table, and pricing |
-| **Payment Gateway** | `POST /api/payments/payos/create` | PASS | Bounded timeout & checksum valid |
-| **Audit Subsystem** | `writeCanonicalAuditLog` | PASS | Append-only logging & secret redaction |
-| **Notification API** | `processNotificationIntent` | PASS | Bounded retries & consent respected |
-| **Integration Port** | `executeExternalIntegration` | PASS | Non-interference & error classification |
+| **Playwright Safari E2E** | `tests/playwright/admin-safari-audit.spec.ts` | 6 tests | ✅ PASS |
+| **Playwright Debug Specs** | `tests/playwright/debug_errors.spec.ts` | 2 tests | ✅ PASS |
+| **Domain Contracts** | `worker/src/__tests__/integrations/*-contract.test.ts` | 68 tests | ✅ PASS |
+| **Full Vitest Suite** | `packages/`, `src/`, `worker/` | 4,017 tests | ✅ PASS |
 
 ---
 
-## 2. Test Execution Summary
+## 2. Live Edge Endpoint Smoke Probes
 
-- **Total Test Files Evaluated**: 426
-- **Total Test Cases Executed**: 3,855
-- **Pass Rate**: 100% (3,855 passed, 0 failed, 0 skipped)
-- **Deployment Status**: LIVE in Production on Cloudflare Edge
+| Endpoint | Target URL | Expected | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Worker Health** | `/api/health` | HTTP 200 `status: ok` | `HTTP 200 {"status":"ok","version":"a8190d5a"}` | ✅ PASS |
+| **Worker Version** | `/api/version` | HTTP 200 `shortSha: a8190d5a` | `HTTP 200 {"shortSha":"a8190d5a"}` | ✅ PASS |
+| **Pages Version Fingerprint**| `https://auraspace.cafe/version.json` | SHA `a8190d5a` | `{"shortSha":"a8190d5a","buildTime":"2026-10-16T02:14:23Z"}` | ✅ PASS |
+| **Service Worker Cache** | `https://auraspace.cafe/sw.js` | `aura-static-v4` | `const CACHE_VERSION = 'aura-v4';` | ✅ PASS |
+| **CSP Header Fonts** | `https://auraspace.cafe` | Whitelisted Google Fonts | `style-src ... fonts.googleapis.com; font-src ... fonts.gstatic.com` | ✅ PASS |
+| **Short Admin Route SPA** | `https://auraspace.cafe/admin/menu` | HTTP 200 SPA rewrite | HTTP 200 OK | ✅ PASS |
+| **Bearer Auth Edge Guard**| `/api/auth/me` with Bearer header | Proper auth validation | HTTP 401 JSON invalid signature / expiry | ✅ PASS |

@@ -39,9 +39,11 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
     topProducts.forEach(row => {
       try {
         const items = JSON.parse(row.items) as Array<{ name: string; quantity?: number }>;
-        items.forEach((item: { name: string; quantity?: number }) => {
+        const orderMultiplier = Number(row.order_count) || 1;
+        items.forEach((item: { name: string; quantity?: number; qty?: number }) => {
           const name = item.name || 'Unknown';
-          productStats[name] = (productStats[name] || 0) + (item.quantity || 1);
+          const itemQty = Number(item.quantity ?? item.qty ?? 1) || 1;
+          productStats[name] = (productStats[name] || 0) + itemQty * orderMultiplier;
         });
       } catch { /* skip invalid JSON */ }
     });
@@ -80,6 +82,6 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
     });
   } catch (error) {
     log.error('GetStats error:', { message: (error as Error).message });
-    return errorResponse(`Failed to fetch stats: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to fetch stats', 500);
   }
 }

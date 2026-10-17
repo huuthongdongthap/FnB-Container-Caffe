@@ -56,7 +56,9 @@ export async function buildPayOSSignature(
 }
 
 export function generateOrderCode(): number {
-  return (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return (Date.now() * 1000) + (buf[0] % 1000);
 }
 
 export interface PayOSOrderValidation {
@@ -72,7 +74,7 @@ export function validatePayOSAccess(
   customerId: string | null,
   role?: string
 ): { allowed: boolean; reason?: 'forbidden' | 'already_paid' | 'invalid_total' } {
-  const isStaffOrOwner = role === 'owner' || role === 'staff';
+  const isStaffOrOwner = role === 'owner' || role === 'manager' || role === 'staff';
   if (orderRow.customer_id && customerId && orderRow.customer_id !== customerId && !isStaffOrOwner) {
     return { allowed: false, reason: 'forbidden' };
   }
@@ -109,7 +111,10 @@ export async function persistPaymentWithRetries(
     checksumKey, clientId, apiKey, cancelUrl, description, returnUrl,
   } = params;
 
-  const paymentId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const randBytes = new Uint8Array(4);
+  crypto.getRandomValues(randBytes);
+  const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const paymentId = `pay_${Date.now()}_${randHex.slice(0, 5)}`;
   const now = new Date().toISOString();
 
   let orderCode = initialOrderCode;

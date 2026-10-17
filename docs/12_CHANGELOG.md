@@ -4,6 +4,12 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### Staff, Admin & KDS Backend/Frontend Data-Flow Contract Fixes (2026-10-17)
+- **fix(staff-auth)** — Enforced PIN lockout (`pin_lockout:${deviceToken}`) on `POST /mobile/refresh` in `packages/domain/staff/commands/staff-auth.ts` (returning `429` when locked) and added `user:${payload.id}` + mobile device profile fallback on `GET /mobile/me` in `worker/src/tree/auth/current-user.ts`.
+- **fix(shifts)** — Added cross-midnight open-shift fallback (`WHERE staff_id = ? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1`) on `POST /api/shifts/clock-out` in `packages/domain/shift/commands/shifts.ts` and mounted `reconciliationRoutes` (`/api/shifts/:id/reconcile`, `/api/shifts/:id/reconciliation`) in `worker/src/routes/features-router.ts`.
+- **fix(kds)** — Normalized station ticket `order_item_id` to composite key `${orderId}:${itemId}` in `packages/domain/kitchen/commands/kitchen-station-tickets.ts` to prevent cross-order item readiness bleed; unified KDS RBAC role arrays (`kitchen`, `barista`, `chef`, `admin`, `owner`, `manager`, `staff`) across `worker/src/index.ts`, `worker/src/routes/orders-unified.ts`, `worker/src/routes/staff-mobile.ts`, `packages/domain/kitchen/commands/kitchen-stations.ts`, and `packages/domain/kitchen/commands/kds-mobile.ts`; updated `orders:latest_updated_at` in `AUTH_KV` on admin status mutations; and normalized `item.name` / `item.modifiers` in `src/hooks/use-kds.ts` SSE stream mapping.
+- **fix(catalog-order-admin)** — Preserved underscore-prefixed product IDs (`prod_...`) during composite variant splitting in `packages/domain/catalog/policies/pricing-resolver.ts`; added `o.table_id` projection to `getAdminOrders` in `packages/domain/order/queries/admin-orders.ts`; multiplied top-products quantity by `row.order_count` in `packages/domain/order/queries/stats.ts`; and mapped `served` and `completed` statuses to `'served'` in `src/pages/admin/Orders.tsx`.
+
 ### 📊 Fullstack Admin Operations — Revenue Analytics & Inventory Management (PR #70 — 2026-10-05)
 - **feat(reports)** — Implemented missing grouped sales analytics endpoints in `worker/src/routes/reports-handlers/grouped-sales-handlers.ts`:
   - `GET /api/dashboard/overview?from=...&to=...`: Time-window aggregation with previous-period comparison (% change, AOV, order totals).

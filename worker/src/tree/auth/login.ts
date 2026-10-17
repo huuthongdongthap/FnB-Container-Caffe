@@ -86,6 +86,6 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     }, 200, { 'Set-Cookie': sessionCookie });
   } catch (error) {
     log.error('Login error:', { message: (error as Error).message });
-    return errorResponse(`Đăng nhập thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Đăng nhập thất bại', 500);
   }
 }

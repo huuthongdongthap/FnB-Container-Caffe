@@ -1,17 +1,4 @@
-import { API_BASE } from '@/lib/api-client';
-
-export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers as Record<string, string>),
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || `Request failed: ${res.status}`);
-  return data;
-}
+export { apiFetch } from '@/lib/api-client';
 
 export function formatCurrency(value: number): string {
   return value.toLocaleString('vi-VN');

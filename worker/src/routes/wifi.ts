@@ -75,8 +75,8 @@ export function createWifiRoutes() {
   });
 
   // POST /api/wifi/authorize
-  // Staff/Owner manual MAC grant/revoke override
-  app.post('/authorize', requireAuth(['owner', 'staff']), async(c) => {
+  // Staff/Manager/Owner manual MAC grant/revoke override
+  app.post('/authorize', requireAuth(['owner', 'manager', 'staff']), async(c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>();
       const parsed = WifiAuthorizeSchema.safeParse(body);
@@ -89,7 +89,7 @@ export function createWifiRoutes() {
       return c.json(result);
     } catch (err) {
       log.error('wifi_authorize_error', { error: (err as Error).message });
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: 'Failed to authorize WiFi session' }, 500);
     }
   });
 

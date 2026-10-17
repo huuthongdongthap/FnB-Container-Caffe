@@ -50,6 +50,63 @@ interface AuditStoreState {
   resetFilters: () => Promise<void>;
 }
 
+function normalizeAuditEntry(raw: Record<string, unknown>): AuditEntry {
+  if (
+    typeof raw.actorId === 'string' &&
+    typeof raw.resourceType === 'string' &&
+    typeof raw.createdAt === 'string'
+  ) {
+    return raw as unknown as AuditEntry;
+  }
+  const rawActorId = String(raw.actorId ?? raw.actor_id ?? '');
+  const actorId =
+    rawActorId && rawActorId !== 'system'
+      ? rawActorId
+      : String(raw.user_id ?? (rawActorId || 'system'));
+  const actorName = String(raw.actorName ?? raw.actor_name ?? actorId);
+  const rawResourceType = String(raw.resourceType ?? raw.resource_type ?? '');
+  const resourceType =
+    rawResourceType && rawResourceType !== 'system'
+      ? rawResourceType
+      : String(raw.entity_type ?? (rawResourceType || 'system'));
+  const resourceId = String(raw.resourceId ?? raw.resource_id ?? raw.entity_id ?? '');
+  const ipAddress =
+    raw.ipAddress !== undefined
+      ? (raw.ipAddress as string | null)
+      : raw.ip_address !== undefined
+        ? (raw.ip_address as string | null)
+        : null;
+  const createdAt = String(raw.createdAt ?? raw.created_at ?? '');
+
+  let details: Record<string, unknown> | null = null;
+  const rawDetails =
+    raw.details !== undefined && raw.details !== '{}' && raw.details !== null
+      ? raw.details
+      : raw.metadata ?? raw.details ?? null;
+  if (typeof rawDetails === 'string') {
+    try {
+      const parsed = JSON.parse(rawDetails);
+      details = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : { value: rawDetails };
+    } catch {
+      details = rawDetails ? { value: rawDetails } : null;
+    }
+  } else if (rawDetails && typeof rawDetails === 'object') {
+    details = rawDetails as Record<string, unknown>;
+  }
+
+  return {
+    id: String(raw.id ?? ''),
+    actorId,
+    actorName,
+    action: String(raw.action ?? ''),
+    resourceType,
+    resourceId,
+    details,
+    ipAddress,
+    createdAt,
+  };
+}
+
 export const useAuditStore = create<AuditStoreState>((set, get) => ({
   entries: [],
   total: 0,
@@ -72,9 +129,10 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
       if (filters.dateTo) params.set('date_to', filters.dateTo);
 
       const body = await apiFetch<any>(`/api/admin/audit-logs?${params}`);
+      const rawRows: Array<Record<string, unknown>> = body?.rows || body?.data || [];
       set({
-        entries: body.rows || [],
-        total: body.total ?? body.rows?.length ?? 0,
+        entries: rawRows.map(normalizeAuditEntry),
+        total: body?.total ?? rawRows.length ?? 0,
         loading: false,
         error: null,
       });

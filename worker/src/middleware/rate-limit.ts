@@ -28,6 +28,20 @@ export const ORDER_RATE_LIMIT: RateLimitConfig = {
   errorMessage: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.'
 };
 
+export const RECRUITMENT_RATE_LIMIT: RateLimitConfig = {
+  max: 5,
+  windowSec: 600,
+  keyPrefix: 'rate:recruitment',
+  errorMessage: 'Quá nhiều lần gửi hồ sơ. Vui lòng thử lại sau 10 phút.'
+};
+
+export const CLIENT_ERROR_RATE_LIMIT: RateLimitConfig = {
+  max: 20,
+  windowSec: 60,
+  keyPrefix: 'rate:client-error',
+  errorMessage: 'Too many error reports. Please try again later.'
+};
+
 export async function checkRateLimit(
   c: Context<{ Bindings: Env }>,
   config: RateLimitConfig
@@ -35,12 +49,14 @@ export async function checkRateLimit(
   // Bypass in test environment or when KV is not configured (test benches)
   if ((c.env as Record<string, unknown>).NODE_ENV === 'test') return true;
   if (!c.env.AUTH_KV) return true;
+  const isProd = (c.env as Record<string, unknown>)?.ENVIRONMENT === 'production' || (c.env as Record<string, unknown>)?.NODE_ENV === 'production';
   const origin = c.req.header('origin') || c.req.header('referer') || '';
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+  if (!isProd && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
     return true;
   }
+  const isTestBypass = !isProd && c.req.header('x-playwright-test') === 'true';
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost' || c.req.header('x-playwright-test') === 'true') {
+  if (!isProd && (ip === '127.0.0.1' || ip === 'localhost' || isTestBypass)) {
     return true;
   }
   const key = `${config.keyPrefix}:${ip}`;

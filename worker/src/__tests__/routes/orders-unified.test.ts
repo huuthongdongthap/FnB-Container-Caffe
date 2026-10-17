@@ -176,4 +176,110 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
     const cancelData = await cancelRes.json() as any;
     expect(cancelData.success).toBe(true);
   });
+
+  it('rejects non-positive item quantities and negative prices in guest checkout', async () => {
+    const env = makeTestEnv();
+    const zeroQtyRes = await app.fetch(
+      new Request('https://test.aura/api/orders/guest-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest Diner',
+          customer_phone: '0909999888',
+          items: [{ name: 'Cafe Sua', qty: 0, price: 30000 }],
+          fulfillment_type: 'TAKEAWAY',
+        }),
+      }),
+      env
+    );
+    expect(zeroQtyRes.status).toBe(400);
+
+    const negPriceRes = await app.fetch(
+      new Request('https://test.aura/api/orders/guest-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest Diner',
+          customer_phone: '0909999888',
+          items: [{ name: 'Cafe Sua', qty: 1, price: -10000 }],
+          fulfillment_type: 'TAKEAWAY',
+        }),
+      }),
+      env
+    );
+    expect(negPriceRes.status).toBe(400);
+  });
+
+  it('prevents Origin: localhost from bypassing orderRateLimit in production', async () => {
+    const env = makeTestEnv();
+    env.ENVIRONMENT = 'production';
+    await env.AUTH_KV.put('rate:order:203.0.113.50', '60');
+
+    const res = await app.fetch(
+      new Request('https://test.aura/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'http://localhost:3000',
+          'cf-connecting-ip': '203.0.113.50',
+        },
+        body: JSON.stringify({
+          customer_name: 'Flooder',
+          customer_phone: '0901112233',
+          payment_method: 'cod',
+          total: 35000,
+          items: [{ name: 'Cafe Sua Da', product_id: 'prod-1', quantity: 1, price: 35000 }],
+        }),
+      }),
+      env
+    );
+    expect(res.status).toBe(429);
+  });
+
+  it('authorizes manager role on /kds, /checkout, and /:id/status', async () => {
+    const env = makeTestEnv();
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Store Manager' }, TEST_SECRET);
+
+    const kdsRes = await app.fetch(
+      new Request('https://test.aura/api/orders/kds', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+    expect(kdsRes.status).toBe(200);
+
+    const posRes = await app.fetch(
+      new Request('https://test.aura/api/orders/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          customer_name: 'Diner',
+          customer_phone: '0901234567',
+          payment_method: 'cash',
+          order_type: 'dine_in',
+          items: [{ name: 'Cafe Sua Da', product_id: 'prod-1', quantity: 1, price: 35000 }],
+        }),
+      }),
+      env
+    );
+    expect([200, 201]).toContain(posRes.status);
+
+    const statusRes = await app.fetch(
+      new Request('https://test.aura/api/orders/ORD-123/status', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: 'confirmed' }),
+      }),
+      env
+    );
+    expect([200, 400]).toContain(statusRes.status); // Not 401 or 403
+    expect(statusRes.status).not.toBe(401);
+    expect(statusRes.status).not.toBe(403);
+  });
 });

@@ -12,6 +12,7 @@ import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { CartDrawer } from '@/components/order/cart-drawer';
 import { RecommendationSection } from '@/components/menu/recommendation-section';
 import { DrinkCustomizerModal } from '@/components/menu/DrinkCustomizerModal';
+import { isReadyToServeItem } from '@/lib/menu-customization';
 import { MapPin, UtensilsCrossed, AlertCircle } from 'lucide-react';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
 
@@ -73,7 +74,25 @@ export function MenuPage() {
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
 
   const handleAddToCart = (stitchItem: MenuItemData) => {
-    // Open customization modal so customer can choose sweetness, ice, size, toppings
+    // Packaged / Ready-to-serve items (bottled water, canned drinks, yogurt cups, etc.)
+    // do not have barista formulation (sweetness, ice, toppings, size).
+    // Directly add to cart with 1 click for instant zero-friction experience!
+    if (isReadyToServeItem(stitchItem)) {
+      const priceNum = parseInt(stitchItem.price.replace(/\D/g, ''), 10) || 0;
+      addItem({
+        id: stitchItem.id,
+        productId: stitchItem.id,
+        name: stitchItem.name,
+        price: priceNum,
+        image: stitchItem.imageSrc || undefined,
+        modifiers: [],
+        notes: undefined,
+      });
+      showToast(`Đã thêm ${stitchItem.name} vào giỏ hàng`, 'success');
+      return;
+    }
+
+    // Craft drinks: Open customization modal so customer can choose sweetness, ice, size, toppings
     setCustomizingItem(stitchItem);
   };
 
@@ -95,6 +114,7 @@ export function MenuPage() {
     for (let i = 0; i < quantity; i++) {
       addItem({
         id: `${item.id}${modKey}${noteKey}`,
+        productId: item.id,
         name: item.name,
         price: finalPrice,
         image: item.imageSrc || undefined,

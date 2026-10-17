@@ -152,4 +152,48 @@ describe('Kitchen / KDS Lifecycle & Coordination Contract', () => {
     expect(skipRes.success).toBe(false);
     expect(skipRes.statusCode).toBe(400);
   });
+
+  it('isolates item readiness across concurrent orders sharing the same catalog product ID', async () => {
+    const orderA = {
+      id: 'ORD_A',
+      status: 'preparing',
+      items: JSON.stringify([{ id: 'prod_shared', name: 'Latte' }]),
+      created_at: new Date().toISOString(),
+    };
+    const orderB = {
+      id: 'ORD_B',
+      status: 'preparing',
+      items: JSON.stringify([
+        { id: 'prod_shared', name: 'Latte' },
+        { id: 'prod_croissant', name: 'Croissant' },
+      ]),
+      created_at: new Date().toISOString(),
+    };
+
+    const { app, db, orders } = makeMockLifecycleDb([orderA, orderB]);
+    const env = { AURA_DB: db };
+    // Mark prod_shared ready on ORD_A
+    await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_A/items/prod_shared/start?station_id=KS_COFFEE', { method: 'POST' }),
+      env
+    );
+    await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_A/items/prod_shared/ready?station_id=KS_COFFEE', { method: 'POST' }),
+      env
+    );
+    expect(orders[0].status).toBe('ready');
+
+    // Now mark ONLY prod_croissant ready on ORD_B — prod_shared on ORD_B was NOT marked ready
+    await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_B/items/prod_croissant/start?station_id=KS_BAKERY', { method: 'POST' }),
+      env
+    );
+    const resB = await app.fetch(
+      new Request('https://test.aura/kitchen-stations/tickets/ORD_B/items/prod_croissant/ready?station_id=KS_BAKERY', { method: 'POST' }),
+      env
+    );
+    const bodyB = await resB.json() as any;
+    expect(bodyB.all_items_ready).toBe(false);
+    expect(orders[1].status).toBe('preparing');
+  });
 });

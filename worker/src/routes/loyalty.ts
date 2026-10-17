@@ -18,7 +18,33 @@ import { handleLookup } from '../tree/loyalty/lookup-handler';
 
 export const loyaltyRouter = new Hono<{ Bindings: Env }>();
 
-loyaltyRouter.use('/*', authCustomer);
+const LEGACY_LOYALTY_PATHS = new Set([
+  '/active-campaign',
+  '/phone-auth',
+  '/summary',
+  '/spend-cashback',
+  '/lookup',
+  '/points',
+  '/cashback',
+  '/redeem',
+  '/my-rewards',
+  '/tiers',
+]);
+
+loyaltyRouter.use('/*', async (c, next) => {
+  const pathSegments = c.req.path.split('/').filter(Boolean);
+  const relPath = pathSegments[0] === 'api' && pathSegments[1] === 'loyalty'
+    ? `/${pathSegments.slice(2).join('/')}`
+    : `/${pathSegments.join('/')}`;
+  const isLegacyRoute =
+    LEGACY_LOYALTY_PATHS.has(relPath) ||
+    (relPath === '/rewards' && c.req.method === 'GET');
+  if (!isLegacyRoute) {
+    await next();
+    return;
+  }
+  return authCustomer(c, next);
+});
 
 loyaltyRouter.get('/active-campaign', async(c) => {
   const campaign = await getActiveCampaign(c.env.AURA_DB);

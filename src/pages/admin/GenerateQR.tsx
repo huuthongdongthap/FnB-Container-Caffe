@@ -13,7 +13,7 @@ export type { AdminQRTable, QrCardProps } from './GenerateQR-types';
 export { QrCard } from './GenerateQR-qr-card';
 
 export default function GenerateQRPage() {
-	const { t } = useTranslation('admin');
+	const { t } = useTranslation();
 	const [filterZone, setFilterZone] = useState<string>('all');
 	const { tables, loading, error, regenerating, handleRegenerate, loadTables } = useQrTables(t);
 

@@ -27,7 +27,7 @@ export function LandingFooter({ brandName = 'AURA CAFE' }: { brandName?: string 
             <img
               src="/images/aura-emblem.png"
               alt="AURA CAFE Logo"
-              className="h-8 w-8 rounded-full border border-[var(--aura-chrome-mid)]/40 object-cover shadow-[0_0_8px_rgba(201,214,223,0.3)]"
+              className="h-8 w-8 rounded-xl border border-[var(--aura-chrome-mid)]/40 object-contain p-0.5 shadow-[0_0_8px_rgba(201,214,223,0.3)]"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = '/images/aura-master-logo.png';
               }}

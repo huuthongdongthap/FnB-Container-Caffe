@@ -23,11 +23,14 @@ export const nameSchema = z
 export const orderItemSchema = z.object({
   id: z.string().optional(),
   product_id: z.string().optional(),
+  productId: z.string().optional(),
+  menuItemId: z.string().optional(),
   name: z.string().min(1),
   qty: z.number().int().positive().optional(),
   quantity: z.number().int().positive().optional(),
   price: z.number().nonnegative().optional(),
   modifiers: z.array(z.unknown()).optional(),
+  notes: z.string().max(500).optional(),
 });
 
 // ── Re-export phone/email primitives from their canonical modules ──

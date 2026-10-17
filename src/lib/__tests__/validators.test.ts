@@ -6,7 +6,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành, Phường 1',
+      address: '29 Nguyễn Tất Thành, Phường 1',
       paymentMethod: 'cod',
     });
     expect(result.success).toBe(true);
@@ -20,7 +20,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '12345',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
     });
     expect(result.success).toBe(false);
@@ -43,7 +43,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: '',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
     });
     expect(result.success).toBe(false);
@@ -53,7 +53,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '+84912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
     });
     expect(result.success).toBe(true);
@@ -63,7 +63,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'momo',
     });
     expect(result.success).toBe(false);
@@ -71,7 +71,7 @@ describe('checkoutFormSchema', () => {
     const result2 = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'payos',
     });
     expect(result2.success).toBe(true);
@@ -81,7 +81,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
       email: 'invalid-email',
     });
@@ -90,7 +90,7 @@ describe('checkoutFormSchema', () => {
     const result2 = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
       email: 'test@example.com',
     });
@@ -101,7 +101,7 @@ describe('checkoutFormSchema', () => {
     const result = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
       tip: 2000000,
     });
@@ -110,7 +110,7 @@ describe('checkoutFormSchema', () => {
     const result2 = checkoutFormSchema.safeParse({
       fullName: 'Nguyễn Văn A',
       phone: '0912345678',
-      address: '39 Nguyễn Tất Thành',
+      address: '29 Nguyễn Tất Thành',
       paymentMethod: 'cod',
       tip: 50000,
     });
@@ -133,7 +133,7 @@ describe('orderApiPayloadSchema', () => {
       total: 70000,
       customer_name: 'Nguyễn Văn A',
       customer_phone: '0912345678',
-      customer_address: '39 Nguyễn Tất Thành',
+      customer_address: '29 Nguyễn Tất Thành',
       payment_method: 'cod',
     });
     expect(result.success).toBe(true);
@@ -145,7 +145,7 @@ describe('orderApiPayloadSchema', () => {
       total: 0,
       customer_name: 'Nguyễn Văn A',
       customer_phone: '0912345678',
-      customer_address: '39 Nguyễn Tất Thành',
+      customer_address: '29 Nguyễn Tất Thành',
       payment_method: 'cod',
     });
     expect(result.success).toBe(false);
@@ -157,7 +157,7 @@ describe('orderApiPayloadSchema', () => {
       total: 70000,
       customer_name: 'Nguyễn Văn A',
       customer_phone: '0912345678',
-      customer_address: '39 Nguyễn Tất Thành',
+      customer_address: '29 Nguyễn Tất Thành',
       payment_method: 'momo',
     });
     expect(result.success).toBe(false);

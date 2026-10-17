@@ -148,7 +148,7 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
-  app.get('/kds', requireAuth(['owner', 'staff']), handleGetKdsOrders);
-  app.patch('/:id/status', requireAuth(['owner', 'staff']), audit('order_status_change'), handleUpdateOrderStatus);
+  app.get('/kds', requireAuth(['owner', 'manager', 'staff']), handleGetKdsOrders);
+  app.patch('/:id/status', requireAuth(['owner', 'manager', 'staff']), audit('order_status_change'), handleUpdateOrderStatus);
   app.patch('/:id/mark-cod-paid', requireAuth(['owner']), audit('order_cod_paid'), handleMarkCodPaid);
 }

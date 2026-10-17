@@ -5,7 +5,17 @@ import { LogOut, Receipt, Printer } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { LiveClock } from './StitchPOSNew-live-clock';
 
-export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
+export function POSFooter({
+  cartOpen: _cartOpen,
+  onOpenDrawer,
+  onPrintReceipt,
+  onEndShift,
+}: {
+  cartOpen: boolean;
+  onOpenDrawer?: () => void;
+  onPrintReceipt?: () => void;
+  onEndShift?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <footer
@@ -25,7 +35,8 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
       <nav className="flex items-center gap-3" aria-label={t('posNew.footerNav')}>
         <button
          type="button"
-          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
+          onClick={() => onOpenDrawer?.()}
+          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
           aria-label={t('posNew.openDrawer')}
         >
           <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
@@ -33,7 +44,8 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
         </button>
         <button
          type="button"
-          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
+          onClick={() => (onPrintReceipt ? onPrintReceipt() : window.print())}
+          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
           aria-label={t('posNew.printReceipt')}
         >
           <Printer className="w-3.5 h-3.5 inline mr-1.5" />
@@ -41,7 +53,8 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
         </button>
         <button
          type="button"
-          className="bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] font-bold px-5 py-1.5 rounded-full text-[11px] active:scale-95 font-body"
+          onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/orders'))}
+          className="bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] font-bold px-5 py-1.5 min-h-[36px] rounded-full text-[11px] active:scale-95 font-body"
           aria-label={t('posNew.endShift')}
         >
           <Receipt className="w-3.5 h-3.5 inline mr-1.5" />

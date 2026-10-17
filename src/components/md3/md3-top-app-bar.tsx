@@ -6,6 +6,7 @@ export interface MD3TopAppBarProps {
   title: string;
   variant?: 'small' | 'center-aligned' | 'medium' | 'large';
   leadingIcon?: ReactNode;
+  leadingAriaLabel?: string;
   onLeadingClick?: () => void;
   actions?: ReactNode[];
   scrollY?: number;
@@ -25,6 +26,7 @@ export function MD3TopAppBar({
   title,
   variant = 'small',
   leadingIcon,
+  leadingAriaLabel = 'Navigation menu',
   onLeadingClick,
   actions,
   scrollY = 0,
@@ -51,9 +53,9 @@ export function MD3TopAppBar({
           <button
             type="button"
             onClick={onLeadingClick}
-            aria-label="Navigation menu"
+            aria-label={leadingAriaLabel}
             className={cn(
-              'flex items-center justify-center w-12 h-12 rounded-md-full',
+              'flex items-center justify-center w-12 h-12 min-h-[44px] min-w-[44px] rounded-md-full',
               'text-md-on-surface-variant cursor-pointer',
               'hover:bg-md-on-surface/[0.08] active:bg-md-on-surface/[0.12]',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',

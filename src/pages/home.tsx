@@ -38,7 +38,7 @@ const JSON_LD = {
     },
   ],
   priceRange: 'VND 15,000 - 65,000',
-  image: 'https://auraspace.cafe/images/night-4k.webp',
+  image: 'https://auraspace.cafe/photos/IMG_6691.webp',
 };
 
 export function HomePage() {

@@ -17,7 +17,7 @@ const CustomerSyncSchema = z.object({
   tax_id: z.string().optional().or(z.literal(''))
 });
 
-const allow = requireAuth(['owner', 'staff']);
+const allow = requireAuth(['owner', 'manager', 'staff']);
 
 export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/customers — list with pagination

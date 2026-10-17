@@ -20,10 +20,11 @@ import {
   handleHAWebhook,
   type DiningPresenceEvent
 } from '../../tree/homeassistant/presence';
+import { requireAuth as jwtRequireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
 import { z } from 'zod';
 
-// ── Auth fallback ──────────────────────────────────────────────────────────────
+// ── Auth middleware resolution ─────────────────────────────────────────────────
 const requireAuth = (function() {
   try {
     const g = globalThis as unknown as { requireAuth?: (...a: unknown[]) => MiddlewareHandler };
@@ -31,14 +32,7 @@ const requireAuth = (function() {
       return g.requireAuth;
     }
   } catch { /* fallback */ }
-  // Test-mode: permissive no-op that matches the factory shape requireAuth(roles) => middleware
-  return function permissiveAuth(_roles: string[]) {
-    return async(_c: unknown, next?: () => Promise<void>) => {
-      if (next) {
-        await next();
-      }
-    };
-  };
+  return (roles: string[]) => jwtRequireAuth(roles as Parameters<typeof jwtRequireAuth>[0]);
 })();
 
 const log = createLogger({ route: 'ha' });
@@ -163,7 +157,7 @@ export function createHARouter() {
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('dispatch_presence_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message }, 500);
+      return c.json({ success: false, error: 'Failed to dispatch presence event' }, 500);
     }
   });
 
@@ -172,10 +166,14 @@ export function createHARouter() {
   // POST /api/ha/webhook — receive state updates or automation logs from HA
   app.post('/webhook', async(c) => {
     try {
+      const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
       const secret = (c.env.HA_WEBHOOK_SECRET ?? c.env.HA_TOKEN ?? '') as string;
+      if (isProd && !secret) {
+        return c.json({ error: 'HA webhook secret not configured' }, 503);
+      }
       if (secret) {
         const token = c.req.header('x-ha-token') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? c.req.query('token');
-        if (token && token !== secret) {
+        if (!token || token !== secret) {
           return c.json({ error: 'Unauthorized HA token' }, 401);
         }
       }
@@ -189,7 +187,7 @@ export function createHARouter() {
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('ha_webhook_error', { error: (err as Error).message });
-      return c.json({ success: false, error: (err as Error).message }, 500);
+      return c.json({ success: false, error: 'Failed to process Home Assistant webhook' }, 500);
     }
   });
 

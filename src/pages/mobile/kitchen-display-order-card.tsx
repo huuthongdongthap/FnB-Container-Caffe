@@ -33,18 +33,23 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
         </div>
       </div>
 
-      {order.items.map((item, idx) => (
-        <div key={idx} style={itemRow}>
-          <span style={itemQty}>{item.quantity}x</span>
-          <div style={{ flex: 1 }}>
-            <div style={itemName}>{item.name}</div>
-            {item.notes && <div style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 2 }}>{item.notes}</div>}
-            {item.modifiers && item.modifiers.length > 0 && (
-              <div style={itemModifier}>{item.modifiers.join(', ')}</div>
-            )}
+      {order.items.map((item, idx) => {
+        const rawItem = item as KitchenOrder['items'][number] & { qty?: number; product_name?: string };
+        const qty = rawItem.quantity ?? rawItem.qty ?? 1;
+        const name = rawItem.name || rawItem.product_name || '';
+        return (
+          <div key={idx} style={itemRow}>
+            <span style={itemQty}>{qty}x</span>
+            <div style={{ flex: 1 }}>
+              <div style={itemName}>{name}</div>
+              {item.notes && <div style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 2 }}>{item.notes}</div>}
+              {item.modifiers && item.modifiers.length > 0 && (
+                <div style={itemModifier}>{item.modifiers.join(', ')}</div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {order.status === 'pending' && (
         <div style={actions}>

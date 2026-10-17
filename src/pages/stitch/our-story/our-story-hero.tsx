@@ -17,7 +17,7 @@ export function HeroSection() {
 
       <div className="relative z-20 text-center px-6">
         <span className="block text-[var(--aura-chrome-mid)] tracking-[0.3em] uppercase mb-6 font-body text-xs font-semibold animate-pulse">
-          Thành lập 2018 • 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp
+          Thành lập 2018 • 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp
         </span>
         <h1 className="font-display text-4xl md:text-6xl lg:text-7xl text-white font-medium mb-8 leading-tight max-w-5xl mx-auto">
           Câu Chuyện{' '}

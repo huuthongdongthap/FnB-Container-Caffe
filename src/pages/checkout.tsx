@@ -41,6 +41,7 @@ export function CheckoutPage() {
   /* ── Handle redirect from checkout.html (PayOS return URL bridge) ── */
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');
+    const cancelled = searchParams.get('cancelled');
     const orderId = searchParams.get('order_id');
 
     if ((paymentStatus === 'pending' || paymentStatus === 'success') && orderId) {
@@ -49,7 +50,10 @@ export function CheckoutPage() {
     if (paymentStatus === 'failure' && orderId) {
       navigate(`/order-failure?order_id=${orderId}`, { replace: true });
     }
-  }, [searchParams, navigate]);
+    if (cancelled === 'true') {
+      setPayosError(t('paymentCancelled', 'Giao dịch chuyển khoản đã huỷ. Giỏ hàng vẫn được giữ nguyên, bạn có thể thử lại hoặc đổi sang Tiền mặt.'));
+    }
+  }, [searchParams, navigate, t]);
 
   /* ── Build CheckoutNewSummary from cart store ── */
   const summary: CheckoutNewSummary = useMemo(() => ({
@@ -99,12 +103,24 @@ export function CheckoutPage() {
     const effectiveTotal = subtotal + effectiveShippingFee;
 
     const payload = {
-      items: items.map((i) => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-      })),
+      items: items.map((i) => {
+        const rawId = i.productId || i.id || '';
+        const baseProductId = (rawId.includes('-') || rawId.includes('_'))
+          ? rawId.split(/[-_]/)[0]?.trim() || rawId
+          : rawId;
+        return {
+          id: i.id,
+          product_id: baseProductId,
+          productId: baseProductId,
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          notes: [
+            i.notes,
+            Array.isArray(i.modifiers) && i.modifiers.length > 0 ? `Tùy chọn: ${i.modifiers.join(', ')}` : '',
+          ].filter(Boolean).join(' | '),
+        };
+      }),
       total: effectiveTotal,
       customer_name: formData.fullName,
       customer_phone: formData.phone,
@@ -154,11 +170,12 @@ export function CheckoutPage() {
         // Send payment token to backend
         const res = await fetch(`${API_BASE}/api/payments/payment-request`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_id: order.id,
             payment_token: response.details,
-            amount: effectiveTotal,
+            amount: order.totalAmount || effectiveTotal,
             currency: 'VND',
           }),
         });
@@ -166,7 +183,10 @@ export function CheckoutPage() {
 
         if (result.success) {
           await response.complete('success');
-          try { localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.totalAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName })); } catch { /* */ }
+          try {
+            localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.totalAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName }));
+            localStorage.removeItem('aura_checkout_form');
+          } catch { /* */ }
           clearCart();
           navigate(`/order-success?order_id=${order.id}`);
         } else {
@@ -191,11 +211,13 @@ export function CheckoutPage() {
         throw new Error(useOrderStore.getState().error || t('failedToCreateOrder'));
       }
 
+      const serverTotal = Number((order as unknown as { total?: number }).total || order.totalAmount || effectiveTotal);
+
       // Save order info for success page
       try {
         localStorage.setItem('pendingOrder', JSON.stringify({
           id: order.id,
-          total: order.totalAmount,
+          total: serverTotal,
           payment_method: formData.paymentMethod,
           customer_name: formData.fullName,
         }));
@@ -204,10 +226,9 @@ export function CheckoutPage() {
       // Handle PayOS redirect with internal retry
       if (formData.paymentMethod === 'payos') {
         setPayosRetrying(true);
-        const url = await retryCreatePaymentLink(order.id, effectiveTotal);
+        const url = await retryCreatePaymentLink(order.id, serverTotal);
         setPayosRetrying(false);
         if (url) {
-          clearCart();
           window.location.href = url;
           return;
         }
@@ -216,6 +237,9 @@ export function CheckoutPage() {
       }
 
       // COD: clear cart and navigate to success
+      try {
+        localStorage.removeItem('aura_checkout_form');
+      } catch { /* storage unavailable */ }
       clearCart();
       navigate(`/order-success?order_id=${order.id}`);
     } catch (err) {

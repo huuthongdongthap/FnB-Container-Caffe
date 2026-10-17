@@ -34,10 +34,10 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
   useFocusTrap(isOpen, onToggle, sidebarRef);
 
   const navItems = [
-    { icon: LayoutDashboard, label: t('kds.dashboard', 'DASHBOARD'), tKey: 'kds.dashboard', active: true },
-    { icon: History, label: t('kds.history', 'HISTORY'), tKey: 'kds.history', active: false },
-    { icon: Package, label: t('kds.inventory', 'INVENTORY'), tKey: 'kds.inventory', active: false },
-    { icon: Users, label: t('kds.staff', 'STAFF'), tKey: 'kds.staff', active: false },
+    { icon: LayoutDashboard, label: t('kds.dashboard', 'DASHBOARD'), tKey: 'kds.dashboard', href: '/admin', active: true },
+    { icon: History, label: t('kds.history', 'HISTORY'), tKey: 'kds.history', href: '/admin/orders', active: false },
+    { icon: Package, label: t('kds.inventory', 'INVENTORY'), tKey: 'kds.inventory', href: '/admin/inventory', active: false },
+    { icon: Users, label: t('kds.staff', 'STAFF'), tKey: 'kds.staff', href: '/admin/staff', active: false },
   ];
 
   return (
@@ -89,7 +89,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
           {navItems.map((item) => (
             <a
               key={item.tKey}
-              href="#"
+              href={item.href}
               className={cn(
                 'flex items-center gap-4 px-4 py-3',
                 'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
@@ -112,7 +112,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
         <div className="mt-auto px-4 pb-8">
           <div className="rounded-lg border border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-surface-container)] p-4">
             <span
-              className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-noir-void)] opacity-60"
+              className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)] opacity-80"
               style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {t('kds.stationLoad', 'STATION LOAD')}

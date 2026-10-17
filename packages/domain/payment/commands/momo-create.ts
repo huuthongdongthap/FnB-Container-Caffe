@@ -7,22 +7,25 @@
  */
 
 import { Hono } from 'hono';
-import type { Context, MiddlewareHandler } from 'hono';
+import type { Context } from 'hono';
 import { z } from 'zod';
+import { optionalAuth } from 'worker/src/middleware/auth';
 import type { Env } from 'worker/src/types/env';
 
-// Auth fallback — no-op factory when middleware isn't loaded (test envs)
-// eslint-disable-next-line no-unused-vars
-const requireAuth: undefined | ((allowedRoles?: string[]) => MiddlewareHandler<{ Bindings: Env }>) =
-  (globalThis as Record<string, unknown>).requireAuth as
-    // eslint-disable-next-line no-unused-vars
-    undefined | ((allowedRoles?: string[]) => MiddlewareHandler<{ Bindings: Env }>) ??
-  // eslint-disable-next-line no-unused-vars
-  ((allowedRoles: string[] = []) =>
-    (async(_c: Context, _next: () => Promise<void>): Promise<Response> =>
-      new Response()) as unknown as MiddlewareHandler<{ Bindings: Env }>);
-
 const momoCreateRouter = new Hono<{ Bindings: Env }>();
+
+function randomOrderCode(): string {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return `${Date.now()}${buf[0] % 1000}`;
+}
+
+function randomPaymentId(): string {
+  const buf = new Uint8Array(4);
+  crypto.getRandomValues(buf);
+  const hex = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `pay_${Date.now()}_${hex.slice(0, 5)}`;
+}
 
 const createSchema = z.object({
   order_id: z.string().uuid(),
@@ -39,18 +42,18 @@ async function hmacSha256(key: string, data: string): Promise<string> {
     false,
     ['sign']
   );
-  const sig = await crypto.subtle.sign('sign', secretKey, encoder.encode(data));
+  const sig = await crypto.subtle.sign('HMAC', secretKey, encoder.encode(data));
   return Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-// ── POST /create ──
-momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), async(c) => {
+const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const locale = (c.req.query('locale') || 'vi') as 'vi' | 'en';
   const errMsg = {
     order_not_found: { vi: 'Không tìm thấy đơn hàng', en: 'Order not found' },
+    forbidden: { vi: 'Từ chối — không phải đơn hàng của bạn', en: 'Forbidden — not your order' },
     momo_not_configured: { vi: 'MoMo chưa được cấu hình', en: 'MoMo env vars not configured' },
     momo_error: { vi: 'Lỗi MoMo', en: 'MoMo error' },
     insert_failed: { vi: 'Không thể tạo thanh toán MoMo', en: 'Failed to create MoMo payment' },
@@ -75,6 +78,16 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
 
     if (!orderRow) {
       return c.json({ error: -1, message: errMsg.order_not_found[locale], message_en: errMsg.order_not_found.en }, 404);
+    }
+
+    const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
+    const isStaffOrOwner = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'staff';
+    if (orderRow.customer_id && user?.id && orderRow.customer_id !== user.id && !isStaffOrOwner) {
+      return c.json({
+        success: false,
+        error: errMsg.forbidden[locale],
+        error_en: errMsg.forbidden.en
+      }, 403);
     }
 
     if (orderRow.payment_status === 'paid') {
@@ -123,7 +136,7 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
       return c.json({ error: -1, message: errMsg.momo_not_configured[locale], message_en: errMsg.momo_not_configured.en }, 500);
     }
 
-    let orderCode = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    let orderCode = randomOrderCode();
     const requestId = crypto.randomUUID();
     const returnUrl = `${c.env.FE_BASE_URL || 'https://auraspace.cafe'}/order-success`;
     const ipnUrl = `${c.env.FE_BASE_URL || 'https://auraspace.cafe'}/api/webhook/momo`;
@@ -188,7 +201,7 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
     }
 
     // Persist payment record (retry on UNIQUE collision)
-    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const paymentId = randomPaymentId();
     const now = new Date().toISOString();
     const transId = String(data.transId || orderCode);
 
@@ -204,7 +217,7 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
         insertOk = true;
       } catch {
         // Colliding orderCode — regenerate and retry
-        orderCode = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        orderCode = randomOrderCode();
       }
     }
 
@@ -220,11 +233,13 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
       orderCode,
       requestId
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return c.json({ error: -1, message, message_en: message }, 500);
+  } catch {
+    return c.json({ error: -1, message: errMsg.internal_error[locale], message_en: errMsg.internal_error.en }, 500);
   }
-});
+};
+
+momoCreateRouter.post('/', optionalAuth() as any, handleMomoCreate);
+momoCreateRouter.post('/create', optionalAuth() as any, handleMomoCreate);
 
 export function momoCreate(app: Hono<{ Bindings: Env }>) {
   app.route('/momo/create', momoCreateRouter);

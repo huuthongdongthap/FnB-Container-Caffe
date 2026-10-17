@@ -45,8 +45,9 @@ function reportError(error: ApiClientError, path: string, method: string, silent
     }
   }
 
-  // Report to analytics endpoint (fire-and-forget) only when network is reachable
-  if (error.status !== 0) {
+  // Report to analytics endpoint (fire-and-forget) only when network is reachable.
+  // Suppress 401 & 403 auth rejections to prevent client-error beacon storms when unauthenticated.
+  if (error.status !== 0 && error.status !== 401 && error.status !== 403) {
     try {
       const body = JSON.stringify({
         type: 'api_error',
@@ -57,10 +58,11 @@ function reportError(error: ApiClientError, path: string, method: string, silent
         url: window.location.href,
         timestamp: new Date().toISOString(),
       });
+      const errorUrl = `${API_BASE}/api/client-error`;
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/errors', body);
+        navigator.sendBeacon(errorUrl, body);
       } else {
-        fetch('/api/errors', { method: 'POST', body, keepalive: true }).catch(() => {});
+        fetch(errorUrl, { method: 'POST', body, keepalive: true }).catch(() => {});
       }
     } catch {
       // Silently fail
@@ -77,14 +79,23 @@ export async function apiFetch<T = unknown>(
   options: ApiFetchOptions = {},
 ): Promise<T> {
   const { silent = false, ...fetchOptions } = options;
-  // Auth handled via httpOnly cookies — no Authorization header needed.
-  // Backend reads the access_token cookie automatically.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(fetchOptions.headers as Record<string, string> | undefined),
   };
 
-  const url = `${API_BASE}${path}`;
+  // Safari ITP / Cross-Origin Bearer Token Support:
+  // If a token is stored in localStorage and not explicitly provided in headers, attach Bearer auth.
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+    if (token && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {
+    // restricted storage access
+  }
+
+  const url = path.startsWith('http://') || path.startsWith('https://') ? path : `${API_BASE}${path}`;
 
   // Network-level fetch — catches Safari "Load failed" / Chrome "Failed to fetch"
   let res: Response;

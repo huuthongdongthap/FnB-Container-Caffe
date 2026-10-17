@@ -22,9 +22,13 @@ vi.mock('@/hooks/stores/use-auth-store', () => ({
   ),
 }));
 
-vi.mock('@/lib/api-client', () => ({
-  API_BASE: 'http://localhost:3001',
-}));
+vi.mock('@/lib/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-client')>();
+  return {
+    ...actual,
+    API_BASE: 'http://localhost:3001',
+  };
+});
 
 vi.mock('@/components/ui/card', () => ({
   Card: ({ children, className }: any) => <div className={className}>{children}</div>,

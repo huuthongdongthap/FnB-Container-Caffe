@@ -7,7 +7,10 @@ import { z } from 'zod';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { isHQSuperAdmin } from '../middleware/tenant';
+import { createLogger } from '../middleware/logger';
 import type { FranchiseLocation } from '../types/api';
+
+const log = createLogger({ route: 'franchise-locations' });
 
 export const franchiseRouter = new Hono<{ Bindings: Env }>();
 
@@ -80,7 +83,8 @@ franchiseRouter.post('/locations', requireAuth(['owner']), async (c) => {
     const created = await db.prepare('SELECT * FROM franchise_locations WHERE id = ?').bind(locId).first<FranchiseLocation>();
     return c.json({ success: true, data: created }, 201);
   } catch (err) {
-    return c.json({ success: false, error: (err as Error).message }, 500);
+    log.error('Failed to register franchise location:', { message: (err as Error).message });
+    return c.json({ success: false, error: 'Failed to register franchise location' }, 500);
   }
 });
 

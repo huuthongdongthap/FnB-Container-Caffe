@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PricingCard, { type PricingTier } from '@/components/saas/PricingCard';
+import { apiFetch } from '@/lib/api-client';
 
 const SUPPORTED_LOCALES = new Set(['vi', 'en']);
 
@@ -29,12 +30,12 @@ export default function PricingPage(): ReactNode {
   useEffect(() => {
     if (!locale || !SUPPORTED_LOCALES.has(locale)) return;
 
-    fetch('/api/saas/pricing', {
+    apiFetch<{ ok?: boolean; success?: boolean; data?: PricingTier[] }>('/api/saas/pricing', {
       headers: { 'Accept-Language': locale },
+      silent: true,
     })
-      .then((res) => res.json())
       .then((json) => {
-        if (json.ok) setTiers(json.data);
+        if (json.ok || json.success) setTiers(json.data || []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

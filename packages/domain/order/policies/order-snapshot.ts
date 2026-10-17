@@ -48,17 +48,22 @@ export async function calculateOrderSnapshot(
   let subtotal = 0;
 
   for (const rawItem of input.items) {
-    const itemId = rawItem.productId || rawItem.product_id || rawItem.menuItemId || rawItem.id || '';
-    const quantity = Math.max(1, Number(rawItem.quantity || rawItem.qty || 1));
+    const rawId = rawItem.productId || rawItem.product_id || rawItem.menuItemId || rawItem.id || '';
+    const itemId = rawId;
+    const rawQty = Number(rawItem.quantity || rawItem.qty || 1);
+    const quantity = Math.max(1, Number.isFinite(rawQty) ? Math.floor(rawQty) : 1);
 
     let unitPriceCents = 0;
     let itemName = rawItem.name || 'Item';
     let validatedModifiers: unknown[] = Array.isArray(rawItem.modifiers) ? rawItem.modifiers : [];
     let categoryId = (rawItem.category_id || rawItem.categoryId || null) as string | null;
+    let resolvedItemId = itemId;
 
     if (db && itemId) {
       const resolved = await resolveServerProductPrice(db, {
         productId: itemId,
+        fallbackPrice: rawItem.price,
+        fallbackName: rawItem.name,
         channel,
         modifiers: rawItem.modifiers,
         now,
@@ -74,16 +79,18 @@ export async function calculateOrderSnapshot(
       unitPriceCents = resolved.unitPriceCents;
       itemName = resolved.name || itemName;
       validatedModifiers = resolved.validatedModifiers;
+      resolvedItemId = resolved.id || itemId;
 
       if (!categoryId) {
         try {
+          const lookupId = resolved.id || itemId;
           const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
-            .bind(itemId).first<{ category_id: string }>();
+            .bind(lookupId).first<{ category_id: string }>();
           if (prod?.category_id) {
             categoryId = prod.category_id;
           } else {
             const menu = await db.prepare('SELECT category_id FROM menu_items WHERE id = ?')
-              .bind(itemId).first<{ category_id: string }>();
+              .bind(lookupId).first<{ category_id: string }>();
             if (menu?.category_id) categoryId = menu.category_id;
           }
         } catch {
@@ -114,7 +121,7 @@ export async function calculateOrderSnapshot(
 
     evaluatedItems.push({
       id: rawItem.id,
-      menuItemId: itemId,
+      menuItemId: resolvedItemId,
       name: itemName,
       quantity,
       price: unitPriceCents,
@@ -126,10 +133,10 @@ export async function calculateOrderSnapshot(
     });
   }
 
-  const shippingFee = Math.max(0, Number(input.shipping_fee || 0));
-  const discount = Math.max(0, Number(input.discount || 0));
-  const serviceFee = Math.max(0, Number(input.service_fee || 0));
-  const tipAmount = Math.max(0, Number(input.tip_amount || 0));
+  const shippingFee = Math.max(0, Number(input.shipping_fee || 0) || 0);
+  const discount = Math.max(0, Number(input.discount || 0) || 0);
+  const serviceFee = Math.max(0, Number(input.service_fee || 0) || 0);
+  const tipAmount = Math.max(0, Number(input.tip_amount || 0) || 0);
   const total = Math.max(0, subtotal + shippingFee - discount + serviceFee + tipAmount);
 
   return {

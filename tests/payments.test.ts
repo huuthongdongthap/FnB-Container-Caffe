@@ -16,6 +16,10 @@ import { TextEncoder, TextDecoder } from 'util';
 // ── Mock Web Crypto API ───────────────────────────────────────────
 delete (globalThis as any).crypto;
 (globalThis as any).crypto = {
+  getRandomValues: vi.fn((arr: Uint8Array | Uint32Array) => {
+    arr.fill(1);
+    return arr;
+  }),
   subtle: {
     importKey: vi.fn(async () => ({ type: 'secret', algorithm: { name: 'HMAC', hash: 'SHA-256' } })),
     sign: vi.fn(async () => new Uint8Array(32).fill(97)), // 0x61 = 'a'

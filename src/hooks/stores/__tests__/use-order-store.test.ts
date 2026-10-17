@@ -10,7 +10,7 @@ const MOCK_ORDER = {
   payment_method: 'cod',
   customer_name: 'Nguyen Van A',
   customer_phone: '0912345678',
-  customer_address: '39 Nguyen Tat Thanh',
+  customer_address: '29 Nguyen Tat Thanh',
   items: [
     { id: '1', name: 'Ca phe sua da', price: 35000, quantity: 2 },
   ],
@@ -22,7 +22,7 @@ const MOCK_PAYLOAD: CreateOrderPayload = {
   total: 85000,
   customer_name: 'Nguyen Van A',
   customer_phone: '0912345678',
-  customer_address: '39 Nguyen Tat Thanh',
+  customer_address: '29 Nguyen Tat Thanh',
   payment_method: 'cod',
 };
 

@@ -1,6 +1,6 @@
 # AURA CAFE — Container Caffe & Space
 
-Premium F&B management system for **AURA CAFE**, an industrial-luxury container cafe at 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp.
+Premium F&B management system for **AURA CAFE**, an industrial-luxury container cafe at 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (Đối diện Khách sạn Thảo Trâm 2).
 
 **Production:** https://auraspace.cafe | **Admin:** https://fnb-caffe-container.pages.dev/admin/login
 

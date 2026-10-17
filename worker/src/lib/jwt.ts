@@ -134,6 +134,15 @@ export function getAuthToken(request: Request): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
+  // URL query parameter fallback — browser EventSource (SSE) cannot set custom headers,
+  // and Safari ITP blocks cross-origin cookies.
+  try {
+    const url = new URL(request.url);
+    const tokenParam = url.searchParams.get('token');
+    if (tokenParam) {
+      return tokenParam;
+    }
+  } catch {}
   // Cookie fallback — EventSource (SSE) cannot set Authorization headers,
   // so the web client authenticates via the login session cookie.
   const cookie = request.headers.get('Cookie');

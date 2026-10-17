@@ -37,6 +37,7 @@ const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
 const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/customer-reviews'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 const SystemHubPage = React.lazy(() => import('@/pages/SystemHub'));
+const RecruitmentPage = React.lazy(() => import('@/pages/RecruitmentPage'));
 
 export const publicRoutes = [
   // Cổng điều hành & Danh mục hệ thống
@@ -77,6 +78,8 @@ export const publicRoutes = [
   <Route key="/about" path="/about" element={guarded(<OurStory />)} />,
   <Route key="/reviews" path="/reviews" element={guarded(<CustomerAccountDashboard />)} />,
   <Route key="/contact" path="/contact" element={guarded(<ContactNew />)} />,
+  <Route key="/tuyen-dung" path="/tuyen-dung" element={guarded(<RecruitmentPage />)} />,
+  <Route key="/ung-tuyen" path="/ung-tuyen" element={guarded(<RecruitmentPage />)} />,
   <Route key="/brand" path="/brand" element={guarded(<BrandGuideline />)} />,
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
   <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,

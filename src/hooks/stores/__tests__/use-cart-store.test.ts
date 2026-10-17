@@ -192,5 +192,31 @@ describe('cart-store', () => {
       const item = useCartStore.getState().items[0]!;
       expect(item.modifiers).toEqual(['Oat milk', 'Extra hot']);
     });
+
+    it('sanitizes composite mobile IDs and strips modifiers from bottled items', () => {
+      useCartStore.getState().addItem({
+        id: 'bt001-Size Tiêu Chuẩn (M)_100% đường (chuẩn)_Đá đầy đủ (chuẩn)',
+        name: 'Nước suối',
+        price: 10000,
+        modifiers: ['Size Tiêu Chuẩn (M)', '100% đường (chuẩn)'],
+      });
+
+      const bottled = useCartStore.getState().items[0]!;
+      expect(bottled.id).toBe('bt001');
+      expect(bottled.productId).toBe('bt001');
+      expect(bottled.modifiers).toEqual([]);
+
+      useCartStore.getState().addItem({
+        id: 'tc001-Size L (+5k)_50% đường',
+        name: 'Cà phê máy',
+        price: 25000,
+        modifiers: ['Size L (+5k)', '50% đường'],
+      });
+
+      const crafted = useCartStore.getState().items[1]!;
+      expect(crafted.id).toBe('tc001-Size L (+5k)_50% đường');
+      expect(crafted.productId).toBe('tc001');
+      expect(crafted.modifiers).toEqual(['Size L (+5k)', '50% đường']);
+    });
   });
 });

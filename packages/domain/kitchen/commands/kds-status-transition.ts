@@ -76,13 +76,16 @@ export async function executeKdsStatusTransition(
 
   // Structural transition validation
   const structural = canTransition(order.status, targetStatus);
-  if (!structural.ok) {
+  const isKdsDirectStart = order.status === 'pending' && targetStatus === 'preparing';
+  if (!structural.ok && !isKdsDirectStart) {
     return { success: false, error: structural.error, statusCode: 400 };
   }
 
   // Role authorization validation
   const role = toActorRole(userRole || 'staff');
-  const authCheck = canActorTransition(role, order.status, targetStatus);
+  const authCheck = isKdsDirectStart
+    ? canActorTransition(role, 'confirmed', 'preparing')
+    : canActorTransition(role, order.status, targetStatus);
   if (!authCheck.ok) {
     return { success: false, error: authCheck.error, statusCode: 403 };
   }

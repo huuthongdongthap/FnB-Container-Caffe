@@ -46,7 +46,7 @@ export default function CartBottomBar() {
 
   return (
     <div
-      className={`fixed ${lift} left-0 right-0 z-[60] transition-transform duration-300 ease-out ${
+      className={`fixed ${lift} left-0 right-0 z-[60] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out ${
         visible ? 'translate-y-0' : hide
       }`}
     >
@@ -55,7 +55,8 @@ export default function CartBottomBar() {
         <button
           type="button"
           onClick={() => navigate('/checkout')}
-          className="w-full flex items-center justify-between gap-3 rounded-2xl px-5 py-3.5
+          aria-label={`Thanh toán ${count} món — ${formatPrice(total)}`}
+          className="w-full min-h-[44px] flex items-center justify-between gap-3 rounded-2xl px-5 py-3.5
                      bg-[var(--aura-noir-deep)]/95 backdrop-blur-md
                      border border-[var(--aura-border-chrome)]
                      shadow-[0_-4px_24px_rgba(0,0,0,0.4)]

@@ -28,7 +28,7 @@ describe('ContactNewPage', () => {
     renderWithProviders(<ContactNewPage />);
     expect(screen.getByRole('heading', { level: 1, name: /Liên Hệ/i })).toBeInTheDocument();
     // Address may appear multiple times across the page sections — use getAllByText
-    expect(screen.getAllByText(/39 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/29 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('+84 946 013 633')).toBeInTheDocument();
     expect(screen.getByText(/06:00 — 23:00/i)).toBeInTheDocument();
   });

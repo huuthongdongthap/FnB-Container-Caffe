@@ -13,6 +13,7 @@ interface MenuSectionProps {
   onSearchChange: (q: string) => void;
   activeCategory: string;
   onCategoryChange: (c: string) => void;
+  categories?: string[];
   filteredItems: POSNewMenuItem[];
   addOns: POSNewAddOn[];
   getQuantity: (id: string) => number;
@@ -26,6 +27,7 @@ export function MenuSection({
   onSearchChange,
   activeCategory,
   onCategoryChange,
+  categories = MENU_CATEGORIES,
   filteredItems,
   addOns,
   getQuantity,
@@ -56,7 +58,7 @@ export function MenuSection({
           />
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 custom-scrollbar-pos" role="tablist" aria-label={t('posNew.categoryFilter')}>
-          {MENU_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               type="button"

@@ -8,9 +8,9 @@
  *   NAV    (network-only)  -> any other navigation route (no caching)
  */
 
-const STATIC_CACHE = 'aura-static-v1';
-const API_QUEUE_CACHE = 'aura-api-queue-v1';
-const CACHE_VERSION = 'aura-v1';
+const STATIC_CACHE = 'aura-static-v4';
+const API_QUEUE_CACHE = 'aura-api-queue-v4';
+const CACHE_VERSION = 'aura-v4';
 
 // ---- Pre-cache list (critical shell assets) ----
 const PRECACHE_URLS = [

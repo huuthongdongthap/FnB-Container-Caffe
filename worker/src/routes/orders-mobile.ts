@@ -5,8 +5,35 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'admin'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin'];
+
+function normalizeOrderItems(raw: unknown): Array<Record<string, unknown>> {
+  let parsed: unknown[] = [];
+  if (Array.isArray(raw)) {
+    parsed = raw;
+  } else if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const json = JSON.parse(raw);
+      if (Array.isArray(json)) parsed = json;
+    } catch {
+      parsed = [];
+    }
+  }
+  return parsed.map((entry) => {
+    const item = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+    const qty = Number(item.qty ?? item.quantity ?? 1);
+    const price = Number(item.price ?? item.unit_price ?? 0);
+    const name = String(item.name ?? item.product_name ?? '');
+    return {
+      ...item,
+      name,
+      qty,
+      quantity: qty,
+      price,
+    };
+  });
+}
 
 // GET /mobile/orders?table_id=xxx — list orders for a table
 export async function getOrdersMobile(
@@ -40,13 +67,13 @@ export async function getOrdersMobile(
       success: true,
       orders: (results as Array<Record<string, unknown>>).map((r) => ({
         ...r,
-        items: JSON.parse((r.items as string) || '[]'),
+        items: normalizeOrderItems(r.items),
       })),
     });
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('getOrdersMobile error:', { message: errMsg });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể tải danh sách đơn hàng', 500);
   }
 }
 
@@ -62,7 +89,12 @@ export async function createOrderMobile(
 
     const body = await context.req.json<{
       table_id: string;
-      items: Array<{ name: string; qty: number; price: number; note?: string }>;
+      table_number?: string | number;
+      customer_name?: string;
+      customer_phone?: string;
+      payment_method?: string;
+      notes?: string;
+      items: Array<{ name: string; qty?: number; quantity?: number; price?: number; note?: string }>;
     }>();
 
     if (!body.table_id) {
@@ -74,20 +106,72 @@ export async function createOrderMobile(
 
     const id = `ORD_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
+    const normalizedItems = normalizeOrderItems(body.items);
+    const total = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.qty ?? 1) * Number(item.price ?? 0),
+      0,
+    );
+    const itemsJson = JSON.stringify(normalizedItems);
+    const tableNumber = String(body.table_number ?? body.table_id);
+    const customerName = String(body.customer_name || `Bàn ${tableNumber}`);
+    const customerPhone = String(body.customer_phone || '0000000000');
+    const paymentMethod = String(body.payment_method || 'cash');
 
-    await context.env.AURA_DB
-      .prepare(
-        `INSERT INTO orders (id, table_id, items, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'pending', ?, ?)`
-      )
-      .bind(id, body.table_id, JSON.stringify(body.items), now, now)
-      .run();
+    try {
+      await context.env.AURA_DB
+        .prepare(
+          `INSERT INTO orders (
+             id, order_number, table_id, table_number,
+             customer_name, customer_phone, items, total,
+             status, payment_method, payment_status, order_type,
+             notes, created_at, updated_at
+           )
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', 'dine_in', ?, ?, ?)`
+        )
+        .bind(
+          id,
+          id,
+          body.table_id,
+          tableNumber,
+          customerName,
+          customerPhone,
+          itemsJson,
+          total,
+          paymentMethod,
+          body.notes ?? null,
+          now,
+          now,
+        )
+        .run();
+    } catch (insertErr) {
+      const msg = String((insertErr as Error)?.message || '');
+      if (msg.includes('no such column') || msg.includes('has no column')) {
+        await context.env.AURA_DB
+          .prepare(
+            `INSERT INTO orders (id, table_id, items, status, created_at, updated_at)
+             VALUES (?, ?, ?, 'pending', ?, ?)`
+          )
+          .bind(id, body.table_id, itemsJson, now, now)
+          .run();
+      } else {
+        throw insertErr;
+      }
+    }
 
-    return jsonResponse({ success: true, order_id: id }, 201);
+    try {
+      await context.env.AURA_DB
+        .prepare('UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?')
+        .bind('Occupied', now, body.table_id)
+        .run();
+    } catch {
+      // Non-blocking if cafe_tables is not present in minimal test mock
+    }
+
+    return jsonResponse({ success: true, order_id: id, total }, 201);
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('createOrderMobile error:', { message: errMsg });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể tạo đơn hàng', 500);
   }
 }
 
@@ -120,12 +204,12 @@ export async function getOrderDetail(
       success: true,
       order: {
         ...data,
-        items: JSON.parse((data.items as string) || '[]'),
+        items: normalizeOrderItems(data.items),
       },
     });
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('getOrderDetail error:', { message: errMsg });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể tải chi tiết đơn hàng', 500);
   }
 }

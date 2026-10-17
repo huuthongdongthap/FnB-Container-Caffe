@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { registerUser, loginUser, logoutUser, getCurrentUser, bootstrapOwner } from '../../routes/auth';
+import { registerUser, registerWithVerification, verifyEmail, loginUser, logoutUser, getCurrentUser, bootstrapOwner, registerStaff, listStaff, expiresAtFromNow } from '../../routes/auth';
 import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
 
 function mockRequest(method: string, path: string, body?: unknown): Request {
@@ -115,5 +115,151 @@ describe('bootstrapOwner', () => {
     expect(res.status).toBe(201);
     const data = await res.json() as Record<string, unknown>;
     expect(data.success).toBe(true);
+  });
+});
+
+describe('verifyEmail & registerWithVerification hardening', () => {
+  it('expiresAtFromNow sets 10-minute TTL instead of 100-minute typo', () => {
+    const diffMs = new Date(expiresAtFromNow()).getTime() - Date.now();
+    expect(diffMs).toBeGreaterThan(9 * 60_000);
+    expect(diffMs).toBeLessThanOrEqual(11 * 60_000);
+  });
+
+  it('locks out OTP verification after 5 failed attempts and deletes verification record', async() => {
+    const env = createMockEnv();
+    let deletedId: string | null = null;
+    (env as any).AURA_DB = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => {
+            if (sql.includes('SELECT id, code, expires_at FROM email_verifications')) {
+              return deletedId
+                ? null
+                : { id: 'EV_1', code: '654321', expires_at: new Date(Date.now() + 600_000).toISOString() };
+            }
+            return null;
+          },
+          run: async () => {
+            if (sql.includes('DELETE FROM email_verifications')) {
+              deletedId = String(args[0]);
+            }
+            return { rowCount: 1 };
+          }
+        })
+      })
+    };
+
+    for (let i = 1; i <= 4; i++) {
+      const req = mockRequest('POST', '/api/auth/verify-email', { email: 'otp@test.com', code: '000000' });
+      const res = await verifyEmail(req, env as unknown as Record<string, unknown>);
+      expect(res.status).toBe(401);
+    }
+
+    const req5 = mockRequest('POST', '/api/auth/verify-email', { email: 'otp@test.com', code: '000000' });
+    const res5 = await verifyEmail(req5, env as unknown as Record<string, unknown>);
+    expect(res5.status).toBe(429);
+    expect(deletedId).toBe('EV_1');
+  });
+
+  it('sanitizes 500 error responses in registerWithVerification and verifyEmail', async() => {
+    const brokenEnv = {
+      ...createMockEnv(),
+      AUTH_KV: {
+        get: async () => { throw new Error('KV_SECRET_CONNECTION_FAILURE'); }
+      },
+      AURA_DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => { throw new Error('D1_INTERNAL_SQL_STACK_LEAK'); }
+          })
+        })
+      }
+    };
+
+    const regReq = mockRequest('POST', '/api/auth/register', { email: 'err@test.com', password: 'Test1234!', name: 'Test' });
+    const regRes = await registerWithVerification(regReq, brokenEnv as unknown as Record<string, unknown>);
+    expect(regRes.status).toBe(500);
+    const regData = await regRes.json() as Record<string, unknown>;
+    expect(String(regData.error)).not.toContain('KV_SECRET_CONNECTION_FAILURE');
+
+    const verReq = mockRequest('POST', '/api/auth/verify-email', { email: 'err@test.com', code: '123456' });
+    const verRes = await verifyEmail(verReq, brokenEnv as unknown as Record<string, unknown>);
+    expect(verRes.status).toBe(500);
+    const verData = await verRes.json() as Record<string, unknown>;
+    expect(String(verData.error)).not.toContain('D1_INTERNAL_SQL_STACK_LEAK');
+  });
+
+  it('verifies OpenAPI auth password hashes round-trip using PBKDF2', async() => {
+    const { hashPassword, verifyPassword } = await import('../../routes/openapi-auth-handlers/helpers');
+    const hash = await hashPassword('AuraSecurePass123!');
+    expect(hash.startsWith('pbkdf2$')).toBe(true);
+    expect(await verifyPassword('AuraSecurePass123!', hash)).toBe(true);
+    expect(await verifyPassword('WrongPass123!', hash)).toBe(false);
+  });
+
+  it('registerStaff mirrors new staff into D1 users even without tenant_id and listStaff returns normalized staff + users', async() => {
+    const env = createMockEnv();
+    const d1Inserted: Array<{ sql: string; args: unknown[] }> = [];
+    (env as any).AURA_DB = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          run: async () => {
+            d1Inserted.push({ sql, args });
+            return { rowCount: 1 };
+          },
+          all: async () => ({ results: [] }),
+        }),
+        all: async () => ({
+          results: [
+            {
+              id: 'USR_D1_SEED',
+              email: 'd1staff@aura.vn',
+              name: 'D1 Seeded Staff',
+              phone: '0905556666',
+              role: 'manager',
+              is_active: 1,
+              created_at: '2026-10-10T08:00:00Z',
+            },
+          ],
+        }),
+      }),
+    };
+
+    const regReq = mockRequest('POST', '/api/auth/register-staff', {
+      email: 'barista1@aura.vn',
+      password: 'StaffPass123!',
+      name: 'Barista One',
+      phone: '0901234567',
+      role: 'Barista',
+    });
+    const regRes = await registerStaff(regReq, env as unknown as Record<string, unknown>);
+    expect(regRes.status).toBe(201);
+    expect(d1Inserted.length).toBeGreaterThanOrEqual(1);
+    expect(d1Inserted[0].sql).toContain('INSERT OR IGNORE INTO users');
+
+    const listReq = mockRequest('GET', '/api/auth/staff');
+    const listRes = await listStaff(listReq, env as unknown as Record<string, unknown>);
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json() as {
+      success: boolean;
+      users: Array<Record<string, unknown>>;
+      staff: Array<Record<string, unknown>>;
+    };
+    expect(listBody.success).toBe(true);
+    expect(listBody.users.length).toBe(2);
+    expect(listBody.staff.length).toBe(2);
+    const kvStaff = listBody.staff.find((s) => s.email === 'barista1@aura.vn');
+    expect(kvStaff).toMatchObject({
+      name: 'Barista One',
+      role: 'Barista',
+      isActive: true,
+    });
+    const d1Staff = listBody.staff.find((s) => s.email === 'd1staff@aura.vn');
+    expect(d1Staff).toMatchObject({
+      id: 'USR_D1_SEED',
+      name: 'D1 Seeded Staff',
+      role: 'manager',
+      isActive: true,
+    });
   });
 });

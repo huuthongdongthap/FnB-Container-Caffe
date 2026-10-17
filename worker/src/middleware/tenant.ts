@@ -54,8 +54,29 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
 
 /**
  * Helper to get tenantId from context in route handlers.
+ * Enforces JWT tenant confinement when c.get('user') is present:
+ * only HQ super-admins may override tenancy via ?tenant_id or x-tenant-id.
  * Usage: const tenantId = getTenantId(c);
  */
-export function getTenantId(c: { get: (_key: string) => unknown }): string {
-  return (c.get('tenantId') as string) ?? 'default';
+export function getTenantId(c: {
+  get: (_key: string) => unknown;
+  req?: { query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined };
+}): string {
+  const explicitTenant = c.get('tenantId') as string | undefined;
+  if (explicitTenant) {
+    return explicitTenant;
+  }
+
+  const user = c.get('user') as { role?: string; tenantId?: string } | undefined;
+  if (user) {
+    if (isHQSuperAdmin(user)) {
+      const requestedTenant = c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id');
+      if (requestedTenant) {
+        return requestedTenant;
+      }
+    }
+    return user.tenantId ?? 'default';
+  }
+
+  return 'default';
 }

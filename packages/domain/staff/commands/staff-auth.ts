@@ -98,13 +98,42 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
     const parsedPin = pinSchema.safeParse(pin);
     if (!parsedPin.success) return errorResponse(parsedPin.error.issues[0].message, 400);
 
+    const lockoutKey = `pin_lockout:${deviceToken}`;
+    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+    let failedAttempts = 0;
+    try {
+      if (authKV) {
+        failedAttempts = parseInt((await authKV.get(lockoutKey)) || '0', 10);
+      }
+    } catch {
+      // Ignore KV transient error
+    }
+    if (failedAttempts >= 5) {
+      return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
+    }
+
     const device = await findDevice(c.env, deviceToken);
     if (!device) return errorResponse('Thiết bị chưa đăng ký', 404);
 
     const ok = await verifyPin(pin, device.pin_hash);
     if (!ok) {
-      log.warn('Staff PIN mismatch', { device_id: device.id, staff_id: device.staff_id });
+      const nextAttempts = failedAttempts + 1;
+      try {
+        await authKV?.put(lockoutKey, String(nextAttempts), { expirationTtl: 300 });
+      } catch {
+        // Ignore KV transient error
+      }
+      log.warn('Staff PIN mismatch', { device_id: device.id, staff_id: device.staff_id, attempts: nextAttempts });
+      if (nextAttempts >= 5) {
+        return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
+      }
       return errorResponse('PIN không đúng', 401);
+    }
+
+    try {
+      await authKV?.delete?.(lockoutKey);
+    } catch {
+      // Ignore cleanup error
     }
 
     // Fire-and-forget last_login update
@@ -113,20 +142,33 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
       .bind(new Date().toISOString(), new Date().toISOString(), deviceToken)
       .run();
 
+    let staffEmail = '';
+    let staffName = '';
+    try {
+      const staffRaw = await authKV?.get(`user:${device.staff_id}`);
+      if (staffRaw) {
+        const parsedStaff = JSON.parse(staffRaw) as { email?: string; name?: string };
+        staffEmail = parsedStaff.email || '';
+        staffName = parsedStaff.name || '';
+      }
+    } catch {
+      // Ignore KV lookup error
+    }
+
     const token = await generateJWT(
-      { email: '', name: '', id: device.staff_id, role: device.role },
+      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role },
       c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
     );
 
     return jsonResponse({
       success: true,
-      user: { id: device.staff_id, email: '', name: '', role: device.role, device_id: device.id },
+      user: { id: device.staff_id, email: staffEmail, name: staffName, role: device.role, device_id: device.id },
       token,
       expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
     });
   } catch (err) {
     log.error('staffMobileLogin error', { message: (err as Error).message });
-    return errorResponse(`Đăng nhập thất bại: ${(err as Error).message}`, 500);
+    return errorResponse('Đăng nhập thất bại', 500);
   }
 }
 
@@ -137,11 +179,34 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
     const deviceToken = String(body.device_token ?? '');
     if (!deviceToken) return errorResponse('Thiếu device_token', 400);
 
+    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+    try {
+      const failedAttempts = parseInt((await authKV?.get(`pin_lockout:${deviceToken}`)) || '0', 10);
+      if (failedAttempts >= 5) {
+        return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
+      }
+    } catch {
+      // Ignore KV transient error
+    }
+
     const device = await findDevice(c.env, deviceToken);
     if (!device) return errorResponse('Thiết bị không hợp lệ', 401);
 
+    let staffEmail = '';
+    let staffName = '';
+    try {
+      const staffRaw = await authKV?.get(`user:${device.staff_id}`);
+      if (staffRaw) {
+        const parsedStaff = JSON.parse(staffRaw) as { email?: string; name?: string };
+        staffEmail = parsedStaff.email || '';
+        staffName = parsedStaff.name || '';
+      }
+    } catch {
+      // Ignore KV lookup error
+    }
+
     const newToken = await generateJWT(
-      { email: '', name: '', id: device.staff_id, role: device.role },
+      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role },
       c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
     );
 
@@ -151,24 +216,44 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
     });
   } catch (err) {
     log.error('staffTokenRefresh error', { message: (err as Error).message });
-    return errorResponse(`Refresh thất bại: ${(err as Error).message}`, 500);
+    return errorResponse('Refresh thất bại', 500);
   }
 }
 
 // POST /mobile/devices/register — owner-only: register a device for a staff account
 export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
   try {
-    const body = await c.req.json<Record<string, unknown>>();
+    const rawBody = await c.req.json<Record<string, unknown>>();
+    const body = {
+      ...rawBody,
+      role: rawBody.role === 'kitchen' ? 'staff' : rawBody.role,
+    };
     const parsed = registerDeviceSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
     const { device_token, device_name, staff_id, role, pin } = parsed.data;
 
-    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
     if (!staff_id) return errorResponse('staff_id là bắt buộc', 400);
 
-    const userStr = await authKV.get(`user:${staff_id}`);
-    if (!userStr) return errorResponse('staff_id không khớp tài khoản nào trong hệ thống', 404);
+    const userStr = authKV ? await authKV.get(`user:${staff_id}`) : null;
+    let user: { id: string; name: string } | null = userStr
+      ? (JSON.parse(userStr) as { id: string; name: string })
+      : null;
+    if (!user && c.env.AURA_DB) {
+      try {
+        const d1User = await c.env.AURA_DB
+          .prepare('SELECT id, name FROM users WHERE id = ?')
+          .bind(staff_id)
+          .first<{ id: string; name: string }>();
+        if (d1User?.id) {
+          user = { id: d1User.id, name: d1User.name || d1User.id };
+        }
+      } catch {
+        // Fallback to 404 if D1 lookup fails
+      }
+    }
+    if (!user) return errorResponse('staff_id không khớp tài khoản nào trong hệ thống', 404);
 
     const callerRole = c.get('user')?.role as string | undefined;
     if (!callerRole) return errorResponse('Vui lòng đăng nhập', 401);
@@ -180,7 +265,6 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     }
 
     const pinHash = await hashPin(pin);
-    const user = JSON.parse(userStr) as { id: string; name: string };
     await upsertDevice(c.env, {
       staff_id: user.id, device_token, device_name,
       role: role as 'owner' | 'manager' | 'staff' | 'waiter', pin_hash: pinHash,
@@ -192,7 +276,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     }, 201);
   } catch (err) {
     log.error('registerStaffDevice error', { message: (err as Error).message });
-    return errorResponse(`Đăng ký thất bại: ${(err as Error).message}`, 500);
+    return errorResponse('Đăng ký thất bại', 500);
   }
 }
 
@@ -226,7 +310,7 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
     return jsonResponse({ success: true, message: 'Đã hủy đăng ký thiết bị' });
   } catch (err) {
     log.error('revokeStaffDevice error', { message: (err as Error).message });
-    return errorResponse(`Hủy thất bại: ${(err as Error).message}`, 500);
+    return errorResponse('Hủy thất bại', 500);
   }
 }
 
@@ -256,13 +340,16 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
     return jsonResponse({
       success: true,
       devices: (rows.results as Array<Record<string, unknown>>).map(r => ({
-        id: r.id as string, device_name: r.device_name as string | null,
-        role: r.role as string, last_login_at: r.last_login_at as string | null,
+        id: r.id as string,
+        staff_id: (r.staff_id as string | undefined) ?? '',
+        device_name: r.device_name as string | null,
+        role: r.role as string,
+        last_login_at: r.last_login_at as string | null,
         created_at: r.created_at as string,
       })),
     });
   } catch (err) {
     log.error('listStaffDevices error', { message: (err as Error).message });
-    return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
+    return errorResponse('Không thể tải danh sách thiết bị', 500);
   }
 }

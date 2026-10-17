@@ -10,6 +10,15 @@ import { generateVerifyToken, expiresAtFromNow, storeVerifyCode } from '../tree/
 
 const log = createLogger({ route: 'auth-register' });
 
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function registerWithVerification(request: Request, env: Record<string, unknown>) {
   try {
     const body = await request.json();
@@ -54,9 +63,10 @@ export async function registerWithVerification(request: Request, env: Record<str
     const { sendEmail } = await import('../lib/email');
     const verifyUrl = `${env.APP_URL || 'http://localhost:3000'}/verify-email?email=${encodeURIComponent(email)}&code=${code}`;
 
+    const safeName = escapeHtml(name || 'bạn');
     const html = `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;padding:24px">
       <h2>Xác thực email — AURA CAFE</h2>
-      <p>Chào ${name || 'bạn'},</p>
+      <p>Chào ${safeName},</p>
       <p>Mã xác thực của bạn: <strong style="font-size:24px">${code}</strong></p>
       <p>Nhập mã này trong vòng 10 phút. Hoặc nhấn:<br><a href="${verifyUrl}">Xác thực ngay</a></p>
       <hr/>
@@ -78,6 +88,6 @@ export async function registerWithVerification(request: Request, env: Record<str
     }, 201);
   } catch (error) {
     log.error('Register error:', { message: (error as Error).message });
-    return errorResponse(`Đăng ký thất bại: ${(error as Error).message}`, 500);
+    return errorResponse('Đăng ký thất bại', 500);
   }
 }

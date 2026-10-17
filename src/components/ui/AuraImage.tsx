@@ -39,29 +39,16 @@ export function AuraImage({ src, alt, className, ...rest }: AuraImageProps) {
     );
   }
 
-  if (isWebp) {
-    const pngSrc = src.replace(/\.webp(\?.*)?$/i, '.png');
-    return (
-      <picture>
-        <source srcSet={src} type="image/webp" />
-        <img
-          src={pngSrc}
-          alt={alt}
-          className={cn(className)}
-          loading="lazy"
-          {...rest}
-        />
-      </picture>
-    );
-  }
-
-  const webpSrc = src.replace(/\.(png|jpg|jpeg|gif|avif)(\?.*)?$/i, '.webp');
+  const webpSrc = isConvertible
+    ? src.replace(/\.(png|jpg|jpeg|gif|avif)(\?.*)?$/i, '.webp')
+    : src;
+  const pngSrc = src;
 
   return (
     <picture>
-      <source srcSet={webpSrc} type="image/webp" />
+      {!isWebp && webpSrc !== src && <source srcSet={webpSrc} type="image/webp" />}
       <img
-        src={src}
+        src={pngSrc}
         alt={alt}
         className={cn(className)}
         loading="lazy"

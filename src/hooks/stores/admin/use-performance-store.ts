@@ -54,9 +54,27 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     const requestId = get()._vitalsRequestId + 1;
     set({ vitalsLoading: true, vitalsError: null, _vitalsRequestId: requestId });
     try {
-      const json: WebVitalsResponse = await apiFetch('/api/admin/metrics?filter=web_vital_*&range=7d');
+      const json = await apiFetch<Partial<WebVitalsResponse> & { metrics?: Array<{ name?: string; count?: number }> }>(
+        '/api/admin/metrics?filter=web_vital_*&range=7d',
+      );
       if (get()._vitalsRequestId !== requestId) return;
-      set({ webVitals: json, vitalsLoading: false, vitalsError: null });
+      const fallbackVitals: Record<string, WebVitalData> = {};
+      if (!json.vitals && Array.isArray(json.metrics)) {
+        for (const m of json.metrics) {
+          const metricName = String(m.name || '').replace(/^web_vital_/, '');
+          if (metricName) {
+            fallbackVitals[metricName] = { good: Number(m.count ?? 0), needsImprovement: 0, poor: 0 };
+          }
+        }
+      }
+      set({
+        webVitals: {
+          vitals: json.vitals ?? fallbackVitals,
+          targets: json.targets ?? {},
+        },
+        vitalsLoading: false,
+        vitalsError: null,
+      });
     } catch (err) {
       if (get()._vitalsRequestId !== requestId) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
@@ -71,9 +89,20 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     const requestId = get()._latencyRequestId + 1;
     set({ latencyLoading: true, latencyError: null, _latencyRequestId: requestId });
     try {
-      const json: APILatencyResponse = await apiFetch('/api/admin/metrics?filter=request_duration_ms&range=7d');
+      const json = await apiFetch<Partial<APILatencyResponse> & { latency?: { p50?: number; p95?: number; p99?: number } }>(
+        '/api/admin/metrics?filter=request_duration_ms&range=7d',
+      );
       if (get()._latencyRequestId !== requestId) return;
-      set({ apiLatency: json, latencyLoading: false, latencyError: null });
+      set({
+        apiLatency: {
+          p50: Number(json.p50 ?? json.latency?.p50 ?? 0),
+          p95: Number(json.p95 ?? json.latency?.p95 ?? 0),
+          p99: Number(json.p99 ?? json.latency?.p99 ?? json.p95 ?? json.latency?.p95 ?? 0),
+          requestCounts: Array.isArray(json.requestCounts) ? json.requestCounts : [],
+        },
+        latencyLoading: false,
+        latencyError: null,
+      });
     } catch (err) {
       if (get()._latencyRequestId !== requestId) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';

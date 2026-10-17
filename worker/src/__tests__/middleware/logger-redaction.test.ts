@@ -53,4 +53,14 @@ describe('logger redaction integration', () => {
     expect(emitted).not.toContain('0901234567');
     expect(emitted).toContain('[REDACTED]');
   });
+
+  it('masks sensitive fields placed directly in LoggerContext base and bare phone in msg', () => {
+    console.log = (line: unknown) => { lines.push(String(line)); };
+    const log = createLogger({ route: 'test', token: 'SECRET_TOKEN_IN_CONTEXT' } as any);
+    log.info('0901234567');
+    const emitted = lines.join('\n');
+    expect(emitted).not.toContain('SECRET_TOKEN_IN_CONTEXT');
+    expect(emitted).not.toContain('0901234567');
+    expect(emitted).toContain('[REDACTED]');
+  });
 });

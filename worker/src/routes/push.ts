@@ -6,11 +6,60 @@ import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErr
 
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
-// POST /api/push/subscribe — save subscription
+// GET /api/push/list-subscriptions — list staff push subscriptions for admin UI
+pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+  const db = c.env.AURA_DB;
+  const { results } = await db.prepare(
+    `SELECT id, customer_id, endpoint, user_agent, role, created_at
+     FROM push_subscriptions
+     WHERE role != 'customer'
+     ORDER BY created_at DESC`
+  ).all<{
+    id: string;
+    customer_id: string | null;
+    endpoint: string;
+    user_agent: string | null;
+    role: string | null;
+    created_at: string;
+  }>();
+
+  const subscriptions = (results || []).map((row) => {
+    const isManual = row.endpoint?.startsWith('https://manual.auraspace.local/');
+    const normalizedRole: 'owner' | 'staff' | 'all' =
+      row.role === 'owner' || row.role === 'staff' || row.role === 'all'
+        ? row.role
+        : row.role?.startsWith('staff')
+          ? 'staff'
+          : 'all';
+    return {
+      name: row.user_agent || row.customer_id || row.id,
+      role: normalizedRole,
+      endpoint: isManual ? '' : (row.endpoint || ''),
+      subscribed: !isManual && Boolean(row.endpoint),
+      createdAt: row.created_at,
+    };
+  });
+
+  return c.json({ success: true, subscriptions });
+});
+
+// POST /api/push/subscribe — save subscription (supports both browser WebPush and manual staff registration)
 pushRouter.post('/subscribe', async(c) => {
   const db = c.env.AURA_DB;
-  const raw = await c.req.json();
-  const parsed = pushSubscribeSchema.safeParse(raw);
+  const raw = await c.req.json() as Record<string, unknown>;
+  const isManualStaffEntry = !raw.endpoint && typeof raw.name === 'string' && raw.name.trim().length > 0;
+  const normalizedPayload = isManualStaffEntry
+    ? {
+        endpoint: `https://manual.auraspace.local/staff/${encodeURIComponent(String(raw.name).trim().toLowerCase())}`,
+        auth_key: 'manual_pending',
+        p256dh_key: 'manual_pending',
+        customer_id: String(raw.name).trim(),
+        user_agent: String(raw.name).trim(),
+        role: typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : 'staff',
+      }
+    : raw;
+
+  const parsed = pushSubscribeSchema.safeParse(normalizedPayload);
   if (!parsed.success) {
     return zodErrorResponse(c, parsed.error);
   }
@@ -34,6 +83,29 @@ pushRouter.post('/subscribe', async(c) => {
   return c.json({ success: true, message: 'Subscribed' }, 201);
 });
 
+// DELETE /api/push/subscribe — remove staff subscription by name or endpoint
+pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+  const db = c.env.AURA_DB;
+  const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  const endpoint = typeof raw.endpoint === 'string' ? raw.endpoint.trim() : '';
+
+  if (!name && !endpoint) {
+    return c.json({ success: false, error: 'name or endpoint is required' }, 400);
+  }
+
+  if (endpoint) {
+    await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+  } else {
+    const manualEndpoint = `https://manual.auraspace.local/staff/${encodeURIComponent(name.toLowerCase())}`;
+    await db.prepare(
+      'DELETE FROM push_subscriptions WHERE user_agent = ? OR customer_id = ? OR endpoint = ?'
+    ).bind(name, name, manualEndpoint).run();
+  }
+
+  return c.json({ success: true, message: 'Unsubscribed' });
+});
+
 // POST /api/push/unsubscribe — remove subscription
 pushRouter.post('/unsubscribe', async(c) => {
   const db = c.env.AURA_DB;
@@ -55,10 +127,22 @@ pushRouter.get('/public-key', async(c) => {
   });
 });
 
-// POST /api/push/send-staff — send push to staff by role (kitchen/cashier/all)
-pushRouter.post('/send-staff', requireAuth(['owner']), async(c) => {
-  const raw = await c.req.json();
-  const parsed = pushSendStaffSchema.safeParse(raw);
+// POST /api/push/send-staff — send push to staff by role (kitchen/cashier/all or admin testSend)
+pushRouter.post('/send-staff', requireAuth(['owner', 'manager', 'admin']), async(c) => {
+  const raw = await c.req.json() as Record<string, unknown>;
+  const targetRole = typeof raw.targetRole === 'string' ? raw.targetRole : undefined;
+  const staffName = typeof raw.name === 'string' ? raw.name : undefined;
+  const normalizedPayload = {
+    ...raw,
+    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title : 'AURA SPACE — Thông báo thử nghiệm',
+    body: typeof raw.body === 'string' && raw.body.trim()
+      ? raw.body
+      : (staffName ? `Thông báo thử cho ${staffName}` : 'Kiểm tra kết nối thông báo đẩy'),
+    role: typeof raw.role === 'string'
+      ? raw.role
+      : (targetRole === 'all' ? '' : (targetRole || 'staff-all')),
+  };
+  const parsed = pushSendStaffSchema.safeParse(normalizedPayload);
   if (!parsed.success) {
     return zodErrorResponse(c, parsed.error);
   }
@@ -70,7 +154,7 @@ pushRouter.post('/send-staff', requireAuth(['owner']), async(c) => {
     data,
     actions
   },
-  role);
+  role === 'all' ? '' : role);
 
   return c.json({ success: true, ...result });
 });

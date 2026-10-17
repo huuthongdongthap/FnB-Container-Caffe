@@ -69,6 +69,38 @@ export async function resolveServerProductPrice(
           .bind(productId)
           .first<{ id: string; name: string; price: number; available: number | boolean }>();
       }
+
+      // If composite item ID (e.g. "bt001-Size Tiêu Chuẩn (M)..."), extract base ID
+      if (!dbItem && productId.includes('-')) {
+        const baseId = productId.split('-')[0]?.trim();
+        if (baseId && baseId !== productId) {
+          dbItem = await db
+            .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+            .bind(baseId)
+            .first<{ id: string; name: string; price: number; available: number | boolean }>();
+          if (!dbItem) {
+            dbItem = await db
+              .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+              .bind(baseId)
+              .first<{ id: string; name: string; price: number; available: number | boolean }>();
+          }
+        }
+      }
+
+      // Fallback matching by name if ID was modified or composite
+      if (!dbItem && fallbackName && fallbackName.trim()) {
+        const cleanName = fallbackName.trim();
+        dbItem = await db
+          .prepare('SELECT id, name, price, is_available as available FROM products WHERE name = ?')
+          .bind(cleanName)
+          .first<{ id: string; name: string; price: number; available: number | boolean }>();
+        if (!dbItem) {
+          dbItem = await db
+            .prepare('SELECT id, name, price, available FROM menu_items WHERE name = ?')
+            .bind(cleanName)
+            .first<{ id: string; name: string; price: number; available: number | boolean }>();
+        }
+      }
     } catch {
       dbItem = null;
     }

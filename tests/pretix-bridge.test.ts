@@ -370,6 +370,13 @@ describe('pretix Routes', () => {
       const body = await res.json();
       expect(body.data.results).toHaveLength(2);
     });
+
+    test('blocks unauthenticated GET /orders in production with 401', async () => {
+      await mountRouter();
+      const prodEnv = { ...env, ENVIRONMENT: 'production', JWT_SECRET: 'test-secret-32-chars-minimum-123456' };
+      const res = await pretixRouter.request('/orders?event=workshop-thang-7', { method: 'GET' }, prodEnv);
+      expect(res.status).toBe(401);
+    });
   });
 
   // ── POST /api/pretix/webhook ─────────────────────────────

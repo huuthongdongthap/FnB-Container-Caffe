@@ -41,8 +41,13 @@ bash scripts/restore-d1.sh backups/fnb-caffe-db-20260825-204654.sql --target-db 
 
 ### Point-in-Time Restore (Time Travel)
 ```bash
-# Use bookmark from backup or any valid bookmark within 30 days
+# 1. Inspect current bookmark or resolve bookmark for a specific RFC3339 / Unix timestamp
+npx wrangler d1 time-travel info fnb-caffe-db
+npx wrangler d1 time-travel info fnb-caffe-db --timestamp="2026-10-15T00:00:00Z"
+
+# 2. Restore using bookmark from backup or any valid bookmark/timestamp within 30 days
 npx wrangler d1 time-travel restore fnb-caffe-db --bookmark=00000645-00000000-000050d2-48dcfd28eff342f20ea3c049d1f2f5f9
+npx wrangler d1 time-travel restore fnb-caffe-db --timestamp="2026-10-15T00:00:00Z"
 ```
 
 ### Verify Restore Integrity
@@ -95,8 +100,9 @@ With a scheduled handler that calls the backup script and uploads to R2.
 
 ## Migration Compatibility
 
-- All schema changes via versioned migrations in `worker/migrations/`
-- Migration order must be preserved on fresh DB: `bash scripts/apply-migrations.sh --remote`
+- All canonical schema changes live in `worker/db/migrations/` (see `worker/db/migrations/README.md`).
+- Bulk replay of all historical migrations is disabled (fail-closed) because re-running table-rebuild migrations (`20260710_02_notifications_fixed.sql`, `20261003_02_admin_metrics_and_inventory.sql`) overwrites live columns.
+- Apply each pending forward migration explicitly: `bash worker/scripts/apply-migrations.sh --file <migration.sql>`
 - Run integrity checks after any restore + migration apply.
 
 ## Contacts

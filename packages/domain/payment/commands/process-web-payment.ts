@@ -50,13 +50,15 @@ interface GooglePayToken {
   };
 }
 
-webPaymentRouter.post('/payment-request', async (c) => {
+webPaymentRouter.post('/payment-request', requireAuth(['owner', 'manager', 'staff', 'customer']) as any, async (c) => {
   const db = getDatabase(c);
   const mc = createMetricsCollector(db);
   const locale = (c.req.query('locale') || 'vi') as 'vi' | 'en';
 
   const errMsg = {
+    unauthorized: { vi: 'Yêu cầu đăng nhập', en: 'Authentication required' },
     order_not_found: { vi: 'Không tìm thấy đơn hàng', en: 'Order not found' },
+    forbidden: { vi: 'Từ chối — không phải đơn hàng của bạn', en: 'Forbidden' },
     already_paid: { vi: 'Đơn hàng đã được thanh toán', en: 'Order already paid' },
     invalid_amount: { vi: 'Số tiền không hợp lệ', en: 'Invalid amount' },
     invalid_token: { vi: 'Token thanh toán không hợp lệ', en: 'Invalid payment token' },
@@ -65,6 +67,11 @@ webPaymentRouter.post('/payment-request', async (c) => {
   };
 
   try {
+    const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
+    if (!user?.id) {
+      return c.json({ success: false, error: errMsg.unauthorized[locale] }, 401);
+    }
+
     const body = await c.req.json() as WebPaymentRequest;
     const { order_id, payment_token, amount, currency } = body;
 
@@ -93,6 +100,11 @@ webPaymentRouter.post('/payment-request', async (c) => {
         c.executionCtx?.waitUntil(mc.recordMetric('web_payment_failed', 1, { reason: 'order_not_found' }));
       } catch { /* executionCtx unavailable */ }
       return c.json({ success: false, error: errMsg.order_not_found[locale] }, 404);
+    }
+
+    const isStaffOrOwner = user.role === 'owner' || user.role === 'manager' || user.role === 'staff';
+    if (!isStaffOrOwner && (!orderRow.customer_id || orderRow.customer_id !== user.id)) {
+      return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
     }
 
     // Check if already paid
@@ -147,53 +159,20 @@ webPaymentRouter.post('/payment-request', async (c) => {
       log.info('Google Pay token received');
     }
 
-    // In production, you would verify the payment token with Apple/Google payment processors
-    // For now, we'll accept validly structured tokens and process the payment
-    // TODO: Implement actual token verification with Apple Pay / Google Pay merchant verification
-
-    const paymentId = `wp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const now = new Date().toISOString();
-
-    // Record payment
-    await db.prepare(`
-      INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_token, created_at)
-      VALUES (?, ?, ?, ?, 'completed', ?, ?, ?)
-    `).bind(
-      paymentId,
-      order_id,
-      isApplePay ? 'apple_pay' : 'google_pay',
-      amount,
-      transactionId,
-      JSON.stringify(payment_token),
-      now
-    ).run();
-
-    // Update order status
-    await db.prepare(`
-      UPDATE orders
-      SET status = 'completed', payment_status = 'paid', paid_at = ?, updated_at = ?
-      WHERE id = ?
-    `).bind(now, now, order_id).run();
-
-    // Record success metric
+    // Fail-closed: cryptographic merchant token verification and payment processor
+    // settlement for Apple Pay / Google Pay are not configured. Never mark an order as paid
+    // or insert a completed payment row based solely on client-supplied token fields.
     try {
-      c.executionCtx?.waitUntil(mc.recordMetric('web_payment_success', amount, {
-        payment_method: isApplePay ? 'apple_pay' : 'google_pay',
-        amount: String(amount),
-      }));
+      c.executionCtx?.waitUntil(mc.recordMetric('web_payment_failed', 1, { reason: 'token_verification_failed' }));
     } catch { /* executionCtx unavailable */ }
-
-    return c.json({
-      success: true,
-      data: {
-        transaction_id: transactionId,
-        status: 'succeeded',
-        payment_method: isApplePay ? 'apple_pay' : 'google_pay',
-        amount,
-        currency,
+    return c.json(
+      {
+        success: false,
+        error: errMsg.token_verification_failed[locale],
+        code: 'PAYMENT_VERIFICATION_UNAVAILABLE',
       },
-    });
+      422
+    );
   } catch (err) {
     log.error('Web payment processing error:', { message: (err as Error).message });
     try {

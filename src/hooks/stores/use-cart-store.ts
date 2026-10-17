@@ -10,6 +10,7 @@ const NEW_KEY = 'aura_cart_v3';
 
 export interface CartItem {
   id: string;
+  productId?: string;
   name: string;
   price: number;
   quantity: number;
@@ -40,6 +41,28 @@ function getInitialTableId(): string | null {
   }
 }
 
+function sanitizeCartItem(item: CartItem): CartItem {
+  const rawId = item.productId || item.id || '';
+  const baseId = (rawId.includes('-') || rawId.includes('_')) ? rawId.split(/[-_]/)[0]?.trim() || rawId : rawId;
+
+  // Ready to serve items check (bottled, snack, packaged)
+  const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
+  if (isReadyToServe) {
+    return {
+      ...item,
+      id: baseId,
+      productId: baseId,
+      modifiers: [],
+      notes: undefined,
+    };
+  }
+
+  return {
+    ...item,
+    productId: baseId || item.productId || item.id,
+  };
+}
+
 function loadInitialItems(): CartItem[] {
   // Support clearing cart via URL parameter ?clear=true or ?reset=true
   try {
@@ -56,7 +79,11 @@ function loadInitialItems(): CartItem[] {
     const raw = localStorage.getItem(NEW_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        const sanitized = parsed.map(sanitizeCartItem);
+        persistItems(sanitized);
+        return sanitized;
+      }
     }
   } catch { /* ignore parse errors */ }
 
@@ -68,12 +95,20 @@ function loadInitialItems(): CartItem[] {
       // Old format: { items: [...] } or direct array
       const items = Array.isArray(oldCart) ? oldCart : oldCart?.items;
       if (Array.isArray(items) && items.length > 0) {
-        const migrated: CartItem[] = items.map((item: Record<string, unknown>) => ({
-          id: String(item.id || ''),
-          name: String(item.name || ''),
-          price: Number(item.price || 0),
-          quantity: Number(item.quantity || 1),
-        }));
+        const migrated: CartItem[] = items.map((item: Record<string, unknown>) => {
+          const rawId = String(item.productId || item.product_id || item.id || '');
+          const baseId = (rawId.includes('-') || rawId.includes('_')) ? rawId.split(/[-_]/)[0]?.trim() || rawId : rawId;
+          const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
+          return {
+            id: isReadyToServe ? baseId : String(item.id || ''),
+            productId: baseId,
+            name: String(item.name || ''),
+            price: Math.max(0, Number(item.price || 0) || 0),
+            quantity: Math.max(1, Math.floor(Number(item.quantity || 1) || 1)),
+            modifiers: isReadyToServe ? [] : (Array.isArray(item.modifiers) ? (item.modifiers as string[]) : undefined),
+            notes: isReadyToServe ? undefined : (typeof item.notes === 'string' ? item.notes : undefined),
+          };
+        });
         // Persist migration
         localStorage.setItem(NEW_KEY, JSON.stringify(migrated));
         return migrated;
@@ -96,12 +131,13 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   addItem: (item) =>
     set((state) => {
-      const existing = state.items.find((i) => i.id === item.id);
+      const sanitized = sanitizeCartItem({ ...item, quantity: 1 });
+      const existing = state.items.find((i) => i.id === sanitized.id);
       const next = existing
         ? state.items.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
+            i.id === sanitized.id ? { ...i, quantity: i.quantity + 1 } : i,
           )
-        : [...state.items, { ...item, quantity: 1 }];
+        : [...state.items, sanitized];
       persistItems(next);
       return { items: next };
     }),

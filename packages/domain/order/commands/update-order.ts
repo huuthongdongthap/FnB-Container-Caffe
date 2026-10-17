@@ -262,6 +262,6 @@ if (['served', 'completed'].includes(body.status as string)) {
     });
   } catch (error) {
     log.error('UpdateOrder error:', { message: (error as Error).message });
-    return errorResponse(`Failed to update order: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to update order', 500);
   }
 }

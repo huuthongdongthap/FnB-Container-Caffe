@@ -11,8 +11,13 @@
 
 export interface LoggerContext {
   request_id?: string;
+  correlation_id?: string;
+  trace_id?: string;
+  category?: 'business' | 'application' | 'infrastructure' | 'audit' | 'security';
   route?: string;
   user_id?: string;
+  tenant_id?: string;
+  operating_unit_id?: string;
   [key: string]: unknown;
 }
 
@@ -65,8 +70,8 @@ function emit(level: string, base: LoggerContext, msg: string, extra?: Record<st
   const record = {
     level,
     ts: nowIso(),
-    ...base,
-    msg,
+    ...(redact(base) as Record<string, unknown>),
+    msg: typeof msg === 'string' && /^0\d{9}$/.test(msg) ? REDACTED : msg,
     ...(extra && typeof extra === 'object' ? (redact(extra) as Record<string, unknown>) : {})
   };
   const line = JSON.stringify(record);

@@ -24,7 +24,44 @@ export async function getCurrentUser(request: Request, env: Record<string, unkno
       return errorResponse('Token đã bị thu hồi (logout)', 401);
     }
 
-    const userStr = await authKV.get(`user:${payload.email}`);
+    let userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
+    if (!userStr && payload.id) {
+      userStr = await authKV.get(`user:${payload.id}`);
+    }
+    if (!userStr && !payload.email && payload.id) {
+      const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
+      if (db) {
+        try {
+          const d1User = await db
+            .prepare('SELECT id, email, name, phone, role FROM users WHERE id = ?')
+            .bind(payload.id)
+            .first<{ id: string; email?: string; name?: string; phone?: string; role?: string }>();
+          if (d1User?.id) {
+            return jsonResponse({
+              success: true,
+              user: {
+                id: d1User.id,
+                email: d1User.email || '',
+                name: d1User.name || payload.name || d1User.id,
+                phone: d1User.phone || '',
+                role: d1User.role || payload.role || 'staff',
+              },
+            });
+          }
+        } catch {
+          // Fall through to token payload claims
+        }
+      }
+      return jsonResponse({
+        success: true,
+        user: {
+          id: payload.id,
+          email: '',
+          name: payload.name || payload.id,
+          role: payload.role || 'staff',
+        },
+      });
+    }
     if (!userStr) {
       return errorResponse(`User '${payload.email}' không tồn tại trong KV`, 404);
     }
@@ -37,6 +74,6 @@ export async function getCurrentUser(request: Request, env: Record<string, unkno
     });
   } catch (error) {
     log.error('GetUser error:', { message: (error as Error).message });
-    return errorResponse(`Lỗi server: ${(error as Error).message}`, 500);
+    return errorResponse('Lỗi server', 500);
   }
 }

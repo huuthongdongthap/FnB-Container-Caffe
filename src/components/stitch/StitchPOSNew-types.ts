@@ -45,8 +45,15 @@ export interface StitchPOSNewProps {
   onClearCustomer?: () => void;
 }
 
-/* ─── Constants ─────────────────────────────────────────────────────── */
-export const MENU_CATEGORIES = ['Coffee', 'Tea', 'Signature', 'Pastries', 'Brunch', 'Merchandise'];
+/* ─── Helpers & Constants ───────────────────────────────────────────── */
+export function formatPosPrice(val: number): string {
+  if (val >= 1000) {
+    return `${Math.round(val).toLocaleString('vi-VN')}₫`;
+  }
+  return `$${val.toFixed(2)}`;
+}
+
+export const MENU_CATEGORIES = ['All', 'Coffee', 'Tea', 'Signature', 'Pastries', 'Brunch', 'Merchandise'];
 
 export const DEFAULT_MENU_ITEMS: POSNewMenuItem[] = [
   { id: 'm1', name: 'Midnight Espresso', price: 6.50, category: 'Coffee' },

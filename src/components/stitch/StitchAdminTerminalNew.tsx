@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
@@ -22,11 +22,13 @@ export function StitchAdminTerminalNew({
   brandName = 'Aura Cafe',
   brandSubtitle = 'Admin Terminal',
   adminName = 'Aura Admin',
-  terminalId = 'Terminal var(--aura-noir-void, #050D1A)',
+  terminalId = 'Terminal #04',
   adminAvatarUrl = DEFAULT_ADMIN_AVATAR,
   children,
 }: Readonly<StitchAdminTerminalNewProps>) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const isPosRoute = location.pathname.startsWith('/admin/pos');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLElement>(null);
@@ -56,17 +58,19 @@ export function StitchAdminTerminalNew({
         adminAvatarUrl={adminAvatarUrl}
       />
 
-      <TopBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onOpenSidebar={() => setSidebarOpen(true)}
-      />
+      {!isPosRoute && (
+        <TopBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenSidebar={() => setSidebarOpen(true)}
+        />
+      )}
 
       {/* Main Content (routed via Outlet or children) */}
       <main
         className={cn(
-          'min-h-screen pt-24 px-4 pb-8 md:px-10',
-          'md:ml-72',
+          'min-h-screen',
+          isPosRoute ? 'p-0' : 'pt-24 px-4 pb-8 md:px-10 md:ml-72',
         )}
         aria-label={tTerminal('mainContent')}
       >

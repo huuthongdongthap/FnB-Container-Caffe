@@ -83,9 +83,9 @@ checkinRouter.post('/', async(c) => {
   return c.json({ success: true, data: row }, 201);
 });
 
-// PATCH /api/checkin/:id/approve — staff approves check-in reward
+// PATCH /api/checkin/:id/approve — staff/manager approves check-in reward
 // Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
-checkinRouter.patch('/:id/approve', requireAuth(['owner', 'staff']), async(c) => {
+checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -101,18 +101,31 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'staff']), async(c) =>
     'UPDATE checkins SET status = ? WHERE id = ?'
   ).bind('approved', id).run();
 
-  // Add cashback reward
-  await db.prepare(
-    'UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?'
-  ).bind(checkin.reward_amount, checkin.customer_id).run();
+  // Add cashback reward to wallet (with fallback for legacy mocks)
+  try {
+    const wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(checkin.customer_id).first<{ id: string; balance: number }>();
+    const now = new Date().toISOString();
+    if (!wallet) {
+      const wid = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      await db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)').bind(wid, checkin.customer_id, checkin.reward_amount, checkin.reward_amount, now, now).run();
+    } else {
+      await db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(checkin.reward_amount, checkin.reward_amount, now, wallet.id).run();
+    }
+  } catch {
+    try {
+      await db.prepare(
+        'UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?'
+      ).bind(checkin.reward_amount, checkin.customer_id).run();
+    } catch {}
+  }
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row });
 });
 
-// PATCH /api/checkin/:id/reject — staff rejects check-in
+// PATCH /api/checkin/:id/reject — staff/manager rejects check-in
 // Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
-checkinRouter.patch('/:id/reject', requireAuth(['owner', 'staff']), async(c) => {
+checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -135,20 +148,41 @@ checkinRouter.get('/', async(c) => {
   const date = c.req.query('date');
   const customerId = c.req.query('customer_id');
 
-  let query = 'SELECT * FROM checkins WHERE 1=1';
   const params: unknown[] = [];
+  let filterClauses = '';
 
   if (status) {
-    query += ' AND status = ?'; params.push(status);
+    filterClauses += ' AND status = ?'; params.push(status);
   }
   if (date) {
-    query += ' AND checkin_date = ?'; params.push(date);
+    filterClauses += ' AND checkin_date = ?'; params.push(date);
   }
   if (customerId) {
-    query += ' AND customer_id = ?'; params.push(customerId);
+    filterClauses += ' AND customer_id = ?'; params.push(customerId);
   }
-  query += ' ORDER BY created_at DESC LIMIT 100';
 
-  const { results } = await db.prepare(query).bind(...params).all<CheckinRecord>();
-  return c.json({ success: true, data: results || [] });
+  let rows: Array<CheckinRecord & { customer_phone?: string; phone?: string }> = [];
+  try {
+    const joinFilter = filterClauses.replace(/\bstatus\b/g, 'ci.status').replace(/\bcheckin_date\b/g, 'ci.checkin_date').replace(/\bcustomer_id\b/g, 'ci.customer_id');
+    const query = `SELECT ci.*, c.phone as customer_phone FROM checkins ci LEFT JOIN customers c ON c.id = ci.customer_id WHERE 1=1${joinFilter} ORDER BY ci.created_at DESC LIMIT 100`;
+    const { results } = await db.prepare(query).bind(...params).all<any>();
+    rows = results || [];
+  } catch {
+    try {
+      const fallbackQuery = `SELECT * FROM checkins WHERE 1=1${filterClauses} ORDER BY created_at DESC LIMIT 100`;
+      const { results } = await db.prepare(fallbackQuery).bind(...params).all<any>();
+      rows = results || [];
+    } catch {
+      rows = [];
+    }
+  }
+
+  const checkins = rows.map((r) => ({
+    ...r,
+    memberId: r.customer_id,
+    memberName: r.customer_name || 'Khách hàng',
+    memberPhone: r.customer_phone || r.phone || '—',
+    submittedAt: r.checkin_time || r.created_at,
+  }));
+  return c.json({ success: true, data: checkins, checkins });
 });

@@ -7,7 +7,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { getTenantId } from '../middleware/tenant';
+import { requireAuth } from '../middleware/auth';
+import { createLogger } from '../middleware/logger';
 import { processCustomerQuery } from './customer-assistant';
+
+const log = createLogger({ route: 'zalo-webhook' });
 
 export const zaloWebhookRouter = new Hono<{ Bindings: Env }>();
 
@@ -55,11 +59,17 @@ zaloWebhookRouter.post('/', async (c) => {
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 
-  const result = await processCustomerQuery(db, aiBinding, tenantId, {
-    query: userText,
-    phone: user_phone,
-    channel: 'zalo'
-  });
+  let result: { intent: string; reply: string; engine: string };
+  try {
+    result = await processCustomerQuery(db, aiBinding, tenantId, {
+      query: userText,
+      phone: user_phone,
+      channel: 'zalo'
+    });
+  } catch (err) {
+    log.error('Zalo webhook query processing error:', { message: (err as Error).message });
+    return c.json({ success: false, error: 'Failed to process Zalo message' }, 500);
+  }
 
   // Outbound push via Zalo OA message API if token is present
   const zaloToken = (c.env as Record<string, unknown>).ZALO_ACCESS_TOKEN as string | undefined;
@@ -92,26 +102,41 @@ zaloWebhookRouter.post('/', async (c) => {
   });
 });
 
-// POST /api/webhooks/zalo/simulate — Dev/Test simulation
-zaloWebhookRouter.post('/simulate', async (c) => {
-  const body = await c.req.json().catch(() => ({})) as { text?: string; phone?: string; user_id?: string };
-  const tenantId = getTenantId(c);
-  const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-  const aiBinding = (c.env as Record<string, unknown>).AI;
-
-  const result = await processCustomerQuery(db, aiBinding, tenantId, {
-    query: body.text || 'Menu có món gì ngon?',
-    phone: body.phone,
-    channel: 'zalo'
-  });
-
-  return c.json({
-    success: true,
-    simulation: true,
-    data: {
-      reply: result.reply,
-      intent: result.intent,
-      engine: result.engine
+// POST /api/webhooks/zalo/simulate — Dev/Test simulation (requires staff auth in production)
+zaloWebhookRouter.post(
+  '/simulate',
+  async (c, next) => {
+    const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
+    if (isProd || c.req.header('Authorization')) {
+      return requireAuth(['owner', 'manager', 'staff'])(c, next);
     }
-  });
-});
+    return next();
+  },
+  async (c) => {
+    const body = await c.req.json().catch(() => ({})) as { text?: string; phone?: string; user_id?: string };
+    const tenantId = getTenantId(c);
+    const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
+    const aiBinding = (c.env as Record<string, unknown>).AI;
+
+    try {
+      const result = await processCustomerQuery(db, aiBinding, tenantId, {
+        query: body.text || 'Menu có món gì ngon?',
+        phone: body.phone,
+        channel: 'zalo'
+      });
+
+      return c.json({
+        success: true,
+        simulation: true,
+        data: {
+          reply: result.reply,
+          intent: result.intent,
+          engine: result.engine
+        }
+      });
+    } catch (err) {
+      log.error('Zalo simulation error:', { message: (err as Error).message });
+      return c.json({ success: false, error: 'Failed to simulate Zalo message' }, 500);
+    }
+  }
+);

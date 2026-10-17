@@ -27,13 +27,18 @@ const sendMessageSchema = z.object({
 // ── Rate limit helper ──
 
 async function checkRateLimit(env: Env, key: string, max: number, windowSec: number): Promise<boolean> {
-  const fullKey = `rl:chat:${key}`;
-  const cur = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
-  if (cur >= max) {
-    return false;
+  if (!env?.AUTH_KV) return true;
+  try {
+    const fullKey = `rl:chat:${key}`;
+    const cur = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
+    if (cur >= max) {
+      return false;
+    }
+    await env.AUTH_KV.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
+    return true;
+  } catch {
+    return true;
   }
-  await env.AUTH_KV.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
-  return true;
 }
 
 // ── Handlers ──
@@ -49,6 +54,17 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
     }
 
     const { name, phone, message } = parsed.data;
+    const clientIp =
+      c.req.header('CF-Connecting-IP') ||
+      c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
+      'unknown';
+
+    if (clientIp !== 'unknown') {
+      const ipOk = await checkRateLimit(c.env, `ip:${clientIp}`, 20, 60);
+      if (!ipOk) {
+        return errorResponse('Qua nhieu tin nhan, vui long thu lai sau', 429);
+      }
+    }
 
     const ok = await checkRateLimit(c.env, `msg:${phone}`, 10, 60);
     if (!ok) {
@@ -68,7 +84,7 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
     }, 201);
   } catch (error) {
     log.error('Chat send message error:', { message: (error as Error).message });
-    return errorResponse(`Failed to send message: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to send message', 500);
   }
 }
 
@@ -104,7 +120,7 @@ async function getConversations(c: Context<{ Bindings: Env }>) {
     return jsonResponse({ success: true, data: conversations });
   } catch (error) {
     log.error('Chat get conversations error:', { message: (error as Error).message });
-    return errorResponse(`Failed to get conversations: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to get conversations', 500);
   }
 }
 
@@ -123,7 +139,7 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
     return jsonResponse({ success: true, data: results });
   } catch (error) {
     log.error('Chat get message history error:', { message: (error as Error).message });
-    return errorResponse(`Failed to get message history: ${(error as Error).message}`, 500);
+    return errorResponse('Failed to get message history', 500);
   }
 }
 
@@ -135,7 +151,7 @@ export const chatRouter = new Hono<{ Bindings: Env }>();
 chatRouter.post('/messages', (c) => sendMessage(c));
 
 // Protected: get all conversations
-chatRouter.get('/conversations', requireAuth(['owner', 'staff']), (c) => getConversations(c));
+chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff']), (c) => getConversations(c));
 
 // Protected: get message history for a phone
-chatRouter.get('/messages/:phone', requireAuth(['owner', 'staff']), (c) => getMessageHistory(c));
+chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff']), (c) => getMessageHistory(c));

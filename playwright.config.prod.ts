@@ -8,7 +8,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'Desktop Chrome', use: { ...devices['Desktop Chrome'] } },
+    { name: 'Desktop Chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
     { name: 'Mobile Safari', use: { ...devices['iPhone 12'] } },
   ],
 });

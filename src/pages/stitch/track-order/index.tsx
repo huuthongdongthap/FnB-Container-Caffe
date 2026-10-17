@@ -55,7 +55,7 @@ export default function TrackOrderPage() {
     id: `${currentOrder.id}-${index}`,
     name: item.name,
     quantity: item.quantity,
-    price: item.unitPriceCents / 100,
+    price: item.unitPriceCents >= 1000 ? item.unitPriceCents : item.unitPriceCents / 100,
   })) ?? [];
 
   return (
@@ -63,7 +63,13 @@ export default function TrackOrderPage() {
       orderId={currentOrder?.orderNumber || currentOrder?.id || orderId || undefined}
       estimatedMinutes={currentOrder ? 8 : undefined}
       items={trackOrderItems.length ? trackOrderItems : undefined}
-      total={currentOrder ? currentOrder.totalAmount / 100 : undefined}
+      total={
+        currentOrder
+          ? currentOrder.totalAmount >= 1000
+            ? currentOrder.totalAmount
+            : currentOrder.totalAmount / 100
+          : undefined
+      }
       status={currentOrder?.status}
       onTrackMap={handleTrackMap}
       onBack={handleBack}

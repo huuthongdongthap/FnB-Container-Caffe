@@ -56,4 +56,25 @@ describe('getMenuItem', () => {
     const res = await getMenuItem(req, env, '1');
     expect(res.status).toBe(200);
   });
+
+  it('scrubs raw database error messages on 500 in getMenu and getMenuItem', async() => {
+    const brokenDb = {
+      prepare: () => {
+        throw new Error('D1_MENU_SQL_SECRET_ERROR');
+      }
+    };
+    const env = { ...createMockEnv(), AURA_DB: brokenDb };
+
+    const menuRes = await getMenu(new Request('https://test.aura/api/menu'), env);
+    expect(menuRes.status).toBe(500);
+    const menuBody = await menuRes.json() as { error: string };
+    expect(menuBody.error).toBe('Failed to fetch menu');
+    expect(menuBody.error).not.toContain('D1_MENU_SQL_SECRET_ERROR');
+
+    const itemRes = await getMenuItem(new Request('https://test.aura/api/menu/1'), env, '1');
+    expect(itemRes.status).toBe(500);
+    const itemBody = await itemRes.json() as { error: string };
+    expect(itemBody.error).toBe('Failed to fetch menu item');
+    expect(itemBody.error).not.toContain('D1_MENU_SQL_SECRET_ERROR');
+  });
 });

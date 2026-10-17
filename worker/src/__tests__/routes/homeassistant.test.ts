@@ -251,4 +251,55 @@ describe('createHARouter', () => {
       }
     });
   });
+
+  describe('Security & Webhook Hardening', () => {
+    it('rejects unauthenticated requests to /devices with 401', async() => {
+      const env = makeEnv();
+      const res = await router.fetch(new Request('https://test.aura/devices', { method: 'GET' }), env);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects customer role on /devices with 403', async() => {
+      const env = makeEnv();
+      const customerToken = await generateJWT(
+        { id: 'cust-1', email: 'cust@aura.cafe', name: 'Customer', role: 'customer' },
+        TEST_JWT_SECRET,
+        '1h'
+      );
+      const res = await router.fetch(
+        new Request('https://test.aura/devices', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${customerToken}` }
+        }),
+        env
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it('rejects POST /webhook when HA_WEBHOOK_SECRET is configured and token is omitted', async() => {
+      const env = makeEnv(undefined, { HA_WEBHOOK_SECRET: 'ha-secret-token' });
+      const res = await router.fetch(
+        new Request('https://test.aura/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity_id: 'light.kitchen', state: 'on' })
+        }),
+        env
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 503 on POST /webhook in production when HA_WEBHOOK_SECRET is unset', async() => {
+      const env = makeEnv(undefined, { ENVIRONMENT: 'production', HA_WEBHOOK_SECRET: '', HA_TOKEN: '' });
+      const res = await router.fetch(
+        new Request('https://test.aura/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity_id: 'light.kitchen', state: 'on' })
+        }),
+        env
+      );
+      expect(res.status).toBe(503);
+    });
+  });
 });
