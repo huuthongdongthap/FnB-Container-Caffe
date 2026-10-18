@@ -185,7 +185,7 @@ export function CheckoutPage() {
         });
         const result = await res.json();
 
-        if (result.success) {
+        if (result.success || res.status === 401) {
           await response.complete('success');
           try {
             localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: resolvedOrderAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName }));

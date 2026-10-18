@@ -6,6 +6,31 @@ import { hashPassword } from '../../lib/jwt';
 
 export { hashPassword };
 
+async function writeStaffAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
+
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
   app.openapi(StaffRoutes.list as any, async (c: any) => {
@@ -29,11 +54,6 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM users ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
-
     const offset = (page - 1) * limit;
     const allowedSorts: Record<string, string> = {
       name: 'name',
@@ -47,19 +67,58 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const sortCol = allowedSorts[sort] || 'name';
     const sortDir = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     const orderClause = `${sortCol} ${sortDir}`;
-    const rows = (await db.prepare(
-      `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
-       FROM users ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const staff = (rows.results || []).map((s: any) => ({
+    let total = 0;
+    let rawRows: any[] = [];
+    try {
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM users ${whereClause}`
+      ).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
+
+      const rows = (await db.prepare(
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+         FROM users ${whereClause}
+         ORDER BY ${orderClause}
+         LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      rawRows = rows.results || [];
+    } catch {
+      let canonicalWhere = 'WHERE role != \'customer\'';
+      const canonicalParams: (string | number)[] = [];
+      if (role) {
+        canonicalWhere += ' AND role = ?';
+        canonicalParams.push(role);
+      }
+      if (isActive !== undefined) {
+        canonicalWhere += ' AND is_active = ?';
+        canonicalParams.push(isActive ? 1 : 0);
+      }
+      if (search) {
+        canonicalWhere += ' AND (name LIKE ? OR phone LIKE ?)';
+        canonicalParams.push(`%${search}%`, `%${search}%`);
+      }
+      const canonicalSort = ['name', 'role', 'created_at'].includes(sortCol) ? sortCol : 'name';
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM users ${canonicalWhere}`
+      ).bind(...canonicalParams).first()) as { total: number } | null;
+      total = countResult?.total || 0;
+
+      const rows = (await db.prepare(
+        `SELECT id, phone, name, role, is_active, created_at, updated_at
+         FROM users ${canonicalWhere}
+         ORDER BY ${canonicalSort} ${sortDir}
+         LIMIT ? OFFSET ?`
+      ).bind(...canonicalParams, limit, offset).all()) as { results: any[] };
+      rawRows = rows.results || [];
+    }
+
+    const staff = rawRows.map((s: any) => ({
       ...s,
       role: s.role,
-      locale: s.locale,
+      locale: s.locale ?? 'vi',
       isActive: s.is_active === 1,
-      hireDate: s.hire_date,
+      hireDate: s.hire_date ?? null,
       createdAt: s.created_at,
       updatedAt: s.updated_at,
     }));
@@ -75,37 +134,71 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const staff = (await db.prepare(
-      `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
-       FROM users WHERE id = ? AND role != 'customer'`
-    ).bind(id).first()) as any;
+    let staff: any = null;
+    try {
+      staff = await db.prepare(
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+         FROM users WHERE id = ? AND role != 'customer'`
+      ).bind(id).first();
+    } catch {
+      staff = await db.prepare(
+        `SELECT id, phone, name, role, is_active, created_at, updated_at
+         FROM users WHERE id = ? AND role != 'customer'`
+      ).bind(id).first();
+    }
 
     if (!staff) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
     // Get shifts for this staff
-    const shifts = (await db.prepare(
-      'SELECT * FROM staff_shifts WHERE staff_id = ? ORDER BY date DESC, start_time DESC LIMIT 10'
-    ).bind(id).all()) as { results: any[] };
+    let shiftResults: any[] = [];
+    try {
+      const shifts = (await db.prepare(
+        'SELECT * FROM staff_shifts WHERE staff_id = ? ORDER BY date DESC, start_time DESC LIMIT 10'
+      ).bind(id).all()) as { results: any[] };
+      shiftResults = shifts.results || [];
+    } catch {
+      try {
+        const shifts = (await db.prepare(
+          'SELECT *, user_id as staff_id, shift_date as date FROM shifts WHERE user_id = ? ORDER BY shift_date DESC, start_time DESC LIMIT 10'
+        ).bind(id).all()) as { results: any[] };
+        shiftResults = shifts.results || [];
+      } catch {
+        shiftResults = [];
+      }
+    }
 
     // Get attendance for this staff
-    const attendance = (await db.prepare(
-      'SELECT * FROM staff_attendance WHERE staff_id = ? ORDER BY date DESC LIMIT 10'
-    ).bind(id).all()) as { results: any[] };
+    let attendanceResults: any[] = [];
+    try {
+      const attendance = (await db.prepare(
+        'SELECT * FROM staff_attendance WHERE staff_id = ? ORDER BY date DESC LIMIT 10'
+      ).bind(id).all()) as { results: any[] };
+      attendanceResults = attendance.results || [];
+    } catch {
+      try {
+        const attendance = (await db.prepare(
+          'SELECT id, user_id as staff_id, id as shift_id, shift_date as date, actual_start as check_in, actual_end as check_out, status, notes, created_at FROM shifts WHERE user_id = ? AND actual_start IS NOT NULL ORDER BY shift_date DESC LIMIT 10'
+        ).bind(id).all()) as { results: any[] };
+        attendanceResults = attendance.results || [];
+      } catch {
+        attendanceResults = [];
+      }
+    }
 
     return c.json({
       success: true,
       data: {
         ...staff,
         role: staff.role,
-        locale: staff.locale,
+        locale: staff.locale ?? 'vi',
         isActive: staff.is_active === 1,
-        hireDate: staff.hire_date,
+        hireDate: staff.hire_date ?? null,
         createdAt: staff.created_at,
         updatedAt: staff.updated_at,
-        recentShifts: shifts.results || [],
-        recentAttendance: attendance.results || [],
+        recentShifts: shiftResults,
+        recentAttendance: attendanceResults,
       },
     });
   });
@@ -122,7 +215,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Check if email exists
-    const existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
+    let existing: unknown = null;
+    try {
+      existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
+    } catch {
+      if (body.phone) {
+        existing = await db.prepare('SELECT id FROM users WHERE phone = ?').bind(body.phone).first().catch(() => null);
+      }
+    }
     if (existing) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
@@ -130,44 +230,65 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
 
-    await db.prepare(
-      `INSERT INTO users (id, name, email, phone, password_hash, role, locale, is_active, avatar_url, hire_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.name,
-      body.email,
-      body.phone || null,
-      passwordHash,
-      body.role,
-      body.locale || 'vi',
-      body.isActive !== false ? 1 : 0,
-      null,
-      body.hireDate || now.slice(0, 10),
-      now,
-      now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO users (id, name, email, phone, password_hash, role, locale, is_active, avatar_url, hire_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.email,
+        body.phone || null,
+        passwordHash,
+        body.role,
+        body.locale || 'vi',
+        body.isActive !== false ? 1 : 0,
+        null,
+        body.hireDate || now.slice(0, 10),
+        now,
+        now
+      ).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO users (id, phone, name, role, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.phone || body.email || id,
+        body.name,
+        body.role,
+        body.isActive !== false ? 1 : 0,
+        now,
+        now
+      ).run();
+    }
 
     // Audit log (redact password)
     const { password: _redactedPassword, ...auditCreateBody } = body;
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'staff_create', 'user', id, JSON.stringify(auditCreateBody), now).run();
+    await writeStaffAuditLog(db, user.id, 'staff_create', 'user', id, JSON.stringify(auditCreateBody), now);
 
-    const created = (await db.prepare(
-      `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
-       FROM users WHERE id = ?`
-    ).bind(id).first()) as any;
+    let created: any = null;
+    try {
+      created = await db.prepare(
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+         FROM users WHERE id = ?`
+      ).bind(id).first();
+    } catch {
+      created = await db.prepare(
+        `SELECT id, phone, name, role, is_active, created_at, updated_at
+         FROM users WHERE id = ?`
+      ).bind(id).first();
+    }
 
     return c.json({
       success: true,
       data: {
         ...created!,
+        email: created?.email ?? body.email,
         role: created!.role,
-        locale: created!.locale,
+        locale: created?.locale ?? body.locale ?? 'vi',
         isActive: created!.is_active === 1,
-        hireDate: created!.hire_date,
+        hireDate: created?.hire_date ?? body.hireDate ?? now.slice(0, 10),
         createdAt: created!.created_at,
         updatedAt: created!.updated_at,
       },
@@ -193,19 +314,46 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
+    const canonicalUpdates: string[] = [];
+    const canonicalParams: (string | number | null)[] = [];
 
-    if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
+    if (body.name !== undefined) {
+      updates.push('name = ?');
+      params.push(body.name);
+      canonicalUpdates.push('name = ?');
+      canonicalParams.push(body.name);
+    }
     if (body.email !== undefined) {
-      const emailExists = await db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(body.email, id).first();
+      let emailExists: unknown = null;
+      try {
+        emailExists = await db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(body.email, id).first();
+      } catch {
+        emailExists = null;
+      }
       if (emailExists) {
         return c.json({ success: false, error: 'Email already exists' }, 409);
       }
       updates.push('email = ?'); params.push(body.email);
     }
-    if (body.phone !== undefined) { updates.push('phone = ?'); params.push(body.phone); }
-    if (body.role !== undefined) { updates.push('role = ?'); params.push(body.role); }
+    if (body.phone !== undefined) {
+      updates.push('phone = ?');
+      params.push(body.phone);
+      canonicalUpdates.push('phone = ?');
+      canonicalParams.push(body.phone);
+    }
+    if (body.role !== undefined) {
+      updates.push('role = ?');
+      params.push(body.role);
+      canonicalUpdates.push('role = ?');
+      canonicalParams.push(body.role);
+    }
     if (body.locale !== undefined) { updates.push('locale = ?'); params.push(body.locale); }
-    if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
+    if (body.isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(body.isActive ? 1 : 0);
+      canonicalUpdates.push('is_active = ?');
+      canonicalParams.push(body.isActive ? 1 : 0);
+    }
     if (body.avatarUrl !== undefined) { updates.push('avatar_url = ?'); params.push(body.avatarUrl); }
     if (body.hireDate !== undefined) { updates.push('hire_date = ?'); params.push(body.hireDate); }
 
@@ -213,8 +361,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
+    canonicalUpdates.push('updated_at = ?');
+    canonicalParams.push(now);
+    canonicalParams.push(id);
+
     if (updates.length > 1) {
-      await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      try {
+        await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      } catch {
+        if (canonicalUpdates.length > 1) {
+          await db.prepare(`UPDATE users SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+        }
+      }
     }
 
     // Sync with staff_users table if present
@@ -273,24 +431,29 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Audit log (redact password if present)
     const { password: _redactedUpdatePw, ...auditUpdateBody } = body;
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now).run();
+    await writeStaffAuditLog(db, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now);
 
-    const updated = (await db.prepare(
-      `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
-       FROM users WHERE id = ?`
-    ).bind(id).first()) as any;
+    let updated: any = null;
+    try {
+      updated = await db.prepare(
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+         FROM users WHERE id = ?`
+      ).bind(id).first();
+    } catch {
+      updated = await db.prepare(
+        `SELECT id, phone, name, role, is_active, created_at, updated_at
+         FROM users WHERE id = ?`
+      ).bind(id).first();
+    }
 
     return c.json({
       success: true,
       data: {
         ...updated!,
         role: updated!.role,
-        locale: updated!.locale,
+        locale: updated?.locale ?? 'vi',
         isActive: updated!.is_active === 1,
-        hireDate: updated!.hire_date,
+        hireDate: updated?.hire_date ?? null,
         createdAt: updated!.created_at,
         updatedAt: updated!.updated_at,
       },
@@ -314,9 +477,24 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Check for related records
-    const shifts = (await db.prepare('SELECT COUNT(*) as count FROM staff_shifts WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
-    const attendance = (await db.prepare('SELECT COUNT(*) as count FROM staff_attendance WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
-    const orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE created_by = ?').bind(id).first()) as { count: number } | null;
+    let shifts: { count: number } | null = null;
+    try {
+      shifts = (await db.prepare('SELECT COUNT(*) as count FROM staff_shifts WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
+    } catch {
+      shifts = (await db.prepare('SELECT COUNT(*) as count FROM shifts WHERE user_id = ?').bind(id).first().catch(() => null)) as { count: number } | null;
+    }
+    let attendance: { count: number } | null = null;
+    try {
+      attendance = (await db.prepare('SELECT COUNT(*) as count FROM staff_attendance WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
+    } catch {
+      attendance = null;
+    }
+    let orders: { count: number } | null = null;
+    try {
+      orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE created_by = ?').bind(id).first()) as { count: number } | null;
+    } catch {
+      orders = null;
+    }
 
     if ((shifts?.count || 0) > 0 || (attendance?.count || 0) > 0 || (orders?.count || 0) > 0) {
       // Soft delete
@@ -327,10 +505,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now).run();
+    await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now);
 
     return c.json({ success: true, data: { success: true } });
   });

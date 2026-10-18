@@ -15,6 +15,15 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     const token = authHeader.substring(7);
+    if (c.env.AUTH_KV) {
+      try {
+        if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
+          return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+        }
+      } catch {
+        // ignore KV error
+      }
+    }
     const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
     if (!payload) {
       return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
@@ -25,9 +34,16 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'No customer ID in token' }, 400);
     }
 
-    const customer = await db.prepare(
-      `${PROFILE_SQL}WHERE c.id = ?`
-    ).bind(customerId).first<CustomerRecord>();
+    let customer: CustomerRecord | null = null;
+    try {
+      customer = await db.prepare(
+        `${PROFILE_SQL}WHERE c.id = ?`
+      ).bind(customerId).first<CustomerRecord>();
+    } catch {
+      customer = await db.prepare(
+        'SELECT c.* FROM customers c WHERE c.id = ?'
+      ).bind(customerId).first<CustomerRecord>();
+    }
 
     if (!customer) {
       return c.json({ success: false, error: 'Customer not found' }, 404);
@@ -46,6 +62,15 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     const token = authHeader.substring(7);
+    if (c.env.AUTH_KV) {
+      try {
+        if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
+          return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+        }
+      } catch {
+        // ignore KV error
+      }
+    }
     const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
     if (!payload) {
       return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
@@ -76,15 +101,29 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Không có trường nào để cập nhật' }, 400);
     }
 
+    const baseUpdates = [...updates];
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(customerId);
-    await db.prepare(
-      `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
-    ).bind(...params).run();
+    try {
+      await db.prepare(
+        `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
+      ).bind(...params).run();
+    } catch {
+      await db.prepare(
+        `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
+      ).bind(...params).run();
+    }
 
-    const customer = await db.prepare(
-      `${PROFILE_SQL}WHERE c.id = ?`
-    ).bind(customerId).first<CustomerRecord>();
+    let customer: CustomerRecord | null = null;
+    try {
+      customer = await db.prepare(
+        `${PROFILE_SQL}WHERE c.id = ?`
+      ).bind(customerId).first<CustomerRecord>();
+    } catch {
+      customer = await db.prepare(
+        'SELECT c.* FROM customers c WHERE c.id = ?'
+      ).bind(customerId).first<CustomerRecord>();
+    }
 
     return c.json({ success: true, data: customer });
   });

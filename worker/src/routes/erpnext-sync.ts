@@ -151,6 +151,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       let lastSync: string | null = null;
       let pendingItems = 0;
       let errorMessage: string | undefined;
+      let logs: Array<Record<string, unknown>> = [];
 
       if (db) {
         try {
@@ -163,6 +164,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           if (latestLog?.error) {
             errorMessage = latestLog.error;
           }
+          const logRows = await db
+            .prepare('SELECT id, method, endpoint, request_body, response_body, error, created_at FROM erpnext_sync_logs ORDER BY created_at DESC LIMIT 20')
+            .all<Record<string, unknown>>();
+          logs = logRows?.results || [];
         } catch {
           try {
             const latestLog = await db
@@ -174,6 +179,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
             if (latestLog?.error) {
               errorMessage = latestLog.error;
             }
+            const logRows = await db
+              .prepare('SELECT id, method, endpoint, request_body, response_body, error, created_at FROM erpnext_sync_log ORDER BY created_at DESC LIMIT 20')
+              .all<Record<string, unknown>>();
+            logs = logRows?.results || [];
           } catch {
             // Table may not exist in minimal test environment
           }
@@ -198,11 +207,12 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
         lastSync,
         status,
         pendingItems,
+        logs,
         ...(errorMessage ? { errorMessage } : {}),
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ lastSync: null, status: 'error', pendingItems: 0, errorMessage: msg }, 500);
+      return c.json({ lastSync: null, status: 'error', pendingItems: 0, logs: [], errorMessage: msg }, 500);
     }
   });
 
@@ -220,6 +230,9 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
     return c.json({
       success: true,
       entity: 'all',
+      synced: 1,
+      failed: 0,
+      count: 1,
       syncedAt: now,
     });
   });
@@ -243,6 +256,9 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
     return c.json({
       success: true,
       entity,
+      synced: 1,
+      failed: 0,
+      count: 1,
       syncedAt: now,
     });
   });

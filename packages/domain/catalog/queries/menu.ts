@@ -10,6 +10,19 @@ import { parseAvailabilityFilter, toAvailabilityFlag } from '../policies/availab
 
 const log = createLogger({ route: 'menu' });
 
+function parseTags(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export async function getMenu(request: Request, env: Record<string, unknown>) {
   try {
     const url = new URL(request.url);
@@ -36,17 +49,47 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
     }
     query += ' ORDER BY category, name LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
-    const { results } = await db.prepare(query).bind(...params).all<MenuItem>();
+
+    let results: MenuItem[] = [];
+    let useProductsFallback = false;
+    try {
+      const res = await db.prepare(query).bind(...params).all<MenuItem>();
+      results = res.results ?? [];
+    } catch {
+      useProductsFallback = true;
+      let prodQuery = 'SELECT *, category_id as category, is_available as available FROM products WHERE 1=1';
+      const prodParams: unknown[] = [];
+      if (category) {
+        prodQuery += ' AND category_id = ?';
+        prodParams.push(category);
+      }
+      if (availableFlag !== null) {
+        prodQuery += ' AND is_available = ?';
+        prodParams.push(availableFlag);
+      }
+      if (search) {
+        prodQuery += ' AND (name LIKE ? OR description LIKE ?)';
+        prodParams.push(`%${search}%`, `%${search}%`);
+      }
+      prodQuery += ' ORDER BY category_id, name LIMIT ? OFFSET ?';
+      prodParams.push(parseInt(limit), parseInt(offset));
+      const res = await db.prepare(prodQuery).bind(...prodParams).all<MenuItem>();
+      results = res.results ?? [];
+    }
+
     const items = (results ?? []).map((item: MenuItem) => ({
       ...item,
-      tags: item.tags ? JSON.parse(item.tags as string) : [],
+      tags: parseTags(item.tags),
       price: parseInt(item.price as unknown as string),
-      available: toAvailabilityFlag(item.available)
+      available: toAvailabilityFlag(item.available ?? (item as unknown as { is_available?: unknown }).is_available)
     }));
 
-    const countQuery = `SELECT COUNT(*) as total FROM menu_items WHERE 1=1${
-      category ? ' AND category = ?' : ''
-    }${availableFlag !== null ? ' AND available = ?' : ''
+    const tableName = useProductsFallback ? 'products' : 'menu_items';
+    const catCol = useProductsFallback ? 'category_id' : 'category';
+    const availCol = useProductsFallback ? 'is_available' : 'available';
+    const countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE 1=1${
+      category ? ` AND ${catCol} = ?` : ''
+    }${availableFlag !== null ? ` AND ${availCol} = ?` : ''
     }${search ? ' AND (name LIKE ? OR description LIKE ?)' : ''}`;
 
     const countParams: unknown[] = [];
@@ -81,18 +124,31 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
 export async function getMenuItem(request: Request, env: Record<string, unknown>, id: string) {
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const { results } = await db.prepare('SELECT * FROM menu_items WHERE id = ?').bind(id).all<MenuItem>();
-
-    const rawItem = results?.[0];
+    let rawItem: MenuItem | undefined;
+    try {
+      const { results } = await db.prepare('SELECT * FROM menu_items WHERE id = ?').bind(id).all<MenuItem>();
+      rawItem = results?.[0];
+    } catch {
+      const { results } = await db.prepare('SELECT *, category_id as category, is_available as available FROM products WHERE id = ?').bind(id).all<MenuItem>();
+      rawItem = results?.[0];
+    }
+    if (!rawItem) {
+      try {
+        const { results } = await db.prepare('SELECT *, category_id as category, is_available as available FROM products WHERE id = ?').bind(id).all<MenuItem>();
+        rawItem = results?.[0];
+      } catch {
+        // Ignore if products fallback fails after menu_items succeeded
+      }
+    }
     if (!rawItem) {
       return errorResponse('Menu item not found', 404);
     }
 
     const item = {
       ...rawItem,
-      tags: rawItem.tags ? JSON.parse(rawItem.tags as string) : [],
+      tags: parseTags(rawItem.tags),
       price: parseInt(rawItem.price as unknown as string),
-      available: toAvailabilityFlag(rawItem.available)
+      available: toAvailabilityFlag(rawItem.available ?? (rawItem as unknown as { is_available?: unknown }).is_available)
     };
 
     return jsonResponse({ success: true, item });

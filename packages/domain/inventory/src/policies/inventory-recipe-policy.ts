@@ -27,6 +27,7 @@ export interface CanonicalRecipe {
 
 export interface OrderConsumptionCalculation {
   depletions: Array<{
+    productId?: string;
     ingredientId: string;
     ingredientName?: string;
     unit: string;
@@ -52,9 +53,19 @@ export async function getCanonicalRecipe(
   db: D1Database,
   productId: string
 ): Promise<CanonicalRecipe | null> {
-  const recipe = await db.prepare(
-    'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? LIMIT 1'
-  ).bind(productId).first<any>();
+  let recipe: any = null;
+  try {
+    recipe = await db.prepare(
+      'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+    ).bind(productId).first<any>();
+  } catch {
+    // Fallback when is_active column is absent
+  }
+  if (!recipe) {
+    recipe = await db.prepare(
+      'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? LIMIT 1'
+    ).bind(productId).first<any>();
+  }
 
   if (!recipe) return null;
 
@@ -90,6 +101,7 @@ export async function calculateOrderConsumption(
   orderItems: Array<{ productId: string; quantity: number; sellingPrice?: number }>
 ): Promise<OrderConsumptionCalculation> {
   const depletionsMap = new Map<string, {
+    productId?: string;
     ingredientId: string;
     ingredientName?: string;
     unit: string;
@@ -115,6 +127,7 @@ export async function calculateOrderConsumption(
         existing.totalCost = existing.quantity * existing.unitCost;
       } else {
         depletionsMap.set(comp.ingredientId, {
+          productId: item.productId,
           ingredientId: comp.ingredientId,
           ingredientName: comp.ingredientName,
           unit: comp.unit,

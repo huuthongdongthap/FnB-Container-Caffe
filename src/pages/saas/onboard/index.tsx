@@ -4,8 +4,10 @@ import StepContainerSize from '@/components/saas/onboarding-wizard/step-containe
 import StepZoneSelection from '@/components/saas/onboarding-wizard/step-zone';
 import StepConfirmation from '@/components/saas/onboarding-wizard/step-confirm';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 export default function OnboardingWizard() {
+  const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState(1);
   const [businessName, setBusinessName] = useState('');
   const [containerSize, setContainerSize] = useState('');
@@ -55,9 +57,10 @@ export default function OnboardingWizard() {
         method: 'POST',
         body: JSON.stringify({
           plan_id: (plan as { id: string }).id,
+          ...(user?.id ? { customer_id: user.id } : {}),
           customer_name: businessName,
-          customer_email: '',
-          customer_phone: '',
+          customer_email: user?.email || '',
+          customer_phone: user?.phone || '',
           container_number: `${zone}-${containerSize}`,
           zone,
           ...(tenantId ? { tenant_id: tenantId } : {}),

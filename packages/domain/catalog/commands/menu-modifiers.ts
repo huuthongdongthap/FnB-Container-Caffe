@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { requireAuth } from 'worker/src/middleware/auth';
 import type { Env } from 'worker/src/types/env';
 import type { ModifierGroup, ModifierChoice } from '../model/catalog-types';
+import { syncModifierChoiceToMenuProjection } from '../policies/menu-projection';
 import { happyHourRouter } from './happy-hour';
 
 export const menuModifiersRouter = new Hono<{ Bindings: Env }>();
@@ -39,10 +40,17 @@ menuModifiersRouter.post('/groups', staffAuth, async (c) => {
   const isActive = body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1;
   const id = makeId('MG');
   const now = new Date().toISOString();
-  await db.prepare(
-    `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, name, type, required, Number(body.sort_order) || 0, isActive, now, now).run();
+  try {
+    await db.prepare(
+      `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, name, type, required, Number(body.sort_order) || 0, isActive, now, now).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO modifier_groups (id, name, type, required, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, name, type, required, Number(body.sort_order) || 0, now, now).run();
+  }
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(id).first<ModifierGroup>();
   return c.json({ success: true, data: group }, 201);
 });
@@ -77,16 +85,36 @@ menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
   if (!name) return c.json({ success: false, error: 'name is required' }, 400);
   const id = makeId('MC');
   const isAvailable = body.is_available !== undefined ? (body.is_available ? 1 : 0) : 1;
-  await db.prepare(
-    `INSERT INTO modifier_choices (id, group_id, name, price_delta, is_default, sort_order, is_available)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    id, groupId, name,
-    Number(body.price_delta) || 0,
-    body.is_default ? 1 : 0,
-    Number(body.sort_order) || 0,
-    isAvailable
-  ).run();
+  const priceDelta = Number(body.price_delta) || 0;
+  try {
+    await db.prepare(
+      `INSERT INTO modifier_choices (id, group_id, name, price_delta, is_default, sort_order, is_available)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, groupId, name,
+      priceDelta,
+      body.is_default ? 1 : 0,
+      Number(body.sort_order) || 0,
+      isAvailable
+    ).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO modifier_choices (id, group_id, name, price_delta, is_default, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, groupId, name,
+      priceDelta,
+      body.is_default ? 1 : 0,
+      Number(body.sort_order) || 0
+    ).run();
+  }
+  await syncModifierChoiceToMenuProjection(db, {
+    id,
+    group_id: groupId,
+    name,
+    price_delta: priceDelta,
+    is_available: isAvailable,
+  });
   const choice = await db.prepare('SELECT * FROM modifier_choices WHERE id = ?').bind(id).first<ModifierChoice>();
   return c.json({ success: true, data: choice }, 201);
 });

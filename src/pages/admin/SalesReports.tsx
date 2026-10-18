@@ -116,12 +116,14 @@ export default function SalesReportsPage() {
           <SalesReportOverview overview={overview} isLoading={isLoading} t={t} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
-            <PeriodComparisonChart
-              data={comparison.data ? { current: comparison.data.current, previous: comparison.data.previous } : null}
-              loading={comparison.loading}
-              error={comparison.error === COMPARISON_ERROR_KEY ? 'Failed to load comparison data' : null}
-              onRetry={comparison.refetch}
-            />
+            {compareMode && (
+              <PeriodComparisonChart
+                data={comparison.data ? { current: comparison.data.current, previous: comparison.data.previous } : null}
+                loading={comparison.loading}
+                error={comparison.error === COMPARISON_ERROR_KEY ? 'Failed to load comparison data' : null}
+                onRetry={comparison.refetch}
+              />
+            )}
             <GroupedSalesChart
               data={groupedQ.data?.data ?? null}
               groupBy={groupBy || 'day'}

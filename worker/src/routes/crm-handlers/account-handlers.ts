@@ -13,7 +13,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    * Returns the authenticated customer's own account view.
    * Auth: any authenticated user (customer sees own, staff sees any via :id).
    */
-  router.get('/account/me', requireAuth(['customer', 'staff', 'owner']), async (c) => {
+  router.get('/account/me', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -31,7 +31,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    * staff/owner can update any customer's (pass customerId in body).
    * Body: { purpose: string, granted: boolean, policyVersion?: string }
    */
-  router.patch('/account/consent', requireAuth(['customer', 'staff', 'owner']), async (c) => {
+  router.patch('/account/consent', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -55,7 +55,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
       source: user.role === 'customer' ? 'customer_portal' : 'staff_action',
       policyVersion: body.policyVersion,
       actorId: user.id,
-      actorRole: user.role as 'customer' | 'staff' | 'owner',
+      actorRole: (user.role === 'customer' ? 'customer' : user.role === 'owner' ? 'owner' : 'staff') as 'customer' | 'staff' | 'owner',
     });
 
     if (!result.ok) {

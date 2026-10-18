@@ -73,11 +73,20 @@ export async function getCustomerAccount(
         .catch(() =>
           db
             .prepare(
-              `SELECT id, total_cents, status, created_at FROM orders
+              `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
                WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
             )
             .bind(customer.phone, orderLimit)
-            .all<Record<string, unknown>>(),
+            .all<Record<string, unknown>>()
+            .catch(() =>
+              db
+                .prepare(
+                  `SELECT id, total, status, created_at FROM orders
+                   WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                )
+                .bind(customer.phone, orderLimit)
+                .all<Record<string, unknown>>(),
+            ),
         ),
 
       db
@@ -114,7 +123,7 @@ export async function getCustomerAccount(
       nextTier,
       recentOrders: (orders.results || []).map((o) => ({
         id: String(o.id ?? ''),
-        totalCents: Number(o.total_cents ?? o.total ?? 0),
+        totalCents: Number(o.total_cents ?? o.total ?? o.total_amount ?? 0),
         status: String(o.status ?? 'pending'),
         placedAt: String(o.created_at ?? o.placed_at ?? ''),
       })),

@@ -71,6 +71,9 @@ export class OrderBroadcaster {
    * Throws if ctx.storage.put fails — caller catches and logs to KV.
    */
   async broadcast(event: OrderEvent): Promise<{ event: OrderEvent; seq: number }> {
+    const prevSeq = this.state.seq;
+    const prevOrder = this.state.orders[event.orderId];
+
     this.state.seq++;
     const seq = this.state.seq;
 
@@ -82,10 +85,43 @@ export class OrderBroadcaster {
 
     // Non-structured write — survives eviction independently
     if (this.storage) {
-      await this.storage.put(`order:${event.orderId}`, JSON.stringify(persisted));
+      try {
+        await this.storage.put(`order:${event.orderId}`, JSON.stringify(persisted));
+      } catch (err) {
+        this.state.seq = prevSeq;
+        if (prevOrder !== undefined) {
+          this.state.orders[event.orderId] = prevOrder;
+        } else {
+          delete this.state.orders[event.orderId];
+        }
+        throw err;
+      }
+    }
+
+    // Prune terminal orders past 200 items to prevent memory bloat
+    const keys = Object.keys(this.state.orders);
+    if (keys.length > 200) {
+      const terminal = new Set(['completed', 'cancelled', 'delivered']);
+      for (const k of keys) {
+        if (terminal.has(this.state.orders[k]?.status) && k !== event.orderId) {
+          delete this.state.orders[k];
+          if (Object.keys(this.state.orders).length <= 200) break;
+        }
+      }
     }
 
     return { event: persisted, seq };
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === '/state') {
+      const since = Number(url.searchParams.get('since') || '0');
+      return new Response(JSON.stringify(this.getState(since)), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response('Not found', { status: 404 });
   }
 
   // ── Client lifecycle ───────────────────────────────────────────────

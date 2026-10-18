@@ -14,12 +14,16 @@ export function InventoryMovementsTab({
 
   const filtered = useMemo(() => {
     if (filterType === 'ALL') return movements;
+    if (filterType === 'adjustment' || filterType === 'adjust') {
+      return movements.filter((m) => m.type === 'adjustment' || m.type === 'adjust');
+    }
     return movements.filter((m) => m.type === filterType);
   }, [movements, filterType]);
 
   const typeLabels: Record<string, { label: string; badge: string }> = {
     in: { label: 'Nhập kho', badge: 'bg-emerald-500/20 text-emerald-300' },
     out: { label: 'Xuất kho', badge: 'bg-sky-500/20 text-sky-300' },
+    adjustment: { label: 'Kiểm kê', badge: 'bg-amber-500/20 text-amber-300' },
     adjust: { label: 'Kiểm kê', badge: 'bg-amber-500/20 text-amber-300' },
     waste: { label: 'Hao hụt', badge: 'bg-rose-500/20 text-rose-300' },
   };
@@ -27,7 +31,7 @@ export function InventoryMovementsTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {['ALL', 'in', 'out', 'adjust', 'waste'].map((t) => (
+        {['ALL', 'in', 'out', 'adjustment', 'waste'].map((t) => (
           <button
             key={t}
             type="button"

@@ -50,25 +50,6 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     }
     const itemsJson = snapshot.itemsJson;
 
-    // ── DO Broadcast (before D1) ──────────────────────────
-    if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
-      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
-      const stub = ns.get(ns.idFromName(orderId));
-      (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
-        orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
-        customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: null,
-        createdAt: Date.now(), updatedAt: Date.now(),
-      }).catch(e => {
-        if (env.AUTH_KV) {
-          (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace).put(
-            `broadcast:fail:${orderId}`,
-            JSON.stringify({ orderId, error: 'DO_BROADCAST_FAILED', message: (e as Error).message, ts: new Date().toISOString() }),
-            { expirationTtl: 86400 }
-          ).catch(() => {});
-        }
-      });
-    }
-
     let resolvedTableId: string | null = null;
     if (data.table_id) {
       const tableNum = data.table_id.trim();
@@ -109,31 +90,73 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     const resolvedCustomerId = ownership.customerId;
 
     // ── Canonical D1 orders persistence ──────────────────────────
-    await db.prepare(`
-      INSERT INTO orders (
-        id, items, total, status, customer_name, customer_phone,
-        customer_email, customer_address, payment_method, payment_status,
-        shipping_fee, discount, notes, delivery_time, table_id,
-        order_type, tip_amount, service_fee, customer_id, tenant_id,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      orderId, itemsJson,
-      snapshot.total, 'pending',
-      data.customer_name, data.customer_phone,
-      data.customer_email || null, data.customer_address || null,
-      validatedMethod, 'unpaid',
-      snapshot.shipping_fee,
-      snapshot.discount,
-      data.notes || null, data.delivery_time || 'now',
-      resolvedTableId,
-      data.order_type || 'dine_in',
-      snapshot.tip_amount,
-      snapshot.service_fee,
-      resolvedCustomerId,
-      data.tenant_id || 'default',
-      now, now
-    ).run();
+    try {
+      await db.prepare(`
+        INSERT INTO orders (
+          id, items, total, status, customer_name, customer_phone,
+          customer_email, customer_address, payment_method, payment_status,
+          shipping_fee, discount, notes, delivery_time, table_id,
+          order_type, tip_amount, service_fee, customer_id, tenant_id,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId, itemsJson,
+        snapshot.total, 'pending',
+        data.customer_name, data.customer_phone,
+        data.customer_email || null, data.customer_address || null,
+        validatedMethod, 'unpaid',
+        snapshot.shipping_fee,
+        snapshot.discount,
+        data.notes || null, data.delivery_time || 'now',
+        resolvedTableId,
+        data.order_type || 'dine_in',
+        snapshot.tip_amount,
+        snapshot.service_fee,
+        resolvedCustomerId,
+        data.tenant_id || 'default',
+        now, now
+      ).run();
+    } catch {
+      await db.prepare(`
+        INSERT INTO orders (
+          id, items, total, status, customer_name, customer_phone,
+          customer_email, customer_address, payment_method, payment_status,
+          shipping_fee, discount, notes, delivery_time, table_id,
+          order_type, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId, itemsJson,
+        snapshot.total, 'pending',
+        data.customer_name, data.customer_phone,
+        data.customer_email || null, data.customer_address || null,
+        validatedMethod, 'unpaid',
+        snapshot.shipping_fee,
+        snapshot.discount,
+        data.notes || null, data.delivery_time || 'now',
+        resolvedTableId,
+        data.order_type || 'dine_in',
+        now, now
+      ).run();
+    }
+
+    // ── DO Broadcast (after validation & D1 insert) ──────────────
+    if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
+      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
+      const stub = ns.get(ns.idFromName(orderId));
+      (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
+        orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+        customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      }).catch(e => {
+        if (env.AUTH_KV) {
+          (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace).put(
+            `broadcast:fail:${orderId}`,
+            JSON.stringify({ orderId, error: 'DO_BROADCAST_FAILED', message: (e as Error).message, ts: new Date().toISOString() }),
+            { expirationTtl: 86400 }
+          ).catch(() => {});
+        }
+      });
+    }
 
     // ── Canonical D1 order_items persistence (7 columns) ─────────
     for (const item of snapshot.items) {

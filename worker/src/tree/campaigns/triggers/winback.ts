@@ -32,7 +32,28 @@ export async function detectWinbackCandidates(
     log.info('winback_candidates', { count: results.length });
     return results;
   } catch (err) {
-    log.error('detectWinbackCandidates error', { error: (err as Error).message });
-    return [];
+    try {
+      const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString();
+      const { results } = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
+        FROM customers c
+        WHERE c.phone IS NOT NULL
+          AND (
+            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
+          ) < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_logs cl
+            WHERE cl.customer_id = c.id
+              AND cl.trigger_type = 'winback'
+              AND cl.created_at > ?
+          )
+      `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+      return results;
+    } catch {
+      log.error('detectWinbackCandidates error', { error: (err as Error).message });
+      return [];
+    }
   }
 }

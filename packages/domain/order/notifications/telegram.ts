@@ -31,7 +31,7 @@ export async function notifyTelegram(env: Record<string, unknown>, order: Record
       }${'━'.repeat(22)}\n` +
       `${esc(items)}\n${
         '━'.repeat(22)}\n` +
-      `💵 <b>${fmt(Number(order.total))}</b>\n` +
+      `💵 <b>${fmt(Number(order.total ?? order.total_amount ?? 0) || 0)}</b>\n` +
       `💳 ${esc(String(order.payment_method).toUpperCase())}\n${
         (order.notes as string) ? `📝 ${esc(order.notes as string)}\n` : ''}`;
     const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;

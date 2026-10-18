@@ -2,7 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
-import { canAccessOrder } from '@aura/domain-order';
+import { canAccessOrder, publishOrderEvent } from '@aura/domain-order';
 
 export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments - Create payment
@@ -121,7 +121,7 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const now = new Date().toISOString();
     const targetId = body.paymentId || c.req.param?.('id');
 
-    if (user?.role && !['owner', 'manager', 'staff', 'admin'].includes(user.role)) {
+    if (user?.role && !['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter'].includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
@@ -152,6 +152,12 @@ export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     // Update canonical order payment status
     await db.prepare('UPDATE orders SET payment_status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, payment.order_id).run();
+
+    if (c.env?.AUTH_KV && payment.order_id) {
+      await c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {});
+      await c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {});
+      await publishOrderEvent(c.env.AUTH_KV, payment.order_id, 'refunded').catch(() => {});
+    }
 
     // Audit log
     const refundId = crypto.randomUUID();

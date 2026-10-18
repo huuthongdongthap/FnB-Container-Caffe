@@ -29,17 +29,17 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Total jobs
     const totalJobs = await db.prepare(
       `SELECT COUNT(*) as total FROM cron_jobs ${whereClause}`
-    ).bind(...params).first();
+    ).bind(...params).first().catch(() => ({ total: 0 }));
 
     // Active jobs
     const activeJobs = await db.prepare(
       `SELECT COUNT(*) as total FROM cron_jobs ${whereClause} AND is_active = 1`
-    ).bind(...params).first();
+    ).bind(...params).first().catch(() => ({ total: 0 }));
 
     // Jobs by status
     const jobsByStatus = await db.prepare(
       `SELECT status, COUNT(*) as count FROM cron_jobs ${whereClause} GROUP BY status`
-    ).bind(...params).all();
+    ).bind(...params).all().catch(() => ({ results: [] }));
 
     // Total runs
     let runWhere = 'WHERE 1=1';
@@ -65,7 +65,7 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
               SUM(CASE WHEN status = 'timeout' THEN 1 ELSE 0 END) as timeout,
               AVG(duration_ms) as avg_duration_ms
        FROM cron_runs ${runWhere}`
-    ).bind(...runParams).first();
+    ).bind(...runParams).first().catch(() => ({ total: 0, successful: 0, failed: 0, timeout: 0, avg_duration_ms: 0 }));
 
     // Recent failures
     const recentFailures = await db.prepare(
@@ -75,7 +75,7 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        ${runWhere} AND cr.status IN ('failed', 'timeout')
        ORDER BY cr.started_at DESC
        LIMIT 10`
-    ).bind(...runParams).all();
+    ).bind(...runParams).all().catch(() => ({ results: [] }));
 
     const tJobs = totalJobs as any;
     const aJobs = activeJobs as any;

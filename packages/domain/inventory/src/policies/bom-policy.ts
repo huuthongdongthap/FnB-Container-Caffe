@@ -116,5 +116,30 @@ export async function deductIngredientsForOrder(
     );
   }
 
-  await db.batch(ops);
+  try {
+    await db.batch(ops);
+  } catch {
+    const fallbackOps = [];
+    for (const [ingredientId, qty] of depletion) {
+      fallbackOps.push(
+        db.prepare(
+          `UPDATE ingredients SET current_stock = MAX(0, current_stock - ?), updated_at = ? WHERE id = ?`
+        ).bind(qty, now, ingredientId)
+      );
+      fallbackOps.push(
+        db.prepare(
+          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, notes, created_at)
+           VALUES (?, ?, 'deduction', ?, ?, ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          ingredientId,
+          -qty,
+          orderId,
+          `BOM deduction for order ${orderId}`,
+          now
+        )
+      );
+    }
+    await db.batch(fallbackOps).catch(() => {});
+  }
 }

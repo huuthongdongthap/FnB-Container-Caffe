@@ -10,7 +10,7 @@ interface AppContext {
   };
 }
 
-const ALLOWED_RECONCILIATION_ROLES = new Set(['owner', 'manager', 'staff', 'admin']);
+const ALLOWED_RECONCILIATION_ROLES = new Set(['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter']);
 
 export function reconciliationRoutes(app: Hono<AppContext>) {
   /**

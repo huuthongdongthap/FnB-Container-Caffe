@@ -37,9 +37,9 @@ export function DatePicker({ selectedDate, onSelect }: DatePickerProps) {
           </div>
         </div>
         <div className="grid grid-cols-7 gap-2 text-center">
-          {dayLabels.map((day) => (
+          {dayLabels.map((day, idx) => (
             <span
-              key={day}
+              key={`${day}-${idx}`}
               className="font-[family-name:var(--aura-body-font)] text-xs text-[var(--aura-chrome-soft)]/60"
             >
               {day}

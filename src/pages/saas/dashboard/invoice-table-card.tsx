@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiFetch } from '@/lib/api-client';
 import { formatVND, StatusBadge } from './dashboard-utils';
 import type { Invoice } from '@/hooks/use-subscriptions';
 import ReceiptDownloadButton from './receipt-download';
@@ -11,8 +12,27 @@ interface Props {
   isLoading: boolean;
 }
 
-function handlePay(invoiceId: string) {
-  window.location.href = `/api/subscriptions/invoices/${invoiceId}/pay`;
+async function handlePay(invoiceId: string) {
+  try {
+    const res = await apiFetch<{
+      payment_url?: string;
+      checkout_url?: string;
+      data?: { payment_url?: string; checkout_url?: string };
+    }>(`/api/subscriptions/invoices/${encodeURIComponent(invoiceId)}/pay`, {
+      method: 'POST',
+      body: JSON.stringify({ payment_method: 'payos' }),
+    });
+    const paymentUrl =
+      res?.payment_url ??
+      res?.checkout_url ??
+      res?.data?.payment_url ??
+      res?.data?.checkout_url;
+    if (paymentUrl) {
+      window.location.href = paymentUrl;
+    }
+  } catch {
+    // Payment request failed or gateway unavailable
+  }
 }
 
 function formatDateRange(start?: string | null, end?: string | null): string {

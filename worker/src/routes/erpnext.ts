@@ -40,7 +40,11 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
 			return new Response(JSON.stringify({
 				success: true,
 				configured: !!(cfgUrl && apiKey),
-				url: cfgUrl ? cfgUrl.replace(/./g, (c, i) => i > 8 && i < cfgUrl.indexOf('/', 8) ? '*' : c) : null,
+				url: cfgUrl ? cfgUrl.replace(/./g, (c, i) => {
+					const slashIdx = cfgUrl.indexOf('/', 8);
+					const end = slashIdx !== -1 ? slashIdx : cfgUrl.length;
+					return i > 8 && i < end ? '*' : c;
+				}) : null,
 				key_set: !!apiKey,
 				secret_set: !!apiKey,
 				source: env.AUTH_KV ? 'kv' : 'env'
@@ -55,7 +59,13 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
 					status: 401, headers: { 'Content-Type': 'application/json' }
 				});
 			}
-			const payload = await verifyJWT(token, env.JWT_SECRET);
+			const revoked = typeof env.AUTH_KV?.get === 'function' ? await env.AUTH_KV.get(`revoked:${token}`) : null;
+if (revoked) {
+  return new Response(JSON.stringify({ success: false, error: 'Token đã bị thu hồi' }), {
+    status: 401, headers: { 'Content-Type': 'application/json' }
+  });
+}
+const payload = await verifyJWT(token, env.JWT_SECRET);
 			if (!payload || !['owner', 'manager', 'admin', 'staff'].includes(payload.role)) {
 				return new Response(JSON.stringify({ success: false, error: 'Không đủ quyền truy cập' }), {
 					status: 403, headers: { 'Content-Type': 'application/json' }
@@ -103,7 +113,13 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
 						status: 401, headers: { 'Content-Type': 'application/json' }
 					});
 				}
-				const payload = await verifyJWT(token, env.JWT_SECRET);
+				const revoked = typeof env.AUTH_KV?.get === 'function' ? await env.AUTH_KV.get(`revoked:${token}`) : null;
+if (revoked) {
+  return new Response(JSON.stringify({ success: false, error: 'Token đã bị thu hồi' }), {
+    status: 401, headers: { 'Content-Type': 'application/json' }
+  });
+}
+const payload = await verifyJWT(token, env.JWT_SECRET);
 				if (!payload || !['owner', 'manager', 'admin', 'staff'].includes(payload.role)) {
 					return new Response(JSON.stringify({ success: false, error: 'Không đủ quyền truy cập' }), {
 						status: 403, headers: { 'Content-Type': 'application/json' }

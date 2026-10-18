@@ -66,7 +66,7 @@ export interface PayOSOrderValidation {
   total: number;
   payment_status: string;
   customer_id: string | null;
-  is_cod: number;
+  is_cod?: number;
 }
 
 export function validatePayOSAccess(
@@ -79,7 +79,8 @@ export function validatePayOSAccess(
     role === 'manager' ||
     role === 'staff' ||
     role === 'admin' ||
-    role === 'cashier';
+    role === 'cashier' ||
+    role === 'waiter';
   if (orderRow.customer_id && customerId && orderRow.customer_id !== customerId && !isStaffOrOwner) {
     return { allowed: false, reason: 'forbidden' };
   }
@@ -127,7 +128,7 @@ export async function persistPaymentWithRetries(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const attemptCode = attempt === 0 ? orderCode : generateOrderCode();
+      const attemptCode = orderCode;
       const attemptPaymentId = attempt === 0 ? paymentId : `${paymentId}_${attempt}`;
       await db.prepare(`
         INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)

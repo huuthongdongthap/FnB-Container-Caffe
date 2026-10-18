@@ -5,7 +5,7 @@ import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../middleware/audit-log';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import { deductInventoryForOrder } from '@aura/domain-inventory';
-import { calculateOrderSnapshot } from '@aura/domain-order';
+import { calculateOrderSnapshot, publishOrderEvent } from '@aura/domain-order';
 import { notifyStaffOnNewOrder } from '../../tree/push/triggers';
 import { syncOrderToERPNext } from '../../tree/erpnext/sync';
 import { makeOrderId, type OrderRecord } from './types';
@@ -71,13 +71,19 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
 
   for (const item of snapshot.items) {
     const lineItemId = makeOrderId('ITEM');
-    await db.prepare(
-      `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      lineItemId, id, item.menuItemId, item.quantity, item.subtotalCents,
-      JSON.stringify(item.modifiers || []), now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        lineItemId, id, item.menuItemId, item.quantity, item.subtotalCents,
+        JSON.stringify(item.modifiers || []), now
+      ).run();
+    } catch (itemErr) {
+      if (!String((itemErr as Error)?.message || '').includes('no such table: order_items')) {
+        throw itemErr;
+      }
+    }
   }
 
   if (data.payment_method !== 'payos') {
@@ -128,6 +134,7 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
     await Promise.all([
       c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
       c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+      publishOrderEvent(c.env.AUTH_KV, id, 'pending'),
     ]);
   }
 
@@ -155,5 +162,5 @@ export async function handlePosCheckout(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerCheckoutHandlers(app: Hono<{ Bindings: Env }>) {
-  app.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin']), audit('order_create_checkout'), handlePosCheckout);
+  app.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
 }

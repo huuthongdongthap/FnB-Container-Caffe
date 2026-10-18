@@ -75,7 +75,7 @@ import type { Env } from '../types/env';
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Admin Protected (Kitchen/Barista/Chef scoped strictly to /api/admin/orders*)
   const adminOrderAuth = requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']);
-  const adminGeneralAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
+  const adminGeneralAuth = requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']);
   app.use('/api/admin/*', async (c, next) => {
     if (c.req.path === '/api/admin/orders' || c.req.path.startsWith('/api/admin/orders/')) {
       return adminOrderAuth(c, next);
@@ -97,10 +97,13 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'valid order id and status are required' }, 400);
     }
     const now = new Date().toISOString();
-    await c.env.AURA_DB
+    const res = await c.env.AURA_DB
       .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
       .bind(status, now, orderId)
       .run();
+    if (res?.meta && typeof res.meta.changes === 'number' && res.meta.changes === 0) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
     await publishOrderEvent(c.env.AUTH_KV, orderId, status).catch(() => {});
     return c.json({ success: true, id: orderId, status, updated_at: now });
   });
@@ -110,10 +113,13 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'order id is required' }, 400);
     }
     const now = new Date().toISOString();
-    await c.env.AURA_DB
+    const res = await c.env.AURA_DB
       .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
       .bind('completed', now, orderId)
       .run();
+    if (res?.meta && typeof res.meta.changes === 'number' && res.meta.changes === 0) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
     await publishOrderEvent(c.env.AUTH_KV, orderId, 'completed').catch(() => {});
     return c.json({ success: true, id: orderId, status: 'completed', updated_at: now });
   });
@@ -129,9 +135,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   registerCronAdminRoutes(app);
 
   // Stats & Dashboard Overview
-  app.use('/api/stats', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/stats', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
   app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
-  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
   app.get('/api/dashboard/overview', handleOverview);
 
   // Payment & Refunds
@@ -170,12 +176,12 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/shifts', shiftsRouter);
   app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));
   app.route('/api/campaigns', campaignsRouter);
-  app.use('/api/broadcast/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/broadcast/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
   app.route('/api/broadcast', broadcastRouter);
   app.route('/api/chat', chatRouter);
 
   // Analytics & Observability
-  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
   app.route('/api/analytics', analyticsRouter);
   registerVitalsRoute(app);
 
@@ -230,12 +236,12 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     await c.env.AUTH_KV?.put(key, JSON.stringify(next));
     return c.json({ success: true, ...next });
   });
-  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
   app.route('/api/reports', reportsRouter);
 
   // Inventory Items (domain-inventory)
   const inventoryItemsApp = new Hono<{ Bindings: Env }>();
-  inventoryItemsApp.use('/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  inventoryItemsApp.use('/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
   inventoryCRUD(inventoryItemsApp as any);
   inventoryTransactions(inventoryItemsApp as any);
   inventorySnapshots(inventoryItemsApp as any);

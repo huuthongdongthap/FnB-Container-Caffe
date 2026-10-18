@@ -49,10 +49,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   fetchOrder: async (id) => {
     set({ loading: true, error: null });
     try {
-      // Canonical OpenAPI detail endpoint — server projects a customer-safe
-      // allowlist payload; IDOR scoping is enforced server-side by resolveCustomerScope().
-      const body = await apiFetch<{ data: CustomerOrder }>(`/api/orders/${id}`);
-      set({ currentOrder: body.data, loading: false, error: null });
+      let body: { data?: CustomerOrder } & Partial<CustomerOrder>;
+      try {
+        body = await apiFetch<{ data?: CustomerOrder } & Partial<CustomerOrder>>(`/api/orders/${id}`);
+      } catch {
+        body = await apiFetch<{ data?: CustomerOrder } & Partial<CustomerOrder>>(`/api/orders/${id}/track`);
+      }
+      const resolvedOrder = (body?.data ?? body) as CustomerOrder;
+      set({ currentOrder: resolvedOrder, loading: false, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
@@ -76,8 +80,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   subscribeToOrder: (id: string) => {
     get().unsubscribeFromOrder();
-    const url = `${API_BASE}/api/orders/${id}/events`;
-    const es = new EventSource(url);
+    const url = `${API_BASE}/api/orders/${encodeURIComponent(id)}/events`;
+    const es = new EventSource(url, { withCredentials: true });
     es.addEventListener('update_order', (event: MessageEvent) => {
       try {
         const incoming = JSON.parse(event.data);

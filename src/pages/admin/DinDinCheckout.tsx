@@ -27,8 +27,18 @@ export default function DinDinCheckout() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<CheckoutEntry[]>(`/api/admin/dindin/checkouts?filter=${filter}`);
-      setEntries(Array.isArray(data) ? data : []);
+      const data = await apiFetch<CheckoutEntry[]>(
+        `/api/admin/dindin/checkouts?filter=${filter}&status=${filter !== 'all' ? filter : ''}`,
+      );
+      const rawList = Array.isArray(data)
+        ? data
+        : ((data as any)?.data ?? (data as any)?.checkouts ?? []);
+      setEntries(
+        rawList.map((item: any) => ({
+          ...item,
+          qcOk: Boolean(item.qcOk ?? item.qcPassed),
+        })),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
     } finally {
@@ -39,16 +49,16 @@ export default function DinDinCheckout() {
   useEffect(() => { void loadEntries(); }, [loadEntries]);
 
   const markPrinted = async (orderId: string) => {
-    setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, printed: true } : e)));
     try {
       await apiFetch(`/api/admin/dindin/checkout/${orderId}/print`, { method: 'POST' });
+      setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, printed: true } : e)));
     } catch { /* silent */ }
   };
 
   const markQcOk = async (orderId: string) => {
-    setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, qcOk: true } : e)));
     try {
       await apiFetch(`/api/admin/dindin/checkout/${orderId}/qc`, { method: 'POST' });
+      setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, qcOk: true } : e)));
     } catch { /* silent */ }
   };
 

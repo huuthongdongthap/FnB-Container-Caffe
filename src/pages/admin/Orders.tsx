@@ -32,6 +32,8 @@ const ACTION_TO_STORE: Record<string, string> = {
   serve: 'delivered',
   served: 'delivered',
   delivered: 'delivered',
+  cancel: 'cancelled',
+  cancelled: 'cancelled',
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────────────── */

@@ -112,17 +112,38 @@ export async function detectCashbackExpiry(db: D1Database): Promise<CampaignCust
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
   const now = new Date().toISOString();
 
-  const { results } = await db.prepare(`
-    SELECT ct.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
-    FROM cashback_transactions ct
-    JOIN customers c ON ct.customer_id = c.id
-    WHERE ct.type IN ('earn', 'bonus')
-      AND ct.expires_at IS NOT NULL
-      AND ct.expires_at <= ?
-      AND ct.expires_at > datetime('now')
-      AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
-    GROUP BY ct.customer_id
-  `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+  let results: ExpiringRow[] = [];
+  try {
+    const primary = await db.prepare(`
+      SELECT ct.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
+      FROM cashback_transactions ct
+      JOIN customers c ON ct.customer_id = c.id
+      WHERE ct.type IN ('earn', 'bonus')
+        AND ct.expires_at IS NOT NULL
+        AND ct.expires_at <= ?
+        AND ct.expires_at > datetime('now')
+        AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+      GROUP BY ct.customer_id
+    `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+    results = primary.results || [];
+  } catch {
+    try {
+      const fallback = await db.prepare(`
+        SELECT cw.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
+        FROM cashback_transactions ct
+        JOIN cashback_wallets cw ON ct.wallet_id = cw.id
+        JOIN customers c ON cw.customer_id = c.id
+        WHERE ct.type IN ('earn', 'bonus')
+          AND cw.expires_at IS NOT NULL
+          AND cw.expires_at <= ?
+          AND cw.expires_at > datetime('now')
+        GROUP BY cw.customer_id
+      `).bind(sevenDaysFromNow).all<ExpiringRow>();
+      results = fallback.results || [];
+    } catch {
+      results = [];
+    }
+  }
 
   return results.map((row) => ({
     id: row.customer_id,
@@ -148,6 +169,10 @@ export async function markExpiryNotified(
   const stmts = customerIds.map((id) =>
     db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, id)
   );
-  await db.batch(stmts);
+  try {
+    await db.batch(stmts);
+  } catch {
+    // Graceful fallback when last_expiry_warning_at column is absent
+  }
   return customerIds.length;
 }

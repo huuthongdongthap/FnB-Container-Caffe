@@ -69,32 +69,40 @@ export class AuditLogger {
    *                Audit details (created_at is auto-assigned)
    */
   async log(entry: Omit<AuditEntry, 'created_at'>): Promise<void> {
-    this.ctx.waitUntil(
-      (async() => {
-        try {
-          let parsedDetails: Record<string, unknown> | null = null;
-          if (entry.details) {
-            try {
-              parsedDetails = JSON.parse(entry.details);
-            } catch {
-              parsedDetails = { raw: entry.details };
-            }
+    const task = (async() => {
+      try {
+        let parsedDetails: Record<string, unknown> | null = null;
+        if (entry.details) {
+          try {
+            parsedDetails = JSON.parse(entry.details);
+          } catch {
+            parsedDetails = { raw: entry.details };
           }
-
-          await writeCanonicalAuditLog(this.db, {
-            actor: { id: entry.actor_id, name: entry.actor_name },
-            action: entry.action,
-            resourceType: entry.resource_type,
-            resourceId: entry.resource_id,
-            metadata: parsedDetails || undefined,
-            ipAddress: entry.ip_address,
-          }, { policy: 'best_effort' });
-        } catch {
-          // Ghi log không quan trọng — không làm crash request
-          // Audit logging is best-effort — never crash the request
         }
-      })()
-    );
+
+        await writeCanonicalAuditLog(this.db, {
+          actor: { id: entry.actor_id, name: entry.actor_name },
+          action: entry.action,
+          resourceType: entry.resource_type,
+          resourceId: entry.resource_id,
+          metadata: parsedDetails || undefined,
+          ipAddress: entry.ip_address,
+        }, { policy: 'best_effort' });
+      } catch {
+        // Ghi log không quan trọng — không làm crash request
+        // Audit logging is best-effort — never crash the request
+      }
+    })();
+
+    try {
+      if (this.ctx?.waitUntil) {
+        this.ctx.waitUntil(task);
+      } else {
+        await task;
+      }
+    } catch {
+      await task;
+    }
   }
 
   /**
@@ -205,7 +213,13 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
   return async(c, next) => {
     // Tạo AuditLogger từ request context — mỗi request có ExecutionCtx riêng
     // Create AuditLogger from request context — each request gets its own ExecutionCtx
-    const auditLogger = new AuditLogger(c.executionCtx, c.env.AURA_DB);
+    let execCtx: ExecutionContext | undefined;
+    try {
+      execCtx = c.executionCtx;
+    } catch {
+      execCtx = undefined;
+    }
+    const auditLogger = new AuditLogger(execCtx as ExecutionContext, c.env.AURA_DB);
 
     await next();
 

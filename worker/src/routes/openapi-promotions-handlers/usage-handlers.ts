@@ -85,7 +85,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
 
     // Verify admin role
-    if (user.role !== 'owner' && user.role !== 'manager') {
+    if (user.role !== 'owner' && user.role !== 'manager' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
 

@@ -114,12 +114,20 @@ export async function processNotificationIntent(
   }
 }
 
+export function verifyWebhookSignature(signature: string | undefined, secretKey?: string): boolean {
+  if (!secretKey) return true;
+  if (!signature || signature !== `sig_${secretKey}` || signature.length < 8) {
+    return false;
+  }
+  return true;
+}
+
 export function verifyAndDeduplicateCallback(
   callback: ProviderCallback,
   processedKeys: Set<string>,
   secretKey?: string
 ): { valid: boolean; deduplicated: boolean; reason?: string } {
-  if (secretKey && callback.signature !== `sig_${secretKey}`) {
+  if (!verifyWebhookSignature(callback.signature, secretKey)) {
     return { valid: false, deduplicated: false, reason: 'invalid_callback_signature' };
   }
   if (processedKeys.has(callback.idempotencyKey)) {
@@ -154,7 +162,43 @@ async function recordDeliveryLog(db: any, intent: NotificationIntent, providerMe
         intent.errorReason || null, intent.retryCount, intent.createdAt
       ).run();
     } catch {
-      // non-blocking
+      try {
+        await db.prepare(
+          `INSERT INTO notification_audit_log (
+            id, channel, phone, template_key, payload, response, error, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          intent.id,
+          intent.channel,
+          intent.recipient.phone || recipientTarget,
+          intent.templateId,
+          JSON.stringify(intent.renderedPayload ?? {}),
+          providerMessageId || null,
+          intent.errorReason || null,
+          intent.status,
+          intent.createdAt
+        ).run();
+      } catch {
+        try {
+          await db.prepare(
+            `INSERT INTO notification_audit_log (
+              order_id, customer_id, channel, phone, message_type, status, provider_response, sent_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            (intent.renderedPayload?.orderId as string) || intent.eventId || null,
+            intent.recipient.customerId || null,
+            intent.channel,
+            intent.recipient.phone || recipientTarget,
+            intent.templateId,
+            intent.status,
+            providerMessageId || intent.errorReason || null,
+            intent.status === 'delivered' ? intent.updatedAt : null,
+            intent.createdAt
+          ).run();
+        } catch {
+          // non-blocking
+        }
+      }
     }
   }
 }

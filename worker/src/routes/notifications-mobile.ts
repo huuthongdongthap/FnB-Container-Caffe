@@ -49,10 +49,14 @@ export async function getNotifications(c: Context<{ Bindings: Env }>) {
       created_at: row.created_at,
     }));
 
-    return jsonResponse({ success: true, notifications: list });
+    return jsonResponse({ success: true, notifications: list, data: { items: list, unreadCount: list.filter(n => !n.read_at).length } });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('no such table')) {
+      return jsonResponse({ success: true, notifications: [], data: { items: [], unreadCount: 0 } });
+    }
     log.error('list_notifications_failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg,
     });
     return errorResponse('Không thể tải thông báo', 500);
   }
@@ -83,8 +87,12 @@ export async function markNotificationRead(c: Context<{ Bindings: Env }>) {
 
     return jsonResponse({ success: true });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('no such table')) {
+      return jsonResponse({ success: true });
+    }
     log.error('mark_read_failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg,
     });
     return errorResponse('Không thể cập nhật trạng thái', 500);
   }
@@ -124,22 +132,40 @@ export async function subscribePush(c: Context<{ Bindings: Env }>) {
     const auth = body.keys?.auth ?? '';
     const userAgent = body.user_agent ?? c.req.header('User-Agent') ?? '';
 
-    await c.env.AURA_DB
-      .prepare(
-        `INSERT INTO push_subscriptions
-             (id, user_id, endpoint, auth_key, p256dh_key, role, user_agent, last_used_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(endpoint) DO UPDATE SET
-             user_id     = excluded.user_id,
-             auth_key    = excluded.auth_key,
-             p256dh_key  = excluded.p256dh_key,
-             role        = excluded.role,
-             user_agent  = excluded.user_agent,
-             last_used_at= excluded.last_used_at,
-             updated_at  = excluded.updated_at`
-      )
-      .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now, now)
-      .run();
+    try {
+      await c.env.AURA_DB
+        .prepare(
+          `INSERT INTO push_subscriptions
+               (id, user_id, endpoint, auth_key, p256dh_key, role, user_agent, last_used_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(endpoint) DO UPDATE SET
+               user_id     = excluded.user_id,
+               auth_key    = excluded.auth_key,
+               p256dh_key  = excluded.p256dh_key,
+               role        = excluded.role,
+               user_agent  = excluded.user_agent,
+               last_used_at= excluded.last_used_at,
+               updated_at  = excluded.updated_at`
+        )
+        .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now, now)
+        .run();
+    } catch {
+      await c.env.AURA_DB
+        .prepare(
+          `INSERT INTO push_subscriptions
+               (id, customer_id, endpoint, auth_key, p256dh_key, role, user_agent, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(endpoint) DO UPDATE SET
+               customer_id = excluded.customer_id,
+               auth_key    = excluded.auth_key,
+               p256dh_key  = excluded.p256dh_key,
+               role        = excluded.role,
+               user_agent  = excluded.user_agent,
+               updated_at  = excluded.updated_at`
+        )
+        .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now)
+        .run();
+    }
 
     return jsonResponse({ success: true, message: 'Đăng ký push thành công' }, 201);
   } catch (err) {

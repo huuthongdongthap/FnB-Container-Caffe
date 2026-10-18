@@ -157,12 +157,15 @@ export async function redeemReferral(
     return { success: false, reason: 'self_referral' };
   }
 
-  // Check for existing pending referral
+  // Check for existing referral (pending, completed, or reversed)
   const existing = await db
-    .prepare("SELECT id, status, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = 'pending'")
+    .prepare('SELECT id, status, bonus_type FROM referrals WHERE referred_customer_id = ?')
     .bind(refereeId)
     .first<{ id: string; status: string; bonus_type: ReferralBonusType | null }>();
   if (existing) {
+    if (existing.status && existing.status !== 'pending') {
+      return { success: false, reason: 'already_referred' };
+    }
     if (existing.bonus_type === 'points') {
       return { success: false, reason: 'already_processed_points' };
     }
@@ -254,6 +257,32 @@ export async function rewardReferralOnFirstOrder(
       .bind(pointsToAward, referral.referral_code)
       .run();
 
+    if (policy.pointsReferee > 0) {
+      try {
+        await db
+          .prepare(
+            'UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE id = ?',
+          )
+          .bind(policy.pointsReferee, policy.pointsReferee, now, refereeId)
+          .run();
+        await db
+          .prepare(
+            'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
+          )
+          .bind(
+            genId('ptl_'),
+            refereeId,
+            policy.pointsReferee,
+            'referral_welcome',
+            `Referral welcome bonus: +${policy.pointsReferee} points`,
+            now,
+          )
+          .run();
+      } catch {
+        // Optional referee bonus credit
+      }
+    }
+
     return { success: true, referrer_id: referrer.id, referee_id: refereeId, reward_points: pointsToAward, new_balance: newPoints, new_lifetime_balance: newLifetime, referral_id: referral.id };
   }
 
@@ -306,6 +335,51 @@ export async function rewardReferralOnFirstOrder(
   );
 
   await db.batch(batch);
+
+  try {
+    await db
+      .prepare('UPDATE referral_codes SET total_cashback_earned_vnd = total_cashback_earned_vnd + ? WHERE code = ?')
+      .bind(cashbackVnd, referral.referral_code)
+      .run();
+  } catch {
+    // Optional column/table in partial schemas
+  }
+
+  if (policy.cashbackRefereeVnd > 0) {
+    try {
+      const refereeCashback = policy.cashbackRefereeVnd;
+      const refWalletId = genId('cbw_');
+      await db
+        .prepare(
+          'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
+        )
+        .bind(refWalletId, refereeId, now)
+        .run();
+      await db
+        .prepare(
+          'UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?',
+        )
+        .bind(refereeCashback, refereeCashback, now, refereeId)
+        .run();
+      await db
+        .prepare(
+          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
+           VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`,
+        )
+        .bind(
+          genId('cbt_'),
+          refWalletId,
+          refereeId,
+          refereeCashback,
+          refereeCashback,
+          `Referral welcome bonus (ref=${referral.id}): +${refereeCashback} VND`,
+          now,
+        )
+        .run();
+    } catch {
+      // Non-blocking referee bonus credit
+    }
+  }
 
   return { success: true, referrer_id: referrer.id, referee_id: refereeId, reward_vnd: cashbackVnd, referral_id: referral.id };
 }

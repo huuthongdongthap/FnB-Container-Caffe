@@ -19,7 +19,14 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
     const now = new Date();
     const validFrom = promotion.valid_from ? new Date(promotion.valid_from) : null;
-    const validTo = promotion.valid_to ? new Date(promotion.valid_to) : null;
+    const validToRaw = promotion.valid_to ?? promotion.expires_at ?? null;
+    const validTo = validToRaw ? new Date(validToRaw) : null;
+    const maxUses = promotion.max_uses ?? promotion.usage_limit ?? null;
+    const currentUses = Number(promotion.current_uses ?? promotion.used_count ?? promotion.usage_count ?? 0);
+    const minOrderValue = promotion.min_order_value ?? promotion.min_order ?? null;
+    const maxDiscountValue = promotion.max_discount_value ?? promotion.max_discount ?? null;
+    const discountType = promotion.discount_type === 'percent' ? 'percentage' : (promotion.discount_type ?? 'percentage');
+    const discountRate = Number(promotion.discount_value ?? promotion.percent ?? 0);
 
     if (validFrom && validFrom > now) {
       return c.json({ success: false, error: 'Promotion not yet valid' }, 400);
@@ -29,15 +36,15 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       return c.json({ success: false, error: 'Promotion has expired' }, 400);
     }
 
-    if (promotion.max_uses && promotion.current_uses >= promotion.max_uses) {
+    if (maxUses && currentUses >= maxUses) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 400);
     }
 
     // Check minimum order value
-    if (promotion.min_order_value && body.orderValue < promotion.min_order_value) {
+    if (minOrderValue && body.orderValue < minOrderValue) {
       return c.json({
         success: false,
-        error: `Minimum order value of ${promotion.min_order_value} VND required`,
+        error: `Minimum order value of ${minOrderValue} VND required`,
       }, 400);
     }
 
@@ -68,18 +75,18 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     const subtotal = body.items.reduce((sum: number, item: { price: number; quantity: number }) =>
       sum + item.price * item.quantity, 0);
 
-    if (promotion.discount_type === 'percentage') {
-      discount = Math.floor(subtotal * promotion.discount_value / 100);
-    } else if (promotion.discount_type === 'fixed') {
-      discount = promotion.discount_value;
-    } else if (promotion.discount_type === 'buy_x_get_y') {
+    if (discountType === 'percentage' || discountType === 'percent') {
+      discount = Math.floor(subtotal * discountRate / 100);
+    } else if (discountType === 'fixed') {
+      discount = discountRate;
+    } else if (discountType === 'buy_x_get_y') {
       // Simplified BOGO logic
       discount = 0; // Would need specific implementation
     }
 
     // Cap at max discount value
-    if (promotion.max_discount_value && discount > promotion.max_discount_value) {
-      discount = promotion.max_discount_value;
+    if (maxDiscountValue && discount > maxDiscountValue) {
+      discount = maxDiscountValue;
     }
 
     return c.json({
@@ -89,9 +96,9 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
           id: promotion.id,
           name: promotion.name,
           code: promotion.code,
-          type: promotion.type,
-          discountValue: promotion.discount_value,
-          discountType: promotion.discount_type,
+          type: promotion.type ?? discountType,
+          discountValue: discountRate,
+          discountType,
         },
         discount,
         subtotal,

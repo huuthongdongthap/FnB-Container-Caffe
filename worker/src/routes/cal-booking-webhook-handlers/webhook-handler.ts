@@ -40,28 +40,47 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
       switch (triggerEvent) {
       case 'BOOKING_CREATED': {
         const attendee = payload.attendees?.[0] || { name: '', email: '' };
-        await db.prepare(
-          `INSERT INTO bookings (cal_uid, title, start_time, end_time, attendee_name, attendee_email, status, metadata, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
-        ).bind(
-          payload.uid, payload.title, payload.startTime, payload.endTime,
-          attendee.name, attendee.email,
-          JSON.stringify(payload.metadata || {}), now, now
-        ).run();
+        try {
+          await db.prepare(
+            `INSERT INTO bookings (cal_uid, title, start_time, end_time, attendee_name, attendee_email, status, metadata, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+          ).bind(
+            payload.uid, payload.title, payload.startTime, payload.endTime,
+            attendee.name, attendee.email,
+            JSON.stringify(payload.metadata || {}), now, now
+          ).run();
+        } catch {
+          const result = await createReservationFromBooking(db, payload);
+          if ('error' in result) {
+            return c.json({ success: false, error: result.error }, 409);
+          }
+        }
         break;
       }
 
       case 'BOOKING_CANCELLED': {
-        await db.prepare(
-          'UPDATE bookings SET status = \'cancelled\', cancellation_reason = ?, updated_at = ? WHERE cal_uid = ?'
-        ).bind(payload.cancellationReason || '', now, payload.uid).run();
+        try {
+          await db.prepare(
+            'UPDATE bookings SET status = \'cancelled\', cancellation_reason = ?, updated_at = ? WHERE cal_uid = ?'
+          ).bind(payload.cancellationReason || '', now, payload.uid).run();
+        } catch {
+          await db.prepare(
+            'UPDATE reservations SET status = \'cancelled\', updated_at = ? WHERE cal_booking_uid = ?'
+          ).bind(now, payload.uid).run();
+        }
         break;
       }
 
       case 'BOOKING_RESCHEDULED': {
-        await db.prepare(
-          'UPDATE bookings SET start_time = ?, end_time = ?, status = \'rescheduled\', updated_at = ? WHERE cal_uid = ?'
-        ).bind(payload.startTime, payload.endTime, now, payload.rescheduleUid || payload.uid).run();
+        try {
+          await db.prepare(
+            'UPDATE bookings SET start_time = ?, end_time = ?, status = \'rescheduled\', updated_at = ? WHERE cal_uid = ?'
+          ).bind(payload.startTime, payload.endTime, now, payload.rescheduleUid || payload.uid).run();
+        } catch {
+          await db.prepare(
+            'UPDATE reservations SET reservation_time = ?, status = \'confirmed\', updated_at = ? WHERE cal_booking_uid = ?'
+          ).bind(payload.startTime, now, payload.rescheduleUid || payload.uid).run();
+        }
         break;
       }
 

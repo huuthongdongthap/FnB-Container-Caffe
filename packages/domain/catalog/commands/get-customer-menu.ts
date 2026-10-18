@@ -54,8 +54,19 @@ interface RawMenuRow {
   price: number | string;
   category: string;
   image_url: string | null;
-  tags: string | null;
+  tags: string | string[] | null;
   available: number | boolean;
+}
+
+function parseTags(tags: string | string[] | null | undefined): string[] {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags.map(String);
+  try {
+    const parsed = JSON.parse(tags);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getCustomerMenu(
@@ -78,7 +89,34 @@ export async function getCustomerMenu(
     }
     query += ' ORDER BY category ASC, name ASC';
 
-    const { results } = await db.prepare(query).bind(...params).all<RawMenuRow>();
+    let results: RawMenuRow[] = [];
+    let primaryErr: unknown = null;
+    try {
+      const res = await db.prepare(query).bind(...params).all<RawMenuRow>();
+      results = res.results ?? [];
+    } catch (err) {
+      primaryErr = err;
+    }
+
+    if (results.length === 0) {
+      try {
+        let prodQuery = `SELECT id, name, name_en, description, description_en, price, category_id AS category, image_url, is_available AS available, is_featured AS featured, tags, sort_order FROM products WHERE 1 = 1`;
+        const prodParams: unknown[] = [];
+        if (!includeUnavailable) {
+          prodQuery += ' AND is_available = 1';
+        }
+        if (opts.category) {
+          prodQuery += ' AND category_id = ?';
+          prodParams.push(opts.category);
+        }
+        prodQuery += ' ORDER BY category_id ASC, name ASC';
+        const prodRes = await db.prepare(prodQuery).bind(...prodParams).all<RawMenuRow>();
+        results = prodRes.results ?? [];
+        primaryErr = null;
+      } catch {
+        if (primaryErr) throw primaryErr;
+      }
+    }
 
     const hasPricingOverrides = Boolean(opts.channel || opts.now || opts.channelDeltas);
     let happyHourWindows: HappyHourWindow[] = [];
@@ -101,6 +139,8 @@ export async function getCustomerMenu(
             happyHourWindows,
             now: opts.now || new Date(),
             channelDeltas: opts.channelDeltas,
+            productId: item.id,
+            categoryId: item.category,
           })
         : basePrice;
 
@@ -111,7 +151,7 @@ export async function getCustomerMenu(
         priceCents,
         category: item.category,
         imageUrl: item.image_url,
-        tags: item.tags ? JSON.parse(item.tags) : [],
+        tags: parseTags(item.tags),
         available: toAvailabilityFlag(item.available),
       };
     });
@@ -140,10 +180,30 @@ export async function getCustomerMenuItem(
   opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenuItem | null> {
   try {
-    const { results } = await db
-      .prepare('SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?')
-      .bind(id)
-      .all<RawMenuRow>();
+    let results: RawMenuRow[] | undefined;
+    let primaryErr: unknown = null;
+    try {
+      const res = await db
+        .prepare('SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?')
+        .bind(id)
+        .all<RawMenuRow>();
+      results = res.results;
+    } catch (err) {
+      primaryErr = err;
+    }
+
+    if (!results || results.length === 0 || !results[0]) {
+      try {
+        const prodRes = await db
+          .prepare('SELECT id, name, description, price, category_id AS category, image_url, tags, is_available AS available FROM products WHERE id = ?')
+          .bind(id)
+          .all<RawMenuRow>();
+        results = prodRes.results;
+        primaryErr = null;
+      } catch {
+        if (primaryErr) throw primaryErr;
+      }
+    }
 
     if (!results || results.length === 0 || !results[0]) {
       return null;
@@ -170,6 +230,8 @@ export async function getCustomerMenuItem(
           happyHourWindows,
           now: opts.now || new Date(),
           channelDeltas: opts.channelDeltas,
+          productId: raw.id,
+          categoryId: raw.category,
         })
       : basePrice;
 
@@ -180,7 +242,7 @@ export async function getCustomerMenuItem(
       priceCents,
       category: raw.category,
       imageUrl: raw.image_url,
-      tags: raw.tags ? JSON.parse(raw.tags) : [],
+      tags: parseTags(raw.tags),
       available: toAvailabilityFlag(raw.available),
     };
   } catch (err) {

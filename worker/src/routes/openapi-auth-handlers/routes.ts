@@ -8,13 +8,13 @@ import { registerDeviceHandlers } from './device-handlers';
 export const authRoutes = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to protected routes only
-const publicPaths = ['/register', '/login', '/verify-email', '/reset-password', '/bootstrap-owner'];
+const publicPaths = ['/register', '/login', '/verify-email', '/forgot-password', '/reset-password', '/bootstrap-owner'];
 authRoutes.use('/api/auth/*', async (c, next) => {
   const path = c.req.path;
   if (publicPaths.some(p => path.endsWith(p))) {
     return next();
   }
-  return requireAuth(['owner', 'manager', 'staff', 'customer'])(c, next);
+  return requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'customer'])(c, next);
 });
 
 // Register all handler groups

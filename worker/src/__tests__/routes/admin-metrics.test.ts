@@ -2,6 +2,8 @@
  * Integration tests for GET /api/admin/metrics
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import adminMetrics from '../../routes/admin-metrics';
+import { createMockEnv } from '../test-utils';
 
 // We test the admin-metrics route handlers directly (unit-style with mocked DB)
 // since full Hono integration tests require miniflare.
@@ -65,5 +67,14 @@ describe('admin-metrics route', () => {
     const values = [100000, 200000, 300000];
     const sum = values.reduce((a, b) => a + b, 0);
     expect(sum).toBe(600000);
+  });
+
+  it('rejects invalid range parameter on real adminMetrics router with 400', async() => {
+    const env = createMockEnv({ AURA_DB: mockDb });
+    const res = await adminMetrics.fetch(
+      new Request('https://test.aura/?range=invalid'),
+      env
+    );
+    expect(res.status).toBe(400);
   });
 });

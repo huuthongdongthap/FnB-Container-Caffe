@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
 import { verifySignature } from '../webhooks-handlers/helpers';
+import { publishOrderEvent } from '@aura/domain-order';
 
 export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/payments/webhook/payos - PayOS webhook
@@ -89,6 +90,7 @@ export function registerPaymentWebhookHandlers(router: OpenAPIHono<{ Bindings: E
       if (c.env?.AUTH_KV) {
         await c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {});
         await c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {});
+        await publishOrderEvent(c.env.AUTH_KV, payment.order_id, 'paid').catch(() => {});
       }
     }
 

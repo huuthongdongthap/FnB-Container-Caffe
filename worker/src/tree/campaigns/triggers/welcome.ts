@@ -27,7 +27,22 @@ export async function detectWelcomeCandidates(
     log.info('welcome_candidates', { count: results.length });
     return results;
   } catch (err) {
-    log.error('detectWelcomeCandidates error', { error: (err as Error).message });
-    return [];
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { results } = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at
+        FROM customers c
+        WHERE c.created_at > ?
+          AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_logs cl
+            WHERE cl.customer_id = c.id AND cl.trigger_type = 'welcome'
+          )
+      `).bind(cutoff).all<CampaignCustomer>();
+      return results;
+    } catch {
+      log.error('detectWelcomeCandidates error', { error: (err as Error).message });
+      return [];
+    }
   }
 }

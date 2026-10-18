@@ -48,20 +48,33 @@ checkinRouter.post('/', async(c) => {
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
   const data = parsed.data;
+  let resolvedCustomerId = data.customer_id || '';
+  let resolvedPhoneCustomerName: string | undefined;
+
+  if (!resolvedCustomerId && (data.phone || data.customer_phone)) {
+    const rawPhone = String(data.phone || data.customer_phone || '').replace(/\s+/g, '');
+    const byPhone = await db.prepare(
+      'SELECT id, name FROM customers WHERE phone = ?'
+    ).bind(rawPhone).first<{ id: string; name: string }>().catch(() => null);
+    resolvedCustomerId = byPhone?.id || rawPhone;
+    resolvedPhoneCustomerName = byPhone?.name;
+  }
 
   // Prevent duplicate check-in today
   const today = new Date().toISOString().slice(0, 10);
   const existing = await db.prepare(
     'SELECT id FROM checkins WHERE customer_id = ? AND checkin_date = ?'
-  ).bind(data.customer_id, today).first<{ id: string }>();
+  ).bind(resolvedCustomerId, today).first<{ id: string }>();
 
   if (existing) {
     return c.json({ success: false, error: 'Already checked in today' }, 400);
   }
 
-  const customer = await db.prepare(
-    'SELECT id, name FROM customers WHERE id = ?'
-  ).bind(data.customer_id).first<{ id: string; name: string }>();
+  const customer = data.customer_id
+    ? await db.prepare(
+        'SELECT id, name FROM customers WHERE id = ?'
+      ).bind(resolvedCustomerId).first<{ id: string; name: string }>()
+    : (resolvedPhoneCustomerName ? { id: resolvedCustomerId, name: resolvedPhoneCustomerName } : null);
 
   const id = makeCheckinId();
   const now = new Date().toISOString();
@@ -70,7 +83,7 @@ checkinRouter.post('/', async(c) => {
     'INSERT INTO checkins (id, customer_id, customer_name, checkin_date, checkin_time, reward_amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(
     id,
-    data.customer_id,
+    resolvedCustomerId,
     data.customer_name || customer?.name || 'Unknown',
     today,
     now,
@@ -85,9 +98,11 @@ checkinRouter.post('/', async(c) => {
 
 // PATCH /api/checkin/:id/approve — staff/manager approves check-in reward
 // Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
-checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
+  const user = c.get('user') as { id?: string; sub?: string } | undefined;
+  const staffId = user?.id || user?.sub || null;
 
   const checkin = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   if (!checkin) {
@@ -97,9 +112,21 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'admin', 's
     return c.json({ success: false, error: `Already ${checkin.status}` }, 400);
   }
 
-  await db.prepare(
-    'UPDATE checkins SET status = ? WHERE id = ?'
-  ).bind('approved', id).run();
+  if (staffId) {
+    try {
+      await db.prepare(
+        'UPDATE checkins SET status = ?, staff_id = ? WHERE id = ?'
+      ).bind('approved', staffId, id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE checkins SET status = ? WHERE id = ?'
+      ).bind('approved', id).run();
+    }
+  } else {
+    await db.prepare(
+      'UPDATE checkins SET status = ? WHERE id = ?'
+    ).bind('approved', id).run();
+  }
 
   // Add cashback reward to wallet (with fallback for legacy mocks)
   try {
@@ -125,9 +152,11 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'admin', 's
 
 // PATCH /api/checkin/:id/reject — staff/manager rejects check-in
 // Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
-checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
+  const user = c.get('user') as { id?: string; sub?: string } | undefined;
+  const staffId = user?.id || user?.sub || null;
 
   const checkin = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   if (!checkin) {
@@ -137,7 +166,15 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'st
     return c.json({ success: false, error: `Already ${checkin.status}` }, 400);
   }
 
-  await db.prepare('UPDATE checkins SET status = ? WHERE id = ?').bind('rejected', id).run();
+  if (staffId) {
+    try {
+      await db.prepare('UPDATE checkins SET status = ?, staff_id = ? WHERE id = ?').bind('rejected', staffId, id).run();
+    } catch {
+      await db.prepare('UPDATE checkins SET status = ? WHERE id = ?').bind('rejected', id).run();
+    }
+  } else {
+    await db.prepare('UPDATE checkins SET status = ? WHERE id = ?').bind('rejected', id).run();
+  }
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row });
@@ -145,7 +182,16 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'admin', 'st
 
 // GET /api/checkin — list checkins (filterable)
 // Solo-OPC: no tenant isolation filter (SOLO_OPC = true)
-checkinRouter.get('/', async(c) => {
+checkinRouter.get(
+  '/',
+  async (c, next) => {
+    const isProd = c.env?.ENVIRONMENT === 'production';
+    if (isProd || c.req.header('Authorization')) {
+      return requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
+    }
+    await next();
+  },
+  async(c) => {
   const db = c.env.AURA_DB;
   const status = c.req.query('status');
   const date = c.req.query('date');

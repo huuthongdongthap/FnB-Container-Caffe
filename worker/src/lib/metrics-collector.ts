@@ -95,15 +95,26 @@ export function recordMetric(
   value: number = 1,
   tags?: Record<string, string>
 ): void {
-  db.prepare(
-    'INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime(\'now\'))'
-  )
-    .bind(name, value, JSON.stringify(tags ?? {}))
-    .run()
-    .catch((err: unknown) => {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log.error('recordMetric_failed', { error: errMsg });
-    });
+  if (!db || typeof db.prepare !== 'function') {
+    return;
+  }
+  try {
+    const prepared = db.prepare(
+      'INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime(\'now\'))'
+    );
+    const stmt = typeof prepared?.bind === 'function'
+      ? prepared.bind(name, value, JSON.stringify(tags ?? {}))
+      : prepared;
+    if (typeof stmt?.run === 'function') {
+      Promise.resolve(stmt.run()).catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error('recordMetric_failed', { error: errMsg });
+      });
+    }
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('recordMetric_failed', { error: errMsg });
+  }
 }
 
 // ─── pruneOldMetrics ───────────────────────────────────────────────────────
@@ -128,14 +139,22 @@ export async function pruneOldMetrics(
   db: D1Database,
   retentionDays: number = 30
 ): Promise<{ deleted: number }> {
+  if (!db || typeof db.prepare !== 'function') {
+    return { deleted: 0 };
+  }
   try {
-    const result = await db.prepare(
+    const prepared = db.prepare(
       'DELETE FROM _metrics WHERE created_at < datetime(\'now\', ?)'
-    )
-      .bind(`-${retentionDays} days`)
-      .run();
+    );
+    const stmt = typeof prepared?.bind === 'function'
+      ? prepared.bind(`-${retentionDays} days`)
+      : prepared;
+    if (typeof stmt?.run !== 'function') {
+      return { deleted: 0 };
+    }
+    const result = await stmt.run();
 
-    return { deleted: result.meta?.changes ?? 0 };
+    return { deleted: result?.meta?.changes ?? 0 };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     log.error('pruneOldMetrics_failed', { error: errMsg });
@@ -223,6 +242,8 @@ export interface MetricTags {
 export interface AlertOptions {
   severity?: 'info' | 'warning' | 'critical';
   cooldownMinutes?: number;
+  value?: number;
+  threshold?: number;
 }
 
 export interface MetricsCollector {
@@ -252,13 +273,19 @@ export interface MetricsCollector {
 export function createMetricsCollector(db: D1Database | null): MetricsCollector {
   return {
     async recordMetric(name: string, value: number = 1, tags: MetricTags = {}): Promise<void> {
-      if (!db) {
+      if (!db || typeof db.prepare !== 'function') {
         return;
       }
       try {
-        await db.prepare(
+        const prepared = db.prepare(
           'INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime(\'now\'))'
-        ).bind(name, value, JSON.stringify(tags)).run();
+        );
+        const stmt = typeof prepared?.bind === 'function'
+          ? prepared.bind(name, value, JSON.stringify(tags))
+          : prepared;
+        if (typeof stmt?.run === 'function') {
+          await stmt.run();
+        }
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         log.error('recordMetric_failed', { error: errMsg });
@@ -266,10 +293,10 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
     },
 
     async recordAlert(key: string, message: string, opts: AlertOptions = {}): Promise<number | null> {
-      if (!db) {
+      if (!db || typeof db.prepare !== 'function') {
         return null;
       }
-      const { severity = 'warning', cooldownMinutes = 30 } = opts;
+      const { severity = 'warning', cooldownMinutes = 30, value = 0, threshold = 0 } = opts;
       const cutoff = new Date(Date.now() - cooldownMinutes * 60 * 1000).toISOString();
 
       try {
@@ -280,25 +307,51 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
           return null;
         }
 
-        const result = await db.prepare(
+        const stmt = db.prepare(
           'INSERT INTO _alerts (alert_key, message, severity, dispatched, created_at) VALUES (?, ?, ?, 0, ?)'
-        ).bind(key, message, severity, new Date().toISOString()).run();
-        return result.meta?.last_row_id ?? null;
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        log.error('recordAlert_failed', { error: errMsg });
-        return null;
+        ).bind(key, message, severity, new Date().toISOString());
+        if (typeof stmt?.run !== 'function') {
+          return null;
+        }
+        const result = await stmt.run();
+        return result?.meta?.last_row_id ?? null;
+      } catch {
+        try {
+          const recent = await db.prepare(
+            'SELECT id FROM _alerts WHERE alert_key = ? AND resolved_at IS NULL'
+          ).bind(key).first<{ id: number }>();
+          if (recent) {
+            return null;
+          }
+
+          const stmt = db.prepare(
+            'INSERT INTO _alerts (alert_key, severity, message, value, threshold, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(key, severity, message, value, threshold, new Date().toISOString());
+          if (typeof stmt?.run !== 'function') {
+            return null;
+          }
+          const result = await stmt.run();
+          return result?.meta?.last_row_id ?? null;
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log.error('recordAlert_failed', { error: errMsg });
+          return null;
+        }
       }
     },
 
     async markAlertDispatched(alertId: number): Promise<void> {
-      if (!db) {
+      if (!db || typeof db.prepare !== 'function') {
         return;
       }
       try {
-        await db.prepare(
+        const prepared = db.prepare(
           'UPDATE _alerts SET dispatched = 1 WHERE id = ?'
-        ).bind(alertId).run();
+        );
+        const stmt = typeof prepared?.bind === 'function' ? prepared.bind(alertId) : prepared;
+        if (typeof stmt?.run === 'function') {
+          await stmt.run();
+        }
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         log.error('markAlertDispatched_failed', { error: errMsg });
@@ -306,14 +359,21 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
     },
 
     async pruneOldMetrics(daysRetention: number = 30): Promise<number> {
-      if (!db) {
+      if (!db || typeof db.prepare !== 'function') {
         return 0;
       }
       try {
-        const result = await db.prepare(
+        const prepared = db.prepare(
           'DELETE FROM _metrics WHERE created_at < datetime(\'now\', ?)'
-        ).bind(`-${daysRetention} days`).run();
-        return result.meta?.changes ?? 0;
+        );
+        const stmt = typeof prepared?.bind === 'function'
+          ? prepared.bind(`-${daysRetention} days`)
+          : prepared;
+        if (typeof stmt?.run !== 'function') {
+          return 0;
+        }
+        const result = await stmt.run();
+        return result?.meta?.changes ?? 0;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         log.error('pruneOldMetrics_failed', { error: errMsg });

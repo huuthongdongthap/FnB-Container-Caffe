@@ -57,6 +57,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
     table: ['read', 'update'],
     order: ['read', 'create', 'update'],
     reservation: ['read', 'create', 'update'],
+    payment: ['read', 'create'],
   },
   kitchen: {
     catalog: ['read'],
@@ -233,6 +234,7 @@ export function authorizeAction(
     if (resource.type === 'table' && ['read', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'order' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'reservation' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
+    if (resource.type === 'payment' && ['read', 'create'].includes(action)) return { allowed: true };
     if (resource.type === 'catalog' && action === 'read') return { allowed: true };
 
     return {

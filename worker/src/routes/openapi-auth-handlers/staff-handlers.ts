@@ -11,7 +11,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    if (user.role !== 'owner') {
+    if (user.role !== 'owner' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Only owners can register staff' }, 403);
     }
 
@@ -31,10 +31,20 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       body.role, body.locale || 'vi', 'bronze', 0, true, null, now, now
     ).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
+    }
 
     const staff = await db.prepare(
       'SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at FROM users WHERE id = ?'
@@ -60,7 +70,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive } = query;
 
-    if (user.role !== 'owner') {
+    if (user.role !== 'owner' && user.role !== 'admin' && user.role !== 'manager') {
       return c.json({ success: false, error: 'Only owners can list staff' }, 403);
     }
 
@@ -145,10 +155,20 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(sessionId, id, accessToken, refreshToken, expiresAt, true, null, 'Bootstrap Device', now, now).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
+    }
 
     const owner = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
 

@@ -105,13 +105,28 @@ signageRouter.get('/menu', async(c) => {
 signageRouter.get('/promos', async(c) => {
   const db = c.env.AURA_DB;
   try {
-    const { results } = await db.prepare(
-      `SELECT code, percent, max_discount, min_order, expires_at
-       FROM promotions
-       WHERE is_active = 1
-         AND (starts_at IS NULL OR starts_at <= datetime('now'))
-         AND (expires_at IS NULL OR expires_at >= datetime('now'))`
-    ).all<SignagePromo>();
+    let results: SignagePromo[] | undefined;
+    try {
+      const res = await db.prepare(
+        `SELECT code, percent, max_discount, min_order, expires_at
+         FROM promotions
+         WHERE is_active = 1
+           AND (starts_at IS NULL OR starts_at <= datetime('now'))
+           AND (expires_at IS NULL OR expires_at >= datetime('now'))`
+      ).all<SignagePromo>();
+      results = res.results;
+    } catch {
+      const now = new Date().toISOString();
+      const res = await db.prepare(
+        `SELECT code, value AS percent, max_discount, min_order, end_date AS expires_at
+         FROM promotions
+         WHERE is_active = 1
+           AND (start_date IS NULL OR datetime(start_date) <= datetime(?))
+           AND (end_date IS NULL OR datetime(end_date) > datetime(?))
+         ORDER BY value DESC`
+      ).bind(now, now).all<SignagePromo>();
+      results = res.results;
+    }
 
     c.header('Cache-Control', 'public, max-age=300');
     return c.json({ success: true, data: results || [] });

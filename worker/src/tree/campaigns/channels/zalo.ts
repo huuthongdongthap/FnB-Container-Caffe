@@ -46,11 +46,11 @@ export async function sendCampaignZalo(
 
 function mapTriggerToZaloTemplate(trigger: string): string {
   const map: Record<string, string> = {
-    welcome: 'welcome_new',
+    welcome: 'welcome_signup',
     birthday: 'birthday_promotion',
     winback: 'winback_offer',
     post_visit: 'post_visit_review',
-    cashback_expiry: 'cashback_expiring'
+    cashback_expiry: 'cashback_expiry_warning'
   };
   return map[trigger] || 'general_promotion';
 }

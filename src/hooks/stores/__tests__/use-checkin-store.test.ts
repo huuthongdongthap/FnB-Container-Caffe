@@ -71,7 +71,7 @@ describe('useCheckinStore', () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith('/api/loyalty/checkin', {
       method: 'POST',
-      body: JSON.stringify({ phone: '0912345678' }),
+      body: JSON.stringify({ phone: '0912345678', customer_id: '0912345678' }),
     });
   });
 

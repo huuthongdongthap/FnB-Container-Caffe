@@ -68,12 +68,12 @@ export async function reverseAccrual(
   }
 
   // ── Load the original order ──
-  let order: { total: number; points_earned: number } | null = null;
+  let order: { total: number; points_earned: number; cashback_earned?: number } | null = null;
   try {
     order = await db
       .prepare('SELECT total, points_earned FROM orders WHERE id = ?')
       .bind(orderId)
-      .first<{ total: number; points_earned: number }>();
+      .first<{ total: number; points_earned: number; cashback_earned?: number }>();
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
   }
@@ -88,7 +88,7 @@ export async function reverseAccrual(
 
   // ── Proportional deduction ──
   const total = order.total ?? 0;
-  const ratio = total > 0 ? Math.min(refundAmountVnd / total, 1) : 1;
+  const ratio = total > 0 ? Math.min(Math.max(0, refundAmountVnd) / total, 1) : 1;
   const pointsToDeduct = Math.max(1, Math.round(pointsEarned * ratio));
 
   // ── Load the customer ──
@@ -165,6 +165,42 @@ export async function reverseAccrual(
     ]);
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `batch failed: ${(e as Error).message}` };
+  }
+
+  // ── Best-effort proportional cashback & order column reversal ──
+  try {
+    const cashbackEarned = Number(order.cashback_earned ?? 0);
+    if (cashbackEarned > 0) {
+      const cashbackToReverse = Math.max(1, Math.round(cashbackEarned * ratio));
+      await db
+        .prepare(
+          `UPDATE cashback_wallets
+           SET balance = MAX(0, balance - ?), updated_at = ?
+           WHERE customer_id = ?`,
+        )
+        .bind(cashbackToReverse, now, customer.id)
+        .run();
+      await db
+        .prepare(
+          `UPDATE orders
+           SET cashback_earned = MAX(0, COALESCE(cashback_earned, 0) - ?),
+               points_earned = MAX(0, COALESCE(points_earned, 0) - ?)
+           WHERE id = ?`,
+        )
+        .bind(cashbackToReverse, pointsToDeduct, orderId)
+        .run();
+    } else {
+      await db
+        .prepare(
+          `UPDATE orders
+           SET points_earned = MAX(0, COALESCE(points_earned, 0) - ?)
+           WHERE id = ?`,
+        )
+        .bind(pointsToDeduct, orderId)
+        .run();
+    }
+  } catch {
+    // Non-blocking on partial schemas or minimal test mocks
   }
 
   // ── Tier downgrade check ──

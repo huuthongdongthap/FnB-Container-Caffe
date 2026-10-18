@@ -17,7 +17,12 @@ export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
 
   let vendorId: string | null = null;
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const payload = await verifyJWT(authHeader.substring(7), c.env.JWT_SECRET) as JwtPayload | null;
+    const token = authHeader.substring(7);
+    const revoked = typeof c.env.AUTH_KV?.get === 'function' ? await c.env.AUTH_KV.get(`revoked:${token}`) : null;
+    if (revoked) {
+      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
+    }
+    const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
     if (payload && ['vendor', 'customer'].includes(payload.role || '')) {
       vendorId = payload.customerId || payload.sub || payload.id || null;
     }
@@ -208,11 +213,30 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
   }
 
-  const customerId = body.customer_id as string | undefined;
-  if (customerId) {
-    const customer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(customerId).first<{ id: string }>();
+  const explicitCustomerId = body.customer_id as string | undefined;
+  let customerId: string | undefined = explicitCustomerId;
+  if (explicitCustomerId) {
+    const customer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(explicitCustomerId).first<{ id: string }>();
     if (!customer) {
       return c.json({ success: false, error: 'Customer not found' }, 400);
+    }
+  } else {
+    const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string } | undefined }).get?.('user');
+    if (ctxUser?.customerId || ctxUser?.id || ctxUser?.sub) {
+      customerId = ctxUser.customerId || ctxUser.id || ctxUser.sub;
+    } else {
+      const authHeader = c.req.header('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const revoked = typeof c.env.AUTH_KV?.get === 'function' ? await c.env.AUTH_KV.get(`revoked:${token}`) : null;
+        if (revoked) {
+          return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
+        }
+        const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
+        if (payload) {
+          customerId = payload.customerId || payload.id || payload.sub || undefined;
+        }
+      }
     }
   }
 
@@ -305,8 +329,27 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
+  let callerUserId: string | null = null;
   if (adminErr) {
-    return adminErr;
+    const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string } | undefined }).get?.('user');
+    if (ctxUser?.customerId || ctxUser?.id || ctxUser?.sub) {
+      callerUserId = ctxUser.customerId || ctxUser.id || ctxUser.sub || null;
+    } else {
+      const authHeader = c.req.header('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const revoked = typeof c.env.AUTH_KV?.get === 'function' ? await c.env.AUTH_KV.get(`revoked:${token}`) : null;
+        if (!revoked) {
+          const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
+          if (payload) {
+            callerUserId = payload.customerId || payload.id || payload.sub || null;
+          }
+        }
+      }
+    }
+    if (!callerUserId) {
+      return adminErr;
+    }
   }
 
   const db = c.env.AURA_DB;
@@ -318,6 +361,9 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!sub) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
+  if (adminErr && (!sub.customer_id || sub.customer_id !== callerUserId)) {
+    return adminErr;
   }
   if (sub.status === 'cancelled') {
     return c.json({ success: false, error: 'Already cancelled' }, 400);
@@ -346,9 +392,15 @@ export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
 
-  await db.prepare(
-    'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
-  ).bind(nowStr(), id).run();
+  try {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ?'
+    ).bind(nowStr(), nowStr(), id).run();
+  } catch {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
+    ).bind(nowStr(), id).run();
+  }
 
   await updateMRRSnapshot(db);
   return c.json({ success: true, message: 'Subscription paused' });
@@ -407,3 +459,24 @@ export async function deleteSubscription(c: Context<{ Bindings: Env }>) {
 
   return c.json({ success: true, message: 'Subscription deleted' });
 }
+
+export async function deletePlan(c: Context<{ Bindings: Env }>) {
+  const adminErr = await requireAdmin(c);
+  if (adminErr) {
+    return adminErr;
+  }
+
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
+
+  const existing = await db.prepare('SELECT id FROM subscription_plans WHERE id = ?').bind(id).first<{ id: string }>();
+  if (!existing) {
+    return c.json({ success: false, error: 'Plan not found' }, 404);
+  }
+
+  await db.prepare('DELETE FROM subscription_plans WHERE id = ?').bind(id).run();
+  return c.json({ success: true, message: 'Plan deleted' });
+}
+
+export const createSubscriptionHandler = createSubscription;
+export const cancelSubscriptionHandler = cancelSubscription;

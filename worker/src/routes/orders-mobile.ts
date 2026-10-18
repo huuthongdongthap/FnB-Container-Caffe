@@ -1,5 +1,6 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
@@ -186,6 +187,7 @@ export async function createOrderMobile(
       await Promise.all([
         context.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
         context.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+        publishOrderEvent(context.env.AUTH_KV, id, 'pending').catch(() => {}),
       ]);
     }
 

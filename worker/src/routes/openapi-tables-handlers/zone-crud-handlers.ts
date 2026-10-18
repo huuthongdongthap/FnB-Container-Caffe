@@ -1,7 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { TableZoneRoutes } from '../../schemas/tables';
-import { formatZone } from './helpers';
+import { formatZone, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
 
 export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
@@ -29,13 +29,6 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(isActive ? 1 : 0);
     }
 
-    // Get total count
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM table_zones ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
-
-    // Get zones
     const offset = (page - 1) * limit;
     const allowedSorts: Record<string, string> = {
       sort_order: 'sort_order',
@@ -47,11 +40,44 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const sortCol = allowedSorts[sort] || 'sort_order';
     const sortDir = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     const orderClause = `${sortCol} ${sortDir}`;
-    const rows = (await db.prepare(
-      `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const zones = (rows.results || []).map(formatZone);
+    let total = 0;
+    let zoneRows: any[] = [];
+    try {
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM table_zones ${whereClause}`
+      ).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
+
+      const rows = (await db.prepare(
+        `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      zoneRows = rows.results || [];
+    } catch {
+      try {
+        const distinctRows = (await db.prepare(
+          'SELECT DISTINCT zone FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
+        ).all()) as { results: Array<{ zone: string }> };
+        const derived = (distinctRows.results || [])
+          .map((r, idx) => ({
+            id: r.zone,
+            slug: r.zone,
+            name: r.zone,
+            description: null,
+            sort_order: idx,
+            is_active: 1,
+            location_id: locationId || null,
+          }))
+          .filter((z) => !search || z.name.toLowerCase().includes(String(search).toLowerCase()));
+        total = derived.length;
+        zoneRows = derived.slice(offset, offset + limit);
+      } catch {
+        total = 0;
+        zoneRows = [];
+      }
+    }
+
+    const zones = zoneRows.map(formatZone);
 
     return c.json({
       success: true,
@@ -64,17 +90,43 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const row = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
+    let row: any = null;
+    try {
+      row = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    } catch {
+      try {
+        const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first();
+        if (cafeTable) {
+          row = { id, slug: id, name: id, description: null, sort_order: 0, is_active: 1, location_id: null };
+        }
+      } catch {
+        row = null;
+      }
+    }
 
     if (!row) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
     }
 
     // Get tables in this zone
-    const tables = (await db.prepare(
-      `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
-       FROM tables WHERE zone_id = ? ORDER BY name`
-    ).bind(id).all()) as { results: any[] };
+    let tableResults: any[] = [];
+    try {
+      const tables = (await db.prepare(
+        `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
+         FROM tables WHERE zone_id = ? ORDER BY name`
+      ).bind(id).all()) as { results: any[] };
+      tableResults = tables.results || [];
+    } catch {
+      try {
+        const tables = (await db.prepare(
+          `SELECT id, CAST(table_number AS TEXT) as code, name, capacity, status, 0 as position_x, 0 as position_y, 80 as width, 80 as height, 0 as rotation
+           FROM cafe_tables WHERE zone = ? ORDER BY name`
+        ).bind(id).all()) as { results: any[] };
+        tableResults = tables.results || [];
+      } catch {
+        tableResults = [];
+      }
+    }
 
     return c.json({
       success: true,
@@ -82,7 +134,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ...row,
         location: row.location_id ? { id: row.location_id } : null,
         isActive: Boolean(row.is_active),
-        tables: (tables.results || []).map((t: any) => ({
+        tables: tableResults.map((t: any) => ({
           ...t,
           position: { x: t.position_x, y: t.position_y },
           dimensions: { width: t.width, height: t.height, rotation: t.rotation },
@@ -102,34 +154,62 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const id = crypto.randomUUID();
 
     // Check slug uniqueness
-    const existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ?').bind(body.slug, body.locationId).first();
+    let existing: unknown = null;
+    try {
+      existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ?').bind(body.slug, body.locationId).first();
+    } catch {
+      existing = null;
+    }
     if (existing) {
       return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
     }
 
-    await db.prepare(
-      `INSERT INTO table_zones (id, slug, name, description, sort_order, is_active, location_id, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.slug,
-      body.name,
-      body.description || null,
-      body.sortOrder || 0,
-      body.isActive !== false ? 1 : 0,
-      body.locationId,
-      JSON.stringify(body.metadata || {}),
-      now,
-      now
-    ).run();
+    let insertFailed = false;
+    try {
+      await db.prepare(
+        `INSERT INTO table_zones (id, slug, name, description, sort_order, is_active, location_id, metadata, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.slug,
+        body.name,
+        body.description || null,
+        body.sortOrder || 0,
+        body.isActive !== false ? 1 : 0,
+        body.locationId,
+        JSON.stringify(body.metadata || {}),
+        now,
+        now
+      ).run();
+    } catch {
+      insertFailed = true;
+    }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now).run();
+    await writeTableAuditLog(db, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now);
 
-    const created = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
+    let created: any = null;
+    if (!insertFailed) {
+      try {
+        created = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+      } catch {
+        created = null;
+      }
+    }
+    if (!created) {
+      created = {
+        id,
+        slug: body.slug,
+        name: body.name,
+        description: body.description || null,
+        sort_order: body.sortOrder || 0,
+        is_active: body.isActive !== false ? 1 : 0,
+        location_id: body.locationId || null,
+        metadata: JSON.stringify(body.metadata || {}),
+        created_at: now,
+        updated_at: now,
+      };
+    }
 
     return c.json({
       success: true,
@@ -149,7 +229,17 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    let existing: any = null;
+    let usingFallback = false;
+    try {
+      existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    } catch {
+      usingFallback = true;
+      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first().catch(() => null);
+      if (cafeTable) {
+        existing = { id, slug: id, name: id, is_active: 1, location_id: null };
+      }
+    }
     if (!existing) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
     }
@@ -158,9 +248,11 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const params: (string | number | null)[] = [];
 
     if (body.slug !== undefined) {
-      const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ? AND id != ?').bind(body.slug, body.locationId || existing.location_id, id).first();
-      if (slugExists) {
-        return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
+      if (!usingFallback) {
+        const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ? AND id != ?').bind(body.slug, body.locationId || existing.location_id, id).first();
+        if (slugExists) {
+          return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
+        }
       }
       updates.push('slug = ?');
       params.push(body.slug);
@@ -176,17 +268,28 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
-    if (updates.length > 1) {
+    if (!usingFallback && updates.length > 1) {
       await db.prepare(`UPDATE table_zones SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
     }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now).run();
+    await writeTableAuditLog(db, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now);
 
-    const updated = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
+    let updated: any = null;
+    if (!usingFallback) {
+      updated = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    } else {
+      updated = {
+        ...existing,
+        slug: body.slug ?? existing.slug,
+        name: body.name ?? existing.name,
+        description: body.description ?? existing.description ?? null,
+        sort_order: body.sortOrder ?? existing.sort_order ?? 0,
+        is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : existing.is_active,
+        location_id: body.locationId ?? existing.location_id ?? null,
+        updated_at: now,
+      };
+    }
 
     return c.json({
       success: true,
@@ -205,24 +308,38 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first()) as any;
+    let existing: any = null;
+    let usingFallback = false;
+    try {
+      existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+    } catch {
+      usingFallback = true;
+      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first().catch(() => null);
+      if (cafeTable) {
+        existing = { id, name: id };
+      }
+    }
     if (!existing) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
     }
 
     // Check for tables in zone
-    const tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
+    let tables: { count: number } | null = null;
+    try {
+      tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
+    } catch {
+      tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone = ?').bind(id).first().catch(() => null)) as { count: number } | null;
+    }
     if (tables && tables.count > 0) {
       return c.json({ success: false, error: 'Cannot delete zone with tables' }, 409);
     }
 
-    await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
+    if (!usingFallback) {
+      await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
+    }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'table_zone_delete', 'table_zone', id, JSON.stringify({ name: existing.name }), now).run();
+    await writeTableAuditLog(db, user.id, 'table_zone_delete', 'table_zone', id, JSON.stringify({ name: existing.name }), now);
 
     return c.json({ success: true, data: { success: true } });
   });

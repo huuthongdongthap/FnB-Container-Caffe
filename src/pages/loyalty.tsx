@@ -3,6 +3,7 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { apiFetch } from '@/lib/api-client';
 import {
   StitchLoyaltyNew,
   type LoyaltyDashboardData,
@@ -33,7 +34,6 @@ export function LoyaltyPage({
   const { t } = useTranslation();
   const store = useLoyaltyStore();
   const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => (s as { token?: string | null }).token);
   const isAuthenticated = !!user;
 
   useEffect(() => {
@@ -142,16 +142,17 @@ export function LoyaltyPage({
   });
 
   const handleCheckIn = async () => {
+    if (!user?.id && !(user as { phone?: string } | null)?.phone) {
+      return;
+    }
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const activeToken = token ?? (useAuthStore.getState() as { token?: string | null }).token;
-      if (activeToken) {
-        headers.Authorization = `Bearer ${activeToken}`;
-      }
-      await fetch('/api/checkin', {
+      await apiFetch('/api/checkin', {
         method: 'POST',
-        credentials: 'include',
-        headers,
+        body: JSON.stringify({
+          ...(user?.id ? { customer_id: user.id } : {}),
+          ...((user as { phone?: string } | null)?.phone ? { phone: (user as { phone?: string }).phone } : {}),
+          customer_name: user?.name || undefined,
+        }),
       });
     } catch {
       // Non-fatal: refresh loyalty state afterward

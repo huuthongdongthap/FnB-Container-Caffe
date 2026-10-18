@@ -50,17 +50,18 @@ export function useNotificationSubscriptions() {
     role: StaffSubscription['role'],
   ): Promise<boolean> => {
     try {
+      const trimmedName = name.trim();
       const resp = await apiFetch<{ success: boolean; message?: string }>(
         '/api/push/subscribe',
         {
           method: 'POST',
-          body: JSON.stringify({ name: name.trim(), role }),
+          body: JSON.stringify({ name: trimmedName, role }),
         },
       );
       if (resp.success) {
         setSubscriptions((prev) => [
-          ...prev,
-          { name: name.trim(), role, endpoint: '', subscribed: true },
+          ...prev.filter((s) => s.name !== trimmedName),
+          { name: trimmedName, role, endpoint: '', subscribed: true },
         ]);
         return true;
       }

@@ -3,6 +3,52 @@ import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
 import { getDatabase } from '../../lib/db';
 
+async function writePromotionAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, 'promotion', entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, 'promotion', entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
+
+function mapPromotionRow(p: any) {
+  const rawDiscountType = p.discount_type === 'percent' ? 'percentage' : (p.discount_type ?? 'percentage');
+  const discountValue = Number(p.discount_value ?? p.percent ?? 0);
+  return {
+    ...p,
+    type: p.type ?? rawDiscountType,
+    discountValue,
+    discountType: rawDiscountType,
+    maxUses: p.max_uses ?? p.usage_limit ?? null,
+    currentUses: p.current_uses ?? p.used_count ?? p.usage_count ?? 0,
+    minOrderValue: p.min_order_value ?? p.min_order ?? null,
+    maxDiscountValue: p.max_discount_value ?? p.max_discount ?? null,
+    validFrom: p.valid_from ?? null,
+    validTo: p.valid_to ?? p.expires_at ?? null,
+    isActive: p.is_active,
+    applicableItems: p.applicable_items ? JSON.parse(p.applicable_items) : null,
+    excludedItems: p.excluded_items ? JSON.parse(p.excluded_items) : null,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at ?? p.created_at,
+  };
+}
+
 export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions - List promotions
   app.openapi(PromotionRoutes.list as any, async (c: any) => {
@@ -32,32 +78,31 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(searchParam, searchParam, searchParam);
     }
 
-    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
+    let total = 0;
+    let promotionResults: any[] = [];
+    try {
+      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
 
-    const promotions = (await db.prepare(
-      `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
+      const promotions = (await db.prepare(
+        `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      promotionResults = promotions.results || [];
+    } catch {
+      const canonicalWhere = whereClause.replace('AND type = ?', 'AND discount_type = ?');
+      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
+      total = countResult?.total || 0;
+
+      const promotions = (await db.prepare(
+        `SELECT * FROM promotions ${canonicalWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
+      promotionResults = promotions.results || [];
+    }
 
     return c.json({
       success: true,
       data: {
-        promotions: (promotions.results || []).map((p: any) => ({
-          ...p,
-          discountValue: p.discount_value,
-          discountType: p.discount_type,
-          maxUses: p.max_uses,
-          currentUses: p.current_uses,
-          minOrderValue: p.min_order_value,
-          maxDiscountValue: p.max_discount_value,
-          validFrom: p.valid_from,
-          validTo: p.valid_to,
-          isActive: p.is_active,
-          applicableItems: p.applicable_items ? JSON.parse(p.applicable_items) : null,
-          excludedItems: p.excluded_items ? JSON.parse(p.excluded_items) : null,
-          createdAt: p.created_at,
-          updatedAt: p.updated_at,
-        })),
+        promotions: promotionResults.map(mapPromotionRow),
         meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
       },
     });
@@ -76,22 +121,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     return c.json({
       success: true,
-      data: {
-        ...promotion,
-        discountValue: promotion.discount_value,
-        discountType: promotion.discount_type,
-        maxUses: promotion.max_uses,
-        currentUses: promotion.current_uses,
-        minOrderValue: promotion.min_order_value,
-        maxDiscountValue: promotion.max_discount_value,
-        validFrom: promotion.valid_from,
-        validTo: promotion.valid_to,
-        isActive: promotion.is_active,
-        applicableItems: promotion.applicable_items ? JSON.parse(promotion.applicable_items) : null,
-        excludedItems: promotion.excluded_items ? JSON.parse(promotion.excluded_items) : null,
-        createdAt: promotion.created_at,
-        updatedAt: promotion.updated_at,
-      },
+      data: mapPromotionRow(promotion),
     });
   });
 
@@ -99,60 +129,82 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(PromotionRoutes.create as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
 
-    await db.prepare(
-      `INSERT INTO promotions (id, name, description, code, type, discount_value, discount_type, max_uses, current_uses, min_order_value, max_discount_value, valid_from, valid_to, is_active, applicable_items, excluded_items, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.name,
-      body.description || null,
-      body.code.toUpperCase(),
-      body.type,
-      body.discountValue,
-      body.discountType,
-      body.maxUses || null,
-      0,
-      body.minOrderValue || null,
-      body.maxDiscountValue || null,
-      body.validFrom || null,
-      body.validTo || null,
-      body.isActive !== false ? 1 : 0,
-      body.applicableItems ? JSON.stringify(body.applicableItems) : null,
-      body.excludedItems ? JSON.stringify(body.excludedItems) : null,
-      now,
-      now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO promotions (id, name, description, code, type, discount_value, discount_type, max_uses, current_uses, min_order_value, max_discount_value, valid_from, valid_to, is_active, applicable_items, excluded_items, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.description || null,
+        body.code.toUpperCase(),
+        body.type,
+        body.discountValue,
+        body.discountType,
+        body.maxUses || null,
+        0,
+        body.minOrderValue || null,
+        body.maxDiscountValue || null,
+        body.validFrom || null,
+        body.validTo || null,
+        body.isActive !== false ? 1 : 0,
+        body.applicableItems ? JSON.stringify(body.applicableItems) : null,
+        body.excludedItems ? JSON.stringify(body.excludedItems) : null,
+        now,
+        now
+      ).run();
+    } catch {
+      const canonicalDiscountType = body.discountType === 'percentage' ? 'percent' : (body.discountType || 'fixed');
+      try {
+        await db.prepare(
+          `INSERT INTO promotions (id, code, name, description, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, is_active, expires_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+        ).bind(
+          id,
+          body.code.toUpperCase(),
+          body.name,
+          body.description || null,
+          canonicalDiscountType,
+          body.discountValue,
+          body.minOrderValue || 0,
+          body.maxDiscountValue || null,
+          body.maxUses || null,
+          body.isActive !== false ? 1 : 0,
+          body.validTo || null,
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active, created_at)
+           VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
+        ).bind(
+          body.code.toUpperCase(),
+          body.discountValue ?? 0,
+          body.maxDiscountValue || 0,
+          body.minOrderValue || 0,
+          body.maxUses || 100,
+          body.validTo || null,
+          body.isActive !== false ? 1 : 0,
+          now
+        ).run();
+      }
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'promotion_create', 'promotion', id, JSON.stringify(body), now).run();
+    await writePromotionAuditLog(db, user.id, 'promotion_create', id, JSON.stringify(body), now);
 
     const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
-      data: {
-        ...promotion!,
-        discountValue: promotion!.discount_value,
-        discountType: promotion!.discount_type,
-        maxUses: promotion!.max_uses,
-        currentUses: promotion!.current_uses,
-        minOrderValue: promotion!.min_order_value,
-        maxDiscountValue: promotion!.max_discount_value,
-        validFrom: promotion!.valid_from,
-        validTo: promotion!.valid_to,
-        isActive: promotion!.is_active,
-        applicableItems: promotion!.applicable_items ? JSON.parse(promotion!.applicable_items) : null,
-        excludedItems: promotion!.excluded_items ? JSON.parse(promotion!.excluded_items) : null,
-        createdAt: promotion!.created_at,
-        updatedAt: promotion!.updated_at,
-      },
+      data: mapPromotionRow(promotion!),
     }, 201);
   });
 
@@ -160,6 +212,9 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(PromotionRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -171,41 +226,59 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const updates: string[] = [];
     const params: (string | number | boolean | null)[] = [];
+    const canonicalUpdates: string[] = [];
+    const canonicalParams: (string | number | boolean | null)[] = [];
 
-    if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
-    if (body.description !== undefined) { updates.push('description = ?'); params.push(body.description); }
-    if (body.code !== undefined) { updates.push('code = ?'); params.push(body.code.toUpperCase()); }
+    if (body.name !== undefined) {
+      updates.push('name = ?'); params.push(body.name);
+      canonicalUpdates.push('name = ?'); canonicalParams.push(body.name);
+    }
+    if (body.description !== undefined) {
+      updates.push('description = ?'); params.push(body.description);
+      canonicalUpdates.push('description = ?'); canonicalParams.push(body.description);
+    }
+    if (body.code !== undefined) {
+      updates.push('code = ?'); params.push(body.code.toUpperCase());
+      canonicalUpdates.push('code = ?'); canonicalParams.push(body.code.toUpperCase());
+    }
     if (body.type !== undefined) { updates.push('type = ?'); params.push(body.type); }
-    if (body.discountValue !== undefined) { updates.push('discount_value = ?'); params.push(body.discountValue); }
-    if (body.discountType !== undefined) { updates.push('discount_type = ?'); params.push(body.discountType); }
-    if (body.maxUses !== undefined) { updates.push('max_uses = ?'); params.push(body.maxUses); }
-    if (body.minOrderValue !== undefined) { updates.push('min_order_value = ?'); params.push(body.minOrderValue); }
-    if (body.maxDiscountValue !== undefined) { updates.push('max_discount_value = ?'); params.push(body.maxDiscountValue); }
+    if (body.discountValue !== undefined) {
+      updates.push('discount_value = ?'); params.push(body.discountValue);
+      canonicalUpdates.push('discount_value = ?'); canonicalParams.push(body.discountValue);
+    }
+    if (body.discountType !== undefined) {
+      updates.push('discount_type = ?'); params.push(body.discountType);
+      canonicalUpdates.push('discount_type = ?');
+      canonicalParams.push(body.discountType === 'percentage' ? 'percent' : body.discountType);
+    }
+    if (body.maxUses !== undefined) {
+      updates.push('max_uses = ?'); params.push(body.maxUses);
+      canonicalUpdates.push('usage_limit = ?'); canonicalParams.push(body.maxUses);
+    }
+    if (body.minOrderValue !== undefined) {
+      updates.push('min_order_value = ?'); params.push(body.minOrderValue);
+      canonicalUpdates.push('min_order = ?'); canonicalParams.push(body.minOrderValue);
+    }
+    if (body.maxDiscountValue !== undefined) {
+      updates.push('max_discount_value = ?'); params.push(body.maxDiscountValue);
+      canonicalUpdates.push('max_discount = ?'); canonicalParams.push(body.maxDiscountValue);
+    }
     if (body.validFrom !== undefined) { updates.push('valid_from = ?'); params.push(body.validFrom); }
-    if (body.validTo !== undefined) { updates.push('valid_to = ?'); params.push(body.validTo); }
-    if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
+    if (body.validTo !== undefined) {
+      updates.push('valid_to = ?'); params.push(body.validTo);
+      canonicalUpdates.push('expires_at = ?'); canonicalParams.push(body.validTo);
+    }
+    if (body.isActive !== undefined) {
+      updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0);
+      canonicalUpdates.push('is_active = ?'); canonicalParams.push(body.isActive ? 1 : 0);
+    }
     if (body.applicableItems !== undefined) { updates.push('applicable_items = ?'); params.push(body.applicableItems ? JSON.stringify(body.applicableItems) : null); }
     if (body.excludedItems !== undefined) { updates.push('excluded_items = ?'); params.push(body.excludedItems ? JSON.stringify(body.excludedItems) : null); }
 
     if (updates.length === 0) {
       return c.json({
         success: true,
-        data: {
-          ...existing,
-          discountValue: existing.discount_value,
-          discountType: existing.discount_type,
-          maxUses: existing.max_uses,
-          currentUses: existing.current_uses,
-          minOrderValue: existing.min_order_value,
-          maxDiscountValue: existing.max_discount_value,
-          validFrom: existing.valid_from,
-          validTo: existing.valid_to,
-          isActive: existing.is_active,
-          applicableItems: existing.applicable_items ? JSON.parse(existing.applicable_items) : null,
-          excludedItems: existing.excluded_items ? JSON.parse(existing.excluded_items) : null,
-          createdAt: existing.created_at,
-          updatedAt: existing.updated_at,
-        },
+        data: mapPromotionRow(existing),
       });
     }
 
@@ -213,33 +286,21 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
-    await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    try {
+      await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    } catch {
+      if (canonicalUpdates.length > 0) {
+        await db.prepare(`UPDATE promotions SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+      }
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'promotion_update', 'promotion', id, JSON.stringify(body), now).run();
+    await writePromotionAuditLog(db, user.id, 'promotion_update', id, JSON.stringify(body), now);
 
     const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
     return c.json({
       success: true,
-      data: {
-        ...promotion!,
-        discountValue: promotion!.discount_value,
-        discountType: promotion!.discount_type,
-        maxUses: promotion!.max_uses,
-        currentUses: promotion!.current_uses,
-        minOrderValue: promotion!.min_order_value,
-        maxDiscountValue: promotion!.max_discount_value,
-        validFrom: promotion!.valid_from,
-        validTo: promotion!.valid_to,
-        isActive: promotion!.is_active,
-        applicableItems: promotion!.applicable_items ? JSON.parse(promotion!.applicable_items) : null,
-        excludedItems: promotion!.excluded_items ? JSON.parse(promotion!.excluded_items) : null,
-        createdAt: promotion!.created_at,
-        updatedAt: promotion!.updated_at,
-      },
+      data: mapPromotionRow(promotion!),
     });
   });
 
@@ -247,7 +308,11 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(PromotionRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const { id } = c.req.valid('param');
+    const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
     if (!existing) {
@@ -256,10 +321,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     await db.prepare('DELETE FROM promotions WHERE id = ?').bind(id).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'promotion_delete', 'promotion', id, JSON.stringify({ name: existing.name }), new Date().toISOString()).run();
+    await writePromotionAuditLog(db, user.id, 'promotion_delete', id, JSON.stringify({ name: existing.name }), now);
 
     return c.json({ success: true, message: 'Promotion deleted successfully' });
   });

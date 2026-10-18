@@ -115,9 +115,24 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   const id = c.req.param('id');
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
 
-  const order = await db.prepare(
-    'SELECT total, status, payment_status, is_cod FROM orders WHERE id = ?'
-  ).bind(id).first<{ total: number; status: string; payment_status: string; is_cod: number }>();
+  let order: { total: number; status: string; payment_status: string; is_cod: number } | null = null;
+  try {
+    order = await db.prepare(
+      'SELECT total, status, payment_status, is_cod FROM orders WHERE id = ?'
+    ).bind(id).first<{ total: number; status: string; payment_status: string; is_cod: number }>();
+  } catch {
+    const fallback = await db.prepare(
+      'SELECT total, status, payment_status, payment_method FROM orders WHERE id = ?'
+    ).bind(id).first<{ total: number; status: string; payment_status: string; payment_method?: string }>();
+    if (fallback) {
+      order = {
+        total: fallback.total,
+        status: fallback.status,
+        payment_status: fallback.payment_status,
+        is_cod: (fallback.payment_method === 'cod' || fallback.payment_method === 'cash') ? 1 : 0,
+      };
+    }
+  }
 
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
   if (order.status === 'cancelled') return c.json({ success: false, error: 'Cannot mark cancelled order as paid' }, 409);
@@ -132,12 +147,24 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   }
 
   const now = new Date().toISOString();
-  await db.prepare(
-    'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
-  ).bind(now, now, id).run();
-  await db.prepare(
-    'UPDATE payments SET status = \'completed\', updated_at = ? WHERE order_id = ? AND method = \'cod\''
-  ).bind(now, id).run();
+  try {
+    await db.prepare(
+      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
+    ).bind(now, now, id).run();
+  } catch {
+    await db.prepare(
+      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', updated_at = ? WHERE id = ?'
+    ).bind(now, id).run();
+  }
+  try {
+    await db.prepare(
+      'UPDATE payments SET status = \'completed\', updated_at = ? WHERE order_id = ? AND method = \'cod\''
+    ).bind(now, id).run();
+  } catch {
+    await db.prepare(
+      'UPDATE payments SET status = \'completed\' WHERE order_id = ? AND method = \'cod\''
+    ).bind(id).run().catch(() => {});
+  }
 
   if (c.env?.AUTH_KV) {
     let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
@@ -153,8 +180,8 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
 }
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
-  const kdsRoles = ['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef'];
+  const kdsRoles = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
   app.get('/kds', requireAuth(kdsRoles), handleGetKdsOrders);
   app.patch('/:id/status', requireAuth(kdsRoles), audit('order_status_change'), handleUpdateOrderStatus);
-  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 }

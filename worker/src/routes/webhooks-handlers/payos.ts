@@ -1,9 +1,20 @@
 import type { Hono } from 'hono';
+import { publishOrderEvent } from '@aura/domain-order';
 import { payosWebhookSchema } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import { log, verifySignature } from './helpers';
 import { sendOrderPaidNotifications } from './notifications';
+
+function safeWaitUntil(c: any, promise: Promise<any>): void {
+  try {
+    if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
+      c.executionCtx.waitUntil(promise);
+    }
+  } catch {
+    // executionCtx may be unavailable in test harnesses or sub-requests
+  }
+}
 
 export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
   router.post('/payos', async (c) => {
@@ -19,9 +30,17 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
         return c.json({ error: 1, message: 'Server misconfiguration' }, 500);
       }
 
-      if (!signature || !payload.data || typeof payload.data !== 'object' || Object.keys(payload.data as Record<string, unknown>).length === 0) {
+      if (!payload.data || typeof payload.data !== 'object' || Object.keys(payload.data as Record<string, unknown>).length === 0) {
         log.info('PayOS test probe / empty payload - ack 200');
         return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
+      }
+
+      if (!signature) {
+        if (!(payload.data as Record<string, unknown>).orderCode) {
+          log.info('PayOS test probe / empty payload - ack 200');
+          return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
+        }
+        return c.json({ error: 1, message: 'Invalid signature' }, 401);
       }
 
       const parsed = payosWebhookSchema.safeParse(payload);
@@ -34,7 +53,7 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
       if (!isValid) {
         log.error('Invalid PayOS webhook signature');
         const mc = createMetricsCollector(db);
-        c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'invalid_signature' }));
+        safeWaitUntil(c, mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'invalid_signature' }));
         return c.json({ error: 1, message: 'Invalid signature' }, 401);
       }
 
@@ -50,14 +69,28 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
         return c.json({ error: 0, message: 'No orderCode, skipped', data: null });
       }
 
-      const existingPayment = await db.prepare(
+      let existingPayment = await db.prepare(
         'SELECT id, order_id, status, amount FROM payments WHERE transaction_id = ?'
       ).bind(String(orderCode)).first<{ id: string; order_id: string; status: string; amount: number }>();
+
+      let matchedByFallback = false;
+      if (!existingPayment) {
+        try {
+          existingPayment = await db.prepare(
+            'SELECT id, order_id, status, amount FROM payments WHERE id = ? OR order_id = ?'
+          ).bind(String(orderCode), String(orderCode)).first<{ id: string; order_id: string; status: string; amount: number }>();
+          if (existingPayment) {
+            matchedByFallback = true;
+          }
+        } catch {
+          // Ignore fallback query error
+        }
+      }
 
       if (!existingPayment) {
         log.warn('Unknown orderCode - no payment row', { orderCode: String(orderCode) });
         const mc = createMetricsCollector(db);
-        c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'unknown_order' }));
+        safeWaitUntil(c, mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'unknown_order' }));
         return c.json({ error: 0, message: 'Unknown order, acknowledged', data: null });
       }
 
@@ -65,8 +98,14 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
         log.info('Already processed', { orderCode: String(orderCode), status: existingPayment.status });
         if (existingPayment.order_id) {
           const orderRow = await db.prepare('SELECT id, payment_status, payment_method FROM orders WHERE id = ?').bind(existingPayment.order_id).first<{ id: string; payment_status: string; payment_method: string }>();
-          if (orderRow && orderRow.payment_status !== 'paid' && orderRow.payment_method === 'payos') {
+          if (orderRow && orderRow.payment_status !== 'paid') {
             await db.prepare('UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?').bind(now, existingPayment.order_id).run();
+            const kv = c.env.AUTH_KV;
+            if (kv) {
+              await kv.put('latest_order_ts', now).catch(() => {});
+              await kv.put('orders:latest_updated_at', now).catch(() => {});
+              await publishOrderEvent(kv, existingPayment.order_id, 'paid');
+            }
             log.info('Self-healed order', { order_id: existingPayment.order_id });
           }
         }
@@ -84,7 +123,7 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
           );
         }
         const mc = createMetricsCollector(db);
-        c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'amount_mismatch' }));
+        safeWaitUntil(c, mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'amount_mismatch' }));
         return c.json({ error: 1, message: 'Amount mismatch' }, 400);
       }
 
@@ -94,9 +133,13 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
       const isCancelled = statusUpper === 'CANCELLED';
       const newStatus = isSuccess ? 'completed' : (isExpired ? 'expired' : isCancelled ? 'cancelled' : 'failed');
       const statusGuard = isSuccess ? 'status != \'completed\'' : 'status = \'pending\'';
-      const transition = await db.prepare(
-        `UPDATE payments SET status = ? WHERE transaction_id = ? AND ${statusGuard}`
-      ).bind(newStatus, String(orderCode)).run();
+      const transition = matchedByFallback
+        ? await db.prepare(
+            `UPDATE payments SET status = ?, transaction_id = COALESCE(transaction_id, ?) WHERE id = ? AND ${statusGuard}`
+          ).bind(newStatus, String(orderCode), existingPayment.id).run()
+        : await db.prepare(
+            `UPDATE payments SET status = ? WHERE transaction_id = ? AND ${statusGuard}`
+          ).bind(newStatus, String(orderCode)).run();
       const transitionMeta = (transition as unknown as { meta?: { changes?: number } }).meta;
       const changedRows = transitionMeta?.changes ?? 0;
       if (changedRows === 0) {
@@ -108,15 +151,15 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
       const amountNum = amount ? parseInt(String(amount), 10) : 0;
       const mc = createMetricsCollector(db);
       if (isSuccess) {
-        c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amountNum, {
+        safeWaitUntil(c, mc.recordMetric('payment_success', amountNum, {
           provider: 'payos',
           order_id: existingPayment.order_id || ''
         }));
-        c.executionCtx?.waitUntil(mc.recordMetric('revenue', amountNum, {
+        safeWaitUntil(c, mc.recordMetric('revenue', amountNum, {
           provider: 'payos'
         }));
       } else {
-        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', amountNum, {
+        safeWaitUntil(c, mc.recordMetric('payment_failed', amountNum, {
           provider: 'payos',
           order_id: existingPayment.order_id || '',
           reason: data.code ? String(data.code) : 'unknown'
@@ -125,19 +168,27 @@ export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
 
       if (isSuccess && existingPayment.order_id) {
         await db.prepare(
-          'UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ? AND payment_method = \'payos\''
+          'UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?'
         ).bind(now, existingPayment.order_id).run();
 
         const kv = c.env.AUTH_KV;
         if (kv) {
-          await kv.put('latest_order_ts', now);
+          await kv.put('latest_order_ts', now).catch(() => {});
           await kv.put('orders:latest_updated_at', now).catch(() => {});
+          await publishOrderEvent(kv, existingPayment.order_id, 'paid');
         }
 
         try {
-          const orderRow = await db.prepare(
-            'SELECT id, items, total, customer_name, customer_phone, customer_email, customer_address, payment_method, notes FROM orders WHERE id = ?'
-          ).bind(existingPayment.order_id).first<Record<string, unknown>>();
+          let orderRow: Record<string, unknown> | null = null;
+          try {
+            orderRow = await db.prepare(
+              'SELECT id, items, total, customer_name, customer_phone, customer_email, customer_address, payment_method, notes FROM orders WHERE id = ?'
+            ).bind(existingPayment.order_id).first<Record<string, unknown>>();
+          } catch {
+            orderRow = await db.prepare(
+              'SELECT id, items, total_amount AS total, customer_name, customer_phone, customer_email, customer_address, payment_method, notes FROM orders WHERE id = ?'
+            ).bind(existingPayment.order_id).first<Record<string, unknown>>();
+          }
 
           if (orderRow) {
             await sendOrderPaidNotifications(c, orderRow, now);

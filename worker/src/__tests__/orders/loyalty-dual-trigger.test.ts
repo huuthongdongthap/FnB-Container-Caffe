@@ -50,6 +50,18 @@ describe('loyalty single-call guard', () => {
     expect(src).toContain('creditLoyaltyIfEligible');
     const invocations = src.match(/creditLoyaltyIfEligible\(/g);
     expect(invocations).not.toBeNull();
-    expect(invocations!.length).toBeGreaterThanOrEqual(1);
+    expect(invocations).toHaveLength(1);
+  });
+
+  it('loyalty-trigger.ts exports creditLoyaltyIfEligible with idempotency guard', async () => {
+    const { fileURLToPath } = await import('url');
+    const { dirname, resolve } = await import('path');
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const triggerSrc = (await import('fs')).readFileSync(
+      resolve(__dirname, '../../../../packages/domain/order/policies/loyalty-trigger.ts'),
+      'utf8'
+    );
+    expect(triggerSrc).toContain('export async function creditLoyaltyIfEligible');
   });
 });

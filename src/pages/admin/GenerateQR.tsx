@@ -61,7 +61,7 @@ export default function GenerateQRPage() {
 					/>
 					{loading && <div className="text-center py-12 text-muted"><div className="animate-pulse">{t('qrCodes.loading')}</div></div>}
 					{!loading && filtered.length === 0 && <div className="text-center py-12 text-muted text-sm">{t('qrCodes.noTablesZone')}</div>}
-					{!loading && (
+					{!loading && Object.keys(grouped).length <= 1 && (
 						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 print:gap-3 print-grid">
 							{filtered.map((table) => (
 								<QrCard key={table.id} tableNumber={table.table_number} zoneName={table.zone} qrPngUrl={table.qr_png_url} signedUrl={table.signed_url} slug={table.slug} status={table.status} onDownload={downloadQrImage} />

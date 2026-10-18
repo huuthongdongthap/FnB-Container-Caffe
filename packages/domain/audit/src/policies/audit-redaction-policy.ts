@@ -20,13 +20,16 @@ export function redactSensitiveValue(val: unknown): unknown {
 
 export function redactSensitiveData(data: unknown, seen = new WeakSet()): unknown {
   if (data === null || data === undefined) return data;
+  if (data instanceof Date) return new Date(data.getTime());
   if (typeof data !== 'object') return redactSensitiveValue(data);
 
   if (seen.has(data as object)) return '[CIRCULAR]';
   seen.add(data as object);
 
   if (Array.isArray(data)) {
-    return data.map(item => redactSensitiveData(item, seen));
+    const mapped = data.map(item => redactSensitiveData(item, seen));
+    seen.delete(data as object);
+    return mapped;
   }
 
   const result: Record<string, unknown> = {};
@@ -37,5 +40,6 @@ export function redactSensitiveData(data: unknown, seen = new WeakSet()): unknow
       result[key] = redactSensitiveData(value, seen);
     }
   }
+  seen.delete(data as object);
   return result;
 }

@@ -31,7 +31,7 @@ export async function getCustomerCanonicalProfile(
   ).bind(customerId).all<any>();
 
   const consentsRes = await db.prepare(
-    'SELECT * FROM consents WHERE customer_id = ? AND granted = 1'
+    'SELECT * FROM consents WHERE customer_id = ? AND granted = 1 AND revoked_at IS NULL'
   ).bind(customerId).all<any>();
 
   const orderStats = await db.prepare(
@@ -163,6 +163,27 @@ export async function mergeCustomerProfiles(
     try {
       await db.prepare('UPDATE loyalty_point_logs SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
       await db.prepare('UPDATE cashback_transactions SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
+      const secWallet = await db.prepare(
+        'SELECT balance, total_earned FROM cashback_wallets WHERE customer_id = ? LIMIT 1'
+      ).bind(secondaryCustomerId).first<{ balance?: number; total_earned?: number }>();
+      const secBalance = Number(secWallet?.balance ?? 0);
+      const secEarned = Number(secWallet?.total_earned ?? 0);
+      if (secBalance > 0 || secEarned > 0) {
+        const walletNow = nowIso();
+        await db
+          .prepare(
+            'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)',
+          )
+          .bind(genCustomerId('wal_'), primaryCustomerId, walletNow, walletNow)
+          .run()
+          .catch(() => {});
+        await db.prepare(
+          'UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?'
+        ).bind(secBalance, secEarned, walletNow, primaryCustomerId).run();
+        await db.prepare(
+          'UPDATE cashback_wallets SET balance = 0, updated_at = ? WHERE customer_id = ?'
+        ).bind(walletNow, secondaryCustomerId).run();
+      }
     } catch {
       // Optional loyalty tables in partial environments
     }
@@ -174,6 +195,9 @@ export async function mergeCustomerProfiles(
     await db.prepare(
       "UPDATE customers SET loyalty_points = 0, name = name || ' [MERGED]', updated_at = ? WHERE id = ?"
     ).bind(nowIso(), secondaryCustomerId).run();
+    await db.prepare(
+      "UPDATE customers SET name = '[MERGED]' WHERE id = ? AND name IS NULL"
+    ).bind(secondaryCustomerId).run().catch(() => {});
 
     // Append merge event
     await db.prepare(

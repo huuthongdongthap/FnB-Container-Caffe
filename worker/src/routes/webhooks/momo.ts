@@ -8,6 +8,7 @@
  */
 
 import { Hono } from 'hono';
+import { publishOrderEvent } from '@aura/domain-order';
 import { createLogger } from '../../middleware/logger';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
@@ -28,7 +29,10 @@ async function verifySignature(data: Record<string, unknown>, secretKey: string)
   );
   const sorted = Object.keys(data)
     .sort()
-    .map((k) => `${k}=${data[k]}`)
+    .map((k) => {
+      const val = data[k] === null || data[k] === undefined ? '' : data[k];
+      return `${k}=${val}`;
+    })
     .join('&');
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(sorted));
   return Array.from(new Uint8Array(sig))
@@ -139,10 +143,22 @@ momoWebhookRouter.post('/', async(c) => {
       db
         .prepare('UPDATE payments SET status = ?, updated_at = ? WHERE id = ?')
         .bind(newStatus, now, payment.id),
-      db
-        .prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?')
-        .bind(success ? 'paid' : 'failed', now, payment.order_id)
+      success
+        ? db
+          .prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?')
+          .bind('paid', now, payment.order_id)
+        : db
+          .prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ? AND payment_status != \'paid\'')
+          .bind('failed', now, payment.order_id)
     ]);
+
+    if (c.env.AUTH_KV && payment.order_id) {
+      await Promise.all([
+        c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {}),
+        c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+        publishOrderEvent(c.env.AUTH_KV, payment.order_id, success ? 'paid' : 'payment_failed')
+      ]);
+    }
 
     // ── Non-blocking side effects ───────────────────────────────────────────
     const sideEffects: Promise<unknown>[] = [];

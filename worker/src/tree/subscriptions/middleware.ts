@@ -11,6 +11,12 @@ export async function requireAdmin(c: Context<{ Bindings: Env }>): Promise<Respo
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   const token = authHeader.substring(7);
+  if (typeof c.env.AUTH_KV?.get === 'function') {
+    const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+    if (revoked) {
+      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
+    }
+  }
   const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
@@ -27,6 +33,12 @@ export async function requireVendor(c: Context<{ Bindings: Env }>): Promise<Resp
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   const token = authHeader.substring(7);
+  if (typeof c.env.AUTH_KV?.get === 'function') {
+    const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+    if (revoked) {
+      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
+    }
+  }
   const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);

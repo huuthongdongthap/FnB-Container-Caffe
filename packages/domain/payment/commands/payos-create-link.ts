@@ -42,9 +42,16 @@ const handleCreateLink = async (c: any) => {
     }
     const { order_id, description, customer_name } = parsed.data;
 
-    const orderRow = await db.prepare(
-      'SELECT id, total, status, payment_status, customer_id, is_cod FROM orders WHERE id = ?'
-    ).bind(order_id).first<{ id: string; total: number; status: string; payment_status: string; customer_id: string | null; is_cod: number }>();
+    let orderRow: { id: string; total?: number; total_amount?: number; status: string; payment_status: string; customer_id: string | null; is_cod?: number } | null = null;
+    try {
+      orderRow = await db.prepare(
+        'SELECT id, total, status, payment_status, customer_id, is_cod FROM orders WHERE id = ?'
+      ).bind(order_id).first();
+    } catch {
+      orderRow = await db.prepare(
+        'SELECT id, total_amount AS total, status, payment_status, customer_id FROM orders WHERE id = ?'
+      ).bind(order_id).first();
+    }
 
     if (!orderRow) {
       try {
@@ -66,7 +73,11 @@ const handleCreateLink = async (c: any) => {
     }
     const amount = rawAmount;
 
-    const access = validatePayOSAccess({ ...orderRow, total: amount }, customerId, user?.role);
+    const access = validatePayOSAccess(
+      { ...orderRow, total: amount, is_cod: Number(orderRow.is_cod ?? 0) },
+      customerId,
+      user?.role
+    );
     if (!access.allowed && access.reason) {
       try {
         c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: access.reason }));
@@ -78,17 +89,29 @@ const handleCreateLink = async (c: any) => {
     // ── COD short-circuit: skip PayOS, mark order as paid immediately ──
     const rawIsCod = Number(orderRow.is_cod ?? 0);
     if (rawIsCod === 1 || orderRow.payment_status === 'cod_pending') {
-      const isStaffActor = ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(user?.role || '');
+      const isStaffActor = ['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter'].includes(user?.role || '');
       if (user?.role === 'customer' || (orderRow.customer_id && !isStaffActor)) {
         return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
       }
       const now = new Date().toISOString();
-      await db.prepare(
-        'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(now, now, order_id).run();
+      try {
+        await db.prepare(
+          'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
+        ).bind(now, now, order_id).run();
+      } catch {
+        await db.prepare(
+          'UPDATE orders SET status = \'completed\', payment_status = \'paid\', updated_at = ? WHERE id = ?'
+        ).bind(now, order_id).run();
+      }
       await db.prepare(
         'UPDATE payments SET status = \'completed\', updated_at = ? WHERE order_id = ? AND method = \'cod\''
       ).bind(now, order_id).run();
+      if (c.env?.AUTH_KV) {
+        await Promise.all([
+          c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {}),
+          c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+        ]);
+      }
       return c.json({ success: true, is_cod: true, message: 'Cash collected', order_id });
     }
 
@@ -103,14 +126,16 @@ const handleCreateLink = async (c: any) => {
       if (existingPayment.status === 'completed') {
         return c.json({ success: false, error: errMsg.already_paid[locale] }, 409);
       }
-      const cachedUrl = existingPayment.payment_url || existingPayment.checkout_url || '';
-      return c.json({
-        success: true,
-        checkoutUrl: cachedUrl,
-        checkout_url: cachedUrl,
-        orderCode: parseInt(existingPayment.transaction_id, 10),
-        cached: true
-      });
+      const existingUrl = existingPayment.payment_url || (existingPayment as { checkout_url?: string }).checkout_url || '';
+      if (Boolean(existingUrl)) {
+        return c.json({
+          success: true,
+          checkoutUrl: existingUrl,
+          checkout_url: existingUrl,
+          orderCode: parseInt(existingPayment.transaction_id, 10),
+          cached: true
+        });
+      }
     }
 
     const orderCode = generateOrderCode();
@@ -168,6 +193,12 @@ const handleCreateLink = async (c: any) => {
       } catch { /* executionCtx unavailable */ }
       return c.json({ success: false, error: errMsg.insert_failed[locale] }, 500);
     }
+
+    try {
+      await db.prepare(
+        "UPDATE orders SET payment_method = 'payos', updated_at = ? WHERE id = ?"
+      ).bind(new Date().toISOString(), order_id).run();
+    } catch { /* non-blocking if schema lacks column */ }
 
     try {
       c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amount, {

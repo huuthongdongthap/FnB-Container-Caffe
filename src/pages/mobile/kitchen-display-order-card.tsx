@@ -47,7 +47,12 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
               <div style={itemName}>{name}</div>
               {itemNote && <div style={{ fontSize: 12, color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic', marginTop: 2 }}>{itemNote}</div>}
               {item.modifiers && item.modifiers.length > 0 && (
-                <div style={itemModifier}>{item.modifiers.join(', ')}</div>
+                <div style={itemModifier}>
+                  {item.modifiers
+                    .map((m: any) => (typeof m === 'string' ? m : m?.name || ''))
+                    .filter(Boolean)
+                    .join(', ')}
+                </div>
               )}
             </div>
           </div>

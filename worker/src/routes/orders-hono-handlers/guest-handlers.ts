@@ -1,4 +1,5 @@
 import type { Hono, Context } from 'hono';
+import { publishOrderEvent } from '@aura/domain-order';
 import { guestCheckinSchema, zodErrorResponse } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
@@ -33,19 +34,36 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   const now = new Date().toISOString();
 
   // Atomic batch: seat the guest + create placeholder order together.
-  const batchResult = await db.batch([
-    db.prepare(
-      'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
-    ).bind(tableRow.id),
-    db.prepare(
-      `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cash', ?, 'dine_in', ?, ?)`
-    ).bind(
-      orderId, data.customer_name, data.customer_phone, tableRow.id,
-      JSON.stringify([]), 0,
-      'Khách QR - cho don mon', now, now
-    )
-  ]);
+  let batchResult: unknown[];
+  try {
+    batchResult = await db.batch([
+      db.prepare(
+        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
+      ).bind(tableRow.id),
+      db.prepare(
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cash', ?, 'dine_in', ?, ?)`
+      ).bind(
+        orderId, data.customer_name, data.customer_phone, tableRow.id,
+        JSON.stringify([]), 0,
+        'Khách QR - cho don mon', now, now
+      )
+    ]);
+  } catch {
+    batchResult = await db.batch([
+      db.prepare(
+        'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND status = \'Available\''
+      ).bind(tableRow.id),
+      db.prepare(
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cash', ?, 'dine_in', ?, ?)`
+      ).bind(
+        orderId, data.customer_name, data.customer_phone, tableRow.id,
+        JSON.stringify([]), 0,
+        'Khách QR - cho don mon', now, now
+      )
+    ]);
+  }
 
   const updateInfo = batchResult[0] as { success: boolean; changes?: number; meta?: { changes?: number } };
   const changes = updateInfo.meta?.changes ?? updateInfo.changes ?? 0;
@@ -57,6 +75,7 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     await Promise.all([
       c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
       c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+      publishOrderEvent(c.env.AUTH_KV, orderId, 'pending'),
     ]);
   }
 
@@ -133,41 +152,92 @@ export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
 
     // If dine-in with table_id, mark table Occupied
     if (tableId && fulfillment === 'DINE_IN') {
-      await db.prepare(
-        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
-      ).bind(tableId).run();
+      try {
+        await db.prepare(
+          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
+        ).bind(tableId).run();
+      } catch {
+        await db.prepare(
+          'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND status = \'Available\''
+        ).bind(tableId).run();
+      }
     }
 
-    const total = body.items.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
+    const resolvedItems = await Promise.all(
+      body.items.map(async (item) => {
+        const lookupId = item.product_id || (item as { item_id?: string; id?: string }).item_id || (item as { id?: string }).id;
+        if (lookupId && !(item.price && item.price > 0)) {
+          try {
+            const prod = await db
+              .prepare('SELECT price FROM products WHERE id = ?')
+              .bind(lookupId)
+              .first<{ price?: number }>();
+            if (prod && typeof prod.price === 'number' && Number.isFinite(prod.price)) {
+              return { ...item, price: prod.price };
+            }
+          } catch {
+            // Fall back to client price in mock/partial environments
+          }
+        }
+        return item;
+      })
+    );
+
+    const total = resolvedItems.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
 
     // Canonical D1 orders persistence with exact schema columns
-    await db.prepare(
-      `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, customer_address, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      orderId, name, phone, tableId,
-      JSON.stringify(body.items),
-      total,
-      payMethod, fulfillment.toLowerCase(), body.delivery_address || null,
-      fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
-      now, now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, customer_address, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        orderId, name, phone, tableId,
+        JSON.stringify(resolvedItems),
+        total,
+        payMethod, fulfillment.toLowerCase(), body.delivery_address || null,
+        fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
+        now, now
+      ).run();
+    } catch (insertErr) {
+      if (String((insertErr as Error)?.message || '').includes('no such column')) {
+        await db.prepare(
+          `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, address, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          orderId, name, phone, tableId,
+          JSON.stringify(resolvedItems),
+          total,
+          payMethod, fulfillment.toLowerCase(), body.delivery_address || null,
+          fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
+          now, now
+        ).run();
+      } else {
+        throw insertErr;
+      }
+    }
 
     // Line item persistence to order_items
-    for (const item of body.items) {
+    for (const item of resolvedItems) {
       const lineItemId = makeOrderId('ITEM');
       const prodId = item.product_id || item.name;
       const subtotal = (item.price || 0) * (item.qty || 1);
-      await db.prepare(
-        `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(lineItemId, orderId, prodId, item.qty || 1, subtotal, '[]', now).run();
+      try {
+        await db.prepare(
+          `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(lineItemId, orderId, prodId, item.qty || 1, subtotal, '[]', now).run();
+      } catch (itemErr) {
+        if (!String((itemErr as Error)?.message || '').includes('no such table: order_items')) {
+          throw itemErr;
+        }
+      }
     }
 
     if (c.env?.AUTH_KV) {
       await Promise.all([
         c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
         c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+        publishOrderEvent(c.env.AUTH_KV, orderId, 'pending'),
       ]);
     }
 

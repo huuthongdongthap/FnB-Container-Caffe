@@ -16,7 +16,7 @@ export interface StockMovementItem {
   id: string;
   ingredient_id: string;
   ingredient_name?: string;
-  type: 'in' | 'out' | 'adjust' | 'waste';
+  type: 'in' | 'out' | 'adjust' | 'adjustment' | 'waste';
   quantity: number;
   reference_id?: string;
   notes?: string;

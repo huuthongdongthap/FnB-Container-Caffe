@@ -2,15 +2,21 @@ import type { ZnsData } from './types';
 
 export const TEMPLATE_IDS: Record<string, string> = {
   welcome_signup: 'YOUR_WELCOME_TEMPLATE_ID',
+  welcome_new: 'YOUR_WELCOME_TEMPLATE_ID',
   cashback_earned: 'YOUR_CASHBACK_TEMPLATE_ID',
   tier_upgrade: 'YOUR_TIER_TEMPLATE_ID',
   cashback_expiry_warning: 'YOUR_EXPIRY_TEMPLATE_ID',
+  cashback_expiring: 'YOUR_EXPIRY_TEMPLATE_ID',
+  birthday_promotion: 'YOUR_BIRTHDAY_TEMPLATE_ID',
+  winback_offer: 'YOUR_WINBACK_TEMPLATE_ID',
+  post_visit_review: 'YOUR_POST_VISIT_TEMPLATE_ID',
   general_promotion: 'YOUR_GENERAL_PROMO_TEMPLATE_ID'
 };
 
 export function buildTemplateData(template_key: string, data: ZnsData): Record<string, string> {
   switch (template_key) {
   case 'welcome_signup':
+  case 'welcome_new':
     return {
       customer_name: data.name || '',
       member_id: data.member_id || '',
@@ -31,6 +37,7 @@ export function buildTemplateData(template_key: string, data: ZnsData): Record<s
       cashback_rate: `${(data.new_rate || 0) * 100}%`
     };
   case 'cashback_expiry_warning':
+  case 'cashback_expiring':
     return {
       customer_name: data.name || '',
       expiring_amount: `${(data.amount || 0).toLocaleString('vi-VN')}đ`,

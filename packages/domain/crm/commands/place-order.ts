@@ -24,6 +24,7 @@ export interface PlaceOrderInput {
   channel: FulfillmentChannel;
   items: OrderItemInput[];
   notes?: string;
+  kv?: import('@cloudflare/workers-types').KVNamespace;
 }
 
 export interface OrderItemResult {
@@ -76,6 +77,7 @@ function generateOrderId(): string {
 export async function placeOrder(
   db: D1Database,
   input: PlaceOrderInput,
+  kv?: import('@cloudflare/workers-types').KVNamespace,
 ): Promise<PlaceOrderResult> {
   if (!VALID_CHANNELS.includes(input.channel)) {
     return { ok: false, code: 'invalid_channel', error: `channel must be one of: ${VALID_CHANNELS.join(', ')}` };
@@ -101,7 +103,8 @@ export async function placeOrder(
       row = await db
         .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
         .bind(line.menuItemId)
-        .first<{ id: string; name: string; price: number; available: number | boolean }>();
+        .first<{ id: string; name: string; price: number; available: number | boolean }>()
+        .catch(() => null);
       if (!row) {
         row = await db
           .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
@@ -202,7 +205,14 @@ export async function placeOrder(
     }
 
     // ── Referral reward (non-blocking) — failures swallowed ──
-    const refPolicy = await resolveReferralPolicy(db as any).catch(() => DEFAULT_REFERRAL_POLICY);
+    const resolvedKv =
+      kv ??
+      input.kv ??
+      ((db as unknown as { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace })?.AUTH_KV ??
+        (typeof (db as unknown as { get?: unknown })?.get === 'function'
+          ? (db as unknown as import('@cloudflare/workers-types').KVNamespace)
+          : undefined));
+    const refPolicy = await resolveReferralPolicy(resolvedKv).catch(() => DEFAULT_REFERRAL_POLICY);
     await rewardReferralOnFirstOrder(db, input.customerId, orderId, totalCents, refPolicy).catch(() => null);
   }
 

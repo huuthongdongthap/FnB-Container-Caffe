@@ -57,12 +57,21 @@ export function FriendNetwork({
               }}
             >
               <div className="w-10 h-10 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <img
-                  className="w-full h-full object-cover"
-                  src={friend.avatarUrl}
-                  alt={friend.avatarAlt}
-                  loading="lazy"
-                />
+                {friend.avatarUrl?.trim() ? (
+                  <img
+                    className="w-full h-full object-cover"
+                    src={friend.avatarUrl}
+                    alt={friend.avatarAlt}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span
+                    className="flex w-full h-full items-center justify-center text-xs font-semibold uppercase text-[var(--aura-chrome-soft)]"
+                    aria-label={friend.avatarAlt || friend.name}
+                  >
+                    {friend.name?.charAt(0) || 'F'}
+                  </span>
+                )}
               </div>
               <div>
                 <p className="font-body text-base leading-[1.5] font-medium text-[var(--aura-chrome-bright, #E8EEF3)]">

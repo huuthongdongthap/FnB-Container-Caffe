@@ -53,16 +53,22 @@ export default function WaiterOrders() {
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const submitOrder = useCallback(async () => {
-    if (!selectedTableId) return;
+    const newOrderTable = selectedTableId.trim();
+    if (!newOrderTable) return;
     const validItems = newOrderItems.filter((i) => i.name.trim());
     if (validItems.length === 0) return;
-    const selectedTable = tables.find((t) => t.id === selectedTableId) as (TableInfo & { number?: number }) | undefined;
+    const selectedTable = tables.find((t) => String(t.id) === newOrderTable) as (TableInfo & { number?: number }) | undefined;
+    const resolvedTableId =
+      Number.isFinite(Number(newOrderTable)) &&
+      String(parseInt(newOrderTable, 10)) === newOrderTable
+        ? parseInt(newOrderTable, 10)
+        : newOrderTable;
     setSubmitting(true);
     try {
       const body = await apiFetch<{ success: boolean }>('/mobile/orders', {
         method: 'POST',
         body: JSON.stringify({
-          table_id: selectedTableId,
+          table_id: resolvedTableId,
           table_number: selectedTable?.number ?? selectedTable?.table_number,
           items: validItems.map((i) => ({
             name: i.name, quantity: i.quantity, price: i.price, note: i.note || undefined,
@@ -117,9 +123,21 @@ export default function WaiterOrders() {
                   {new Date(o.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
-              {o.items.map((item, idx) => (
-                <div key={idx} style={orderItem}>{item.quantity}x {item.name}{item.note ? ` (${item.note})` : ''}</div>
-              ))}
+              {o.items.map((item, idx) => {
+                const modStr = Array.isArray((item as any).modifiers)
+                  ? (item as any).modifiers
+                      .map((m: any) => (typeof m === 'string' ? m : m?.name || ''))
+                      .filter(Boolean)
+                      .join(', ')
+                  : '';
+                return (
+                  <div key={idx} style={orderItem}>
+                    {item.quantity}x {item.name}
+                    {modStr ? ` (${modStr})` : ''}
+                    {item.note ? ` (${item.note})` : ''}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </>

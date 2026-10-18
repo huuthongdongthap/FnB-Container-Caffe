@@ -94,9 +94,33 @@ productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
     }
   }
   const id = `prod_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  await db.prepare(
-    'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
-  ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+  const rawBody = body as Record<string, unknown>;
+  const tagsVal = rawBody.tags !== undefined
+    ? (typeof rawBody.tags === 'string' ? rawBody.tags : JSON.stringify(rawBody.tags))
+    : undefined;
+  const badgeVal = typeof rawBody.badge === 'string' ? rawBody.badge : undefined;
+
+  try {
+    if (tagsVal !== undefined || badgeVal !== undefined) {
+      await db.prepare(
+        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order, tags, badge) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0, tagsVal ?? null, badgeVal ?? null).run();
+    } else {
+      await db.prepare(
+        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+    }
+  } catch {
+    try {
+      await db.prepare(
+        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+    } catch {
+      await db.prepare(
+        'INSERT INTO products (id, name, description, price, category_id, image_url, is_available) VALUES (?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.description || '', data.price, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0).run();
+    }
+  }
   await syncProductToMenuProjection(db, id);
   const row = (await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(id).first()) as Product | null;
   return c.json({ success: true, data: row }, 201);
@@ -125,9 +149,51 @@ const handleUpdateProduct = async (c: any) => {
   if (!existing) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
-  await db.prepare(
-    'UPDATE products SET name=?, slug=?, description=?, price=?, compare_at_price=?, category_id=?, image_url=?, is_available=?, sort_order=? WHERE id=?'
-  ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description, data.price ?? existing.price, data.compare_at_price ?? existing.compare_at_price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, data.is_available !== undefined ? (data.is_available ? 1 : 0) : existing.is_available, data.sort_order ?? existing.sort_order, id).run();
+  if (data.slug && data.slug !== existing.slug) {
+    try {
+      const slugConflict = (await db.prepare('SELECT id FROM products WHERE slug = ? AND id != ?').bind(data.slug, id).first()) as { id: string } | null;
+      if (slugConflict && slugConflict.id !== id) {
+        return c.json({ success: false, error: 'Slug already exists' }, 409);
+      }
+    } catch {
+      // Ignore if slug column is absent on legacy schema
+    }
+  }
+  const rawBody = body as Record<string, unknown>;
+  const hasTagsOrBadge = rawBody.tags !== undefined || rawBody.badge !== undefined;
+  const nextTags = rawBody.tags !== undefined
+    ? (typeof rawBody.tags === 'string' ? rawBody.tags : JSON.stringify(rawBody.tags))
+    : (existing.tags ?? null);
+  const nextBadge = rawBody.badge !== undefined
+    ? (typeof rawBody.badge === 'string' ? rawBody.badge : null)
+    : (existing.badge ?? null);
+  const nextAvailable = data.is_available !== undefined ? (data.is_available ? 1 : 0) : existing.is_available;
+
+  try {
+    if (hasTagsOrBadge) {
+      await db.prepare(
+        'UPDATE products SET name=?, slug=?, description=?, price=?, compare_at_price=?, category_id=?, image_url=?, is_available=?, sort_order=?, tags=?, badge=? WHERE id=?'
+      ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description, data.price ?? existing.price, data.compare_at_price ?? existing.compare_at_price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, nextAvailable, data.sort_order ?? existing.sort_order, nextTags, nextBadge, id).run();
+    } else {
+      await db.prepare(
+        'UPDATE products SET name=?, slug=?, description=?, price=?, compare_at_price=?, category_id=?, image_url=?, is_available=?, sort_order=? WHERE id=?'
+      ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description, data.price ?? existing.price, data.compare_at_price ?? existing.compare_at_price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, nextAvailable, data.sort_order ?? existing.sort_order, id).run();
+    }
+  } catch (updateErr) {
+    const errMsg = String((updateErr as Error)?.message || '');
+    if (errMsg.includes('UNIQUE') && errMsg.includes('slug')) {
+      return c.json({ success: false, error: 'Slug already exists' }, 409);
+    }
+    try {
+      await db.prepare(
+        'UPDATE products SET name=?, slug=?, description=?, price=?, compare_at_price=?, category_id=?, image_url=?, is_available=?, sort_order=? WHERE id=?'
+      ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description, data.price ?? existing.price, data.compare_at_price ?? existing.compare_at_price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, nextAvailable, data.sort_order ?? existing.sort_order, id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE products SET name=?, description=?, price=?, category_id=?, image_url=?, is_available=? WHERE id=?'
+      ).bind(data.name ?? existing.name, data.description ?? existing.description, data.price ?? existing.price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, nextAvailable, id).run();
+    }
+  }
   await syncProductToMenuProjection(db, id);
   const row = (await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(id).first()) as Product | null;
   return c.json({ success: true, data: row });
@@ -145,7 +211,11 @@ productsRouter.delete('/:id', staffAuth, audit('product_delete'), async (c) => {
   }
   const orderItems = (await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first()) as { count: number } | null;
   if (orderItems && orderItems.count > 0) {
-    await db.prepare("UPDATE products SET is_available = 0, updated_at = datetime('now') WHERE id = ?").bind(id).run();
+    try {
+      await db.prepare("UPDATE products SET is_available = 0, updated_at = datetime('now') WHERE id = ?").bind(id).run();
+    } catch {
+      await db.prepare('UPDATE products SET is_available = 0 WHERE id = ?').bind(id).run();
+    }
     await syncProductAvailabilityProjection(db, id, 0);
   } else {
     await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();

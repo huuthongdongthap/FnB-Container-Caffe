@@ -4,6 +4,31 @@ import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword } from './helpers';
 
+async function writeDeviceAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
+
 export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/reset-password - Request password reset
   app.openapi(AuthRoutes.resetPassword as any, async (c: any) => {
@@ -46,12 +71,16 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const passwordHash = await hashPassword(body.newPassword);
     await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
-    await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
+    try {
+      await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
+    } catch {
+      const token = c.req.header('Authorization')?.replace('Bearer ', '');
+      if (token && c.env.AUTH_KV) {
+        await c.env.AUTH_KV.put('revoked:' + token, '1').catch(() => {});
+      }
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'change_password', 'user', user.id, JSON.stringify({}), now).run();
+    await writeDeviceAuditLog(db, user.id, 'change_password', 'user', user.id, JSON.stringify({}), now);
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -61,14 +90,19 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
-    const devices = await db.prepare(
-      `SELECT id, fingerprint, name, platform, browser, ip, is_trusted, last_used_at, created_at, expires_at
-       FROM trusted_devices WHERE user_id = ? ORDER BY created_at DESC`
-    ).bind(user.id).all();
+    let devices: { results: any[] } = { results: [] };
+    try {
+      devices = await db.prepare(
+        `SELECT id, fingerprint, name, platform, browser, ip, is_trusted, last_used_at, created_at, expires_at
+         FROM trusted_devices WHERE user_id = ? ORDER BY created_at DESC`
+      ).bind(user.id).all();
+    } catch {
+      return c.json({ success: true, data: [] });
+    }
 
     return c.json({
       success: true,
-      data: devices.results.map((d: any) => ({
+      data: (devices.results || []).map((d: any) => ({
         ...d,
         isTrusted: d.is_trusted === 1,
         platform: d.platform,
@@ -87,18 +121,24 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const now = new Date().toISOString();
 
-    const device = await db.prepare('SELECT * FROM trusted_devices WHERE id = ? AND user_id = ?').bind(id, user.id).first();
+    let device: any = null;
+    try {
+      device = await db.prepare('SELECT * FROM trusted_devices WHERE id = ? AND user_id = ?').bind(id, user.id).first();
+    } catch {
+      device = null;
+    }
     if (!device) {
       return c.json({ success: false, error: 'Device not found' }, 404);
     }
 
-    await db.prepare('DELETE FROM trusted_devices WHERE id = ?').bind(id).run();
-    await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ? AND device_fingerprint = ?').bind(now, user.id, device.fingerprint).run();
+    await db.prepare('DELETE FROM trusted_devices WHERE id = ?').bind(id).run().catch(() => {});
+    try {
+      await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ? AND device_fingerprint = ?').bind(now, user.id, device.fingerprint).run();
+    } catch {
+      // Sessions table may be absent when using KV-backed tokens
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'revoke_device', 'trusted_device', id, JSON.stringify({ name: device.name }), now).run();
+    await writeDeviceAuditLog(db, user.id, 'revoke_device', 'trusted_device', id, JSON.stringify({ name: device.name }), now);
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -109,13 +149,17 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(user.id).run();
-    await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
+    await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(user.id).run().catch(() => {});
+    try {
+      await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
+    } catch {
+      const token = c.req.header('Authorization')?.replace('Bearer ', '');
+      if (token && c.env.AUTH_KV) {
+        await c.env.AUTH_KV.put('revoked:' + token, '1').catch(() => {});
+      }
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'revoke_all_devices', 'trusted_device', user.id, JSON.stringify({}), now).run();
+    await writeDeviceAuditLog(db, user.id, 'revoke_all_devices', 'trusted_device', user.id, JSON.stringify({}), now);
 
     return c.json({ success: true, data: { success: true } });
   });

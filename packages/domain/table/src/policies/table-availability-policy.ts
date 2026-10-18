@@ -49,11 +49,22 @@ export async function checkTableAvailability(
   const stmt = params.length ? db.prepare(sql).bind(...params) : db.prepare(sql);
   const { results: tables } = await stmt.all<CanonicalTable>();
 
-  const rsvStmt = db.prepare(
-    `SELECT table_id, time FROM reservations
-     WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')`
-  ).bind(query.date);
-  const { results: rsvs } = await rsvStmt.all<{ table_id: string; time: string }>();
+  let rsvs: { table_id: string; time: string }[] = [];
+  try {
+    const rsvStmt = db.prepare(
+      `SELECT table_id, time FROM reservations
+       WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')`
+    ).bind(query.date);
+    const res = await rsvStmt.all<{ table_id: string; time: string }>();
+    rsvs = res.results || [];
+  } catch {
+    const rsvStmt = db.prepare(
+      `SELECT table_id, reservation_time as time FROM reservations
+       WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'seated')`
+    ).bind(query.date);
+    const res = await rsvStmt.all<{ table_id: string; time: string }>();
+    rsvs = res.results || [];
+  }
 
   const reservedMap = new Set(
     (rsvs || [])
@@ -62,7 +73,7 @@ export async function checkTableAvailability(
   );
 
   const mapped = (tables || []).map((t) => {
-    const isPhysicalAvailable = t.status === 'Available';
+    const isPhysicalAvailable = String(t.status).toLowerCase() === 'available';
     const isNotReserved = !reservedMap.has(t.id) && !reservedMap.has(String(t.table_number));
     return {
       ...t,

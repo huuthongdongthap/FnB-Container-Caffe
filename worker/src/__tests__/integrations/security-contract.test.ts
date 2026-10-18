@@ -183,4 +183,38 @@ describe('Security & Data Protection Contract — Canonical Invariants', () => {
     expect(evaluation.unresolvedBlockers).toBe(0);
     expect(evaluation.mitigatedFindings).toBe(5);
   });
+
+  it('supports operational staff roles (barista, kitchen, cashier, waiter, shipper, supervisor) and blocks guest IDOR', () => {
+    for (const role of ['barista', 'kitchen', 'cashier', 'waiter', 'shipper', 'supervisor'] as const) {
+      const dec = validateAccessControl(
+        { userId: `u-${role}`, userRole: role, userTenantId: 't1' },
+        { resourceType: 'order', resourceId: 'ord-1', tenantId: 't1', ownerId: 'other-cust' }
+      );
+      expect(dec.allowed).toBe(true);
+    }
+
+    const guestIdor = validateAccessControl(
+      { userId: 'guest-1', userRole: 'guest' },
+      { resourceType: 'order', resourceId: 'ord-99', ownerId: 'cust-99' }
+    );
+    expect(guestIdor.allowed).toBe(false);
+    expect(guestIdor.code).toBe('FORBIDDEN_IDOR');
+  });
+
+  it('redacts non-string sensitive fields, preserves Date instances, and handles cyclic references safely', () => {
+    const now = new Date('2026-10-18T00:00:00.000Z');
+    const cyclic: any = {
+      createdAt: now,
+      pin: 123456,
+      cvv: 999,
+    };
+    cyclic.self = cyclic;
+
+    const out = redactSensitiveObject(cyclic);
+    expect(out.createdAt).toBeInstanceOf(Date);
+    expect((out.createdAt as Date).toISOString()).toBe('2026-10-18T00:00:00.000Z');
+    expect(out.pin).toBe('[REDACTED]');
+    expect(out.cvv).toBe('[REDACTED]');
+    expect(out.self).toBe('[CIRCULAR]');
+  });
 });

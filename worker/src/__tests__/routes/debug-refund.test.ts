@@ -16,7 +16,6 @@ describe('debug', () => {
       prepare: (sql: string) => {
         prepCount++;
         const s = sql.replace(/\s+/g, ' ').trim();
-        console.log(`  [${prepCount}] ${s.slice(0, 90)}`);
         const n = s.toLowerCase();
         let target: any = null;
         if (n.includes('payments where')) target = { id: 'PAY_1', order_id: 'ORD_1', method: 'payos', amount: 50000, status: 'paid', transaction_id: '111', refund_status: null, refund_amount: null };
@@ -24,7 +23,7 @@ describe('debug', () => {
         if (n.includes('from customers')) target = { id: 'C1', loyalty_points: 500, lifetime_points: 500 };
         if (n.includes('from cashback_wallets')) target = { id: 'WAL_1', customer_id: 'C1', balance: 5000 };
         const stmt: any = { _sql: s, _binds: [], bind(..._a: any[]) { return stmt; } };
-        stmt.first = async () => { console.log(`  -> first() returns:`, target ? (target.id || target.refund_status || 'cust/wallet') : 'null'); return target; };
+        stmt.first = async () => target;
         stmt.all = async () => ({ results: [] });
         stmt.run = async () => ({ success: true, changes: 1 });
         stmt.raw = async () => [];
@@ -36,12 +35,25 @@ describe('debug', () => {
     };
     const env = { ...createMockEnv(), AURA_DB: db };
     const h = await ownerHeaders();
-    const req = new Request('https://x.api/payments/refund', { method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify({ paymentId: 'PAY_1', amount: 50000, reason: 't' }) });
+    const req = new Request('https://x.api/refund', { method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify({ paymentId: 'PAY_1', amount: 50000, reason: 't' }) });
     const r = await router.fetch(req, env);
     const text = await r.text();
-    console.log('\nStatus:', r.status);
-    console.log('Headers:', [...r.headers.entries()]);
-    console.log('Body:', text.slice(0, 200));
-    expect(true).toBe(true);
+    expect([200, 400, 404, 500, 502]).toContain(r.status);
+    expect(text.length).toBeGreaterThan(0);
+    expect(prepCount).toBeGreaterThan(0);
+    const parsed = JSON.parse(text);
+    expect(typeof parsed).toBe('object');
+  });
+
+  it('rejects unauthenticated refund request with 401', async () => {
+    const router = (await import('../../routes/refunds')).refundRouter;
+    const env = createMockEnv();
+    const req = new Request('https://x.api/refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentId: 'PAY_1', amount: 50000, reason: 't' }),
+    });
+    const res = await router.fetch(req, env);
+    expect(res.status).toBe(401);
   });
 });

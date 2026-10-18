@@ -20,8 +20,14 @@ export async function signQRUrl(slug: string, secret: string, baseUrl: string): 
 }
 
 export async function verifyQRSignature(slug: string, ts: number, sig: string, secret: string): Promise<boolean> {
+  if (!Number.isFinite(ts)) return false;
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - ts) > WINDOW_SECONDS) return false;
   const expected = await sha256Hex(`${ts}|${slug}|${secret}`);
-  return sig === expected;
+  if (typeof sig !== 'string' || sig.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+  }
+  return diff === 0;
 }

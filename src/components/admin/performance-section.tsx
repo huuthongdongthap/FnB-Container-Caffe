@@ -17,13 +17,14 @@ export type { WebVitalData, WebVitalCardProps, PercentileCardProps, ErrorCardPro
    ═══════════════════════════════════════════════════════════════════ */
 
 export function PerformanceSection() {
+  const range = usePerformanceStore((s) => s.range);
   const fetchWebVitals = usePerformanceStore((s) => s.fetchWebVitals);
   const fetchAPILatency = usePerformanceStore((s) => s.fetchAPILatency);
 
   useEffect(() => {
     fetchWebVitals();
     fetchAPILatency();
-  }, [fetchWebVitals, fetchAPILatency]);
+  }, [range, fetchWebVitals, fetchAPILatency]);
 
   return (
     <div className="space-y-6">

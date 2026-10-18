@@ -13,8 +13,18 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
 
-  const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
-    .bind(cust.loyalty_tier || DEFAULT_TIER).first<LoyaltyTier>();
+  let tier: LoyaltyTier | null = null;
+  try {
+    tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
+      .bind(cust.loyalty_tier || DEFAULT_TIER).first<LoyaltyTier>();
+  } catch {
+    try {
+      tier = await db.prepare('SELECT tier AS tier_name, min_points, cashback_rate, points_multiplier, perks FROM tier_configs WHERE tier = ?')
+        .bind(cust.loyalty_tier || DEFAULT_TIER).first<LoyaltyTier>();
+    } catch {
+      tier = null;
+    }
+  }
 
   let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
     .bind(cust.id).first<CashbackWallet>();
@@ -26,8 +36,18 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
     wallet = { id: wid, customer_id: cust.id, balance: 0, total_earned: 0, total_spent: 0, created_at: now, updated_at: now };
   }
 
-  const nextTier = await db.prepare('SELECT tier_name, min_points FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1')
-    .bind(cust.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+  let nextTier: { tier_name: string; min_points: number } | null = null;
+  try {
+    nextTier = await db.prepare('SELECT tier_name, min_points FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1')
+      .bind(cust.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+  } catch {
+    try {
+      nextTier = await db.prepare('SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? ORDER BY min_points ASC LIMIT 1')
+        .bind(cust.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+    } catch {
+      nextTier = null;
+    }
+  }
 
   let activeRewards: { cnt: number }[] = [];
   try {
@@ -47,9 +67,16 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
   }
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
-  const expiring = await db.prepare(
-    'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE wallet_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
-  ).bind(wallet.id, sevenDaysFromNow).first<{ total: number }>();
+  let expiring: { total: number } | null = null;
+  try {
+    expiring = await db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE wallet_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
+    ).bind(wallet.id, sevenDaysFromNow).first<{ total: number }>();
+  } catch {
+    expiring = await db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
+    ).bind(cust.id, sevenDaysFromNow).first<{ total: number }>();
+  }
 
   return c.json({
     success: true,

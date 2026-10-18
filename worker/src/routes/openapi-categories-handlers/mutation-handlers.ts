@@ -25,27 +25,41 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     const viName = body.translations?.find((t) => t.locale === 'vi')?.name || body.name;
     const enName = body.translations?.find((t) => t.locale === 'en')?.name || null;
 
-    await db.prepare(
-      `INSERT INTO categories (id, name, slug, description, sort_order, image_url, display_name_vi, display_name_en, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.name,
-      body.slug || id,
-      body.description || null,
-      sortOrder,
-      body.imageUrl || null,
-      viName,
-      enName,
-      now,
-      now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO categories (id, name, slug, description, sort_order, image_url, display_name_vi, display_name_en, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.slug || id,
+        body.description || null,
+        sortOrder,
+        body.imageUrl || null,
+        viName,
+        enName,
+        now,
+        now
+      ).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO categories (id, name, description, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(id, body.name, body.description || null, sortOrder, now).run();
+    }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'category_create', 'category', id, JSON.stringify(body), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'category_create', 'category', id, JSON.stringify(body), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, 'category_create', user.id, 'category', id, JSON.stringify(body), now).run().catch(() => {});
+    }
 
     const created = (await db.prepare(
       'SELECT c.* FROM categories c WHERE c.id = ?'
@@ -99,14 +113,36 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     params.push(id);
 
     if (updates.length > 1) {
-      await db.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      try {
+        await db.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      } catch {
+        const fallbackUpdates: string[] = [];
+        const fallbackParams: (string | number | null)[] = [];
+        if (body.name !== undefined) { fallbackUpdates.push('name = ?'); fallbackParams.push(body.name); }
+        if (body.description !== undefined) { fallbackUpdates.push('description = ?'); fallbackParams.push(body.description); }
+        if (body.sortOrder !== undefined || body.displayOrder !== undefined) {
+          fallbackUpdates.push('sort_order = ?');
+          fallbackParams.push(body.sortOrder ?? body.displayOrder ?? 0);
+        }
+        if (fallbackUpdates.length > 0) {
+          fallbackParams.push(id);
+          await db.prepare(`UPDATE categories SET ${fallbackUpdates.join(', ')} WHERE id = ?`).bind(...fallbackParams).run();
+        }
+      }
     }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'category_update', 'category', id, JSON.stringify(body), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'category_update', 'category', id, JSON.stringify(body), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, 'category_update', user.id, 'category', id, JSON.stringify(body), now).run().catch(() => {});
+    }
 
     const updated = (await db.prepare(
       'SELECT c.* FROM categories c WHERE c.id = ?'
@@ -136,10 +172,17 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     await db.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'category_delete', 'category', id, JSON.stringify({ name: existing.name }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'category_delete', 'category', id, JSON.stringify({ name: existing.name }), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, 'category_delete', user.id, 'category', id, JSON.stringify({ name: existing.name }), now).run().catch(() => {});
+    }
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -155,16 +198,29 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     const { items } = body;
 
     for (const item of items) {
-      await db.prepare(
-        'UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?'
-      ).bind(item.sortOrder, now, item.id).run();
+      try {
+        await db.prepare(
+          'UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?'
+        ).bind(item.sortOrder, now, item.id).run();
+      } catch {
+        await db.prepare(
+          'UPDATE categories SET sort_order = ? WHERE id = ?'
+        ).bind(item.sortOrder, item.id).run();
+      }
     }
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'category_reorder', 'category', 'multiple', JSON.stringify({ items }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'category_reorder', 'category', 'multiple', JSON.stringify({ items }), now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, 'category_reorder', user.id, 'category', 'multiple', JSON.stringify({ items }), now).run().catch(() => {});
+    }
 
     return c.json({ success: true, data: { success: true } });
   });

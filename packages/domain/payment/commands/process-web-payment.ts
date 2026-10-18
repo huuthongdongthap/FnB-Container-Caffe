@@ -50,7 +50,7 @@ interface GooglePayToken {
   };
 }
 
-webPaymentRouter.post('/payment-request', requireAuth(['owner', 'manager', 'staff', 'admin', 'cashier', 'customer']) as any, async (c) => {
+webPaymentRouter.post('/payment-request', requireAuth(['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter', 'customer']) as any, async (c) => {
   const db = getDatabase(c);
   const mc = createMetricsCollector(db);
   const locale = (c.req.query('locale') || 'vi') as 'vi' | 'en';
@@ -107,7 +107,8 @@ webPaymentRouter.post('/payment-request', requireAuth(['owner', 'manager', 'staf
       user.role === 'manager' ||
       user.role === 'staff' ||
       user.role === 'admin' ||
-      user.role === 'cashier';
+      user.role === 'cashier' ||
+      user.role === 'waiter';
     if (!isStaffOrOwner && (!orderRow.customer_id || orderRow.customer_id !== user.id)) {
       return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
     }

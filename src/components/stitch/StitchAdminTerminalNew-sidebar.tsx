@@ -115,11 +115,20 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                   borderImageSlice: 1,
                 }}
               >
-                <img
-                  className="h-full w-full object-cover"
-                  src={adminAvatarUrl}
-                  alt={tTerminal('adminAvatar')}
-                />
+                {adminAvatarUrl?.trim() ? (
+                  <img
+                    className="h-full w-full object-cover"
+                    src={adminAvatarUrl}
+                    alt={tTerminal('adminAvatar')}
+                  />
+                ) : (
+                  <span
+                    className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase text-[var(--aura-text-primary, #e8e8e8)]"
+                    aria-label={tTerminal('adminAvatar')}
+                  >
+                    {adminName?.charAt(0) || 'A'}
+                  </span>
+                )}
               </div>
               <div>
                 <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">{adminName}</p>

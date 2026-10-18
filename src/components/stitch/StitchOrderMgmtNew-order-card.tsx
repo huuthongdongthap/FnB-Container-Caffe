@@ -126,7 +126,7 @@ export function OrderCard({ order, onAction, onViewDetails }: Readonly<OrderCard
           <div className="grid grid-cols-2 gap-2">
             <OrderActionButton
               label={tTerminal('details')}
-              onClick={onViewDetails ?? (isServed ? undefined : onAction)}
+              onClick={onViewDetails}
             />
             <OrderActionButton
               label={tTerminal(actionLabel.toLowerCase()) || actionLabel}

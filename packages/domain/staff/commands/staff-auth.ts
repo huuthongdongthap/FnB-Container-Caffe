@@ -52,20 +52,53 @@ async function verifyPin(pin: string, stored: string): Promise<boolean> {
 
 // ── Internal helpers ────────────────────────────────────────────────
 
+type StaffDeviceRole =
+  | 'owner'
+  | 'admin'
+  | 'manager'
+  | 'staff'
+  | 'waiter'
+  | 'cashier'
+  | 'kitchen'
+  | 'barista'
+  | 'chef';
+
+const MANAGER_MANAGED_ROLES = new Set(['staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef']);
+
+const VALID_DEVICE_ROLES = new Set<StaffDeviceRole>([
+  'owner',
+  'admin',
+  'manager',
+  'staff',
+  'waiter',
+  'cashier',
+  'kitchen',
+  'barista',
+  'chef',
+]);
+
+function normalizeDeviceRole(rawRole: unknown): StaffDeviceRole {
+  const roleStr = String(rawRole ?? 'staff').trim().toLowerCase();
+  if (VALID_DEVICE_ROLES.has(roleStr as StaffDeviceRole)) {
+    return roleStr as StaffDeviceRole;
+  }
+  return 'staff';
+}
+
 async function findDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1Database; AUTH_KV: import('@cloudflare/workers-types').KVNamespace }, token: string) {
   const row = await env.AURA_DB
     .prepare('SELECT * FROM staff_devices WHERE device_token = ?')
     .bind(token)
     .first<{
       id: string; staff_id: string; device_token: string;
-      pin_hash: string; role: 'owner' | 'manager' | 'staff' | 'waiter';
+      pin_hash: string; role: StaffDeviceRole;
     }>();
   return row ?? null;
 }
 
 async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1Database }, data: {
   staff_id: string; device_token: string; device_name?: string;
-  role: 'owner' | 'manager' | 'staff' | 'waiter'; pin_hash: string;
+  role: StaffDeviceRole; pin_hash: string;
 }) {
   const now = new Date().toISOString();
   await env.AURA_DB
@@ -159,10 +192,18 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
         staffName = parsedStaff.name || '';
       }
       if (!staffEmail && !staffName && c.env.AURA_DB) {
-        const d1Staff = await c.env.AURA_DB
-          .prepare('SELECT email, name FROM users WHERE id = ?')
-          .bind(device.staff_id)
-          .first<{ email?: string; name?: string }>();
+        let d1Staff: { email?: string; name?: string } | null = null;
+        try {
+          d1Staff = await c.env.AURA_DB
+            .prepare('SELECT email, name FROM users WHERE id = ?')
+            .bind(device.staff_id)
+            .first<{ email?: string; name?: string }>();
+        } catch {
+          d1Staff = await c.env.AURA_DB
+            .prepare('SELECT username as email, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
+            .bind(device.staff_id)
+            .first<{ email?: string; name?: string }>();
+        }
         if (d1Staff) {
           staffEmail = d1Staff.email || '';
           staffName = d1Staff.name || '';
@@ -219,10 +260,18 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
         staffName = parsedStaff.name || '';
       }
       if (!staffEmail && !staffName && c.env.AURA_DB) {
-        const d1Staff = await c.env.AURA_DB
-          .prepare('SELECT email, name FROM users WHERE id = ?')
-          .bind(device.staff_id)
-          .first<{ email?: string; name?: string }>();
+        let d1Staff: { email?: string; name?: string } | null = null;
+        try {
+          d1Staff = await c.env.AURA_DB
+            .prepare('SELECT email, name FROM users WHERE id = ?')
+            .bind(device.staff_id)
+            .first<{ email?: string; name?: string }>();
+        } catch {
+          d1Staff = await c.env.AURA_DB
+            .prepare('SELECT username as email, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
+            .bind(device.staff_id)
+            .first<{ email?: string; name?: string }>();
+        }
         if (d1Staff) {
           staffEmail = d1Staff.email || '';
           staffName = d1Staff.name || '';
@@ -251,14 +300,24 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
 export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
   try {
     const rawBody = await c.req.json<Record<string, unknown>>();
+    const hasExplicitRole = rawBody.role !== undefined;
+    const requestedRole = String(rawBody.role ?? 'staff').trim().toLowerCase();
+    const isExtendedValidRole = VALID_DEVICE_ROLES.has(requestedRole as StaffDeviceRole);
     const body = {
       ...rawBody,
-      role: ['kitchen', 'barista', 'chef'].includes(String(rawBody.role)) ? 'staff' : rawBody.role,
+      role: !hasExplicitRole
+        ? undefined
+        : isExtendedValidRole
+          ? (['owner', 'manager', 'staff', 'waiter'].includes(requestedRole) ? requestedRole : 'staff')
+          : rawBody.role,
     };
     const parsed = registerDeviceSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
-    const { device_token, device_name, staff_id, role, pin } = parsed.data;
+    const { device_token, device_name, staff_id, pin } = parsed.data;
+    const role: StaffDeviceRole = hasExplicitRole && isExtendedValidRole
+      ? normalizeDeviceRole(requestedRole)
+      : normalizeDeviceRole(parsed.data.role);
 
     const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
     if (!staff_id) return errorResponse('staff_id là bắt buộc', 400);
@@ -269,10 +328,18 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
       : null;
     if (!user && c.env.AURA_DB) {
       try {
-        const d1User = await c.env.AURA_DB
-          .prepare('SELECT id, name FROM users WHERE id = ?')
-          .bind(staff_id)
-          .first<{ id: string; name: string }>();
+        let d1User: { id: string; name?: string } | null = null;
+        try {
+          d1User = await c.env.AURA_DB
+            .prepare('SELECT id, name FROM users WHERE id = ?')
+            .bind(staff_id)
+            .first<{ id: string; name?: string }>();
+        } catch {
+          d1User = await c.env.AURA_DB
+            .prepare('SELECT id, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
+            .bind(staff_id)
+            .first<{ id: string; name?: string }>();
+        }
         if (d1User?.id) {
           user = { id: d1User.id, name: d1User.name || d1User.id };
         }
@@ -285,7 +352,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     const callerRole = c.get('user')?.role as string | undefined;
     if (!callerRole) return errorResponse('Vui lòng đăng nhập', 401);
 
-    if (callerRole === 'manager' && !['staff', 'waiter'].includes(role)) {
+    if (callerRole === 'manager' && !MANAGER_MANAGED_ROLES.has(role) && !MANAGER_MANAGED_ROLES.has(requestedRole)) {
       return errorResponse('Manager chỉ đăng ký được bếp/phục vụ', 403);
     } else if (!['owner', 'admin', 'manager'].includes(callerRole)) {
       return errorResponse('Chỉ owner hoặc manager đăng ký thiết bị', 403);
@@ -294,7 +361,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     const pinHash = await hashPin(pin);
     await upsertDevice(c.env, {
       staff_id: user.id, device_token, device_name,
-      role: role as 'owner' | 'manager' | 'staff' | 'waiter', pin_hash: pinHash,
+      role: role as StaffDeviceRole, pin_hash: pinHash,
     });
 
     return jsonResponse({
@@ -327,7 +394,7 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
       callerRole === 'owner' ||
       callerRole === 'admin' ||
       device.staff_id === callerId ||
-      (callerRole === 'manager' && ['staff', 'waiter'].includes(device.role));
+      (callerRole === 'manager' && MANAGER_MANAGED_ROLES.has(device.role));
     if (!canDelete) return errorResponse('Không đủ quyền xóa thiết bị', 403);
 
     await c.env.AURA_DB
@@ -356,7 +423,7 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
         .all();
     } else if (callerRole === 'manager') {
       rows = await c.env.AURA_DB
-        .prepare("SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE role IN ('staff','waiter') ORDER BY created_at DESC")
+        .prepare("SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE role IN ('staff','waiter','cashier','kitchen','barista','chef') ORDER BY created_at DESC")
         .all();
     } else {
       rows = await c.env.AURA_DB

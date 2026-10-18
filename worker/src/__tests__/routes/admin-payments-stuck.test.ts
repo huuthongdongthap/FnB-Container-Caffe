@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TEST_JWT_SECRET, createMockKV } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
+import { getStuckPayments } from '../../routes/admin-handlers';
 
 describe('GET /api/admin/payments/stuck', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -13,7 +14,7 @@ describe('GET /api/admin/payments/stuck', () => {
     mockKV = createMockKV();
   });
 
-  it('returns { stuck, dlq, total } for owner role', async() => {
+  it('returns { stuck, dlq, total } with full amounts for owner role', async() => {
     await mockKV.put('payment:stuck:ORD_99', JSON.stringify({
       orderId: 'ORD_99',
       orderCode: '12345',
@@ -22,37 +23,47 @@ describe('GET /api/admin/payments/stuck', () => {
       detectedAt: new Date().toISOString()
     }));
 
-    const stuckKeys = await mockKV.list({ prefix: 'payment:stuck:' });
-    const dlqKeys = await mockKV.list({ prefix: 'webhook:dlq:' });
-
-    expect(stuckKeys.keys).toHaveLength(1);
-    expect(dlqKeys.keys).toHaveLength(0);
-
-    const raw = await mockKV.get('payment:stuck:ORD_99');
-    const parsed = JSON.parse(raw!);
-
-    const result = {
-      stuck: [{ ...parsed, amount: '***' }],
-      dlq: [],
-      total: stuckKeys.keys.length + dlqKeys.keys.length
+    const ownerToken = await generateJWT(
+      { id: 'USR_OWNER', email: 'owner@test.com', name: 'Owner', role: 'owner' },
+      TEST_JWT_SECRET
+    );
+    const req = new Request('https://test.aura/api/admin/payments/stuck', {
+      headers: { Authorization: `Bearer ${ownerToken}` }
+    });
+    const res = await getStuckPayments(req, { AUTH_KV: mockKV, JWT_SECRET: TEST_JWT_SECRET });
+    expect(res.status).toBe(200);
+    const result = await res.json() as {
+      stuck: Array<{ orderId: string; dbAmount: unknown; webhookAmount: unknown }>;
+      dlq: unknown[];
+      total: number;
     };
 
     expect(result.stuck).toHaveLength(1);
-    expect(result.stuck[0].amount).toBe('***');
+    expect(result.stuck[0].orderId).toBe('ORD_99');
+    expect(result.stuck[0].dbAmount).toBe(50000);
+    expect(result.stuck[0].webhookAmount).toBe(60000);
     expect(result.dlq).toEqual([]);
     expect(result.total).toBe(1);
   });
 
   it('returns { stuck: [], dlq: [], total: 0 } when KV has no stuck payments', async() => {
-    const stuckKeys = await mockKV.list({ prefix: 'payment:stuck:' });
-    const dlqKeys = await mockKV.list({ prefix: 'webhook:dlq:' });
+    const ownerToken = await generateJWT(
+      { id: 'USR_OWNER', email: 'owner@test.com', name: 'Owner', role: 'owner' },
+      TEST_JWT_SECRET
+    );
+    const req = new Request('https://test.aura/api/admin/payments/stuck', {
+      headers: { Authorization: `Bearer ${ownerToken}` }
+    });
+    const res = await getStuckPayments(req, { AUTH_KV: mockKV, JWT_SECRET: TEST_JWT_SECRET });
+    expect(res.status).toBe(200);
+    const result = await res.json() as { stuck: unknown[]; dlq: unknown[]; total: number };
 
-    expect(stuckKeys.keys).toHaveLength(0);
-    expect(dlqKeys.keys).toHaveLength(0);
-    expect(stuckKeys.keys.length + dlqKeys.keys.length).toBe(0);
+    expect(result.stuck).toHaveLength(0);
+    expect(result.dlq).toHaveLength(0);
+    expect(result.total).toBe(0);
   });
 
-  it('masks amounts in stuck payment list', async() => {
+  it('masks dbAmount and webhookAmount in stuck payment list for non-owner roles', async() => {
     await mockKV.put('payment:stuck:ORD_1', JSON.stringify({
       orderId: 'ORD_1',
       dbAmount: 150000,
@@ -60,13 +71,24 @@ describe('GET /api/admin/payments/stuck', () => {
       detectedAt: new Date().toISOString()
     }));
 
-    const raw = await mockKV.get('payment:stuck:ORD_1');
-    const parsed = JSON.parse(raw!);
-    const masked = { ...parsed, amount: '***' };
+    const staffToken = await generateJWT(
+      { id: 'USR_STAFF', email: 'staff@test.com', name: 'Staff', role: 'staff' },
+      TEST_JWT_SECRET
+    );
+    const req = new Request('https://test.aura/api/admin/payments/stuck', {
+      headers: { Authorization: `Bearer ${staffToken}` }
+    });
+    const res = await getStuckPayments(req, { AUTH_KV: mockKV, JWT_SECRET: TEST_JWT_SECRET });
+    expect(res.status).toBe(200);
+    const result = await res.json() as {
+      stuck: Array<{ orderId: string; amount: string; dbAmount: string; webhookAmount: string }>;
+    };
 
-    expect(masked.amount).toBe('***');
-    expect(masked.dbAmount).toBe(150000);
-    expect(masked.orderId).toBe('ORD_1');
+    expect(result.stuck).toHaveLength(1);
+    expect(result.stuck[0].orderId).toBe('ORD_1');
+    expect(result.stuck[0].amount).toBe('***');
+    expect(result.stuck[0].dbAmount).toBe('***');
+    expect(result.stuck[0].webhookAmount).toBe('***');
   });
 
   it('includes DLQ entries with key name', async() => {

@@ -51,9 +51,24 @@ categoriesRouter.post('/', staffAuth, async (c) => {
   }
   const data = parsed.data;
   const id = `cat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  await db.prepare(
-    'INSERT INTO categories (id, name, slug, sort_order, image_url) VALUES (?, ?, ?, ?, ?)'
-  ).bind(id, data.name, data.slug || '', data.sort_order || 0, data.image_url || '').run();
+  const resolvedSlug =
+    data.slug ||
+    data.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') ||
+    id;
+  try {
+    await db.prepare(
+      'INSERT INTO categories (id, name, slug, sort_order, image_url) VALUES (?, ?, ?, ?, ?)'
+    ).bind(id, data.name, resolvedSlug, data.sort_order || 0, data.image_url || '').run();
+  } catch {
+    await db.prepare(
+      'INSERT INTO categories (id, name, slug, sort_order) VALUES (?, ?, ?, ?)'
+    ).bind(id, data.name, resolvedSlug, data.sort_order || 0).run();
+  }
   const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<Category>();
   return c.json({ success: true, data: row }, 201);
 });
@@ -81,9 +96,25 @@ const handleUpdateCategory = async (c: any) => {
   if (!existing) {
     return c.json({ success: false, error: 'Category not found' }, 404);
   }
-  await db.prepare(
-    'UPDATE categories SET name=?, slug=?, sort_order=?, image_url=? WHERE id=?'
-  ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.sort_order ?? existing.sort_order, data.image_url ?? existing.image_url, id).run();
+  const nextName = data.name ?? existing.name;
+  const nextSlug =
+    (data.slug !== undefined && data.slug !== '' ? data.slug : existing.slug) ||
+    nextName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') ||
+    id;
+  try {
+    await db.prepare(
+      'UPDATE categories SET name=?, slug=?, sort_order=?, image_url=? WHERE id=?'
+    ).bind(nextName, nextSlug, data.sort_order ?? existing.sort_order, data.image_url ?? existing.image_url, id).run();
+  } catch {
+    await db.prepare(
+      'UPDATE categories SET name=?, slug=?, sort_order=? WHERE id=?'
+    ).bind(nextName, nextSlug, data.sort_order ?? existing.sort_order, id).run();
+  }
   if (data.slug && data.slug !== existing.slug) {
     await syncCategorySlugToMenuProjection(db, id, data.slug);
   }

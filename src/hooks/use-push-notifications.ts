@@ -13,7 +13,23 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-export function usePushNotifications() {
+const KNOWN_PUSH_ROLES = new Set([
+  'customer',
+  'staff',
+  'staff-kitchen',
+  'staff-cashier',
+  'staff-waiter',
+  'owner',
+  'manager',
+  'admin',
+  'waiter',
+  'kitchen',
+  'barista',
+  'chef',
+  'cashier',
+]);
+
+export function usePushNotifications(defaultToken?: string) {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
@@ -35,7 +51,7 @@ export function usePushNotifications() {
     }
   }, []);
 
-  const subscribe = useCallback(async (customerId?: string, role: string = 'customer') => {
+  const subscribe = useCallback(async (customerId?: string, role: string = 'customer', token?: string) => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setError('Trinh duyet khong ho tro thong bao');
       return false;
@@ -64,10 +80,10 @@ export function usePushNotifications() {
       }
 
       // Register service worker if not already controlled
- if (!navigator.serviceWorker.controller) {
-   await navigator.serviceWorker.register('/sw.js');
- }
- const reg = await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) {
+        await navigator.serviceWorker.register('/sw.js');
+      }
+      const reg = await navigator.serviceWorker.ready;
 
       // Subscribe
       const subscription = await reg.pushManager.subscribe({
@@ -75,18 +91,26 @@ export function usePushNotifications() {
         applicationServerKey: urlBase64ToUint8Array(keyData.publicKey) as unknown as BufferSource,
       });
 
+      const isRoleAsFirstArg = Boolean(customerId && KNOWN_PUSH_ROLES.has(customerId) && role === 'customer');
+      const resolvedCustomerId = isRoleAsFirstArg ? null : (customerId || null);
+      const resolvedRole = isRoleAsFirstArg ? customerId! : (role || 'customer');
+      const authToken = token || defaultToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
       // Send to backend
       const subData = subscription.toJSON();
       const subscribeRes = await fetch(`${API_BASE}/api/push/subscribe`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           endpoint: subData.endpoint,
           auth_key: subData.keys?.auth || '',
           p256dh_key: subData.keys?.p256dh || '',
-          customer_id: customerId || null,
+          customer_id: resolvedCustomerId,
           user_agent: navigator.userAgent,
-    role,
+          role: resolvedRole,
         }),
       });
 
@@ -105,9 +129,9 @@ export function usePushNotifications() {
       setSubscribing(false);
       return false;
     }
-  }, []);
+  }, [defaultToken]);
 
-  const unsubscribe = useCallback(async () => {
+  const unsubscribe = useCallback(async (tokenOrEvent?: string | unknown) => {
     try {
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.ready;
@@ -115,11 +139,17 @@ export function usePushNotifications() {
         if (sub) {
           await sub.unsubscribe();
 
+          const explicitToken = typeof tokenOrEvent === 'string' ? tokenOrEvent : undefined;
+          const authToken = explicitToken || defaultToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null);
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
           // Notify backend
           const subData = sub.toJSON();
           await fetch(`${API_BASE}/api/push/unsubscribe`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            headers,
             body: JSON.stringify({ endpoint: subData.endpoint }),
           });
         }
@@ -128,7 +158,7 @@ export function usePushNotifications() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Loi huy dang ky');
     }
-  }, []);
+  }, [defaultToken]);
 
   return {
     permission,

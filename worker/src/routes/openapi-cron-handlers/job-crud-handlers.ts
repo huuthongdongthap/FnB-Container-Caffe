@@ -2,11 +2,36 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
 import { formatJob } from './helpers';
+import { getDatabase } from '../../lib/db';
+
+async function writeCronJobAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, 'cron_job', entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, 'cron_job', entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
 
 export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/cron/jobs - List cron jobs
   app.openapi(CronRoutes.list as any, async (c: any) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', status, locationId, isActive } = query;
 
@@ -26,30 +51,37 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(isActive ? 1 : 0);
     }
 
-    const countResult = await db.prepare(
-      `SELECT COUNT(*) as total FROM cron_jobs ${whereClause}`
-    ).bind(...params).first();
-    const total = countResult?.total || 0;
+    let total = 0;
+    let jobs: any[] = [];
+    try {
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM cron_jobs ${whereClause}`
+      ).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
 
-    const offset = (page - 1) * limit;
-    const allowedSorts: Record<string, string> = {
-      name: 'name',
-      next_run_at: 'next_run_at',
-      nextRunAt: 'next_run_at',
-      last_run_at: 'last_run_at',
-      lastRunAt: 'last_run_at',
-      created_at: 'created_at',
-      createdAt: 'created_at',
-      status: 'status',
-    };
-    const sortCol = allowedSorts[sort] || 'created_at';
-    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    const orderClause = `${sortCol} ${sortDir}`;
-    const rows = await db.prepare(
-      `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+      const offset = (page - 1) * limit;
+      const allowedSorts: Record<string, string> = {
+        name: 'name',
+        next_run_at: 'next_run_at',
+        nextRunAt: 'next_run_at',
+        last_run_at: 'last_run_at',
+        lastRunAt: 'last_run_at',
+        created_at: 'created_at',
+        createdAt: 'created_at',
+        status: 'status',
+      };
+      const sortCol = allowedSorts[sort] || 'created_at';
+      const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      const orderClause = `${sortCol} ${sortDir}`;
+      const rows = (await db.prepare(
+        `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const jobs = rows.results.map(formatJob);
+      jobs = (rows.results || []).map(formatJob);
+    } catch {
+      total = 0;
+      jobs = [];
+    }
 
     return c.json({
       success: true,
@@ -59,10 +91,15 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/cron/jobs/:id - Get cron job by ID
   app.openapi(CronRoutes.get as any, async (c: any) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
+    let job: any = null;
+    try {
+      job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
+    } catch {
+      job = null;
+    }
 
     if (!job) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
@@ -76,7 +113,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/cron/jobs - Create cron job
   app.openapi(CronRoutes.create as any, async (c: any) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -114,10 +151,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'cron_job_create', 'cron_job', id, JSON.stringify(body), now).run();
+    await writeCronJobAuditLog(db, user.id, 'cron_job_create', id, JSON.stringify(body), now);
 
     const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
@@ -129,13 +163,13 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PUT /api/cron/jobs/:id - Update cron job
   app.openapi(CronRoutes.update as any, async (c: any) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
+    const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null);
     if (!existing) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
@@ -180,10 +214,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare(`UPDATE cron_jobs SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'cron_job_update', 'cron_job', id, JSON.stringify(body), now).run();
+    await writeCronJobAuditLog(db, user.id, 'cron_job_update', id, JSON.stringify(body), now);
 
     const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
@@ -195,12 +226,12 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // DELETE /api/cron/jobs/:id - Delete cron job
   app.openapi(CronRoutes.delete as any, async (c: any) => {
-    const db = c.env.AURA_DB;
+    const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
+    const existing = (await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null)) as any;
     if (!existing) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
@@ -208,10 +239,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare('DELETE FROM cron_jobs WHERE id = ?').bind(id).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'cron_job_delete', 'cron_job', id, JSON.stringify({ name: existing.name }), now).run();
+    await writeCronJobAuditLog(db, user.id, 'cron_job_delete', id, JSON.stringify({ name: existing.name }), now);
 
     return c.json({ success: true, data: { deleted: true } });
   });

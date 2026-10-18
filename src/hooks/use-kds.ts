@@ -159,7 +159,10 @@ export function useKDS(station: string = 'all'): KDSResult {
     es.addEventListener('snapshot', (event: MessageEvent) => {
       try {
         const orders = mapStreamOrders(JSON.parse(event.data as string) as KdsStreamOrder[]);
-        queryClient.setQueryData<KDSOrder[]>(['kds-orders', 'all'], orders);
+        const prev = queryClient.getQueryData<KDSOrder[]>(['kds-orders', 'all']) || [];
+        const snapshotIds = new Set(orders.map((o) => o.id));
+        const preservedReady = prev.filter((o) => o.status === 'ready' && !snapshotIds.has(o.id));
+        queryClient.setQueryData<KDSOrder[]>(['kds-orders', 'all'], [...orders, ...preservedReady]);
       } catch { /* ignore malformed frame */ }
     });
     es.onerror = () => {

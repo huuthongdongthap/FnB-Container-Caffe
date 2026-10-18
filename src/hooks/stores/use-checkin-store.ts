@@ -45,13 +45,17 @@ export const useCheckinStore = create<CheckinState>((set) => ({
     try {
       const body = await apiFetch<any>('/api/loyalty/checkin', {
         method: 'POST',
-        body: JSON.stringify({ phone: phoneClean }),
+        body: JSON.stringify({ phone: phoneClean, customer_id: phoneClean }),
       });
 
       set({
         checkinResult: {
-          points: body.data?.points ?? 0,
-          reward: body.data?.reward ?? 'Đã ghi nhận',
+          points: body.data?.points ?? body.data?.reward_amount ?? 0,
+          reward:
+            body.data?.reward ??
+            (body.data?.reward_amount
+              ? `+${Number(body.data.reward_amount).toLocaleString('vi-VN')}đ`
+              : 'Đã ghi nhận'),
         },
         loading: false,
         error: null,

@@ -39,7 +39,7 @@ export interface OrderItemStation {
 const kitchenStationsRouter = new Hono<{ Bindings: Env }>();
 
 // All station management + KDS views require staff auth.
-kitchenStationsRouter.use('/*', requireStaff(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']));
+kitchenStationsRouter.use('/*', requireStaff(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']));
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);

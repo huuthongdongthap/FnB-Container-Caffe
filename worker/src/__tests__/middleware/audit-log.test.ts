@@ -7,6 +7,7 @@
  * Will be updated in Phase 3 when audit-log.ts becomes canonical.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { audit } from '../../middleware/audit-log';
 
 function mockAuditContext(overrides: {
   user?: Record<string, unknown> | null;
@@ -25,17 +26,23 @@ function mockAuditContext(overrides: {
   const ua = overrides.userAgent || 'vitest';
 
   // Build a Hono-like context with same API surface
+  const headersMap = new Map([
+    ['cf-connecting-ip', ip],
+    ['user-agent', ua],
+    ['x-forwarded-for', ip]
+  ]);
   return {
     req: {
       method,
+      path,
       url: `https://test.aura${path}`,
-      headers: new Map([
-        ['cf-connecting-ip', ip],
-        ['user-agent', ua],
-        ['x-forwarded-for', ip]
-      ])
+      headers: headersMap,
+      header: (name: string) => headersMap.get(name.toLowerCase()),
+      param: () => overrides.targetId ?? undefined,
     },
+    res: { status: 200 },
     env: { AURA_DB: db },
+    executionCtx: { waitUntil: (p: Promise<unknown>) => { void p; } },
     get: (key: string) => (key === 'user' ? user : undefined),
     set: vi.fn(),
     json: vi.fn().mockImplementation((body: unknown) => new Response(JSON.stringify(body), {
@@ -160,5 +167,37 @@ describe('audit middleware (JS version — admin_audit_log table)', () => {
     expect(defaults.admin_id).toBe('unknown');
     expect(defaults.admin_email).toBe('unknown');
     expect(defaults.admin_role).toBe('unknown');
+  });
+
+  it('executes the real audit middleware export cleanly', async () => {
+    const runSpy = vi.fn().mockResolvedValue({});
+    let realSql = '';
+    let realBinds: unknown[] = [];
+    const mockDB = {
+      prepare: vi.fn((sql: string) => {
+        realSql = sql;
+        return {
+          bind: vi.fn((...args: unknown[]) => {
+            realBinds = args;
+            return { run: runSpy };
+          }),
+        };
+      }),
+    };
+    const c = mockAuditContext({
+      user: { id: 'USR_1', email: 'a@b.c', name: 'A', role: 'owner' },
+      db: mockDB,
+      path: '/api/admin/orders/ORD_99',
+      targetId: 'ORD_99',
+    });
+    const mw = audit('real_action');
+    let nextCalled = false;
+    await mw(c as any, async () => {
+      nextCalled = true;
+    });
+    expect(nextCalled).toBe(true);
+    expect(mockDB.prepare).toHaveBeenCalled();
+    expect(realSql).toContain('INSERT INTO');
+    expect(realBinds).toContain('real_action');
   });
 });

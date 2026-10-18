@@ -20,8 +20,20 @@ export interface ConsentUpdate {
   source: string; // 'customer_portal' | 'checkout' | 'staff_action'
   policyVersion?: string;
   actorId: string; // customer.id or staff user id
-  actorRole: 'customer' | 'staff' | 'owner' | 'manager' | 'admin';
+  actorRole:
+    | 'customer'
+    | 'staff'
+    | 'owner'
+    | 'manager'
+    | 'admin'
+    | 'cashier'
+    | 'waiter'
+    | 'kitchen'
+    | 'barista'
+    | 'chef';
 }
+
+export type UpdateConsentInput = ConsentUpdate;
 
 export interface ConsentRow {
   id: string;
@@ -60,6 +72,17 @@ export async function updateConsent(
     const granted = update.granted ? 1 : 0;
     const grantedAt = now;
     const revokedAt = update.granted ? null : now;
+
+    try {
+      await db
+        .prepare(
+          'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
+        )
+        .bind(now, update.customerId, update.purpose)
+        .run();
+    } catch {
+      // Optional prior-row revocation when table/column is available
+    }
 
     try {
       await db

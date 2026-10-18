@@ -53,15 +53,11 @@ export function happyHourDiscountFor(
 
       const applyTo = (w.apply_to || 'all').toLowerCase();
       if (applyTo === 'product_id' || applyTo === 'product' || applyTo === 'products') {
-        if (context?.productId) {
-          const ids = parseApplyIds(w.apply_ids);
-          if (ids.length > 0 && !ids.includes(context.productId)) return false;
-        }
+        const ids = parseApplyIds(w.apply_ids);
+        if (ids.length > 0 && (!context?.productId || !ids.includes(context.productId))) return false;
       } else if (applyTo === 'category_id' || applyTo === 'category' || applyTo === 'categories') {
-        if (context?.categoryId) {
-          const ids = parseApplyIds(w.apply_ids);
-          if (ids.length > 0 && !ids.includes(context.categoryId)) return false;
-        }
+        const ids = parseApplyIds(w.apply_ids);
+        if (ids.length > 0 && (!context?.categoryId || !ids.includes(context.categoryId))) return false;
       }
       return true;
     })

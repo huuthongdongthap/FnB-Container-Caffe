@@ -28,8 +28,16 @@ export default function KDSPage() {
 
   const orderIdMap = useMemo(() => {
     const map = new Map<string, string>();
+    const seenShort = new Set<string>();
     for (const o of orders) {
-      map.set(`#${o.id.slice(-4)}`, o.id);
+      const shortId = `#${o.id.slice(-4)}`;
+      const displayId = seenShort.has(shortId) ? `#${o.id}` : shortId;
+      seenShort.add(shortId);
+      map.set(displayId, o.id);
+      if (!map.has(shortId)) {
+        map.set(shortId, o.id);
+      }
+      map.set(o.id, o.id);
     }
     return map;
   }, [orders]);
@@ -82,20 +90,27 @@ export default function KDSPage() {
   }, [orders]);
 
   const tickets = useMemo((): Ticket[] => {
+    const seenShort = new Set<string>();
     return orders
       .filter((o) => o.status !== 'served')
       .map((o): Ticket => {
+        const shortId = `#${o.id.slice(-4)}`;
+        const ticketId = seenShort.has(shortId) ? `#${o.id}` : shortId;
+        seenShort.add(shortId);
+        const normalizedRawStatus =
+          (o.status as string) === 'confirmed' ? 'pending' : o.status;
         const elapsedSeconds = calcElapsedSeconds(o.createdAt);
         const status: TicketStatus =
-          (o.status === 'pending' || o.status === 'preparing') &&
+          (normalizedRawStatus === 'pending' || normalizedRawStatus === 'preparing') &&
           elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60
             ? 'overdue'
-            : (o.status as TicketStatus);
+            : (normalizedRawStatus as TicketStatus);
         return {
-          id: `#${o.id.slice(-4)}`,
+          id: ticketId,
           table: o.table ? `TABLE ${o.table}` : 'TAKEAWAY',
           type: o.table ? ('DINE IN' as const) : ('TOGO' as const),
           status,
+          rawStatus: normalizedRawStatus,
           items: o.items.map((item) => ({
             name: item.name,
             quantity: item.quantity,

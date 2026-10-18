@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { apiFetch } from '@/lib/api-client';
 import { StatCard } from './subscription-stats-card';
 import { formatCurrency } from './subscription-api';
 import { useSubscriptionPlans } from './use-subscription-plans';
@@ -11,10 +12,34 @@ import { SubscriptionsTable } from './subscriptions-table';
 import { PlansTable } from './plans-table';
 import { PlanModal } from './plan-modal';
 import { CancelSubModal } from './cancel-sub-modal';
+import { InvoiceTable } from './invoice-history-table';
+import type { InvoiceRecord } from './invoice-history-types';
 
 export default function SubscriptionsManagerPage() {
   const { t } = useTranslation('adminSubscriptions');
   const [activeTab, setActiveTab] = useState<'subscriptions' | 'plans' | 'invoices'>('subscriptions');
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+
+  const fetchInvoices = useCallback(async () => {
+    setInvoicesLoading(true);
+    try {
+      const res = await apiFetch<{ success?: boolean; data?: InvoiceRecord[] }>('/api/erpnext-invoices/list');
+      if (res?.data && Array.isArray(res.data)) {
+        setInvoices(res.data);
+      }
+    } catch {
+      // Leave empty list when ERPNext invoices are unavailable
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'invoices') {
+      void fetchInvoices();
+    }
+  }, [activeTab, fetchInvoices]);
 
   const plans = useSubscriptionPlans(t);
   const subs = useSubscriptions();
@@ -135,9 +160,17 @@ export default function SubscriptionsManagerPage() {
           )}
 
           {activeTab === 'invoices' && (
-            <Card className="p-10 text-center">
-              <p className="text-sm text-muted/60">{t('invoicesPlaceholder')}</p>
-              <p className="mt-1 text-xs text-muted/40">{t('invoicesHint')}</p>
+            <Card className="p-6">
+              {invoicesLoading ? (
+                <Skeleton className="h-32 w-full rounded-xl" />
+              ) : invoices.length > 0 ? (
+                <InvoiceTable invoices={invoices} />
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-muted/60">{t('invoicesPlaceholder')}</p>
+                  <p className="mt-1 text-xs text-muted/40">{t('invoicesHint')}</p>
+                </div>
+              )}
             </Card>
           )}
         </div>

@@ -56,49 +56,108 @@ export async function resolveServerProductPrice(
   const { productId, channel = 'dine_in', modifiers = [], now = new Date(), channelDeltas, fallbackPrice, fallbackName } = input;
   const normChannel = normalizeChannel(channel);
 
-  let dbItem: { id: string; name: string; price: number; available: number | boolean } | null = null;
+  type DbCatalogRow = {
+    id: string;
+    name: string;
+    price: number;
+    available: number | boolean;
+    category_id?: string | null;
+    category?: string | null;
+  };
+
+  let dbItem: DbCatalogRow | null = null;
   if (db && productId) {
-    try {
-      dbItem = await db
-        .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
-        .bind(productId)
-        .first<{ id: string; name: string; price: number; available: number | boolean }>();
-      if (!dbItem) {
-        dbItem = await db
-          .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
-          .bind(productId)
-          .first<{ id: string; name: string; price: number; available: number | boolean }>();
+    const findById = async (id: string): Promise<DbCatalogRow | null> => {
+      try {
+        const row = await db
+          .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE id = ?')
+          .bind(id)
+          .first<DbCatalogRow>();
+        if (row) return row;
+      } catch {
+        // fallback to legacy column list
       }
+      try {
+        const row = await db
+          .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+          .bind(id)
+          .first<DbCatalogRow>();
+        if (row) return row;
+      } catch {
+        // fallback to menu_items
+      }
+      try {
+        const row = await db
+          .prepare('SELECT id, name, price, available, category FROM menu_items WHERE id = ?')
+          .bind(id)
+          .first<DbCatalogRow>();
+        if (row) return row;
+      } catch {
+        // fallback to legacy column list
+      }
+      try {
+        const row = await db
+          .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+          .bind(id)
+          .first<DbCatalogRow>();
+        if (row) return row;
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+
+    try {
+      dbItem = await findById(productId);
 
       // If composite item ID (e.g. "bt001-Size Tiêu Chuẩn (M)..."), extract base ID
       if (!dbItem && productId.includes('-')) {
         const baseId = productId.split('-')[0]?.trim();
         if (baseId && baseId !== productId) {
-          dbItem = await db
-            .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
-            .bind(baseId)
-            .first<{ id: string; name: string; price: number; available: number | boolean }>();
-          if (!dbItem) {
-            dbItem = await db
-              .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
-              .bind(baseId)
-              .first<{ id: string; name: string; price: number; available: number | boolean }>();
-          }
+          dbItem = await findById(baseId);
         }
       }
 
       // Fallback matching by name if ID was modified or composite
       if (!dbItem && fallbackName && fallbackName.trim()) {
         const cleanName = fallbackName.trim();
-        dbItem = await db
-          .prepare('SELECT id, name, price, is_available as available FROM products WHERE name = ?')
-          .bind(cleanName)
-          .first<{ id: string; name: string; price: number; available: number | boolean }>();
-        if (!dbItem) {
+        try {
           dbItem = await db
-            .prepare('SELECT id, name, price, available FROM menu_items WHERE name = ?')
+            .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE name = ?')
             .bind(cleanName)
-            .first<{ id: string; name: string; price: number; available: number | boolean }>();
+            .first<DbCatalogRow>();
+        } catch {
+          dbItem = null;
+        }
+        if (!dbItem) {
+          try {
+            dbItem = await db
+              .prepare('SELECT id, name, price, is_available as available FROM products WHERE name = ?')
+              .bind(cleanName)
+              .first<DbCatalogRow>();
+          } catch {
+            dbItem = null;
+          }
+        }
+        if (!dbItem) {
+          try {
+            dbItem = await db
+              .prepare('SELECT id, name, price, available, category FROM menu_items WHERE name = ?')
+              .bind(cleanName)
+              .first<DbCatalogRow>();
+          } catch {
+            dbItem = null;
+          }
+        }
+        if (!dbItem) {
+          try {
+            dbItem = await db
+              .prepare('SELECT id, name, price, available FROM menu_items WHERE name = ?')
+              .bind(cleanName)
+              .first<DbCatalogRow>();
+          } catch {
+            dbItem = null;
+          }
         }
       }
     } catch {
@@ -172,6 +231,7 @@ export async function resolveServerProductPrice(
     }
   }
 
+  const categoryId = dbItem?.category_id ?? dbItem?.category ?? null;
   const unitPriceCents = resolveItemPrice({
     basePriceCents,
     channel: normChannel,
@@ -180,6 +240,7 @@ export async function resolveServerProductPrice(
     now,
     channelDeltas,
     productId: dbItem?.id || productId,
+    categoryId,
   });
 
   const rawDelta =

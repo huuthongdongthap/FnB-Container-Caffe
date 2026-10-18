@@ -76,15 +76,45 @@ export async function dispatchCustomerEvent(
 
     // Persist to immutable append-only customer_events log
     const storageCustomerId = customerId || 'guest';
-    await db.prepare(
-      'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(
-      event.id,
-      storageCustomerId,
-      event.eventType,
-      JSON.stringify(event.payload),
-      event.recordedAt
-    ).run();
+    let persisted = false;
+    try {
+      await db.prepare(
+        'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(
+        event.id,
+        storageCustomerId,
+        event.eventType,
+        JSON.stringify(event.payload),
+        event.recordedAt
+      ).run();
+      persisted = true;
+    } catch (insertErr) {
+      const errMsg = String((insertErr as Error)?.message || '');
+      const isConstraintOrSchemaErr =
+        !customerId &&
+        (errMsg.includes('FOREIGN KEY') ||
+          errMsg.includes('constraint') ||
+          errMsg.includes('no such table'));
+      if (isConstraintOrSchemaErr) {
+        try {
+          await db.prepare(
+            'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+          ).bind(
+            event.id,
+            null,
+            event.eventType,
+            JSON.stringify(event.payload),
+            event.recordedAt
+          ).run();
+          persisted = true;
+        } catch {
+          // Anonymous event on strict NOT NULL FK schema: continue to CRM consumer without failing
+          persisted = false;
+        }
+      } else {
+        throw insertErr;
+      }
+    }
 
     // Isolated CRM consumer dispatch
     let crmResult: CrmConsumeResult | undefined;
@@ -102,7 +132,7 @@ export async function dispatchCustomerEvent(
     return {
       ok: true,
       eventId: event.id,
-      created: true,
+      created: persisted,
       crmResult,
     };
   } catch (err) {

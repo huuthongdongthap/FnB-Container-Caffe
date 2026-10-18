@@ -82,21 +82,45 @@ export async function calculateOrderSnapshot(
       resolvedItemId = resolved.id || itemId;
 
       if (!categoryId) {
+        const lookupId = resolved.id || itemId;
         try {
-          const lookupId = resolved.id || itemId;
-          const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
-            .bind(lookupId).first<{ category_id: string }>();
-          if (prod?.category_id) {
-            categoryId = prod.category_id;
-          } else {
+          const prod = await db.prepare('SELECT id, name, price, available, category FROM products WHERE id = ?')
+            .bind(lookupId).first<{ category_id?: string; category?: string }>();
+          if (prod?.category_id || prod?.category) {
+            categoryId = (prod.category_id || prod.category) ?? null;
+          }
+        } catch {
+          try {
+            const prod = await db.prepare('SELECT id, name, price, available FROM products WHERE id = ?')
+              .bind(lookupId).first<{ category_id?: string; category?: string }>();
+            if (prod?.category_id || prod?.category) {
+              categoryId = (prod.category_id || prod.category) ?? null;
+            }
+          } catch {
+            // Fallback to category_id / menu_items below
+          }
+        }
+        if (!categoryId) {
+          try {
+            const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
+              .bind(lookupId).first<{ category_id?: string; category?: string }>();
+            if (prod?.category_id || prod?.category) {
+              categoryId = (prod.category_id || prod.category) ?? null;
+            }
+          } catch {
+            // Ignore missing column
+          }
+        }
+        if (!categoryId) {
+          try {
             const menu = await db.prepare('SELECT category FROM menu_items WHERE id = ?')
               .bind(lookupId).first<{ category?: string; category_id?: string }>();
             if (menu?.category || menu?.category_id) {
               categoryId = (menu.category || menu.category_id) ?? null;
             }
+          } catch {
+            // DB mock or missing column
           }
-        } catch {
-          // DB mock or missing column
         }
       }
     } else {

@@ -101,10 +101,17 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
 
   updateOrderStatus: async (orderId, status) => {
     try {
-      await apiFetch<Record<string, unknown>>(`/api/orders/${orderId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
+      try {
+        await apiFetch<Record<string, unknown>>(`/api/orders/${orderId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+      } catch {
+        await apiFetch<Record<string, unknown>>(`/api/orders/${orderId}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+      }
       await get().fetchOrders();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';

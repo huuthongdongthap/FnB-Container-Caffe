@@ -57,7 +57,7 @@ export default function TableReservationPage() {
     setSelectedTable(null);
   };
 
-  const handleIdentityVerify = (data: { name: string; phone: string }) => {
+  const handleIdentityVerify = async (data: { name: string; phone: string }) => {
     if (!selectedTable) return;
     const payload = {
       table_id: selectedTable,
@@ -67,7 +67,8 @@ export default function TableReservationPage() {
       date,
       time: selectedTime,
     };
-    createReservation(payload);
+    const created = await createReservation(payload);
+    if (!created) return;
     const table = tables.find((t) => t.id === selectedTable);
     setSuccessDetails({
       table: `#${table?.table_number || selectedTable}`,

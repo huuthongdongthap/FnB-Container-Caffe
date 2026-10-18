@@ -24,7 +24,7 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
     pending = await db.prepare('SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string; bonus_type: string | null }>();
   } catch {
     const row = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string }>();
-    pending = row ? { id: row.id, bonus_type: 'cashback' } : { id: 'pending_d1', bonus_type: 'cashback' };
+    pending = row ? { id: row.id, bonus_type: 'cashback' } : null;
   }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };

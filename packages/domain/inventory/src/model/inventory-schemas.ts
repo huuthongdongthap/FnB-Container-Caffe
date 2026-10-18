@@ -21,10 +21,18 @@ export const inventoryTransactionSchema = z.object({
   id: z.string().min(1).optional(),
   item_id: z.string().min(1, 'ID nguyên liệu không hợp lệ / Invalid item ID'),
   type: z.enum(['in', 'out', 'adjust', 'waste', 'reserve', 'release']),
-  quantity: z.number().positive('Số lượng phải lớn hơn 0 / Quantity must be positive'),
+  quantity: z.number().refine((v) => v !== 0, { message: 'Quantity cannot be zero' }),
   reference_id: z.string().min(1).optional(),
   reference_type: z.enum(['order', 'purchase', 'adjustment', 'waste_report', 'sync']).optional(),
   notes: z.string().max(500).optional(),
+}).superRefine((data, ctx) => {
+  if (data.type !== 'adjust' && data.quantity <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['quantity'],
+      message: 'Quantity must be positive',
+    });
+  }
 });
 
 export type InventoryTransactionInput = z.infer<typeof inventoryTransactionSchema>;

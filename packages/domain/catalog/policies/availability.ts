@@ -6,7 +6,9 @@
  */
 export function parseAvailabilityFilter(raw: string | null): 0 | 1 | null {
   if (raw === null) return null;
-  return raw === 'true' || raw === '1' ? 1 : 0;
+  if (raw === 'true' || raw === '1') return 1;
+  if (raw === 'false' || raw === '0') return 0;
+  return null;
 }
 
 /** Coerce D1's 0/1 column into the API's boolean field. */

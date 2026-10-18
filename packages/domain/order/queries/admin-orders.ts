@@ -35,27 +35,47 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
      FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
     const { clause, params } = buildOrderFilterClause({ filters });
-    query += clause;
-    query += buildOrderTail({
+    const tail = buildOrderTail({
       sort: sortParam,
       order,
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
+      prefix: 'o.',
     });
-    params.push(parseInt(limit), parseInt(offset));
+    query += clause + tail;
 
-    const { results } = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
+    let results: Record<string, unknown>[] = [];
+    try {
+      const res = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
+      results = res.results ?? [];
+    } catch {
+      const fallbackQuery = `SELECT o.* FROM orders o WHERE 1=1${clause}${tail}`;
+      const res = await db.prepare(fallbackQuery).bind(...params).all<Record<string, unknown>>();
+      results = res.results ?? [];
+    }
 
-    const orders = results.map(order => ({
-      ...order,
-      items: order.items ? JSON.parse(order.items as string) : [],
-      total: parseInt(order.total as string),
-      payment_id: order.payment_id || null,
-      payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
-      refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
-      shipping_fee: parseInt(String(order.shipping_fee || 0)),
-      discount: parseInt(String(order.discount || 0))
-    }));
+    const orders = results.map(order => {
+      let parsedItems: unknown[] = [];
+      if (Array.isArray(order.items)) {
+        parsedItems = order.items;
+      } else if (typeof order.items === 'string' && order.items) {
+        try {
+          parsedItems = JSON.parse(order.items);
+        } catch {
+          parsedItems = [];
+        }
+      }
+      return {
+        ...order,
+        items: parsedItems,
+        total: parseInt(order.total as string),
+        payment_id: order.payment_id || null,
+        payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
+        refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
+        shipping_fee: parseInt(String(order.shipping_fee || 0)),
+        discount: parseInt(String(order.discount || 0))
+      };
+    });
 
     const countQuery = `SELECT COUNT(*) as total FROM orders WHERE 1=1${clause.replace(/o\./g, '')}`;
     const countParams = filters.map(([, value]) => value);

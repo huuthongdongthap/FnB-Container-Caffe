@@ -11,7 +11,7 @@ export function WebVitalsSection() {
   const retry = usePerformanceStore((s) => s.fetchWebVitals);
 
   if (loading && !webVitals) return <WebVitalsSkeleton />;
-  if (error) return <ErrorCard message={error} onRetry={retry} />;
+  if (error) return <ErrorCard message={error} onRetry={() => void retry()} />;
 
   const entries = webVitals?.vitals ? Object.entries(webVitals.vitals) : [];
   if (entries.length === 0) return <EmptyCard title="Web Vitals" />;

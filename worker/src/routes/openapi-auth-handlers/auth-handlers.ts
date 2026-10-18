@@ -3,6 +3,31 @@ import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword, generateToken } from './helpers';
 
+async function writeAuthAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
+
 export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/register - Register new customer
   app.openapi(AuthRoutes.register as any, async (c: any) => {
@@ -35,10 +60,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(sessionId, id, accessToken, refreshToken, expiresAt, !!body.deviceFingerprint, body.deviceFingerprint || null, null, now, now).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, id, 'register', 'user', id, JSON.stringify({ email: body.email }), now).run();
+    await writeAuthAuditLog(db, id, 'register', 'user', id, JSON.stringify({ email: body.email }), now);
 
     const user = await db.prepare(
       'SELECT id, name, email, phone, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at FROM users WHERE id = ?'
@@ -97,10 +119,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, isTrustedDevice, body.deviceFingerprint || null, null, now, now).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'login', 'session', sessionId, JSON.stringify({ rememberMe: body.rememberMe }), now).run();
+    await writeAuthAuditLog(db, user.id, 'login', 'session', sessionId, JSON.stringify({ rememberMe: body.rememberMe }), now);
 
     return c.json({
       success: true,
@@ -143,10 +162,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare('UPDATE sessions SET expires_at = ? WHERE access_token = ?').bind(now, token).run();
     }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'logout', 'session', token || 'unknown', JSON.stringify({}), now).run();
+    await writeAuthAuditLog(db, user.id, 'logout', 'session', token || 'unknown', JSON.stringify({}), now);
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -251,10 +267,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(sessionId, user!.id, accessToken, refreshToken, expiresAt, false, null, null, now, now).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user!.id, 'verify_email', 'user', user!.id, JSON.stringify({}), now).run();
+    await writeAuthAuditLog(db, user!.id, 'verify_email', 'user', user!.id, JSON.stringify({}), now);
 
     return c.json({
       success: true,

@@ -3,7 +3,18 @@
  * Defines the unified RBAC + Multi-Tenant Operating Unit Matrix
  */
 
-export type RoleType = 'owner' | 'manager' | 'staff' | 'waiter' | 'customer' | 'guest';
+export type RoleType =
+  | 'owner'
+  | 'admin'
+  | 'manager'
+  | 'staff'
+  | 'barista'
+  | 'chef'
+  | 'kitchen'
+  | 'cashier'
+  | 'waiter'
+  | 'customer'
+  | 'guest';
 export type ResourceType = 'staff' | 'shift' | 'table' | 'order' | 'payment' | 'inventory' | 'reservation' | 'catalog';
 export type ActionType = 'read' | 'create' | 'update' | 'delete' | 'admin' | 'operate' | 'refund';
 

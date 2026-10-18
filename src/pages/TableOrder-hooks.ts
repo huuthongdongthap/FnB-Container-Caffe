@@ -65,6 +65,7 @@ export function useHandleViewCart({
               `${API_BASE}/api/orders/guest-checkin`,
               {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                   'Content-Type': 'application/json',
                   ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),

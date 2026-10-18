@@ -29,7 +29,7 @@ export interface ThreatModelItem {
 
 export interface AccessControlContext {
   userId?: string;
-  userRole?: 'owner' | 'manager' | 'staff' | 'waiter' | 'customer' | 'guest';
+  userRole?: 'owner' | 'admin' | 'manager' | 'staff' | 'waiter' | 'cashier' | 'kitchen' | 'barista' | 'chef' | 'customer' | 'guest';
   userTenantId?: string;
   isSuperAdmin?: boolean;
 }

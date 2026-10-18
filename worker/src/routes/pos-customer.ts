@@ -11,7 +11,7 @@ import { requireStaff } from '../middleware/staff-auth';
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/pos/customer?phone=09xxxxxxxx
-posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 'admin']), async (c) => {
+posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
   const phone = c.req.query('phone')?.trim();
   if (!phone) {
     return errorResponse('Thiếu số điện thoại', 400);
@@ -25,34 +25,54 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
   const db = c.env.AURA_DB;
 
   // Query customer + cashback wallet
-  const row = await db
-    .prepare(`
-      SELECT c.id, c.name, c.phone, c.email,
-             c.loyalty_tier, c.loyalty_points, c.lifetime_points,
-             c.created_at,
-             COALESCE(cw.balance, 0) AS cashback_balance,
-             COALESCE(cw.total_earned, 0) AS total_earned,
-             COALESCE(cw.total_spent, 0) AS total_spent,
-             (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
-      FROM customers c
-      LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-      WHERE c.phone = ?
-    `)
-    .bind(normalizedPhone)
-    .first<{
-      id: string;
-      name: string;
-      phone: string;
-      email: string;
-      loyalty_tier: string;
-      loyalty_points: number;
-      lifetime_points: number;
-      created_at: string;
-      cashback_balance: number;
-      total_earned: number;
-      total_spent: number;
-      visit_count: number;
-    }>();
+  type PosCustomerRow = {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    loyalty_tier: string;
+    loyalty_points: number;
+    lifetime_points: number;
+    created_at: string;
+    cashback_balance: number;
+    total_earned: number;
+    total_spent: number;
+    visit_count: number;
+  };
+  let row: PosCustomerRow | null = null;
+  try {
+    row = await db
+      .prepare(`
+        SELECT c.id, c.name, c.phone, c.email,
+               c.loyalty_tier, c.loyalty_points, c.lifetime_points,
+               c.created_at,
+               COALESCE(cw.balance, 0) AS cashback_balance,
+               COALESCE(cw.total_earned, 0) AS total_earned,
+               COALESCE(cw.total_spent, 0) AS total_spent,
+               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+        FROM customers c
+        LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+        WHERE c.phone = ?
+      `)
+      .bind(normalizedPhone)
+      .first<PosCustomerRow>();
+  } catch {
+    row = await db
+      .prepare(`
+        SELECT c.id, c.name, c.phone, c.email,
+               c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+               c.created_at,
+               COALESCE(cw.balance, 0) AS cashback_balance,
+               COALESCE(cw.total_earned, 0) AS total_earned,
+               COALESCE(cw.total_spent, 0) AS total_spent,
+               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+        FROM customers c
+        LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+        WHERE c.phone = ?
+      `)
+      .bind(normalizedPhone)
+      .first<PosCustomerRow>();
+  }
 
   if (!row) {
     return jsonResponse({

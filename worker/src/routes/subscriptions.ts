@@ -10,7 +10,7 @@ import { listPlans, getPlan, createPlan, updatePlan } from '../tree/subscription
 import {
   listSubscriptions, getStatsHandler, getMRRTrend, getSubscription,
   createSubscription, updateSubscription, cancelSubscription,
-  pauseSubscription, resumeSubscription, deleteSubscription
+  pauseSubscription, resumeSubscription, deleteSubscription, deletePlan
 } from '../tree/subscriptions/sub-handlers';
 import { listInvoices, payInvoice, generateInvoices } from '../tree/subscriptions/invoice-handlers';
 
@@ -21,6 +21,7 @@ subscriptionsRouter.get('/plans', listPlans);
 subscriptionsRouter.get('/plans/:id', getPlan);
 subscriptionsRouter.post('/plans', createPlan);
 subscriptionsRouter.put('/plans/:id', updatePlan);
+subscriptionsRouter.delete('/plans/:id', deletePlan);
 
 // ── Subscriptions ──
 subscriptionsRouter.get('/', listSubscriptions);

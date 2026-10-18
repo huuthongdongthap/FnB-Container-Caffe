@@ -92,7 +92,7 @@ export function StitchKDSNew({
 
   const filtered = filteredTickets();
   const countPreparing = tickets.filter((tk) => tk.status === 'preparing').length;
-  const countPending = tickets.filter((tk) => tk.status === 'pending').length;
+  const countPending = tickets.filter((tk) => tk.status === 'pending' || (tk.status as string) === 'confirmed').length;
   const countReady = tickets.filter((tk) => tk.status === 'ready').length;
   const activeCount = countPreparing + countPending;
 

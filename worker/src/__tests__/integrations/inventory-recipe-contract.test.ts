@@ -9,6 +9,9 @@ import {
   calculateOrderConsumption,
   deductOrderStock,
   calculateProductMargin,
+  inventoryTransactionSchema,
+  deductInventoryForOrder,
+  restoreInventoryForOrder,
 } from '@aura/domain-inventory';
 
 describe('Inventory / Recipe Contract', () => {
@@ -179,5 +182,138 @@ describe('Inventory / Recipe Contract', () => {
       m => m.reference_id === 'ORD_TEST' && m.reference_type === 'order'
     );
     expect(existingOrderDeduction).toBeUndefined();
+  });
+
+  it('9. inventoryTransactionSchema allows negative quantity only for type === adjust', () => {
+    const validNegAdjust = inventoryTransactionSchema.safeParse({
+      item_id: 'ing_1',
+      type: 'adjust',
+      quantity: -10,
+      notes: 'Spillage adjustment',
+    });
+    expect(validNegAdjust.success).toBe(true);
+
+    const invalidZero = inventoryTransactionSchema.safeParse({
+      item_id: 'ing_1',
+      type: 'adjust',
+      quantity: 0,
+    });
+    expect(invalidZero.success).toBe(false);
+
+    const invalidNegOut = inventoryTransactionSchema.safeParse({
+      item_id: 'ing_1',
+      type: 'out',
+      quantity: -5,
+    });
+    expect(invalidNegOut.success).toBe(false);
+  });
+
+  it('10. restoreInventoryForOrder falls back to stock_movements when inventory_transactions is empty', async () => {
+    const restoredStock: Record<string, number> = { ing_coffee: 80 };
+    const insertedMovements: any[] = [];
+    const mockDb = {
+      prepare: (sql: string) => {
+        let binds: unknown[] = [];
+        const stmt = {
+          bind: (...args: unknown[]) => { binds = args; return stmt; },
+          all: async () => {
+            if (sql.includes('FROM inventory_transactions')) return { results: [] };
+            if (sql.includes("FROM stock_movements WHERE reference_id = ? AND type = 'out'")) return { results: [] };
+            if (sql.includes("FROM stock_movements") && sql.includes("type = 'consumption'")) {
+              return { results: [{ id: 'sm_1', ingredient_id: 'ing_coffee', quantity: -20 }] };
+            }
+            return { results: [] };
+          },
+          run: async () => {
+            if (sql.includes('UPDATE ingredients SET current_stock = current_stock +')) {
+              restoredStock[binds[2] as string] = (restoredStock[binds[2] as string] || 0) + (binds[0] as number);
+            }
+            if (sql.includes('INSERT INTO stock_movements')) {
+              insertedMovements.push(binds);
+            }
+            return { success: true, meta: { changes: 1 } };
+          },
+        };
+        return stmt;
+      },
+      batch: async (ops: any[]) => {
+        for (const op of ops) await op.run();
+        return [];
+      },
+    };
+
+    await restoreInventoryForOrder({ AURA_DB: mockDb as any }, 'ORD_CANCEL_1');
+    expect(restoredStock.ing_coffee).toBe(100);
+    expect(insertedMovements.length).toBe(1);
+  });
+
+  it('11. deductInventoryForOrder deducts BOM items via recipe and non-BOM items via SKU fallback', async () => {
+    const stock: Record<string, number> = { ing_beans: 100, ing_bottled: 10 };
+    const txQuantities: number[] = [];
+    const mockDb = {
+      prepare: (sql: string) => {
+        let binds: unknown[] = [];
+        const stmt = {
+          bind: (...args: unknown[]) => { binds = args; return stmt; },
+          first: async () => {
+            if (sql.includes('FROM recipes WHERE product_id')) {
+              return binds[0] === 'prod_espresso' ? { id: 'rec_esp', product_id: 'prod_espresso' } : null;
+            }
+            if (sql.includes('FROM ingredients WHERE id =')) {
+              const id = binds[0] as string;
+              return stock[id] !== undefined ? { id, name: id, current_stock: stock[id] } : null;
+            }
+            if (sql.includes('FROM inventory_items')) {
+              return binds[0] === 'prod_water'
+                ? { id: 'ing_bottled', sku: 'prod_water', name: 'Water', current_stock: stock.ing_bottled, unit: 'pcs' }
+                : null;
+            }
+            return null;
+          },
+          all: async () => {
+            if (sql.includes('FROM recipe_items ri')) {
+              return {
+                results: [{ id: 'ri_1', recipe_id: 'rec_esp', ingredient_id: 'ing_beans', quantity: 18, unit: 'g', ing_name: 'Beans', cost_per_unit: 500 }],
+              };
+            }
+            return { results: [] };
+          },
+          run: async () => {
+            if (sql.includes('UPDATE ingredients SET current_stock = current_stock -')) {
+              stock[binds[2] as string] -= binds[0] as number;
+            }
+            if (sql.includes('UPDATE inventory_items SET current_stock = ?')) {
+              stock[binds[1] as string] = binds[0] as number;
+            }
+            if (sql.includes('INSERT INTO stock_movements')) {
+              txQuantities.push(binds[2] as number);
+            }
+            if (sql.includes('INSERT INTO inventory_transactions')) {
+              txQuantities.push(binds[3] as number);
+            }
+            return { success: true, meta: { changes: 1 } };
+          },
+        };
+        return stmt;
+      },
+      batch: async (ops: any[]) => {
+        for (const op of ops) await op.run();
+        return [];
+      },
+    };
+
+    await deductInventoryForOrder(
+      { AURA_DB: mockDb as any },
+      'ORD_MIXED_1',
+      [
+        { product_id: 'prod_espresso', name: 'Espresso', quantity: 1 },
+        { product_id: 'prod_water', name: 'Water', quantity: 15 },
+      ]
+    );
+    expect(stock.ing_beans).toBe(82);
+    expect(stock.ing_bottled).toBe(0);
+    // Actual delta for ing_bottled is -(10 - 0) = -10, not -15
+    expect(txQuantities).toContain(-18);
+    expect(txQuantities).toContain(-10);
   });
 });

@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { publishOrderEvent } from '@aura/domain-order';
 import {
   placeOrder,
   VALID_CHANNELS,
@@ -18,7 +19,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    *         channel: 'pickup' | 'delivery',
    *         customerId?, customerPhone?, customerName?, notes? }
    */
-  router.post('/orders', requireAuth(['customer', 'staff', 'owner']), async (c) => {
+  router.post('/orders', requireAuth(['customer', 'staff', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -70,6 +71,10 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: err.error }, (statusByCode[err.code] ?? 400) as any);
     }
 
+    if (c.env?.AUTH_KV) {
+      await publishOrderEvent(c.env.AUTH_KV, result.orderId, result.status).catch(() => {});
+    }
+
     return c.json({
       success: true,
       data: {
@@ -98,7 +103,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    * Fulfillment status + ETA for one order.
    * Auth: owner/staff (any order) or customer (own orders only).
    */
-  router.get('/orders/:id/fulfillment', requireAuth(['customer', 'staff', 'owner']), async (c) => {
+  router.get('/orders/:id/fulfillment', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 

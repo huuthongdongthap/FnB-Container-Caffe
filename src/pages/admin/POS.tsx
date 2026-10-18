@@ -183,8 +183,8 @@ export default function AdminPOSPage() {
         customer={customer}
         onCustomerFound={setCustomer}
         onClearCustomer={() => setCustomer(null)}
-        onOpenSchedule={() => navigate('/admin/shifts')}
-        onEndShift={() => navigate('/admin/shifts')}
+        onOpenSchedule={() => navigate('/admin/staff')}
+        onEndShift={() => navigate('/admin/staff')}
       />
 
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}
@@ -222,28 +222,43 @@ export default function AdminPOSPage() {
         </div>
       )}
 
-      {/* ── PayOS Payment Link Banner (replaces window.open) ─────────── */}
-      {paymentUrl && checkoutSuccess && (
+      {/* ── PayOS Payment Link Modal (replaces window.open) ─────────── */}
+      {paymentUrl && (
         <div
-          className="fixed top-32 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 px-5 py-4 rounded-lg shadow-lg max-w-sm w-full text-center"
-          style={{ backgroundColor: 'rgba(10,26,46,0.97)', border: '1px solid rgba(201,214,223,0.3)', color: '#fff' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Thanh toán PayOS"
         >
-          <span className="text-xs font-semibold text-[#C9D6DF] uppercase tracking-wider">Thanh toán PayOS</span>
-          <a
-            href={paymentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 mt-1 px-4 py-2 rounded-full bg-[#6B9FB8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
+          <div
+            className="flex flex-col items-center gap-3 px-6 py-5 rounded-xl shadow-2xl max-w-sm w-full text-center"
+            style={{ backgroundColor: 'rgba(10,26,46,0.98)', border: '1px solid rgba(201,214,223,0.3)', color: '#fff' }}
           >
-            <ExternalLink className="w-4 h-4" /> Mở trang thanh toán
-          </a>
-          <button
-            type="button"
-            onClick={() => setPaymentUrl(null)}
-            className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"
-          >
-            Đóng
-          </button>
+            <span className="text-xs font-semibold text-[#C9D6DF] uppercase tracking-wider">Thanh toán PayOS</span>
+            <div className="rounded-lg bg-white p-3">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(paymentUrl)}`}
+                alt="PayOS QR Code"
+                className="h-44 w-44 object-contain"
+              />
+            </div>
+            <p className="text-xs text-[#C9D6DF] break-all">{paymentUrl}</p>
+            <a
+              href={paymentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 mt-1 px-4 py-2 rounded-full bg-[#6B9FB8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            >
+              <ExternalLink className="w-4 h-4" /> Mở trang thanh toán
+            </a>
+            <button
+              type="button"
+              onClick={() => setPaymentUrl(null)}
+              className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -14,10 +14,13 @@ async function handleInvoicePdfDownload(
 ): Promise<void> {
   e.preventDefault();
   try {
-    const res = await apiFetch<{ success?: boolean; data?: { pdf_url?: string } }>(
+    const res = await apiFetch<{ success?: boolean; data?: { pdf_url?: string; pdfUrl?: string } }>(
       `/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`,
     );
-    const pdfUrl = res?.data?.pdf_url || getInvoicePdfUrl(erpnextId);
+    const pdfUrl =
+      (res?.data as any)?.pdfUrl ||
+      res?.data?.pdf_url ||
+      `${API_BASE}/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`;
     window.open(pdfUrl, '_blank', 'noopener,noreferrer');
   } catch {
     window.open(getInvoicePdfUrl(erpnextId), '_blank', 'noopener,noreferrer');

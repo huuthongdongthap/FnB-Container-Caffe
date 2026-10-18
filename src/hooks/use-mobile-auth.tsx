@@ -106,6 +106,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
           `${API_BASE}/mobile/refresh`,
           {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ device_token: state.deviceToken }),
             signal: controller.signal,
@@ -147,6 +148,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         `${API_BASE}/mobile/refresh`,
         {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_token: deviceToken }),
         }
@@ -203,6 +205,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         `${API_BASE}/mobile/login`,
         {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_token: deviceToken, pin }),
         }

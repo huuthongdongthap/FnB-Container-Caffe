@@ -105,6 +105,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
       const data = body.data || body;
       const pointsRemaining = Number(data.points_remaining ?? data.points ?? get().points);
 
+      persistLoyalty(get().tier, pointsRemaining, get().cashbackRate);
       set({ points: pointsRemaining, loading: false, error: null });
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -125,10 +126,14 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   phoneAuth: async (phone: string) => {
     set({ loading: true, error: null });
     try {
-      await apiFetch('/api/loyalty/phone-auth', {
+      const res = await apiFetch<any>('/api/loyalty/phone-auth', {
         method: 'POST',
         body: JSON.stringify({ phone }),
       });
+      const token = res?.token || res?.data?.token;
+      if (token && typeof window !== 'undefined') {
+        window.localStorage.setItem('aura_auth_token', token);
+      }
       set({ loading: false, error: null });
     } catch (err) {
       if (err instanceof ApiClientError) {

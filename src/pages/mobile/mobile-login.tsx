@@ -186,6 +186,7 @@ export default function MobileLogin() {
     try {
       const res = await fetch(`${API_BASE}/mobile/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ device_token: deviceToken.trim(), pin: fullPin }),
       });

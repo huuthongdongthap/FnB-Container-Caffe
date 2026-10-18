@@ -55,9 +55,16 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
         body: JSON.stringify({ paymentId, amount, reason }),
       });
 
-      const hash: string | null = body.tx_hash || body.transactionHash || body.txHash || null;
+      const data = body?.data ?? body;
+      const hash: string | null = data?.tx_hash || data?.transactionHash || data?.txHash || null;
 
-      set({ status: 'success', txHash: hash, error: null });
+      set({
+        status: 'success',
+        txHash: hash,
+        amount: data?.refundAmount ?? data?.amount ?? amount,
+        reason: data?.refundReason ?? data?.reason ?? reason,
+        error: null,
+      });
       return hash;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
@@ -70,13 +77,14 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
     set({ status: 'pending', error: null });
 
     try {
-      const body = await apiFetch<any>(`/api/payments/refunds/${paymentId}`);
+      const body = await apiFetch<any>(`/api/payments/refunds/${encodeURIComponent(String(paymentId))}`);
+      const data = body?.data ?? body;
       set({
         paymentId,
-        amount: body.amount ?? get().amount,
-        reason: body.reason ?? get().reason,
-        status: 'success',
-        txHash: body.tx_hash || body.transactionHash || body.txHash || null,
+        amount: data?.refundAmount ?? data?.amount ?? get().amount,
+        reason: data?.refundReason ?? data?.reason ?? get().reason,
+        status: data?.refundStatus === 'completed' || data?.status === 'success' ? 'success' : 'pending',
+        txHash: data?.tx_hash || data?.transactionHash || data?.txHash || null,
         error: null,
       });
     } catch (err) {

@@ -29,13 +29,24 @@ export async function createCanonicalReservation(
     return { ok: false, error: 'cross_operating_unit_mismatch' };
   }
 
-  const existingRsv = await db.prepare(
-    `SELECT id FROM reservations
-     WHERE (table_id = ? OR table_id = ?)
-       AND date = ? AND time = ?
-       AND status IN ('confirmed', 'pending', 'seated')
-     LIMIT 1`
-  ).bind(table.id, String(table.table_number), input.date, input.time).first<{ id: string }>();
+  let existingRsv: { id: string } | null = null;
+  try {
+    existingRsv = await db.prepare(
+      `SELECT id FROM reservations
+       WHERE (table_id = ? OR table_id = ?)
+         AND date = ? AND time = ?
+         AND status IN ('confirmed', 'pending', 'seated')
+       LIMIT 1`
+    ).bind(table.id, String(table.table_number), input.date, input.time).first<{ id: string }>();
+  } catch {
+    existingRsv = await db.prepare(
+      `SELECT id FROM reservations
+       WHERE (table_id = ? OR table_id = ?)
+         AND reservation_date = ? AND reservation_time = ?
+         AND status IN ('confirmed', 'pending', 'seated')
+       LIMIT 1`
+    ).bind(table.id, String(table.table_number), input.date, input.time).first<{ id: string }>();
+  }
 
   if (existingRsv) {
     return { ok: false, error: 'overlapping_reservation' };
@@ -58,17 +69,31 @@ export async function createCanonicalReservation(
     updated_at: now,
   };
 
-  await db.prepare(
-    `INSERT INTO reservations (
-      id, table_id, customer_name, customer_phone, guest_count,
-      date, time, zone, status, notes, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    reservation.id, reservation.table_id, reservation.customer_name,
-    reservation.customer_phone, reservation.guest_count, reservation.date,
-    reservation.time, reservation.zone, reservation.status, reservation.notes,
-    now, now
-  ).run();
+  try {
+    await db.prepare(
+      `INSERT INTO reservations (
+        id, table_id, customer_name, customer_phone, guest_count,
+        date, time, zone, status, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      reservation.id, reservation.table_id, reservation.customer_name,
+      reservation.customer_phone, reservation.guest_count, reservation.date,
+      reservation.time, reservation.zone, reservation.status, reservation.notes,
+      now, now
+    ).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO reservations (
+        id, table_id, customer_name, phone, pax,
+        reservation_date, reservation_time, status, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      reservation.id, reservation.table_id, reservation.customer_name,
+      reservation.customer_phone, reservation.guest_count, reservation.date,
+      reservation.time, reservation.status, reservation.notes,
+      now, now
+    ).run();
+  }
 
   return { ok: true, reservation };
 }
@@ -164,8 +189,8 @@ export async function releaseTable(
   const table = tableCheck.table;
   const now = new Date().toISOString();
 
-  if (table.status === 'Available') {
-    return { ok: true, table, alreadyReleased: true };
+  if (String(table.status).toLowerCase() === 'available') {
+    return { ok: true, table: { ...table, status: 'Available' }, alreadyReleased: true };
   }
 
   try {

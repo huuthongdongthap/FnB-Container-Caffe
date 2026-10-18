@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -12,6 +13,7 @@ import type { StatusStep } from '@/components/tracking/track-order-types';
 
 export default function TrackOrderPage() {
   const { t } = useTranslation('trackOrder');
+  const [searchParams] = useSearchParams();
   const [orderId, setOrderId] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
@@ -22,7 +24,15 @@ export default function TrackOrderPage() {
   const startPolling = useOrderStoreWithOfflineFlush((s) => s.startPolling);
   const stopPolling = useOrderStoreWithOfflineFlush((s) => s.stopPolling);
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
+  useEffect(() => {
+    const paramId = (searchParams.get('id') || searchParams.get('order_id') || '').trim();
+    if (paramId) {
+      setOrderId(paramId);
+      setActiveOrderId(paramId);
+      fetchOrder(paramId).then(() => startPolling(paramId)).catch(() => {});
+    }
+    return () => stopPolling();
+  }, [searchParams, fetchOrder, startPolling, stopPolling]);
 
   const handleTrack = useCallback((e: React.FormEvent) => {
     e.preventDefault();

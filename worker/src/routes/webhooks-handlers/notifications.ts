@@ -21,13 +21,19 @@ export async function sendOrderPaidNotifications(
       total: orderRow.total,
       customer_name: orderRow.customer_name,
       customer_phone: orderRow.customer_phone,
-      customer_address: orderRow.customer_address,
+      customer_address: orderRow.customer_address ?? orderRow.address,
       payment_method: orderRow.payment_method,
       notes: orderRow.notes
     }).catch(e => log.error('Telegram webhook error:', { message: (e as Error).message }));
 
-    if (c.executionCtx?.waitUntil) {
-      c.executionCtx.waitUntil(tgPromise);
+    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+    try {
+      waitUntilFn = c.executionCtx?.waitUntil?.bind(c.executionCtx);
+    } catch {
+      waitUntilFn = undefined;
+    }
+    if (waitUntilFn) {
+      waitUntilFn(tgPromise);
     } else {
       await tgPromise;
     }
@@ -51,8 +57,16 @@ export async function sendOrderPaidNotifications(
         })
       }).catch(e => log.error('Email receipt error:', { message: (e as Error).message }));
 
-      if (c.executionCtx?.waitUntil) {
-        c.executionCtx.waitUntil(emailPromise);
+      let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+      try {
+        waitUntilFn = c.executionCtx?.waitUntil?.bind(c.executionCtx);
+      } catch {
+        waitUntilFn = undefined;
+      }
+      if (waitUntilFn) {
+        waitUntilFn(emailPromise);
+      } else {
+        await emailPromise;
       }
     } catch (emailErr) {
       log.error('Email receipt failed:', { message: (emailErr as Error).message });

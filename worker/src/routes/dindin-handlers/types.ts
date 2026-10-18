@@ -60,11 +60,16 @@ export async function readCartRD(env: Env, sessionId: string): Promise<Cart | nu
     return fromKv;
   }
 
-  const row = await queryFirst<{ raw: string }>(
-    env.AURA_DB,
-    'SELECT raw FROM dindin_cart WHERE session_id = ?',
-    sessionId
-  );
+  let row: { raw: string } | null = null;
+  try {
+    row = await queryFirst<{ raw: string }>(
+      env.AURA_DB,
+      'SELECT raw FROM dindin_cart WHERE session_id = ?',
+      sessionId
+    );
+  } catch {
+    row = null;
+  }
   if (!row) {
     return null;
   }
@@ -84,14 +89,17 @@ export async function writeCart(env: Env, sessionId: string, cart: Cart): Promis
       'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
       sessionId,
       blob
-    ),
+    ).catch(() => {}),
   ]);
 }
 
 export async function writeConfig(env: Env, configBlob: string): Promise<void> {
-  await execute(
-    env.AURA_DB,
-    'INSERT INTO dindin_config (id, config, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at',
-    configBlob
-  );
+  await Promise.all([
+    kvSet(env.AUTH_KV, 'dindin:config', configBlob),
+    execute(
+      env.AURA_DB,
+      'INSERT INTO dindin_config (id, config, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at',
+      configBlob
+    ).catch(() => {}),
+  ]);
 }

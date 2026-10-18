@@ -21,38 +21,93 @@ interface Env {
  * Idempotent: no-op if no `reserve` txns exist for the order.
  */
 export async function restoreInventoryForOrder(env: Env, orderId: string): Promise<void> {
-  const reservations = await env.AURA_DB.prepare(
-    `SELECT id, item_id, quantity FROM inventory_transactions
-     WHERE reference_id = ? AND reference_type = 'order' AND type = 'reserve'`
-  )
-    .bind(orderId)
-    .all<{ id: string; item_id: string; quantity: number }>();
+  try {
+    const reservations = await env.AURA_DB.prepare(
+      `SELECT id, item_id, quantity FROM inventory_transactions
+       WHERE reference_id = ? AND reference_type = 'order' AND type = 'reserve'`
+    )
+      .bind(orderId)
+      .all<{ id: string; item_id: string; quantity: number }>();
 
-  if (!reservations.results || reservations.results.length === 0) return;
-
-  const ops = [];
-  for (const res of reservations.results) {
-    ops.push(
-      env.AURA_DB.prepare(
-        'UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime(\'now\') WHERE id = ?'
-      ).bind(Math.abs(res.quantity), res.item_id)
-    );
-    ops.push(
-      env.AURA_DB.prepare(
-        'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(
-        crypto.randomUUID(),
-        res.item_id,
-        'release',
-        Math.abs(res.quantity),
-        orderId,
-        'order',
-        `Restore from cancelled order ${orderId}`
-      )
-    );
-    ops.push(env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id));
+    if (reservations.results && reservations.results.length > 0) {
+      const ops = [];
+      for (const res of reservations.results) {
+        ops.push(
+          env.AURA_DB.prepare(
+            'UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime(\'now\') WHERE id = ?'
+          ).bind(Math.abs(res.quantity), res.item_id)
+        );
+        ops.push(
+          env.AURA_DB.prepare(
+            'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            crypto.randomUUID(),
+            res.item_id,
+            'release',
+            Math.abs(res.quantity),
+            orderId,
+            'order',
+            `Restore from cancelled order ${orderId}`
+          )
+        );
+        ops.push(env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id));
+      }
+      await env.AURA_DB.batch(ops);
+      return;
+    }
+  } catch {
+    // Fallback to stock_movements below
   }
-  await env.AURA_DB.batch(ops);
+
+  try {
+    let movements = await env.AURA_DB.prepare(
+      `SELECT ingredient_id, quantity FROM stock_movements WHERE reference_id = ? AND type = 'out'`
+    )
+      .bind(orderId)
+      .all<{ id?: string; ingredient_id: string; quantity: number }>();
+
+    if (!movements.results || movements.results.length === 0) {
+      movements = await env.AURA_DB.prepare(
+        `SELECT id, ingredient_id, quantity FROM stock_movements
+         WHERE reference_id = ? AND reference_type = 'order' AND type = 'consumption'`
+      )
+        .bind(orderId)
+        .all<{ id?: string; ingredient_id: string; quantity: number }>();
+    }
+
+    if (!movements.results || movements.results.length === 0) return;
+
+    const now = new Date().toISOString();
+    const ops = [];
+    for (const mov of movements.results) {
+      const absQty = Math.abs(mov.quantity);
+      ops.push(
+        env.AURA_DB.prepare(
+          'UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?'
+        ).bind(absQty, now, mov.ingredient_id)
+      );
+      ops.push(
+        env.AURA_DB.prepare(
+          'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(
+          crypto.randomUUID(),
+          mov.ingredient_id,
+          'adjustment',
+          absQty,
+          orderId,
+          'order',
+          `Restore from cancelled order ${orderId}`,
+          now
+        )
+      );
+      if (mov.id) {
+        ops.push(env.AURA_DB.prepare('DELETE FROM stock_movements WHERE id = ?').bind(mov.id));
+      }
+    }
+    await env.AURA_DB.batch(ops);
+  } catch {
+    // non-blocking fallback
+  }
 }
 
 /**
@@ -64,6 +119,7 @@ export async function deductInventoryForOrder(
   orderId: string,
   orderItems: Array<{ product_id: string; quantity: number; name?: string }>
 ): Promise<void> {
+  let bomProductIds = new Set<string>();
   try {
     const bomRes = await deductOrderStock(
       env.AURA_DB as any,
@@ -71,7 +127,17 @@ export async function deductInventoryForOrder(
       orderItems.map(i => ({ productId: i.product_id, quantity: i.quantity })),
       { allowNegative: true }
     );
-    if (bomRes.alreadyDeducted || (bomRes.ok && bomRes.depletions.length > 0)) {
+    if (bomRes.alreadyDeducted) {
+      return;
+    }
+    bomProductIds = new Set((bomRes.ok ? bomRes.depletions : []).map((d: any) => d.productId).filter(Boolean));
+    const itemsWithProductId = orderItems.filter(i => Boolean(i.product_id));
+    if (
+      bomRes.ok &&
+      bomRes.depletions.length > 0 &&
+      itemsWithProductId.length > 0 &&
+      itemsWithProductId.every(i => bomProductIds.has(i.product_id))
+    ) {
       return;
     }
   } catch (err) {
@@ -79,6 +145,7 @@ export async function deductInventoryForOrder(
   }
 
   for (const item of orderItems) {
+    if (item.product_id && bomProductIds.has(item.product_id)) continue;
     try {
       const cleanName = (item.name || '').trim().toLowerCase();
       let invItem = cleanName
@@ -113,15 +180,59 @@ export async function deductInventoryForOrder(
           crypto.randomUUID(),
           invItem.id,
           'reserve',
-          -need,
+          -(have - newStock),
           orderId,
           'order',
           `Auto-deduct from order ${orderId}`
         ),
       ]);
     } catch (err) {
-      const sku = item.product_id;
-      console.error('[inventory] deduction failed', { orderId, productId: sku, message: (err as Error).message });
+      try {
+        const cleanName = (item.name || '').trim().toLowerCase();
+        const ingredient = cleanName
+          ? await env.AURA_DB.prepare(
+              `SELECT id, name, current_stock, unit FROM ingredients
+               WHERE id = ? OR LOWER(name) LIKE ?
+               LIMIT 1`
+            )
+              .bind(String(item.product_id), `%${cleanName}%`)
+              .first<{ id: string; name: string; current_stock: number; unit: string }>()
+          : await env.AURA_DB.prepare(
+              `SELECT id, name, current_stock, unit FROM ingredients
+               WHERE id = ?
+               LIMIT 1`
+            )
+              .bind(String(item.product_id))
+              .first<{ id: string; name: string; current_stock: number; unit: string }>();
+
+        if (!ingredient) continue;
+
+        const have = ingredient.current_stock || 0;
+        const need = item.quantity;
+        const newStock = Math.max(0, have - need);
+        const now = new Date().toISOString();
+
+        await env.AURA_DB.batch([
+          env.AURA_DB.prepare(
+            'UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?'
+          ).bind(newStock, now, ingredient.id),
+          env.AURA_DB.prepare(
+            'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            crypto.randomUUID(),
+            ingredient.id,
+            'consumption',
+            -(have - newStock),
+            orderId,
+            'order',
+            `Auto-deduct from order ${orderId}`,
+            now
+          ),
+        ]);
+      } catch {
+        const sku = item.product_id;
+        console.error('[inventory] deduction failed', { orderId, productId: sku, message: (err as Error).message });
+      }
     }
   }
 }

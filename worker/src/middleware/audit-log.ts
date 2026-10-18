@@ -12,14 +12,14 @@ export function audit(action: string): MiddlewareHandler<{ Bindings: Env }> {
   return async(c, next) => {
     await next();
     try {
-      const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenant_id?: string } | undefined;
+      const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
       if (user && c.env.AURA_DB) {
         await writeCanonicalAuditLog(c.env.AURA_DB, {
           actor: {
             id: user.id || 'unknown',
             name: user.name || user.email || 'unknown',
             role: user.role,
-            tenantId: user.tenant_id,
+            tenantId: user?.tenantId ?? user?.tenant_id,
           },
           action,
           resourceType: action.split('_')[0] || 'resource',

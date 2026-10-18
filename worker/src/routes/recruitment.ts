@@ -62,15 +62,21 @@ export async function submitApplication(c: Context<{ Bindings: Env }>) {
     ).run();
 
     // Dual-record into contact_messages for notifications
+    const summary = `[Ứng tuyển AURA CAFE] Vị trí: ${
+      data.position === 'barista' ? 'Pha chế (Barista)' : 'Phục vụ & Thu ngân'
+    } | Năm sinh: ${data.birthYear || 'Chưa rõ'} | Ca: ${data.shifts.join(', ')} | Kinh nghiệm: ${data.experience}`;
     try {
-      const summary = `[Ứng tuyển AURA CAFE] Vị trí: ${
-        data.position === 'barista' ? 'Pha chế (Barista)' : 'Phục vụ & Thu ngân'
-      } | Năm sinh: ${data.birthYear || 'Chưa rõ'} | Ca: ${data.shifts.join(', ')} | Kinh nghiệm: ${data.experience}`;
       await db.prepare(
         'INSERT INTO contact_messages (id, name, phone, email, category, content, status) VALUES (?, ?, ?, NULL, ?, ?, ?)'
       ).bind(appId, data.fullName.trim(), data.phone.trim(), 'recruitment', summary, 'unread').run();
     } catch {
-      // Primary table is already committed
+      try {
+        await db.prepare(
+          'INSERT INTO contact_messages (name, phone, message, direction, created_at) VALUES (?, ?, ?, ?, datetime(\'now\'))'
+        ).bind(data.fullName.trim(), data.phone.trim(), summary, 'customer').run();
+      } catch {
+        // Primary table is already committed
+      }
     }
 
     log.info('Application submitted successfully', { appId, position: data.position });

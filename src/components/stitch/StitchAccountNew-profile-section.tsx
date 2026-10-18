@@ -41,12 +41,21 @@ export function AccountNewProfileSection({
       <div className="flex items-center gap-5 relative z-10">
         <div className="relative">
           <div className="w-20 h-20 rounded-full border-2 border-[var(--aura-chrome-light, #C9D6DF)] p-1">
-            <img
-              className="w-full h-full rounded-full object-cover"
-              src={profile.avatar}
-              alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name })}
-              loading="lazy"
-            />
+            {profile.avatar?.trim() ? (
+              <img
+                className="w-full h-full rounded-full object-cover"
+                src={profile.avatar}
+                alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name })}
+                loading="lazy"
+              />
+            ) : (
+              <span
+                className="flex w-full h-full rounded-full items-center justify-center text-lg font-semibold uppercase text-[var(--aura-chrome-light, #C9D6DF)]"
+                aria-label={t('stitch.accountDashboard.avatarAlt', { name: profile.name })}
+              >
+                {profile.name?.charAt(0) || 'U'}
+              </span>
+            )}
           </div>
           <div
             className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest"

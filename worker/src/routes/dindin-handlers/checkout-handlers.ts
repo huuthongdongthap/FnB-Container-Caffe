@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
 import { queryFirst, execute } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
@@ -16,6 +17,7 @@ import {
 export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /checkouts ──────────────────────────────────────────────────────────
   router.get('/checkouts', async (c) => {
+    const statusFilter = c.req.query('status');
     let checkouts: Array<Record<string, unknown>> = [];
     try {
       const { results } = await c.env.AURA_DB.prepare(
@@ -32,6 +34,10 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       }>();
 
       for (const row of results || []) {
+        const rowStatus = row.status || 'pending';
+        if (statusFilter && statusFilter !== 'all' && rowStatus !== statusFilter) {
+          continue;
+        }
         let parsedItems: Array<Record<string, unknown>> = [];
         try {
           const raw = JSON.parse(row.items || '[]');
@@ -92,6 +98,13 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     } catch {
       // Best-effort DB status update
     }
+    if (c.env.AUTH_KV) {
+      await Promise.all([
+        kvSet(c.env.AUTH_KV, 'latest_order_ts', checkedAt, 3600),
+        kvSet(c.env.AUTH_KV, 'orders:latest_updated_at', checkedAt, 3600),
+        publishOrderEvent(c.env.AUTH_KV, orderId, 'completed').catch(() => {}),
+      ]).catch(() => undefined);
+    }
     return c.json({ success: true, orderId, qcPassed: true, status: 'completed', checkedAt });
   });
 
@@ -110,12 +123,12 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
 
       const idempotencyKey = c.req.header('Idempotency-Key');
       if (idempotencyKey) {
-        const cached = await kvGet<{ ok: boolean; orderId: string; status: string; at: string }>(
+        const cached = await kvGet<{ ok?: boolean; orderId?: string; status?: string; at?: string }>(
           c.env.AUTH_KV,
           idempotencyKVKey(idempotencyKey)
         );
-        if (cached) {
-          return c.json({ success: true, orderId: cached.orderId, status: cached.status, cached: true });
+        if (cached && cached.orderId) {
+          return c.json({ success: true, orderId: cached.orderId, status: cached.status || 'pending', cached: true });
         }
       }
 
@@ -124,7 +137,15 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         return errorResponse(c as DindinContext, err('D01', 400, 'Giỏ hàng trống hoặc phiên đã hết hạn'));
       }
 
-      const configRow = await queryFirst<{ config: string }>(c.env.AURA_DB, 'SELECT config FROM dindin_config LIMIT 1');
+      let configRow: { config: string } | null = null;
+      try {
+        configRow = await queryFirst<{ config: string }>(c.env.AURA_DB, 'SELECT config FROM dindin_config LIMIT 1');
+      } catch {
+        const kvConfig = await kvGet<Record<string, unknown> | string>(c.env.AUTH_KV, 'dindin:config');
+        if (kvConfig) {
+          configRow = { config: typeof kvConfig === 'string' ? kvConfig : JSON.stringify(kvConfig) };
+        }
+      }
       if (!configRow?.config) {
         return errorResponse(c as DindinContext, err('D07', 400, 'Định dạng config menu không hợp lệ'));
       }
@@ -207,6 +228,9 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           'pending'
         );
       } catch {
+        if (idempotencyKey && c.env.AUTH_KV) {
+          await c.env.AUTH_KV.delete(idempotencyKVKey(idempotencyKey)).catch(() => {});
+        }
         return errorResponse(c as DindinContext, err('D06', 500, 'Lỗi ghi CSDL - vui lòng thử lại sau'));
       }
 
@@ -218,6 +242,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           kvSet(c.env.AUTH_KV, 'latest_order_ts', ts, 3600),
           kvSet(c.env.AUTH_KV, 'orders:latest_updated_at', ts, 3600),
           kvSet(c.env.AUTH_KV, `order_event:${orderId}`, JSON.stringify({ status: 'pending', updatedAt: ts }), 3600),
+          publishOrderEvent(c.env.AUTH_KV, orderId, 'pending').catch(() => {}),
         ]).catch(() => undefined);
       }
 

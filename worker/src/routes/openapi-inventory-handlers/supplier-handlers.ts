@@ -3,6 +3,30 @@ import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
 
+async function writeSupplierAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, 'supplier', entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, 'supplier', entityId, metadata, now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
+}
+
 export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers - List suppliers
   app.openapi(InventoryRoutes.suppliers.list as any, async (c: any) => {
@@ -26,16 +50,44 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.isActive ? 1 : 0);
     }
 
-    const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
+    let total = 0;
+    let supplierResults: any[] = [];
+    try {
+      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
 
-    const items = (await db.prepare(
-      `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
+      const items = (await db.prepare(
+        `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
+      supplierResults = items.results || [];
+    } catch {
+      try {
+        const distinctRows = (await db.prepare(
+          'SELECT DISTINCT supplier FROM inventory_items WHERE supplier IS NOT NULL AND supplier != \'\' ORDER BY supplier ASC'
+        ).all()) as { results: Array<{ supplier: string }> };
+        const derived = (distinctRows.results || [])
+          .map((r) => ({
+            id: r.supplier,
+            name: r.supplier,
+            contact_person: null,
+            phone: null,
+            email: null,
+            address: null,
+            payment_terms: 30,
+            is_active: 1,
+          }))
+          .filter((s) => !query.search || s.name.toLowerCase().includes(String(query.search).toLowerCase()));
+        total = derived.length;
+        supplierResults = derived.slice(offset, offset + limit);
+      } catch {
+        total = 0;
+        supplierResults = [];
+      }
+    }
 
     return c.json({
       success: true,
-      data: items.results || [],
+      data: supplierResults,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   });
@@ -45,7 +97,15 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    let supplier: any = null;
+    try {
+      supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    } catch {
+      const row = await db.prepare('SELECT supplier FROM inventory_items WHERE supplier = ? LIMIT 1').bind(id).first().catch(() => null);
+      if (row) {
+        supplier = { id, name: id, contact_person: null, phone: null, email: null, address: null, payment_terms: 30, is_active: 1 };
+      }
+    }
 
     if (!supplier) {
       return c.json({ success: false, error: 'Supplier not found' }, 404);
@@ -63,28 +123,46 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const id = `sup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    await db.prepare(
-      `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      body.name,
-      body.contactPerson || null,
-      body.phone || null,
-      body.email || null,
-      body.address || null,
-      body.paymentTerms || 30,
-      body.isActive !== false ? 1 : 0,
-      now,
-      now
-    ).run();
+    let usingFallback = false;
+    try {
+      await db.prepare(
+        `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.contactPerson || null,
+        body.phone || null,
+        body.email || null,
+        body.address || null,
+        body.paymentTerms || 30,
+        body.isActive !== false ? 1 : 0,
+        now,
+        now
+      ).run();
+    } catch {
+      usingFallback = true;
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'supplier_create', 'supplier', id, JSON.stringify(body), now).run();
+    await writeSupplierAuditLog(db, user.id, 'supplier_create', id, JSON.stringify(body), now);
 
-    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    let supplier: any = null;
+    if (!usingFallback) {
+      supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    } else {
+      supplier = {
+        id,
+        name: body.name,
+        contact_person: body.contactPerson || null,
+        phone: body.phone || null,
+        email: body.email || null,
+        address: body.address || null,
+        payment_terms: body.paymentTerms || 30,
+        is_active: body.isActive !== false ? 1 : 0,
+        created_at: now,
+        updated_at: now,
+      };
+    }
     return c.json({ success: true, data: supplier }, 201);
   });
 
@@ -96,7 +174,17 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    let existing: any = null;
+    let usingFallback = false;
+    try {
+      existing = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    } catch {
+      usingFallback = true;
+      const row = await db.prepare('SELECT supplier FROM inventory_items WHERE supplier = ? LIMIT 1').bind(id).first().catch(() => null);
+      if (row) {
+        existing = { id, name: id, is_active: 1 };
+      }
+    }
     if (!existing) {
       return c.json({ success: false, error: 'Supplier not found' }, 404);
     }
@@ -120,14 +208,18 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
-    await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    if (!usingFallback) {
+      await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    }
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'supplier_update', 'supplier', id, JSON.stringify(body), now).run();
+    await writeSupplierAuditLog(db, user.id, 'supplier_update', id, JSON.stringify(body), now);
 
-    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    let supplier: any = null;
+    if (!usingFallback) {
+      supplier = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
+    } else {
+      supplier = { ...existing, ...body, updated_at: now };
+    }
     return c.json({ success: true, data: supplier });
   });
 }

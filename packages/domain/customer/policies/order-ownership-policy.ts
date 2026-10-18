@@ -42,13 +42,25 @@ export async function findCustomerByIdentifier(
   return null;
 }
 
+const PRIVILEGED_STAFF_ROLES = [
+  'owner',
+  'manager',
+  'staff',
+  'admin',
+  'cashier',
+  'waiter',
+  'kitchen',
+  'barista',
+  'chef',
+];
+
 export async function resolveServerOrderOwnership(
   input: ResolveOwnershipInput
 ): Promise<OrderOwnershipResolution> {
   const { actor, clientSuppliedCustomerId, customerPhone, db } = input;
   const role = actor?.role;
 
-  if (role && ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(role)) {
+  if (role && PRIVILEGED_STAFF_ROLES.includes(role)) {
     if (clientSuppliedCustomerId) {
       return { customerId: clientSuppliedCustomerId, stage: 'customer_profile', isGuest: false, resolvedVia: 'staff_override' };
     }
@@ -81,7 +93,7 @@ export function canAccessOrder(
   order: { id: string; customer_id?: string | null }
 ): { allowed: boolean; reason?: string } {
   const role = actor?.role;
-  if (role && ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(role)) {
+  if (role && PRIVILEGED_STAFF_ROLES.includes(role)) {
     return { allowed: true };
   }
   if (role === 'customer' && actor?.id) {
@@ -116,7 +128,7 @@ export interface ClaimGuestOrderResult {
 
 export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<ClaimGuestOrderResult> {
   const { db, orderId, actor } = input;
-  if (!actor || !actor.id || (actor.role !== 'customer' && !['owner', 'manager', 'staff', 'admin', 'cashier'].includes(actor.role || ''))) {
+  if (!actor || !actor.id || (actor.role !== 'customer' && !PRIVILEGED_STAFF_ROLES.includes(actor.role || ''))) {
     return { success: false, error: 'Unauthorized: authentication required to claim an order', statusCode: 401 };
   }
 

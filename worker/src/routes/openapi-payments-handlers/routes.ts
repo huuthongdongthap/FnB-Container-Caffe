@@ -15,9 +15,9 @@ const authMiddleware = async (c: any, next: any) => {
   }
   // Listing all payments or processing refunds is restricted to staff & management
   if (path.endsWith('/refund') || (c.req.method === 'GET' && (path === '/api/payments' || path === '/api/payments/'))) {
-    return requireAuth(['owner', 'manager', 'staff', 'admin'])(c, next);
+    return requireAuth(['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter'])(c, next);
   }
-  return requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'customer'])(c, next);
+  return requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier', 'customer'])(c, next);
 };
 
 // Apply auth middleware to all routes except verified provider webhooks

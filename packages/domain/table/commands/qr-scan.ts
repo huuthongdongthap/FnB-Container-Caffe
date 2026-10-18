@@ -46,7 +46,11 @@ qrRouter.get('/:slug', async (c) => {
   }
 
   // Generate QR payload — deep link to ordering page
-  const qrPayload = `${c.req.header('host') || 'localhost:3000'}?table=${slug}`;
+  const host = c.req.header('host') || 'localhost:3000';
+  const proto = c.req.header('x-forwarded-proto') || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const qrPayload = host.startsWith('http://') || host.startsWith('https://')
+    ? `${host}?table=${slug}`
+    : `${proto}://${host}?table=${slug}`;
   const pngBuffer = await QRCode.toBuffer(qrPayload, {
     type: 'png',
     width: 400,

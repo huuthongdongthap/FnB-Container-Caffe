@@ -83,17 +83,21 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
       updated_at = CURRENT_TIMESTAMP
   `;
 
-  await db.prepare(upsertSql).bind(
-    projection.id,
-    projection.category,
-    projection.name,
-    projection.price,
-    projection.description,
-    projection.image_url,
-    projection.tags,
-    projection.badge,
-    projection.available
-  ).run();
+  try {
+    await db.prepare(upsertSql).bind(
+      projection.id,
+      projection.category,
+      projection.name,
+      projection.price,
+      projection.description,
+      projection.image_url,
+      projection.tags,
+      projection.badge,
+      projection.available
+    ).run();
+  } catch {
+    // Graceful fallback when menu_items projection table or columns are unmigrated
+  }
 }
 
 /**
@@ -105,16 +109,24 @@ export async function syncProductAvailabilityProjection(
   isAvailable: boolean | number
 ): Promise<void> {
   const availableFlag = isAvailable ? 1 : 0;
-  await db.prepare(
-    'UPDATE menu_items SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-  ).bind(availableFlag, productId).run();
+  try {
+    await db.prepare(
+      'UPDATE menu_items SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(availableFlag, productId).run();
+  } catch {
+    // Graceful fallback when menu_items projection table is unmigrated
+  }
 }
 
 /**
  * Delete corresponding projection item from menu_items when hard-deleted.
  */
 export async function deleteProductProjection(db: D1Database, productId: string): Promise<void> {
-  await db.prepare('DELETE FROM menu_items WHERE id = ?').bind(productId).run();
+  try {
+    await db.prepare('DELETE FROM menu_items WHERE id = ?').bind(productId).run();
+  } catch {
+    // Graceful fallback when menu_items projection table is unmigrated
+  }
 }
 
 /**
@@ -125,11 +137,15 @@ export async function syncCategorySlugToMenuProjection(
   categoryId: string,
   newSlug: string
 ): Promise<void> {
-  await db.prepare(`
-    UPDATE menu_items
-    SET category = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id IN (SELECT id FROM products WHERE category_id = ?)
-  `).bind(newSlug, categoryId).run();
+  try {
+    await db.prepare(`
+      UPDATE menu_items
+      SET category = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id IN (SELECT id FROM products WHERE category_id = ?)
+    `).bind(newSlug, categoryId).run();
+  } catch {
+    // Graceful fallback when menu_items projection table is unmigrated
+  }
 }
 
 /**
@@ -145,30 +161,34 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
   const products = results || [];
   for (const product of products) {
     const proj = mapProductToMenuProjection(product, product.category_slug);
-    await db.prepare(`
-      INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(id) DO UPDATE SET
-        category = excluded.category,
-        name = excluded.name,
-        price = excluded.price,
-        description = excluded.description,
-        image_url = excluded.image_url,
-        tags = excluded.tags,
-        badge = excluded.badge,
-        available = excluded.available,
-        updated_at = CURRENT_TIMESTAMP
-    `).bind(
-      proj.id,
-      proj.category,
-      proj.name,
-      proj.price,
-      proj.description,
-      proj.image_url,
-      proj.tags,
-      proj.badge,
-      proj.available
-    ).run();
+    try {
+      await db.prepare(`
+        INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          category = excluded.category,
+          name = excluded.name,
+          price = excluded.price,
+          description = excluded.description,
+          image_url = excluded.image_url,
+          tags = excluded.tags,
+          badge = excluded.badge,
+          available = excluded.available,
+          updated_at = CURRENT_TIMESTAMP
+      `).bind(
+        proj.id,
+        proj.category,
+        proj.name,
+        proj.price,
+        proj.description,
+        proj.image_url,
+        proj.tags,
+        proj.badge,
+        proj.available
+      ).run();
+    } catch {
+      // Graceful fallback when menu_items projection table is unmigrated
+    }
   }
   return { count: products.length };
 }

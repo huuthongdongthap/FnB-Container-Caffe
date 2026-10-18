@@ -17,13 +17,14 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
       if (!handler) handler = rowsBySql.find(h => h.match(sql));
       const rows = handler?.rows ?? [];
       const firstRow = handler?.firstRow !== undefined ? handler.firstRow : (rows[0] ?? null);
-      return {
-        bind: (..._args: unknown[]) => db.prepare(sql),
+      const stmt = {
+        bind: (..._args: unknown[]) => stmt,
         run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }),
         first: async () => firstRow,
         all: async () => ({ results: rows, success: true, meta: {} }),
         raw: async () => [],
       };
+      return stmt;
     },
     batch: async () => [],
     exec: async () => ({ count: 0, duration: 0 }),
@@ -47,8 +48,8 @@ describe('dbg', () => {
     app.route('/api/table-sessions', tableSessionsRouter);
     const req = new Request('https://test.aura/api/table-sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ table_id: 'T1', customer_name: 'Julian' }) });
     const res = await app.fetch(req, { AURA_DB: db, AUTH_KV: { get: async () => null, put: async () => {}, delete: async () => {} } as any, JWT_SECRET: 'test-jwt-secret-at-least-16-chars' } as any, { waitUntil: () => {} } as any);
-    require('fs').appendFileSync('/tmp/dbg.txt', 'STATUS ' + res.status + '\n');
-    require('fs').appendFileSync('/tmp/dbg.txt', 'BODY ' + await res.clone().text() + '\n');
-    require('fs').appendFileSync('/tmp/dbg.txt', 'LOGS ' + JSON.stringify(db._log) + '\n');
+    expect(res.status).toBe(201);
+    const body = await res.json() as any;
+    expect(body.success).toBe(true);
   });
 });

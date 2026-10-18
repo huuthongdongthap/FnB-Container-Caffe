@@ -39,25 +39,46 @@ adminQRRouter.get('/tables', async(c) => {
     .all<CafeTable>();
 
   // Fetch existing QR codes
-  const { results: qrRows } = await db
-    .prepare('SELECT table_id, slug FROM table_qr_codes')
-    .all<QrCodeRow>();
-
-  const slugMap = new Map(qrRows.map((r) => [r.table_id, r.slug]));
-
-  // Auto-generate slugs for tables missing them
-  if (tables.some((t) => !slugMap.has(Number(t.id)))) {
-    await bulkGenerateSlugs(db, tables);
-    // Re-fetch after upsert
-    const { results: updatedQR } = await db
+  let qrRows: QrCodeRow[] = [];
+  try {
+    const res = await db
       .prepare('SELECT table_id, slug FROM table_qr_codes')
       .all<QrCodeRow>();
-    updatedQR.forEach((r) => slugMap.set(r.table_id, r.slug));
+    qrRows = res.results || [];
+  } catch {
+    qrRows = [];
+  }
+
+  const slugMap = new Map<string | number, string>();
+  qrRows.forEach((r) => {
+    slugMap.set(r.table_id, r.slug);
+    slugMap.set(String(r.table_id), r.slug);
+    const n = Number(r.table_id);
+    if (!Number.isNaN(n)) slugMap.set(n, r.slug);
+  });
+
+  // Auto-generate slugs for tables missing them
+  if (tables.some((t) => !(slugMap.get(String(t.id)) ?? slugMap.get(Number(t.id))))) {
+    const generated = await bulkGenerateSlugs(db, tables);
+    generated.forEach((v, k) => slugMap.set(k, v));
+    // Re-fetch after upsert
+    try {
+      const { results: updatedQR } = await db
+        .prepare('SELECT table_id, slug FROM table_qr_codes')
+        .all<QrCodeRow>();
+      (updatedQR || []).forEach((r) => {
+        slugMap.set(r.table_id, r.slug);
+        slugMap.set(String(r.table_id), r.slug);
+        const n = Number(r.table_id);
+        if (!Number.isNaN(n)) slugMap.set(n, r.slug);
+      });
+    } catch {
+      // table_qr_codes optional in fallback mode
+    }
   }
 
   const tableList = await Promise.all(tables.map(async (t) => {
-    const idNum = Number(t.id);
-    const slug = slugMap.get(idNum);
+    const slug = slugMap.get(String(t.id)) ?? slugMap.get(Number(t.id));
     const signedUrl = slug ? await signQRUrl(slug, secret, baseUrl) : null;
     return {
       id: t.id,
@@ -75,7 +96,11 @@ adminQRRouter.get('/tables', async(c) => {
 // ── POST /api/admin/qr/regenerate — clear + re-generate all slugs ──
 adminQRRouter.post('/regenerate', async(c) => {
   const db = c.env.AURA_DB;
-  await db.prepare('DELETE FROM table_qr_codes').run();
+  try {
+    await db.prepare('DELETE FROM table_qr_codes').run();
+  } catch {
+    // ignore if table_qr_codes is missing
+  }
   const { results: tables } = await db
     .prepare('SELECT * FROM cafe_tables')
     .all<CafeTable>();
@@ -94,11 +119,16 @@ adminQRRouter.get('/:slug/download', async(c) => {
   const slug = c.req.param('slug');
 
   // Verify slug exists
-  const qrRowRaw = await db
-    .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
-    .bind(slug)
-    .first();
-  const qrRow = qrRowRaw as { table_id: number } | null;
+  let qrRowRaw: unknown = null;
+  try {
+    qrRowRaw = await db
+      .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
+      .bind(slug)
+      .first();
+  } catch {
+    qrRowRaw = null;
+  }
+  const qrRow = qrRowRaw as { table_id: number | string } | null;
   if (!qrRow) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -134,10 +164,15 @@ adminQRRouter.get('/:slug/png', async(c) => {
   const slug = c.req.param('slug');
 
   // Verify slug exists
-  const qrRow = await db
-    .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
-    .bind(slug)
-    .first<{ table_id: number }>();
+  let qrRow: { table_id: number | string } | null = null;
+  try {
+    qrRow = await db
+      .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
+      .bind(slug)
+      .first<{ table_id: number | string }>();
+  } catch {
+    qrRow = null;
+  }
   if (!qrRow) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -165,14 +200,19 @@ adminQRRouter.get('/:slug/png', async(c) => {
     errorCorrectionLevel: 'M'
   });
 
-  if (c.executionCtx?.waitUntil) {
-    c.executionCtx.waitUntil(
-      db.prepare(
-        'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
-      )
-        .bind(slug)
-        .run()
-    );
+  try {
+    if (c.executionCtx?.waitUntil) {
+      c.executionCtx.waitUntil(
+        db.prepare(
+          'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
+        )
+          .bind(slug)
+          .run()
+          .catch(() => {})
+      );
+    }
+  } catch {
+    // executionCtx unavailable
   }
 
   return new Response(pngBuffer as unknown as BodyInit, {

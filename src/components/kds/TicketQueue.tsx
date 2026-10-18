@@ -76,7 +76,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
           {sortedOrders
             .filter((o) => o.status === 'preparing')
             .map((order) => (
-              <OrderTicket key={order.id} order={order} />
+              <OrderTicket key={order.id} order={order} onComplete={onComplete} />
             ))}
         </QueueColumn>
 
@@ -89,7 +89,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
           {sortedOrders
             .filter((o) => o.status === 'ready')
             .map((order) => (
-              <OrderTicket key={order.id} order={order} />
+              <OrderTicket key={order.id} order={order} onComplete={onComplete} />
             ))}
         </QueueColumn>
 

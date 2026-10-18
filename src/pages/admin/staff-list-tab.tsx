@@ -9,6 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 
+function formatDate(iso?: string | null): string {
+  if (!iso) return '—';
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('vi-VN');
+}
+
 export function StaffListTab() {
   const { t } = useTranslation();
   const { staff, loading, error, fetchStaff, registerStaff, toggleStaffActive } = useAdminStaffStore();
@@ -105,7 +112,7 @@ export function StaffListTab() {
                         <p className="font-medium">{member.name}</p>
                         <p>{member.phone}</p>
                         <p>{member.email}</p>
-                        <p>{new Date(member.startedAt).toLocaleDateString('vi-VN')}</p>
+                        <p>{formatDate(member.startedAt)}</p>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-border">

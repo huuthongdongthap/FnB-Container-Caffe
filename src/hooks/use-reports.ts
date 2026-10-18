@@ -35,9 +35,14 @@ export interface CustomerMetricsData {
 
 // ── Daily Report ──
 export function useDailyReport(from: string, to: string) {
-  return useQuery<{ success: boolean; data: DailyReport[] }>({
+  return useQuery<DailyReport[]>({
     queryKey: ['reports', 'daily', from, to],
-    queryFn: () => apiFetch(`/api/reports/daily?from=${from}&to=${to}`),
+    queryFn: async () => {
+      const res = await apiFetch<{ success?: boolean; data?: DailyReport[] } | DailyReport[]>(
+        `/api/reports/daily?from=${from}&to=${to}`,
+      );
+      return Array.isArray(res) ? res : (res?.data ?? []);
+    },
     enabled: !!from && !!to,
     staleTime: 60_000,
   });
@@ -45,9 +50,14 @@ export function useDailyReport(from: string, to: string) {
 
 // ── Top Products ──
 export function useTopProducts(from: string, to: string, limit = 10) {
-  return useQuery<{ success: boolean; data: TopProduct[] }>({
+  return useQuery<TopProduct[]>({
     queryKey: ['reports', 'top-products', from, to, limit],
-    queryFn: () => apiFetch(`/api/reports/top-products?from=${from}&to=${to}&limit=${limit}`),
+    queryFn: async () => {
+      const res = await apiFetch<{ success?: boolean; data?: TopProduct[] } | TopProduct[]>(
+        `/api/reports/top-products?from=${from}&to=${to}&limit=${limit}`,
+      );
+      return Array.isArray(res) ? res : (res?.data ?? []);
+    },
     enabled: !!from && !!to,
     staleTime: 60_000,
   });
@@ -55,9 +65,14 @@ export function useTopProducts(from: string, to: string, limit = 10) {
 
 // ── Peak Hours ──
 export function usePeakHours(from: string, to: string) {
-  return useQuery<{ success: boolean; data: PeakHour[] }>({
+  return useQuery<PeakHour[]>({
     queryKey: ['reports', 'peak-hours', from, to],
-    queryFn: () => apiFetch(`/api/reports/peak-hours?from=${from}&to=${to}`),
+    queryFn: async () => {
+      const res = await apiFetch<{ success?: boolean; data?: PeakHour[] } | PeakHour[]>(
+        `/api/reports/peak-hours?from=${from}&to=${to}`,
+      );
+      return Array.isArray(res) ? res : (res?.data ?? []);
+    },
     enabled: !!from && !!to,
     staleTime: 60_000,
   });
@@ -65,9 +80,14 @@ export function usePeakHours(from: string, to: string) {
 
 // ── Customer Metrics ──
 export function useCustomerMetrics() {
-  return useQuery<{ success: boolean; data: CustomerMetricsData }>({
+  return useQuery<CustomerMetricsData>({
     queryKey: ['reports', 'customer-metrics'],
-    queryFn: () => apiFetch('/api/reports/customer-metrics'),
+    queryFn: async () => {
+      const res = await apiFetch<{ success?: boolean; data?: CustomerMetricsData } | CustomerMetricsData>(
+        '/api/reports/customer-metrics',
+      );
+      return (res as { data?: CustomerMetricsData })?.data ?? (res as CustomerMetricsData);
+    },
     staleTime: 60_000,
   });
 }

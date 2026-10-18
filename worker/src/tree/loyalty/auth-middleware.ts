@@ -17,13 +17,33 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
   if (!auth || !auth.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const payload = await verifyJWT(auth.substring(7), c.env.JWT_SECRET);
+  const token = auth.substring(7);
+  if (c.env.AUTH_KV) {
+    try {
+      const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+      if (revoked) {
+        return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+      }
+    } catch {
+      // ignore KV error
+    }
+  }
+  const payload = await verifyJWT(token, c.env.JWT_SECRET);
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
-  const customer = await c.env.AURA_DB.prepare(
-    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE email = ? OR id = ?'
-  ).bind(payload.email || '', payload.id || (payload as unknown as Record<string, unknown>).sub || '').first<Customer>();
+  const emailBind = payload.email ? String(payload.email) : null;
+  const idBind = payload.id || (payload as unknown as Record<string, unknown>).sub || null;
+  let customer: Customer | null = null;
+  try {
+    customer = await c.env.AURA_DB.prepare(
+      'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE email = ? OR id = ?'
+    ).bind(emailBind, idBind).first<Customer>();
+  } catch {
+    customer = await c.env.AURA_DB.prepare(
+      'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE email = ? OR id = ?'
+    ).bind(emailBind, idBind).first<Customer>();
+  }
   if (!customer) {
     return c.json({ success: false, error: 'Customer not found' }, 404);
   }

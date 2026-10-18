@@ -49,14 +49,26 @@ reservationsRouter.get('/availability', async (c) => {
     'SELECT * FROM cafe_tables ORDER BY zone ASC, table_number ASC'
   ).all<Record<string, unknown>>();
 
-  let query = "SELECT table_id, time FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')";
-  const params: unknown[] = [date];
-  if (time) {
-    query += ' AND time = ?';
-    params.push(time);
+  let reservations: { table_id: string }[] = [];
+  try {
+    let query = "SELECT table_id, time FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')";
+    const params: unknown[] = [date];
+    if (time) {
+      query += ' AND time = ?';
+      params.push(time);
+    }
+    const res = await db.prepare(query).bind(...params).all<{ table_id: string }>();
+    reservations = res.results || [];
+  } catch {
+    let fallbackQuery = "SELECT table_id, reservation_time AS time FROM reservations WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'seated')";
+    const params: unknown[] = [date];
+    if (time) {
+      fallbackQuery += ' AND reservation_time = ?';
+      params.push(time);
+    }
+    const res = await db.prepare(fallbackQuery).bind(...params).all<{ table_id: string }>();
+    reservations = res.results || [];
   }
-
-  const { results: reservations } = await db.prepare(query).bind(...params).all<{ table_id: string }>();
   const bookedIds = new Set(reservations.map(r => String(r.table_id)));
   const data = tables.map(t => ({
     ...t,
@@ -95,9 +107,16 @@ reservationsRouter.post('/', async (c) => {
   }
 
   const canonicalTableId = String(table.id ?? table_id);
-  const existing = await db.prepare(
-    "SELECT id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'seated')"
-  ).bind(canonicalTableId, date, time).first<{ id: string }>();
+  let existing: { id: string } | null = null;
+  try {
+    existing = await db.prepare(
+      "SELECT id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'seated')"
+    ).bind(canonicalTableId, date, time).first<{ id: string }>();
+  } catch {
+    existing = await db.prepare(
+      "SELECT id FROM reservations WHERE table_id = ? AND reservation_date = ? AND reservation_time = ? AND status IN ('confirmed', 'pending', 'seated')"
+    ).bind(canonicalTableId, date, time).first<{ id: string }>();
+  }
   if (existing) {
     return c.json({ success: false, error: 'Table already reserved for this time slot' }, 409);
   }
@@ -105,10 +124,17 @@ reservationsRouter.post('/', async (c) => {
   const id = `rsv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
 
-  await db.prepare(
-    `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
-  ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
+  try {
+    await db.prepare(
+      `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+    ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO reservations (id, table_id, customer_name, phone, pax, reservation_date, reservation_time, notes, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+    ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, String(notes || '').slice(0, 500), now, now).run();
+  }
 
   if (date === today) {
     await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ?").bind(canonicalTableId).run();
@@ -120,31 +146,53 @@ reservationsRouter.post('/', async (c) => {
   }, 201);
 });
 
+const reservationStaffRoles = ['owner', 'staff', 'manager', 'admin', 'waiter', 'cashier'];
+
 // GET /api/reservations?date=&limit=&offset=
-reservationsRouter.get('/', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
+reservationsRouter.get('/', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const limit = parseInt(c.req.query('limit') || '50', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
 
-  let query = `
-    SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
-    FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
-    WHERE 1=1
-  `;
-  const params: unknown[] = [];
-  if (date) {
-    query += ' AND r.date = ?'; params.push(date);
-  }
-  query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  let results: unknown[] = [];
+  try {
+    let query = `
+      SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
+      FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+    if (date) {
+      query += ' AND r.date = ?'; params.push(date);
+    }
+    query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
-  const { results } = await db.prepare(query).bind(...params).all();
+    const res = await db.prepare(query).bind(...params).all();
+    results = res.results || [];
+  } catch {
+    let fallbackQuery = `
+      SELECT r.*, r.reservation_date AS date, r.reservation_time AS time, r.phone AS customer_phone, r.pax AS guest_count,
+             t.table_number, t.zone AS table_zone, t.capacity
+      FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+    if (date) {
+      fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
+    }
+    fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const res = await db.prepare(fallbackQuery).bind(...params).all();
+    results = res.results || [];
+  }
   return c.json({ success: true, data: results });
 });
 
 // PATCH /api/reservations/:id/approve
-reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
+reservationsRouter.patch('/:id/approve', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -158,7 +206,7 @@ reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff', 'manager
 });
 
 // PATCH /api/reservations/:id/reject
-reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
+reservationsRouter.patch('/:id/reject', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -168,12 +216,12 @@ reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff', 'manager'
   }
 
   await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ?").bind(rsv.table_id).run();
+  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
   return c.json({ success: true, message: 'Reservation rejected' });
 });
 
 // DELETE /api/reservations/:id
-reservationsRouter.delete('/:id', requireAuth(['owner', 'staff', 'manager', 'admin']) as any, async (c) => {
+reservationsRouter.delete('/:id', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -183,6 +231,6 @@ reservationsRouter.delete('/:id', requireAuth(['owner', 'staff', 'manager', 'adm
   }
 
   await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ?").bind(rsv.table_id).run();
+  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
   return c.json({ success: true, message: 'Reservation cancelled' });
 });

@@ -158,4 +158,34 @@ describe('Canonical Notification Contract', () => {
     await processNotificationIntent(legacyDb, intent, async () => ({ ok: true }));
     expect(legacyInsertCalled).toBe(true);
   });
+
+  it('11. schema fallback to canonical 0016 notification_audit_log (phone, template_key, payload) and cyclic payload safety', async () => {
+    let canonical0016Called = false;
+    const db0016 = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          run: async () => {
+            if (sql.includes('event_id') || sql.includes('recipient')) {
+              throw new Error('table notification_audit_log has no column named recipient');
+            }
+            if (sql.includes('template_key')) {
+              canonical0016Called = true;
+            }
+            return { success: true };
+          },
+        }),
+      }),
+    };
+    const intent = createNotificationIntent(sampleEvent, 'sms', 'speedsms', { phone: '0909000111' }, 'otp_tmpl');
+    await processNotificationIntent(db0016, intent, async () => ({ ok: true }));
+    expect(canonical0016Called).toBe(true);
+
+    const ts = new Date('2026-10-18T12:00:00.000Z');
+    const cyclicPayload: Record<string, unknown> = { sentAt: ts, secret_code: 4242 };
+    cyclicPayload.loop = cyclicPayload;
+    const sanitized = sanitizeNotificationPayload(cyclicPayload);
+    expect(sanitized.sentAt).toBeInstanceOf(Date);
+    expect(sanitized.secret_code).toBe('[REDACTED]');
+    expect(sanitized.loop).toBe('[CIRCULAR]');
+  });
 });

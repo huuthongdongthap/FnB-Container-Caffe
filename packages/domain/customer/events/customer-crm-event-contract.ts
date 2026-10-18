@@ -103,14 +103,46 @@ function isProhibitedKey(key: string): boolean {
   return PROHIBITED_PATTERNS.some(p => k.includes(p));
 }
 
+function sanitizeNestedValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  if (seen.has(value)) {
+    return undefined;
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeNestedValue(item, seen))
+      .filter((item) => item !== undefined);
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (!isProhibitedKey(k) && v !== undefined) {
+      const cleaned = sanitizeNestedValue(v, seen);
+      if (cleaned !== undefined) {
+        out[k] = cleaned;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Sanitizes event payload to guarantee customer safety.
- * Strips confidential financial/internal fields and attaches schema version.
+ * Strips confidential financial/internal fields (recursively) and attaches schema version.
  */
 export function sanitizeCustomerEventPayload<T extends Record<string, unknown>>(
   eventType: CanonicalEventType,
   raw: T
 ): T & { v: number; event_type: CanonicalEventType } {
+  const seen = new WeakSet<object>();
+  seen.add(raw);
   const sanitized: Record<string, unknown> = {
     v: 1,
     event_type: eventType,
@@ -118,7 +150,10 @@ export function sanitizeCustomerEventPayload<T extends Record<string, unknown>>(
 
   for (const [key, value] of Object.entries(raw)) {
     if (!isProhibitedKey(key) && value !== undefined) {
-      sanitized[key] = value;
+      const cleaned = sanitizeNestedValue(value, seen);
+      if (cleaned !== undefined) {
+        sanitized[key] = cleaned;
+      }
     }
   }
 

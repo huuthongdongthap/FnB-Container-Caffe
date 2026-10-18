@@ -71,12 +71,15 @@ export function classifyIntegrationError(statusOrCode: number | string, message?
 
 export function sanitizeIntegrationSecrets(data: unknown, seen = new WeakSet()): unknown {
   if (data === null || data === undefined) return data;
+  if (data instanceof Date) return new Date(data.getTime());
   if (typeof data !== 'object') return data;
   if (seen.has(data as object)) return '[CIRCULAR]';
   seen.add(data as object);
 
   if (Array.isArray(data)) {
-    return data.map(item => sanitizeIntegrationSecrets(item, seen));
+    const mapped = data.map(item => sanitizeIntegrationSecrets(item, seen));
+    seen.delete(data as object);
+    return mapped;
   }
 
   const sanitized: Record<string, unknown> = {};
@@ -87,7 +90,16 @@ export function sanitizeIntegrationSecrets(data: unknown, seen = new WeakSet()):
       sanitized[key] = sanitizeIntegrationSecrets(val, seen);
     }
   }
+  seen.delete(data as object);
   return sanitized;
+}
+
+export function verifyWebhookSignature(signature: string | undefined, secretKey?: string): boolean {
+  if (!secretKey) return true;
+  if (!signature || signature !== `sig_${secretKey}` || signature.length < 8) {
+    return false;
+  }
+  return true;
 }
 
 export function verifyWebhookBoundary(
@@ -98,7 +110,7 @@ export function verifyWebhookBoundary(
     return { valid: false, deduplicated: false, reason: 'malformed_payload' };
   }
 
-  if (input.secretKey && input.signature !== `sig_${input.secretKey}`) {
+  if (!verifyWebhookSignature(input.signature, input.secretKey)) {
     return { valid: false, deduplicated: false, reason: 'invalid_signature' };
   }
 
@@ -110,6 +122,20 @@ export function verifyWebhookBoundary(
   }
 
   return { valid: true, deduplicated: false };
+}
+
+function normalizeAuraStatus(provider: IntegrationProvider, rawStatus: string | number): NormalizedStatus {
+  const str = String(rawStatus).toLowerCase().trim();
+  if (['paid', 'completed', 'served', 'confirmed', '1', 'submitted', 'delivered', 'sent', 'ok', '00', 'success'].includes(str)) {
+    return 'success';
+  }
+  if (['pending', 'draft', '0', 'processing', 'preparing', 'ready'].includes(str)) {
+    return 'pending';
+  }
+  if (['cancelled', 'rejected', '2', 'expired', 'bounced', 'complained'].includes(str)) {
+    return 'rejected';
+  }
+  return normalizeExternalStatus(provider, rawStatus);
 }
 
 export function reconcileEntityState(
@@ -129,7 +155,7 @@ export function reconcileEntityState(
   }
 
   const normalizedExtStatus = normalizeExternalStatus(provider, externalEntity.status);
-  const normalizedIntStatus = normalizeExternalStatus(provider, auraEntity.status);
+  const normalizedIntStatus = normalizeAuraStatus(provider, auraEntity.status);
   const isStatusAligned = normalizedExtStatus === normalizedIntStatus;
   const isAmountAligned = auraEntity.total === undefined || externalEntity.total === undefined || auraEntity.total === externalEntity.total;
 

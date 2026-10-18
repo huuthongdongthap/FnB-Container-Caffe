@@ -61,12 +61,21 @@ export function ReviewCard({
           className="h-12 w-12 shrink-0 overflow-hidden rounded-full border"
           style={{ borderColor: 'rgba(68, 71, 77, 0.3)' }}
         >
-          <img
-            className="h-full w-full object-cover"
-            src={review.avatarUrl}
-            alt={review.avatarAlt}
-            loading="lazy"
-          />
+          {review.avatarUrl?.trim() ? (
+            <img
+              className="h-full w-full object-cover"
+              src={review.avatarUrl}
+              alt={review.avatarAlt}
+              loading="lazy"
+            />
+          ) : (
+            <span
+              className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase text-[var(--aura-chrome-soft)]"
+              aria-label={review.avatarAlt || review.author}
+            >
+              {review.author.charAt(0)}
+            </span>
+          )}
         </div>
         <div>
           <h3

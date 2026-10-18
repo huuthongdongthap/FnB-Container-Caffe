@@ -38,8 +38,9 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
         return c.json({ success: false, error: 'Promotion not found' }, 404);
       }
 
-      const promo = promos[0];
-      const content = `🔥 ${promo.code}: Giảm ${promo.percent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
+      const promo = promos[0] as PromotionRow & { discount_value?: number };
+      const discountPercent = promo.percent ?? promo.discount_value ?? 0;
+      const content = `🔥 ${promo.code}: Giảm ${discountPercent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
       return c.json({
         success: true,
         data: { content, hashtags: ['AuraCafe', 'KhuyenMai'] }

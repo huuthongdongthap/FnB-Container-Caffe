@@ -3,6 +3,7 @@ import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../middleware/audit-log';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import { loadPolicy, reverseAccrual } from '@aura/domain-crm';
+import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
 import {
   log,
@@ -14,7 +15,7 @@ import {
 
 export function registerRefundMutationHandlers(router: Hono<{ Bindings: Env }>): void {
   // POST /api/payments/refund
-  router.post('/refund', requireAuth(['owner', 'manager', 'staff', 'admin']), audit('refund_create'), async (c) => {
+  router.post('/refund', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('refund_create'), async (c) => {
     const db = c.env.AURA_DB;
     const mc = createMetricsCollector(db);
 
@@ -136,6 +137,10 @@ export function registerRefundMutationHandlers(router: Hono<{ Bindings: Env }>):
       await db.prepare(
         'UPDATE payments SET refund_status = ?, refund_amount = ?, refund_reason = ?, updated_at = ? WHERE id = ?'
       ).bind(refundStatus, amount, reason, now, payment.id).run();
+
+      if (c.env?.AUTH_KV) {
+        await publishOrderEvent(c.env.AUTH_KV, payment.order_id, refundStatus).catch(() => {});
+      }
 
       try {
         c.executionCtx?.waitUntil(mc.recordMetric('refund_success', amount, {

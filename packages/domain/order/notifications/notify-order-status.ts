@@ -57,19 +57,23 @@ export async function notifyOrderStatus(
   const customerName = order.customer_name || 'Khach hang';
   const totalFormatted = `${(order.total || 0).toLocaleString('vi-VN')}d`;
 
+  const tasks: Promise<unknown>[] = [];
+
   // ── ZNS ──────────────────────────────────────────────
   if (env.ZALO_ACCESS_TOKEN) {
-    sendZNS(env as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database }, {
-      phone: order.customer_phone,
-      template_key: 'order_status_update',
-      data: {
-        name: customerName,
-        order_id: orderId,
-        status: statusLabel,
-        amount: order.total || 0
-      } as ZnsData
-    }).catch((err: unknown) =>
-      log.error('ZNS order notification error:', { message: err instanceof Error ? err.message : String(err) })
+    tasks.push(
+      sendZNS(env as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database }, {
+        phone: order.customer_phone,
+        template_key: 'order_status_update',
+        data: {
+          name: customerName,
+          order_id: orderId,
+          status: statusLabel,
+          amount: order.total || 0
+        } as ZnsData
+      }).catch((err: unknown) =>
+        log.error('ZNS order notification error:', { message: err instanceof Error ? err.message : String(err) })
+      )
     );
   }
 
@@ -80,11 +84,17 @@ export async function notifyOrderStatus(
       `AURA CAFE - ${customerName} oi, don hang ${orderRef} da ${statusLabel}. ` +
       `Tong tien: ${totalFormatted}. Cam on quy khach!`;
 
-    sendSMS(env as SpeedSMSEnv, {
-      phone: order.customer_phone,
-      message: smsMessage
-    }).catch((err: unknown) =>
-      log.error('SMS order notification error:', { message: err instanceof Error ? err.message : String(err) })
+    tasks.push(
+      sendSMS(env as SpeedSMSEnv, {
+        phone: order.customer_phone,
+        message: smsMessage
+      }).catch((err: unknown) =>
+        log.error('SMS order notification error:', { message: err instanceof Error ? err.message : String(err) })
+      )
     );
+  }
+
+  if (tasks.length > 0) {
+    await Promise.allSettled(tasks);
   }
 }

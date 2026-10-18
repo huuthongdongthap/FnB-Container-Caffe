@@ -58,23 +58,43 @@ export function evaluateChannelEligibility(
   }
 }
 
-export function sanitizeNotificationPayload(payload: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeNotificationPayload(
+  payload: Record<string, unknown>,
+  seen = new WeakSet<object>()
+): Record<string, unknown> {
+  if (!payload || typeof payload !== 'object') return {};
+  if (seen.has(payload)) return { circular: '[CIRCULAR]' };
+  seen.add(payload);
+
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, val] of Object.entries(payload)) {
     if (SECRET_KEY_PATTERN.test(key)) {
       sanitized[key] = '[REDACTED]';
+    } else if (val instanceof Date) {
+      sanitized[key] = new Date(val.getTime());
     } else if (typeof val === 'object' && val !== null) {
-      if (Array.isArray(val)) {
-        sanitized[key] = val.map(item => (typeof item === 'object' && item !== null ? sanitizeNotificationPayload(item as Record<string, unknown>) : item));
+      if (seen.has(val)) {
+        sanitized[key] = '[CIRCULAR]';
+      } else if (Array.isArray(val)) {
+        seen.add(val);
+        sanitized[key] = val.map(item => {
+          if (item instanceof Date) return new Date(item.getTime());
+          if (typeof item === 'object' && item !== null) {
+            return sanitizeNotificationPayload(item as Record<string, unknown>, seen);
+          }
+          return item;
+        });
+        seen.delete(val);
       } else {
-        sanitized[key] = sanitizeNotificationPayload(val as Record<string, unknown>);
+        sanitized[key] = sanitizeNotificationPayload(val as Record<string, unknown>, seen);
       }
     } else {
       sanitized[key] = val;
     }
   }
 
+  seen.delete(payload);
   return sanitized;
 }
 

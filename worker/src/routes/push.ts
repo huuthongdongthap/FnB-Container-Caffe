@@ -7,7 +7,7 @@ import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErr
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/push/list-subscriptions — list staff push subscriptions for admin UI
-pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   let results: Array<{
     id: string;
@@ -121,7 +121,7 @@ pushRouter.post('/subscribe', async(c) => {
 });
 
 // DELETE /api/push/subscribe — remove staff subscription by name or endpoint
-pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
+pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const name = typeof raw.name === 'string' ? raw.name.trim() : '';

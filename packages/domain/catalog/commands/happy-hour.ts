@@ -127,9 +127,38 @@ happyHourRouter.get('/happy-hour/now', async (c) => {
   const { results } = await db.prepare(
     'SELECT * FROM happy_hour_windows WHERE active = 1'
   ).all<HappyHourWindow>();
+  const productId = c.req.query('product_id') || c.req.query('productId') || null;
+  let categoryId = c.req.query('category_id') || c.req.query('categoryId') || null;
+  if (productId && !categoryId) {
+    try {
+      const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
+        .bind(productId)
+        .first<{ category_id?: string; category?: string }>();
+      categoryId = prod?.category_id || prod?.category || null;
+    } catch {
+      // Optional category lookup when only product_id is passed
+    }
+    if (!categoryId) {
+      try {
+        const menuRow = await db.prepare('SELECT id, name, price, category AS category_id FROM menu_items WHERE id = ?')
+          .bind(productId)
+          .first<{ id?: string; category_id?: string; category?: string }>();
+        categoryId = menuRow?.category_id || menuRow?.category || null;
+        if (!categoryId) {
+          const { results: menuItems } = await db.prepare(
+            'SELECT id, name, price, category AS category_id FROM menu_items WHERE available = 1'
+          ).all<{ id: string; category_id?: string; category?: string }>();
+          const matched = (menuItems || []).find((m) => m.id === productId);
+          categoryId = matched?.category_id || matched?.category || null;
+        }
+      } catch {
+        // Optional menu_items fallback
+      }
+    }
+  }
   const win = happyHourDiscountFor(results, new Date(), {
-    productId: c.req.query('product_id') || null,
-    categoryId: c.req.query('category_id') || null,
+    productId,
+    categoryId,
   });
   return c.json({ success: true, data: win });
 });

@@ -62,7 +62,7 @@ interface OrderRow {
   created_at: string;
 }
 
-const TERMINAL_STATUSES = new Set(['served', 'picked_up', 'cancelled', 'rejected']);
+const TERMINAL_STATUSES = new Set(['served', 'picked_up', 'delivered', 'completed', 'cancelled', 'rejected']);
 
 /**
  * Compute the fulfillment view for one order.

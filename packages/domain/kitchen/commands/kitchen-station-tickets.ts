@@ -105,12 +105,15 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
 
   const items = parseOrderItems(order.items);
   let allReady = items.length > 0;
-  for (const it of items) {
+  for (let idx = 0; idx < items.length; idx++) {
+    const it = items[idx];
     const idKey = (it.id || it.menuItemId || it.productId || '') as string;
-    if (!idKey) continue;
+    const compositeKey = idKey
+      ? (idKey.startsWith(`${orderId}:`) ? idKey : `${orderId}:${idKey}`)
+      : `${orderId}:${idx}`;
     const itemReady = await db.prepare(
       'SELECT ready_at FROM order_item_stations WHERE (order_item_id = ? OR order_item_id = ?) AND ready_at IS NOT NULL LIMIT 1'
-    ).bind(idKey, `${orderId}:${idKey}`).first<{ ready_at: string }>();
+    ).bind(compositeKey, idKey || compositeKey).first<{ ready_at: string }>();
     if (!itemReady?.ready_at) {
       allReady = false;
       break;
@@ -119,6 +122,10 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
 
   let finalStatus = order.status;
   if (allReady && (order.status === 'preparing' || order.status === 'confirmed')) {
+    if (order.status === 'confirmed') {
+      const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', 'staff', { kv: c.env?.AUTH_KV });
+      if (prepTrans.success) finalStatus = 'preparing';
+    }
     const trans = await executeKdsStatusTransition(db, orderId, 'ready', 'staff', { kv: c.env?.AUTH_KV });
     if (trans.success) finalStatus = 'ready';
   }

@@ -3,6 +3,8 @@
  * Keeps the router table thin; these handlers need DB + KV access.
  */
 
+import { verifyJWT } from '../lib/jwt';
+
 export async function getAdminCustomers(request: Request, env: Record<string, unknown>) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const url = new URL(request.url);
@@ -201,25 +203,65 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
     return Response.json({ stuck: [], dlq: [], total: 0 });
   }
 
+  let isOwner =
+    (env as { user?: { role?: string }; role?: string })?.user?.role === 'owner' ||
+    (env as { role?: string })?.role === 'owner' ||
+    (request as unknown as { user?: { role?: string } })?.user?.role === 'owner';
+
+  if (!isOwner) {
+    const authHeader = request?.headers?.get?.('Authorization') || request?.headers?.get?.('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const secret = typeof env.JWT_SECRET === 'string' && env.JWT_SECRET ? env.JWT_SECRET : '';
+      if (secret) {
+        try {
+          const payload = await verifyJWT(authHeader.slice(7), secret);
+          if (payload?.role === 'owner') {
+            isOwner = true;
+          }
+        } catch {
+          // Default to non-owner masking when token verification fails
+        }
+      }
+    }
+  }
+
   const stuckList = await kv.list({ prefix: 'payment:stuck:' });
   const dlqList = await kv.list({ prefix: 'webhook:dlq:' });
 
   const stuck = await Promise.all(
     stuckList.keys.slice(0, 20).map(async(k) => {
       const raw = await kv.get(k.name);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) {
+        return null;
+      }
+      try {
+        return JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
     })
   );
 
   const dlq = await Promise.all(
     dlqList.keys.slice(0, 20).map(async(k) => {
       const raw = await kv.get(k.name);
-      return raw ? { key: k.name, ...JSON.parse(raw) } : null;
+      if (!raw) {
+        return null;
+      }
+      try {
+        return { key: k.name, ...(JSON.parse(raw) as Record<string, unknown>) };
+      } catch {
+        return null;
+      }
     })
   );
 
   return Response.json({
-    stuck: stuck.filter(Boolean).map((s: Record<string, unknown>) => ({ ...s, amount: '***' })),
+    stuck: (stuck.filter(Boolean) as Record<string, unknown>[]).map((s) =>
+      isOwner
+        ? s
+        : { ...s, amount: '***', dbAmount: '***', webhookAmount: '***' }
+    ),
     dlq: dlq.filter(Boolean),
     total: stuckList.keys.length + dlqList.keys.length
   });

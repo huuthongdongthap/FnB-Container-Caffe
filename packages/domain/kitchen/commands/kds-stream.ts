@@ -81,6 +81,8 @@ kdsStreamRouter.get('/stream', async(c) => {
 
   const encoder = new TextEncoder();
   let closed = false;
+  let warningTimer: ReturnType<typeof setTimeout> | undefined;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -96,7 +98,7 @@ kdsStreamRouter.get('/stream', async(c) => {
       const queryActiveOrders = async(): Promise<KdsStreamOrder[]> => {
         const { results } = await db.prepare(
           `SELECT id, customer_name, table_id, items, status, created_at FROM orders
-           WHERE status IN ('pending', 'confirmed', 'preparing')
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ORDER BY created_at ASC LIMIT 50`
         ).all<OrderRecord>();
         return (results || []).map(mapKdsOrder);
@@ -133,7 +135,7 @@ kdsStreamRouter.get('/stream', async(c) => {
       const pollPromise = run();
 
       // Connection timeout — close cleanly; EventSource reconnects.
-      setTimeout(() => {
+      closeTimer = setTimeout(() => {
         closed = true;
         try {
           controller.close();
@@ -143,6 +145,8 @@ kdsStreamRouter.get('/stream', async(c) => {
       // Cleanup on client disconnect.
       c.req.raw.signal.addEventListener('abort', () => {
         closed = true;
+        if (warningTimer) clearTimeout(warningTimer);
+        if (closeTimer) clearTimeout(closeTimer);
         try {
           controller.close();
         } catch { /* ignore */ }
@@ -150,11 +154,15 @@ kdsStreamRouter.get('/stream', async(c) => {
 
       await Promise.race([
         pollPromise,
-        new Promise((resolve) => setTimeout(resolve, SSE_TIMEOUT_MS))
+        new Promise((resolve) => {
+          warningTimer = setTimeout(resolve, SSE_TIMEOUT_MS);
+        })
       ]);
     },
     cancel() {
       closed = true;
+      if (warningTimer) clearTimeout(warningTimer);
+      if (closeTimer) clearTimeout(closeTimer);
     }
   });
 

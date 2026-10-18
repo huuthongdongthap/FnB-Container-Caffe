@@ -5,7 +5,7 @@ import { log } from './helpers';
 
 export function registerRefundReadHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/payments/refunds/:paymentId
-  router.get('/refunds/:paymentId', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
+  router.get('/refunds/:paymentId', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const paymentId = c.req.param('paymentId');
 

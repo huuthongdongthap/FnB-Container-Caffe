@@ -32,6 +32,7 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['my-active-subscription'] });
       setOpen(false);
     },

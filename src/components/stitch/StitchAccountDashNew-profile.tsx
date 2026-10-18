@@ -28,12 +28,21 @@ export function DashProfileSection({ profile, setGlassCardRef }: DashProfileSect
             className="w-20 h-20 rounded-full overflow-hidden border-2"
             style={{ borderColor: 'rgba(255,183,121,0.3)' }}
           >
-            <img
-              className="w-full h-full object-cover"
-              src={profile.avatar}
-              alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name }) || profile.name}
-              loading="lazy"
-            />
+            {profile.avatar?.trim() ? (
+              <img
+                className="w-full h-full object-cover"
+                src={profile.avatar}
+                alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name }) || profile.name}
+                loading="lazy"
+              />
+            ) : (
+              <span
+                className="flex w-full h-full items-center justify-center text-lg font-semibold uppercase text-[var(--aura-chrome-bright)]"
+                aria-label={t('stitch.accountDashboard.avatarAlt', { name: profile.name }) || profile.name}
+              >
+                {profile.name?.charAt(0) || 'U'}
+              </span>
+            )}
           </div>
           <div
             className="absolute -bottom-1 -right-1 bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest uppercase"

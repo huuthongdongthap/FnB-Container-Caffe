@@ -66,7 +66,13 @@ export function StaffNotificationSettings() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          credentials: 'include',
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
+        });
         if (!res.ok) return;
         const json = (await res.json().catch(() => ({}))) as { role?: string; user?: { role?: string } };
         if (cancelled) return;
@@ -112,10 +118,13 @@ export function StaffNotificationSettings() {
       setPreferences(next);
       try {
         await applySubscriptions(next);
+        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
         await fetch(`${API_BASE}/api/staff/notification-settings`, {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ [key]: next[key] }),
         }).catch(() => undefined);
         setSavedAt(new Date().toLocaleTimeString());

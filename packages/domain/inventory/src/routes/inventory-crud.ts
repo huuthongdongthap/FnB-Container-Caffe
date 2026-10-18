@@ -34,17 +34,38 @@ export function inventoryCRUD(app: Hono<AppContext>) {
     query += ' ORDER BY name LIMIT ?';
     params.push(limit);
 
-    const results = await db.prepare(query).bind(...params).all();
+    let results: { results: any[] };
+    try {
+      results = await db.prepare(query).bind(...params).all();
+    } catch {
+      let fallbackQuery = 'SELECT * FROM ingredients WHERE is_active = 1';
+      const fallbackParams: (string | number)[] = [];
+      if (category) {
+        fallbackQuery += ' AND category = ?';
+        fallbackParams.push(category);
+      }
+      fallbackQuery += ' ORDER BY name LIMIT ?';
+      fallbackParams.push(limit);
+      results = await db.prepare(fallbackQuery).bind(...fallbackParams).all();
+    }
     return c.json({ success: true, data: { items: results.results || [] } });
   });
 
   app.get('/:id', async (c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
-    const item = await db
+    let item = await db
       .prepare('SELECT * FROM inventory_items WHERE id = ?')
       .bind(id)
-      .first();
+      .first()
+      .catch(() => null);
+    if (!item) {
+      item = await db
+        .prepare('SELECT * FROM ingredients WHERE id = ?')
+        .bind(id)
+        .first()
+        .catch(() => null);
+    }
     if (!item) {
       return c.json({ success: false, error: 'Không tìm thấy / Item not found' }, 404);
     }

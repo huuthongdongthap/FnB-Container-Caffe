@@ -9,7 +9,7 @@ import { canAccessOrder } from '@aura/domain-order';
 
 export { handleGetOrderSummary };
 
-const STAFF_ROLES = ['owner', 'manager', 'staff'];
+const STAFF_ROLES = ['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier'];
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
   total_amount: 'o.total_amount',
@@ -143,6 +143,36 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   return c.json({
     success: true,
     data: projectForActor(scope, order, items, formatOrder, formatCustomerOrder, payments),
+  });
+}
+
+export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
+  const db = getDatabase(c);
+  const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
+
+  let order: Record<string, any> | null = null;
+  try {
+    order = (await db.prepare(
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+       FROM orders o
+       LEFT JOIN cafe_tables t ON o.table_id = t.id
+       WHERE o.id = ?`
+    ).bind(id).first()) as Record<string, any> | null;
+  } catch {
+    order = (await db.prepare(
+      'SELECT * FROM orders WHERE id = ?'
+    ).bind(id).first()) as Record<string, any> | null;
+  }
+
+  if (!order) {
+    return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+
+  const { items } = await fetchOrderItemsAndPayments(db, id);
+
+  return c.json({
+    success: true,
+    data: formatCustomerOrder(order, items),
   });
 }
 

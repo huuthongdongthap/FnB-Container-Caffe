@@ -70,36 +70,44 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
         if (!orderId || !customerId) return { ok: true, processed: false, actionTaken: 'no_order_id' };
         const total = Number(payload.totalAmount || 0);
         const policy = await loadPolicy(db);
-        await reverseAccrual(db, policy, {
+        const rRes = await reverseAccrual(db, policy, {
           orderId,
           customerId,
           refundAmountVnd: total,
         });
-        return { ok: true, processed: true, actionTaken: 'refund_accrual_reversed' };
+        const ok = rRes ? rRes.ok !== false : true;
+        return { ok, processed: ok, actionTaken: ok ? 'refund_accrual_reversed' : 'refund_reversal_failed' };
       }
 
       case 'customer_linked': {
         if (!orderId || !customerId) return { ok: true, processed: false, actionTaken: 'missing_params' };
-        await db.prepare('UPDATE visits SET customer_id = ? WHERE order_id = ?')
-          .bind(customerId, orderId).run();
+        try {
+          await db.prepare('UPDATE visits SET customer_id = ? WHERE order_id = ?')
+            .bind(customerId, orderId).run();
+        } catch {
+          // Graceful fallback when visits table is absent
+        }
         const total = Number(payload.totalAmount || payload.total || 0);
+        let accrualOk = true;
         if (total > 0) {
           const policy = await loadPolicy(db);
-          await applyAccrual(db, policy, {
+          const aRes = await applyAccrual(db, policy, {
             orderId,
             customerId,
             orderTotalVnd: total,
           });
+          accrualOk = aRes ? aRes.ok !== false : true;
         }
-        return { ok: true, processed: true, actionTaken: 'customer_linked_and_backfilled' };
+        return { ok: accrualOk, processed: accrualOk, actionTaken: accrualOk ? 'customer_linked_and_backfilled' : 'customer_link_accrual_failed' };
       }
 
       case 'visit_recorded': {
         if (!customerId) return { ok: true, processed: false };
         const channel = (payload.channel as any) || 'in_store';
         const spent = typeof payload.spent === 'number' ? payload.spent : null;
-        await recordVisit({ db, customerId, orderId, channel, spent });
-        return { ok: true, processed: true, actionTaken: 'visit_materialized' };
+        const vRes = await recordVisit({ db, customerId, orderId, channel, spent });
+        const ok = vRes ? vRes.ok !== false : true;
+        return { ok, processed: ok, actionTaken: ok ? 'visit_materialized' : 'visit_failed' };
       }
 
       case 'customer_identified': {

@@ -108,7 +108,7 @@ export function optionalAuth(): import('hono').MiddlewareHandler<{ Bindings: Env
             if (!revoked) {
               const userRole = payload.role || 'customer';
               c.set('user', {
-                id: payload.id,
+                id: String(payload.id || (payload as { sub?: string }).sub || ''),
                 email: payload.email,
                 name: payload.name,
                 role: userRole as AuthUser['role'],

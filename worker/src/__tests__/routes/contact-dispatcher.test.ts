@@ -3,6 +3,8 @@
  * Verifies prefix stripping + executionContext passing before Phase 2 consolidation.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { submitContact } from '../../routes/contact';
+import { createMockEnv } from '../test-utils';
 
 describe('Contact dispatcher wrapper', () => {
   it('strips /api/contact prefix before passing to contactRouter', async() => {
@@ -57,5 +59,16 @@ describe('Contact dispatcher wrapper', () => {
     await contactRouter.fetch(new Request(strippedUrl, { method: 'POST', body }), {});
 
     expect(capturedBody).toBe(JSON.stringify({ message: 'hello', phone: '0912345678' }));
+  });
+
+  it('validates contact submission payload via real submitContact handler', async() => {
+    const env = createMockEnv();
+    const req = new Request('https://test.aura/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '', phone: 'bad', content: '' })
+    });
+    const res = await submitContact(req, env as unknown as Record<string, unknown>);
+    expect(res.status).toBe(400);
   });
 });

@@ -93,6 +93,12 @@ describe('Canonical Integration Boundary Contract', () => {
     const missing = reconcileEntityState({ id: 'ord_3', status: 'PAID' }, null, 'erpnext');
     expect(missing.syncStatus).toBe('pending');
     expect(missing.discrepancy).toBe('external_record_missing');
+
+    const internalAuraPaid = reconcileEntityState({ id: 'ord_4', status: 'completed', total: 65000 }, { id: 'ext_4', status: 1, total: 65000 }, 'erpnext');
+    expect(internalAuraPaid.syncStatus).toBe('synced');
+
+    const internalAuraCancelled = reconcileEntityState({ id: 'ord_5', status: 'cancelled' }, { id: 'ext_5', status: 'CANCELLED' }, 'payos');
+    expect(internalAuraCancelled.syncStatus).toBe('synced');
   });
 
   it('9. secret redaction: masks API keys, secrets, tokens, and credentials from logs', () => {

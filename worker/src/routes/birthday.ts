@@ -77,7 +77,7 @@ birthdayRouter.put(
   '/config',
   async (c, next) => {
     if (c.env?.JWT_SECRET) {
-      return requireAuth(['owner', 'manager', 'admin', 'staff'])(c, next);
+      return requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
     }
     await next();
   },
@@ -135,12 +135,24 @@ birthdayRouter.get('/check', async(c) => {
 
     const today = new Date();
     const birthday = new Date(customer.birthday);
-    const isBirthdayMonth = today.getMonth() === birthday.getMonth();
-    const isBirthdayDay = isBirthdayMonth && today.getDate() === birthday.getDate();
+    const bMonth = birthday.getMonth();
+    const bDate = birthday.getDate();
+    const isBirthdayDay = today.getMonth() === bMonth && today.getDate() === bDate;
 
-    // Eligible during configured birthday window
-    const dayDiff = today.getDate() - birthday.getDate();
-    const isEligible = isBirthdayMonth && (dayDiff >= -earlyWindowDays && dayDiff <= lateWindowDays);
+    // Eligible during configured birthday window (including across month/year boundaries)
+    const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const MS_PER_DAY = 86400000;
+    let isEligible = false;
+    if (!Number.isNaN(birthday.getTime())) {
+      for (const yearOffset of [-1, 0, 1]) {
+        const candidateUtc = Date.UTC(today.getFullYear() + yearOffset, bMonth, bDate);
+        const dayDiff = Math.round((todayUtc - candidateUtc) / MS_PER_DAY);
+        if (dayDiff >= -earlyWindowDays && dayDiff <= lateWindowDays) {
+          isEligible = true;
+          break;
+        }
+      }
+    }
 
     // Check if already redeemed this year
     const yearStart = `${today.getFullYear()}-01-01`;

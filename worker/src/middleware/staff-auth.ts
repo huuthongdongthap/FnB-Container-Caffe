@@ -15,7 +15,7 @@ import { ROLE_LABELS } from '@aura/domain-staff';
  * @param allowedRoles — subset of ['owner','manager','staff','waiter']; omit or pass [] to accept all.
  */
 export function requireStaff(
-  allowedRoles: string[] = ['owner', 'manager', 'staff', 'waiter']
+  allowedRoles: string[] = ['owner', 'manager', 'staff', 'waiter', 'admin']
 ): MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
     if (!(c.env as Env).JWT_SECRET) {
@@ -32,7 +32,8 @@ export function requireStaff(
       return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
     }
 
-    const revoked = await (c.env as Env).AUTH_KV.get(`revoked:${token}`);
+    const authKv = (c.env as Env)?.AUTH_KV;
+    const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
     if (revoked) {
       return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
     }
@@ -56,11 +57,13 @@ export function requireStaff(
     }
 
     c.set('user', {
-      id: payload.id,
+      id: String(payload.id || (payload as { sub?: string }).sub || ''),
       email: payload.email || '',
       name: payload.name || '',
       role: userRole as 'owner' | 'manager' | 'staff' | 'waiter',
-    });
+      tenantId: (payload as { tenantId?: string }).tenantId || 'default',
+      tier: (payload as { tier?: string }).tier,
+    } as any);
 
     await next();
   };

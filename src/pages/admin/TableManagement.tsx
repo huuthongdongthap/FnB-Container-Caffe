@@ -14,7 +14,7 @@ export type { CafeTableRow, OrderRow };
 export default function TableManagementPage() {
 	const { t } = useTranslation();
 	const statusLabel = (status: CafeTableRow['status']) =>
-		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { fallback: status });
+		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { defaultValue: status, fallback: status });
 
 	const [tables, setTables] = useState<CafeTableRow[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -118,7 +118,7 @@ export default function TableManagementPage() {
 	if (loading) {
 		return (
 			<div className="min-h-screen bg-background flex items-center justify-center">
-				<div className="animate-pulse text-muted">{t('admin.tableManagement.loading', { fallback: t('qrCodes.loading') })}</div>
+				<div className="animate-pulse text-muted">{t('admin.tableManagement.loading', { defaultValue: t('qrCodes.loading'), fallback: t('qrCodes.loading') })}</div>
 			</div>
 		);
 	}
@@ -133,15 +133,15 @@ export default function TableManagementPage() {
 						<div className="flex gap-2 flex-wrap">
 							<button onClick={() => bulkSetStatus('Available')} disabled={updating === 'BULK'}
 								className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors">
-								{t("admin.tableManagement.openAll", { fallback: "Open all" })}
+								{t("admin.tableManagement.openAll", { defaultValue: "Open all", fallback: "Open all" })}
 							</button>
 							<button onClick={() => bulkSetStatus('Reserved')} disabled={updating === 'BULK'}
 								className="px-3 py-1.5 text-xs rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors">
-								{t("admin.tableManagement.bookAll", { fallback: "Book all" })}
+								{t("admin.tableManagement.bookAll", { defaultValue: "Book all", fallback: "Book all" })}
 							</button>
 							<button onClick={loadTables}
 								className="px-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-foreground hover:bg-muted/20 transition-colors">
-								{t("admin.tableManagement.refresh", { fallback: "Refresh" })}
+								{t("admin.tableManagement.refresh", { defaultValue: "Refresh", fallback: "Refresh" })}
 							</button>
 						</div>
 					</div>
@@ -167,7 +167,7 @@ export default function TableManagementPage() {
 						onZoneChange={setFilterZone} onStatusChange={setFilterStatus} statusLabel={statusLabel} />
 
 					{tables.length === 0 ? (
-						<p className="text-center text-muted py-12">{t("admin.tableManagement.noTables", { fallback: "No tables found" })}</p>
+						<p className="text-center text-muted py-12">{t("admin.tableManagement.noTables", { defaultValue: "No tables found", fallback: "No tables found" })}</p>
 					) : (
 						<div className="space-y-8">
 							{Object.entries(grouped).map(([zone, zoneTables]) => (

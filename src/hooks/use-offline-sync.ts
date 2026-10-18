@@ -48,9 +48,13 @@ export function useOfflineSync() {
   /* ── Sync a single item ─────────────────────────────────────── */
   const syncItem = useCallback(async (item: QueuedItem): Promise<boolean> => {
     try {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/api/orders/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           localId: item.localId,
           orderData: item.orderData,
@@ -75,8 +79,8 @@ export function useOfflineSync() {
 
   /* ── Flush entire queue ─────────────────────────────────────── */
   const syncAll = useCallback(async () => {
-    const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : state.isOnline;
-    if (syncingRef.current || state.syncing || (!currentlyOnline && !state.isOnline)) return;
+    const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    if (syncingRef.current || !currentlyOnline) return;
     syncingRef.current = true;
     setState(s => ({ ...s, syncing: true, error: null }));
 
@@ -103,18 +107,19 @@ export function useOfflineSync() {
     } finally {
       syncingRef.current = false;
     }
-  }, [state.syncing, state.isOnline, syncItem]);
+  }, [syncItem]);
 
   /* ── Queue a new mutation ───────────────────────────────────── */
   const queueMutation = useCallback(async (orderData: object): Promise<string> => {
     const localId = await offlineDb.saveOrder(orderData);
     await refreshPendingCount();
     // If online, try immediate sync
-    if (state.isOnline && !state.syncing) {
+    const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    if (currentlyOnline && !syncingRef.current) {
       void syncAll();
     }
     return localId;
-  }, [state.isOnline, state.syncing, refreshPendingCount, syncAll]);
+  }, [refreshPendingCount, syncAll]);
 
   /* ── Online/offline listeners ───────────────────────────────── */
   useEffect(() => {

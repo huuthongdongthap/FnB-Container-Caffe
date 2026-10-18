@@ -88,8 +88,8 @@ export function SubscriptionTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {subscriptions.map((sub) => (
-                  <tr key={sub.name}>
+                {subscriptions.map((sub, idx) => (
+                  <tr key={`${sub.name}-${idx}`}>
                     <td className="py-3 pr-4">
                       <span className="font-medium text-[var(--aura-chrome-bright)]">
                         {sub.name}

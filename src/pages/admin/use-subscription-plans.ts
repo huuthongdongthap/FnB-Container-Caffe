@@ -24,12 +24,14 @@ export function useSubscriptionPlans(t: (key: string, options?: Record<string, u
         .map((f) => f.trim())
         .filter(Boolean);
 
+      const monthlyPriceVnd = Number(formData.monthly_price_vnd);
       const body: Record<string, unknown> = {
         name: formData.name,
         slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
         description: formData.description,
         container_size: formData.container_size,
-        monthly_price_vnd: Number(formData.monthly_price_vnd),
+        price: monthlyPriceVnd,
+        monthly_price_vnd: monthlyPriceVnd,
         deposit_vnd: Number(formData.deposit_vnd),
         features,
         max_occupants: Number(formData.max_occupants),

@@ -25,9 +25,21 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
 
   const [totalResult, revenueResult, statusResult, paymentResult] = await Promise.all([
     db.prepare(`SELECT COUNT(*) as total FROM orders ${whereClause}`).bind(...params).first(),
-    db.prepare(`SELECT SUM(total_amount) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first(),
+    (async () => {
+      try {
+        return await db.prepare(`SELECT SUM(total_amount) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first();
+      } catch {
+        return await db.prepare(`SELECT SUM(total) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first();
+      }
+    })(),
     db.prepare(`SELECT status, COUNT(*) as count FROM orders ${whereClause} GROUP BY status`).bind(...params).all(),
-    db.prepare(`SELECT source, COUNT(*) as count FROM orders ${whereClause} GROUP BY source`).bind(...params).all(),
+    (async () => {
+      try {
+        return await db.prepare(`SELECT source, COUNT(*) as count FROM orders ${whereClause} GROUP BY source`).bind(...params).all();
+      } catch {
+        return await db.prepare(`SELECT COALESCE(order_type, 'dine_in') as source, COUNT(*) as count FROM orders ${whereClause} GROUP BY COALESCE(order_type, 'dine_in')`).bind(...params).all();
+      }
+    })(),
   ]);
 
   const totalRow = totalResult as any;

@@ -17,9 +17,16 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
-  const customer = await db.prepare(
-    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-  ).bind(phone).first<Customer>();
+  let customer: Customer | null = null;
+  try {
+    customer = await db.prepare(
+      'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+    ).bind(phone).first<Customer>();
+  } catch {
+    customer = await db.prepare(
+      'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+    ).bind(phone).first<Customer>();
+  }
   if (!customer) {
     return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);
   }
@@ -50,17 +57,39 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
   }
 
-  const nextTierRow = await db.prepare(
-    'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
-  ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+  let nextTierRow: { tier_name: string; min_points: number } | null = null;
+  try {
+    nextTierRow = await db.prepare(
+      'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+    ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+  } catch {
+    try {
+      nextTierRow = await db.prepare(
+        'SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+      ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+    } catch {
+      nextTierRow = null;
+    }
+  }
 
   let tierProgress: Record<string, unknown> | null = null;
   if (nextTierRow && customer.lifetime_points !== undefined) {
     const pts = customer.lifetime_points || 0;
     const needed = nextTierRow.min_points - pts;
-    const prevTier = await db.prepare(
-      'SELECT min_points FROM loyalty_tiers WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
-    ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+    let prevTier: { min_points: number } | null = null;
+    try {
+      prevTier = await db.prepare(
+        'SELECT min_points FROM loyalty_tiers WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
+      ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+    } catch {
+      try {
+        prevTier = await db.prepare(
+          'SELECT min_points FROM tier_configs WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
+        ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+      } catch {
+        prevTier = null;
+      }
+    }
     const range = nextTierRow.min_points - (prevTier?.min_points || 0);
     const filled = pts - (prevTier?.min_points || 0);
     tierProgress = {

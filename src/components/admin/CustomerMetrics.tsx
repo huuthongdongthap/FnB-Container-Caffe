@@ -106,12 +106,17 @@ export function CustomerMetrics({ data, loading, error, onRetry, className }: Cu
   if (error) return <CustomerMetricsError message={error} onRetry={onRetry} />;
   if (!data) return null;
 
+  const totalCustomers = Number(data.total_customers ?? 0);
+  const newCustomers30d = Number((data as unknown as Record<string, unknown>).new_customers_30d ?? data.new_30d ?? 0);
+  const repeatRate = Number(data.repeat_rate ?? 0);
+  const avgOrderValue = Number((data as unknown as Record<string, unknown>).avg_spend_per_customer ?? data.avg_order_value ?? 0);
+
   return (
     <div className={cn('grid grid-cols-2 md:grid-cols-4 gap-3', className)}>
       {/* Total customers */}
       <StatCard
         label="Tong khach"
-        value={data.total_customers.toLocaleString('vi-VN')}
+        value={totalCustomers.toLocaleString('vi-VN')}
         accent="chrome"
         icon={
           <svg className="w-6 h-6 text-[var(--aura-chrome-light)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -123,7 +128,7 @@ export function CustomerMetrics({ data, loading, error, onRetry, className }: Cu
       {/* New customers (30d) */}
       <StatCard
         label="Khach moi (30d)"
-        value={`+${data.new_30d.toLocaleString('vi-VN')}`}
+        value={`+${newCustomers30d.toLocaleString('vi-VN')}`}
         accent="green"
         icon={
           <svg className="w-6 h-6 text-[var(--aura-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -135,7 +140,7 @@ export function CustomerMetrics({ data, loading, error, onRetry, className }: Cu
       {/* Repeat rate */}
       <StatCard
         label="Ty le quay lai"
-        value={`${(data.repeat_rate * 100).toFixed(1)}%`}
+        value={`${(repeatRate * 100).toFixed(1)}%`}
         accent="amber"
         icon={
           <svg className="w-6 h-6 text-[var(--aura-chrome-mid)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -147,7 +152,7 @@ export function CustomerMetrics({ data, loading, error, onRetry, className }: Cu
       {/* Avg order value */}
       <StatCard
         label="Gia tri TB don"
-        value={formatVnd(data.avg_order_value)}
+        value={formatVnd(avgOrderValue)}
         accent="blue"
         icon={
           <svg className="w-6 h-6 text-[var(--aura-chrome-light)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

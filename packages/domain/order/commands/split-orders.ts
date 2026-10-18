@@ -67,9 +67,34 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     const createdOrders: Array<Record<string, unknown>> = [];
     const now = new Date().toISOString();
 
+    // Load catalog product prices when available so client-supplied unit prices cannot be forged below catalog price
+    const catalogPrices = new Map<string, number>();
+    try {
+      const allItemIds = Array.from(
+        new Set(orders.flatMap((o) => o.items.map((i) => i.id)))
+      );
+      for (const itemId of allItemIds) {
+        const prod = await db.prepare(
+          'SELECT id, price FROM products WHERE id = ?'
+        ).bind(itemId).first<{ id: string; price: number }>();
+        if (prod && typeof prod.price === 'number' && prod.price > 0) {
+          catalogPrices.set(prod.id, prod.price);
+        }
+      }
+    } catch {
+      // Fallback to validated request item prices when products table is unavailable
+    }
+
     for (const order of orders) {
       const orderId = generateId('ORD_');
-      const itemsSubtotal = order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const normalizedItems = order.items.map((i) => {
+        const authoritativePrice = catalogPrices.get(i.id) ?? i.price;
+        return {
+          ...i,
+          price: authoritativePrice
+        };
+      });
+      const itemsSubtotal = normalizedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
       const shippingFee = parseInt(String(order.shipping_fee || 0), 10) || 0;
       const discount = parseInt(String(order.discount || 0), 10) || 0;
       const tipAmount = parseInt(String(order.tip || 0), 10) || 0;
@@ -77,7 +102,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         ? Math.max(0, itemsSubtotal + shippingFee - discount + tipAmount)
         : parseInt(String(order.total), 10);
       const itemsJson = JSON.stringify(
-        order.items.map((i) => ({
+        normalizedItems.map((i) => ({
           id: i.id,
           name: i.name,
           price: i.price,
@@ -114,6 +139,27 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         now,
         now
       ).run();
+
+      try {
+        for (const item of order.items) {
+          const lineItemId = generateId('ITEM_');
+          await db.prepare(`
+            INSERT INTO order_items (
+              id, order_id, product_id, quantity, subtotal, modifiers, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            lineItemId,
+            orderId,
+            item.id,
+            item.quantity,
+            item.price * item.quantity,
+            '[]',
+            now
+          ).run();
+        }
+      } catch {
+        // Best-effort order_items persistence when table exists
+      }
 
       // Create payment record for each sub-order
       const paymentId = generateId('PAY_');

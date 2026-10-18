@@ -85,6 +85,10 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
     }
 
     if (paymentStatus === 'finished' || paymentStatus === 'confirmed') {
+      if (row.status === 'paid') {
+        return jsonResponse({ ok: true, idempotent: true });
+      }
+
       await db.prepare('UPDATE subscription_invoices SET status = \'paid\', paid_at = ?, updated_at = ? WHERE id = ?')
         .bind(new Date().toISOString(), new Date().toISOString(), row.id)
         .run();

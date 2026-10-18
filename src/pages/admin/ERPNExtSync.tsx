@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAdmin } from '@/hooks/use-admin';
@@ -27,11 +27,21 @@ export default function AdminERPNExtSyncPage() {
     enableOrders: false,
     enableCustomers: false,
   });
-  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>(
-    MOCK_LOGS.map((log) => ({ ...log, message: t(log.message) }))
-  );
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
   const [syncingEntity, setSyncingEntity] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+
+  useEffect(() => {
+    const rawStatus = syncStatus as (typeof syncStatus & { logs?: SyncLogEntry[]; data?: { logs?: SyncLogEntry[] } }) | undefined;
+    const remoteLogs = rawStatus?.logs ?? rawStatus?.data?.logs;
+    if (Array.isArray(remoteLogs)) {
+      setSyncLogs(remoteLogs);
+    } else if (!isLoadingSyncStatus && !syncStatus) {
+      setSyncLogs((prev) =>
+        prev.length > 0 ? prev : MOCK_LOGS.map((log) => ({ ...log, message: t(log.message) }))
+      );
+    }
+  }, [syncStatus, isLoadingSyncStatus, t]);
 
   const appendLog = (entry: Omit<SyncLogEntry, 'id' | 'timestamp'>) => {
     setSyncLogs((prev) => [
@@ -43,13 +53,14 @@ export default function AdminERPNExtSyncPage() {
   const triggerSync = async (entity: string) => {
     setSyncingEntity(entity);
     try {
-      await apiFetch(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
+      const res = await apiFetch<{ count?: number; synced?: number; message?: string }>(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
       void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
+      const count = res?.count ?? res?.synced;
       appendLog({
         entity,
         action: 'sync',
         status: 'success',
-        message: t('syncSuccess', { entity }),
+        message: res?.message || t('syncSuccess', { entity, ...(count !== undefined ? { count } : {}) }),
       });
     } catch {
       appendLog({ entity, action: 'sync', status: 'error', message: t('syncConnectionError', { entity }) });
@@ -61,13 +72,14 @@ export default function AdminERPNExtSyncPage() {
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
-      await apiFetch('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
+      const res = await apiFetch<{ count?: number; synced?: number; message?: string }>('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
       void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
+      const count = res?.count ?? res?.synced;
       appendLog({
         entity: 'All',
         action: 'sync-all',
         status: 'success',
-        message: t('syncAllSuccess'),
+        message: res?.message || t('syncAllSuccess', count !== undefined ? { count } : undefined),
       });
     } catch {
       appendLog({ entity: 'All', action: 'sync-all', status: 'error', message: t('syncAllConnectionError') });

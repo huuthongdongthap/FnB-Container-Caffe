@@ -14,9 +14,18 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/carts', async (c) => {
     let carts: Array<Record<string, unknown>> = [];
     try {
-      const { results } = await c.env.AURA_DB.prepare(
-        'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
-      ).all<{ session_id: string; cart: string; updated_at?: string }>();
+      let results: Array<{ session_id: string; cart: string; updated_at?: string }> | undefined;
+      try {
+        const res = await c.env.AURA_DB.prepare(
+          'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
+        ).all<{ session_id: string; cart: string; updated_at?: string }>();
+        results = res.results;
+      } catch {
+        const res = await c.env.AURA_DB.prepare(
+          'SELECT session_id, cart, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
+        ).all<{ session_id: string; cart: string; updated_at?: string }>();
+        results = res.results;
+      }
       for (const row of results || []) {
         try {
           const parsed = JSON.parse(row.cart) as {
@@ -132,7 +141,7 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
       const nextQty = Math.max(1, Number(item.qty ?? item.quantity ?? prevQty));
       const nextPrice = Number(item.price ?? prevPrice);
       cart.items[idx] = { ...cart.items[idx], ...item, price: nextPrice, qty: nextQty, quantity: nextQty } as (typeof cart.items)[number];
-      cart.total = Math.round(cart.total + (nextPrice * (nextQty - prevQty)));
+      cart.total = Math.max(0, Math.round(cart.total + (nextPrice * nextQty - prevPrice * prevQty)));
     }
 
     await writeCart(c.env, sessionId, cart);

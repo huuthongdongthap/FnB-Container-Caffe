@@ -3,6 +3,8 @@
  * Verifies executionContext passing before Phase 2 consolidation.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { reviewsRouter as realReviewsRouter } from '../../routes/reviews';
+import { createMockEnv } from '../test-utils';
 
 describe('Reviews dispatcher wrapper', () => {
   it('strips /api/reviews prefix before passing to reviewsRouter', async() => {
@@ -45,5 +47,20 @@ describe('Reviews dispatcher wrapper', () => {
     await reviewsRouter.fetch(new Request(strippedUrl, req), {});
 
     expect(fetchSpy.mock.calls[0][0].url).toBe('https://test.aura/submit/123');
+  });
+
+  it('rejects invalid review rating on real reviewsRouter', async() => {
+    const env = createMockEnv();
+    const res = await realReviewsRouter.fetch(
+      new Request('https://test.aura/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: 'ORD_1', rating: 99 }),
+      }),
+      env
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.success).toBe(false);
   });
 });

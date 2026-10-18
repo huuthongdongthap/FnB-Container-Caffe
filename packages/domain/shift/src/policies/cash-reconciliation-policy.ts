@@ -28,6 +28,36 @@ function determineVarianceStatus(variance: number): VarianceStatus {
   return variance > 0 ? 'overage' : 'shortage';
 }
 
+async function getShiftWindow(
+  db: D1Database,
+  shiftId: string
+): Promise<{ clock_in: string; clock_out: string | null } | null> {
+  try {
+    return await db
+      .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
+      .bind(shiftId)
+      .first<{ clock_in: string; clock_out: string | null }>();
+  } catch {
+    try {
+      const staffShift = await db
+        .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
+        .bind(shiftId)
+        .first<{ clock_in: string; clock_out: string | null }>();
+      if (staffShift) return staffShift;
+    } catch {
+      // Fallback to shifts with actual_start/start_time
+    }
+    try {
+      return await db
+        .prepare('SELECT COALESCE(actual_start, start_time) AS clock_in, actual_end AS clock_out FROM shifts WHERE id = ?')
+        .bind(shiftId)
+        .first<{ clock_in: string; clock_out: string | null }>();
+    } catch {
+      return null;
+    }
+  }
+}
+
 /**
  * Fetch cash payments received during shift time window.
  */
@@ -35,10 +65,7 @@ async function getCashPaymentsForShift(
   db: D1Database,
   shiftId: string
 ): Promise<number> {
-  const shift = await db
-    .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
-    .bind(shiftId)
-    .first<{ clock_in: string; clock_out: string | null }>();
+  const shift = await getShiftWindow(db, shiftId);
 
   if (!shift) return 0;
 
@@ -86,25 +113,26 @@ async function getCashPayoutsForShift(
   db: D1Database,
   shiftId: string
 ): Promise<number> {
-  const shift = await db
-    .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
-    .bind(shiftId)
-    .first<{ clock_in: string; clock_out: string | null }>();
+  const shift = await getShiftWindow(db, shiftId);
 
   if (!shift) return 0;
 
   const endTime = shift.clock_out || new Date().toISOString();
 
-  const result = await db
-    .prepare(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM cash_payouts
-       WHERE created_at >= ? AND created_at <= ?
-       AND status = 'completed'`
-    )
-    .bind(shift.clock_in, endTime)
-    .first<{ total: number }>();
+  try {
+    const result = await db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) as total FROM cash_payouts
+         WHERE created_at >= ? AND created_at <= ?
+         AND status = 'completed'`
+      )
+      .bind(shift.clock_in, endTime)
+      .first<{ total: number }>();
 
-  return result?.total ?? 0;
+    return result?.total ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**

@@ -68,7 +68,7 @@ export function useDevices() {
     if (!regStaffId || !regPin) { setRegisterError('Vui lòng chọn nhân viên và nhập PIN'); return; }
     setActionLoading(true); setRegisterError(null);
     const effectiveToken = regDeviceToken.trim() || `dev-${crypto.randomUUID().slice(0, 12)}`;
-    const effectiveRole = regRole === 'kitchen' ? 'staff' : regRole;
+    const effectiveRole = regRole;
     try {
       await apiFetch('/mobile/devices/register', {
         method: 'POST',

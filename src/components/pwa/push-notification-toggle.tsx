@@ -8,7 +8,11 @@ import type { PushNotificationToggleProps } from './push-notification-toggle-typ
 
 export type { PushNotificationToggleProps } from './push-notification-toggle-types';
 
-export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
+export function PushNotificationToggle({
+  token,
+  role,
+  customerId,
+}: PushNotificationToggleProps & { role?: string; customerId?: string }) {
   const { t } = useTranslation();
   const {
     permission,
@@ -18,8 +22,8 @@ export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
     subscribe,
     unsubscribe,
     supported,
-  } = usePushNotifications();
-  const [showCard, setShowCard] = useState(true);
+  } = usePushNotifications(token);
+  const [showCard] = useState(true);
 
   if (!showCard || !supported) return null;
 
@@ -32,7 +36,11 @@ export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
   };
 
   const subscribeAction = async () => {
-    await subscribe();
+    if (customerId !== undefined || role !== undefined) {
+      await subscribe(customerId, role);
+    } else {
+      await subscribe();
+    }
   };
 
   const unsubscribeAction = async () => {

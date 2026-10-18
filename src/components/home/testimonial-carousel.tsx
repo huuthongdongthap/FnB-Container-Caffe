@@ -92,7 +92,14 @@ export function TestimonialCarousel() {
         >
           {/* Testimonial card */}
           <div className="animate-fade-in-up rounded-2xl border border-chrome-light/10 bg-gradient-to-br from-[#0A1A2E]/80 to-[#050D1A]/90 p-8 text-center backdrop-blur-sm">
-            <div className="mb-4 text-4xl">{testimonial.avatar}</div>
+            {(() => {
+              const AvatarIcon = REVIEW_AVATARS[testimonial.avatar] || Star;
+              return (
+                <div className="mb-4 flex justify-center">
+                  <AvatarIcon className="h-8 w-8 text-chrome-light" aria-hidden="true" />
+                </div>
+              );
+            })()}
 
             <div className="mb-4 flex justify-center gap-1" aria-label={`${testimonial.rating} trên 5 sao`}>
               {Array.from({ length: 5 }).map((_, i) => (

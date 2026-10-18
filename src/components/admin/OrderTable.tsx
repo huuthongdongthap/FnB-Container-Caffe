@@ -25,6 +25,7 @@ export function OrderTable({
   onRefund,
 }: OrderTableProps) {
   const { t } = useTranslation();
+  const userRole = useAuthStore((s) => s.user?.role);
   const [search, setSearch] = useState(searchQuery);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -135,7 +136,7 @@ export function OrderTable({
                       {onRefund && 'payment_status' in order && (order as unknown as { payment_status?: string }).payment_status === 'paid' && (
                         <RefundAction
                           order={order}
-                          userRole={useAuthStore.getState().user?.role}
+                          userRole={userRole}
                           onRefund={onRefund}
                           t={t}
                         />

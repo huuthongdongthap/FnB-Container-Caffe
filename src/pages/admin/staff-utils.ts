@@ -1,9 +1,16 @@
-export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(iso.trim())) return iso.trim();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('vi-VN');
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('vi-VN');
 }
 
 export function formatHours(hours: number | null): string {

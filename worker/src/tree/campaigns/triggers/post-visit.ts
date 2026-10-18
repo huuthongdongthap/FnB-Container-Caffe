@@ -34,7 +34,29 @@ export async function detectPostVisitCandidates(
     log.info('post_visit_candidates', { count: results.length });
     return results;
   } catch (err) {
-    log.error('detectPostVisitCandidates error', { error: (err as Error).message });
-    return [];
+    try {
+      const now = Date.now();
+      const since = new Date(now - 48 * 60 * 60 * 1000).toISOString();
+      const until = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+      const { results } = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email,
+          o.id as order_id, o.created_at as last_order_date
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.id
+        WHERE o.status = 'completed'
+          AND o.created_at BETWEEN ? AND ?
+          AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_logs cl
+            WHERE cl.customer_id = c.id
+              AND cl.trigger_type = 'post_visit'
+              AND cl.created_at > ?
+          )
+      `).bind(since, until, since).all<CampaignCustomer>();
+      return results;
+    } catch {
+      log.error('detectPostVisitCandidates error', { error: (err as Error).message });
+      return [];
+    }
   }
 }

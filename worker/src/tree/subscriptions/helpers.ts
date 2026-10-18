@@ -12,10 +12,20 @@ export function nowStr(): string {
 }
 
 export function addMonths(dateStr: string, months: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setMonth(d.getMonth() + months);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const parts = dateStr.slice(0, 10).split('-').map(Number);
+  const year = parts[0];
+  const month = parts[1] - 1;
+  const day = parts[2];
+
+  const targetDate = new Date(Date.UTC(year, month + months, 1));
+  const targetYear = targetDate.getUTCFullYear();
+  const targetMonth = targetDate.getUTCMonth();
+
+  const maxDays = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const targetDay = Math.min(day, maxDays);
+
+  const y = targetYear;
+  const m = String(targetMonth + 1).padStart(2, '0');
+  const d = String(targetDay).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }

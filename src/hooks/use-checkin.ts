@@ -60,26 +60,33 @@ export function useCheckin(): CheckinResult {
 
     try {
       // Lookup customer
-      const lookupRes = await apiFetch<{ success: boolean; member: MemberInfo }>(
+      const lookupRes = await apiFetch<{ success?: boolean; ok?: boolean; member?: MemberInfo }>(
         `/api/loyalty/lookup?phone=${encodeURIComponent(phone)}`
       );
 
-      if (!lookupRes.success || !lookupRes.member) {
+      if ((!lookupRes.success && !lookupRes.ok) || !lookupRes.member) {
         setError('Không tìm thấy số điện thoại trong hệ thống');
         setIsLoading(false);
         return;
       }
 
       // Check eligibility
-      const eligRes = await apiFetch<EligibilityResult>(
-        `/api/loyalty/checkin/eligibility/${lookupRes.member.member_id}`
-      );
+      let eligRes: EligibilityResult;
+      try {
+        eligRes = await apiFetch<EligibilityResult>(
+          `/api/loyalty/checkin/eligibility/${lookupRes.member.member_id}`
+        );
+      } catch {
+        eligRes = await apiFetch<EligibilityResult>(
+          `/api/checkin/eligibility/${lookupRes.member.member_id}`
+        );
+      }
 
       setState((prev) => ({
         ...prev,
         step: eligRes.eligible ? 3 : 2,
         phone,
-        member: lookupRes.member,
+        member: lookupRes.member!,
         eligibility: eligRes,
       }));
     } catch (err) {
@@ -90,6 +97,11 @@ export function useCheckin(): CheckinResult {
   }, []);
 
   const markPosted = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
     setState((prev) => ({
       ...prev,
       step: 4,

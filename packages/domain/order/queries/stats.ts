@@ -13,12 +13,24 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const todayStartParam = todayStart.toISOString().slice(0, 10) + ' 00:00:00';
 
-    const { results: ordersTodayResult } = await db.prepare(`
-      SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
-      FROM orders
-      WHERE created_at >= ? AND status != 'cancelled'
-    `).bind(todayStart.toISOString()).all<{ total: number; revenue: number }>();
+    let ordersTodayResult: { total: number; revenue: number }[] = [];
+    try {
+      const res = await db.prepare(`
+        SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
+        FROM orders
+        WHERE created_at >= ? AND status != 'cancelled'
+      `).bind(todayStartParam).all<{ total: number; revenue: number }>();
+      ordersTodayResult = res.results || [];
+    } catch {
+      const res = await db.prepare(`
+        SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+        FROM orders
+        WHERE created_at >= ? AND status != 'cancelled'
+      `).bind(todayStartParam).all<{ total: number; revenue: number }>();
+      ordersTodayResult = res.results || [];
+    }
 
     const { results: statusResult } = await db.prepare(`
       SELECT status, COUNT(*) as count
@@ -55,14 +67,29 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    const sevenDaysAgoParam = sevenDaysAgo.toISOString().slice(0, 10) + ' 00:00:00';
 
-    const { results: revenueResult } = await db.prepare(`
-      SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
-      FROM orders
-      WHERE created_at >= ? AND status != 'cancelled'
-      GROUP BY DATE(created_at)
-      ORDER BY date DESC
-    `).bind(sevenDaysAgo.toISOString()).all<{ date: string; revenue: number }>();
+    let revenueResult: { date: string; revenue: number }[] = [];
+    try {
+      const res = await db.prepare(`
+        SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
+        FROM orders
+        WHERE created_at >= ? AND status != 'cancelled'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      `).bind(sevenDaysAgoParam).all<{ date: string; revenue: number }>();
+      revenueResult = res.results || [];
+    } catch {
+      const res = await db.prepare(`
+        SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+        FROM orders
+        WHERE created_at >= ? AND status != 'cancelled'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      `).bind(sevenDaysAgoParam).all<{ date: string; revenue: number }>();
+      revenueResult = res.results || [];
+    }
 
     return jsonResponse({
       success: true,

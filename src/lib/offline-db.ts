@@ -163,13 +163,20 @@ export class OfflineDB {
         const cursor = req.result;
         if (!cursor) return;
         const key = String(cursor.primaryKey ?? '');
-        if (!preservedKeys.has(key) && !key.startsWith('_') && (cursor.value as OfflineOrderRecord).createdAt) {
+        const val = cursor.value as OfflineOrderRecord;
+        if (!preservedKeys.has(key) && !key.startsWith('_') && val?.synced === true) {
           store.delete(cursor.primaryKey);
         }
         cursor.continue();
       };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.oncomplete = () => {
+        try { db.close(); } catch {}
+        resolve();
+      };
+      tx.onerror = () => {
+        try { db.close(); } catch {}
+        reject(tx.error);
+      };
     });
   }
 
@@ -179,8 +186,14 @@ export class OfflineDB {
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.oncomplete = () => {
+        try { db.close(); } catch {}
+        resolve();
+      };
+      tx.onerror = () => {
+        try { db.close(); } catch {}
+        reject(tx.error);
+      };
     });
   }
 }

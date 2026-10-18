@@ -7,8 +7,8 @@ import { executeKdsStatusTransition } from './kds-status-transition';
 const log = createLogger({ route: 'kds-mobile' });
 
 // Allowed roles per action
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
 const VALID_STATUSES: string[] = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled'];
 
 function parseKdsItems(raw: unknown): unknown[] {
@@ -101,6 +101,10 @@ export async function updateKdsStatus(
     const body = await context.req.json<{ status: string }>();
     if (!body?.status || !VALID_STATUSES.includes(body.status)) {
       return errorResponse('Trạng thái không hợp lệ', 400);
+    }
+
+    if (role === 'waiter' && body.status !== 'served' && body.status !== 'completed') {
+      return errorResponse('Không có quyền cập nhật', 403);
     }
 
     let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;

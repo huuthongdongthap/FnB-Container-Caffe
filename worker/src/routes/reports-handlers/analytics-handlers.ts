@@ -124,7 +124,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       ),
       db.prepare(
         'SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?'
-      ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>(),
+      ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>().catch(() =>
+        db.prepare(
+          'SELECT COUNT(*) as count FROM customers WHERE created_at >= ?'
+        ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>().catch(() => ({ count: 0 }))
+      ),
       db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>()
     ]);
 
@@ -248,7 +252,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       db.prepare('SELECT COUNT(*) as count FROM customers WHERE created_at >= ?')
         .bind(thirtyDaysAgo).first<{ count: number }>(),
       db.prepare(
-        'SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders GROUP BY customer_id HAVING COUNT(*) > 1)'
+        "SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND customer_id != '' AND customer_id != 'guest' GROUP BY customer_id HAVING COUNT(*) > 1)"
       ).first<{ count: number }>(),
       db.prepare(
         'SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != \'cancelled\''

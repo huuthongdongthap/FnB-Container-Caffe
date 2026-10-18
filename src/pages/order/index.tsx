@@ -96,7 +96,11 @@ export function OrderPage() {
           table_id: isTableMode ? tableId : undefined,
         };
 
-        const order = await createOrder(payload);
+        const raw = await createOrder(payload);
+        const order =
+          (raw as { order?: { id?: string }; data?: { id?: string }; id?: string } | null)?.order ??
+          (raw as { data?: { id?: string }; id?: string } | null)?.data ??
+          raw;
         if (order?.id) {
           navigate(`/order-success?order_id=${order.id}`);
         } else {

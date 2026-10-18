@@ -62,7 +62,8 @@ export function TicketCard({
   const isReady = ticket.status === 'ready';
   const isOverdue = ticket.status === 'overdue';
   const isPreparing = ticket.status === 'preparing';
-  const isPending = ticket.status === 'pending';
+  const isPending = ticket.status === 'pending' || (ticket.status as string) === 'confirmed';
+  const isOverduePreparing = isOverdue && (ticket as any).rawStatus === 'preparing';
 
   const accentColorClass = getAccentColorClass(ticket.status);
   const timerColorClass = getTimerColorClass(ticket.status);
@@ -178,12 +179,18 @@ export function TicketCard({
         )}
         {isOverdue && (onComplete || onStart) && (
           <ActionButton
-            onClick={() => (onStart ? onStart(ticket.id) : onComplete?.(ticket.id))}
+            onClick={() =>
+              isOverduePreparing
+                ? (onComplete ? onComplete(ticket.id) : onStart?.(ticket.id))
+                : (onStart ? onStart(ticket.id) : onComplete?.(ticket.id))
+            }
             className="bg-error"
           >
-            {onStart
-              ? t('kds.startPrep', 'START PREP')
-              : t('kds.priorityComplete', 'PRIORITY COMPLETE')}
+            {isOverduePreparing
+              ? t('kds.priorityComplete', 'PRIORITY COMPLETE')
+              : onStart
+                ? t('kds.startPrep', 'START PREP')
+                : t('kds.priorityComplete', 'PRIORITY COMPLETE')}
           </ActionButton>
         )}
       </div>

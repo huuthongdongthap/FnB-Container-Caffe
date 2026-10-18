@@ -26,6 +26,18 @@ export function computeSplits(
   return result;
 }
 
+/** Compute items not assigned to an active split (0 <= index < splitCount). */
+export function computeUnassignedItems(
+  cartItems: CartItem[],
+  assignments: Record<string, number>,
+  splitCount: number,
+): CartItem[] {
+  return cartItems.filter((item) => {
+    const idx = assignments[item.id];
+    return idx === undefined || idx < 0 || idx >= splitCount;
+  });
+}
+
 /** Build API order payloads for split-bill confirmation. */
 export function buildSplitOrders(
   splits: SplitResult[],

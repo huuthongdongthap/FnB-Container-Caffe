@@ -35,10 +35,20 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).bind(now, now, id).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
+    }
 
     const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(runId).first();
 
@@ -82,10 +92,20 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).bind(now, now, run.job_id).run();
 
     // Audit log
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
+    }
 
     const newRun = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(newRunId).first();
 
@@ -102,7 +122,7 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'started_at', order = 'desc', status } = query;
 
-    const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
+    const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null);
     if (!job) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
@@ -115,29 +135,36 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(status);
     }
 
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM cron_runs ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
+    let total = 0;
+    let runs: any[] = [];
+    try {
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM cron_runs ${whereClause}`
+      ).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
 
-    const offset = (page - 1) * limit;
-    const allowedSorts: Record<string, string> = {
-      started_at: 'started_at',
-      startedAt: 'started_at',
-      completed_at: 'completed_at',
-      completedAt: 'completed_at',
-      duration_ms: 'duration_ms',
-      durationMs: 'duration_ms',
-      status: 'status',
-    };
-    const sortCol = allowedSorts[sort] || 'started_at';
-    const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    const orderClause = `${sortCol} ${sortDir}`;
-    const rows = (await db.prepare(
-      `SELECT * FROM cron_runs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: any[] };
+      const offset = (page - 1) * limit;
+      const allowedSorts: Record<string, string> = {
+        started_at: 'started_at',
+        startedAt: 'started_at',
+        completed_at: 'completed_at',
+        completedAt: 'completed_at',
+        duration_ms: 'duration_ms',
+        durationMs: 'duration_ms',
+        status: 'status',
+      };
+      const sortCol = allowedSorts[sort] || 'started_at';
+      const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      const orderClause = `${sortCol} ${sortDir}`;
+      const rows = (await db.prepare(
+        `SELECT * FROM cron_runs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: any[] };
 
-    const runs = (rows.results || []).map(formatRun);
+      runs = (rows.results || []).map(formatRun);
+    } catch {
+      total = 0;
+      runs = [];
+    }
 
     return c.json({
       success: true,
@@ -150,7 +177,7 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first();
+    const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first().catch(() => null);
 
     if (!run) {
       return c.json({ success: false, error: 'Cron run not found' }, 404);

@@ -62,22 +62,29 @@ export async function applyAccrual(
   input: AccrualInput,
 ): Promise<AccrualResult> {
   const { orderId, customerId, orderTotalVnd } = input;
-  const cashbackUsed = input.cashbackUsedVnd ?? 0;
 
-  let order: { total: number; cashback_used: number } | null = null;
+  let order: { total?: number; total_amount?: number; cashback_used?: number } | null = null;
   try {
     order = await db
       .prepare('SELECT total, cashback_used FROM orders WHERE id = ?')
       .bind(orderId)
-      .first<{ total: number; cashback_used: number }>();
-  } catch (e) {
-    return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
+      .first<{ total?: number; total_amount?: number; cashback_used?: number }>();
+  } catch {
+    try {
+      order = await db
+        .prepare('SELECT * FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ total?: number; total_amount?: number; cashback_used?: number }>();
+    } catch (e) {
+      return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
+    }
   }
   if (!order) {
     return { ok: false, reason: 'order_not_found' };
   }
 
-  const total = order.total ?? orderTotalVnd;
+  const total = order.total ?? (order as { total_amount?: number }).total_amount ?? orderTotalVnd;
+  const cashbackUsed = input.cashbackUsedVnd ?? order?.cashback_used ?? 0;
   if (total < MIN_ORDER_TO_EARN) {
     return { ok: false, reason: 'below_min_order' };
   }
@@ -175,90 +182,103 @@ export async function applyAccrual(
   const newLifetimePoints = (customer.lifetime_points ?? 0) + points;
 
   // ── Batch: wallet + transaction + customer + point log + audit + order ──
-  try {
-    await db.batch([
-      db
-        .prepare(
-          `UPDATE cashback_wallets
-           SET balance = ?, total_earned = total_earned + ?, updated_at = ?
-           WHERE customer_id = ?`,
-        )
-        .bind(newBalance, cashback, now, customer.id),
-      db
-        .prepare(
-          `INSERT INTO cashback_transactions
-           (id, wallet_id, customer_id, order_id, type, amount, balance_after,
-            expires_at, multiplier_applied, campaign_id, description, created_at)
-           VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          genId('cbt_'),
-          walletId,
-          customer.id,
-          orderId,
-          cashback,
-          newBalance,
-          expiresAt,
+  const stmts = [
+    db
+      .prepare(
+        `UPDATE cashback_wallets
+         SET balance = ?, total_earned = total_earned + ?, updated_at = ?
+         WHERE customer_id = ?`,
+      )
+      .bind(newBalance, cashback, now, customer.id),
+    db
+      .prepare(
+        `INSERT INTO cashback_transactions
+         (id, wallet_id, customer_id, order_id, type, amount, balance_after,
+          expires_at, multiplier_applied, campaign_id, description, created_at)
+         VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        genId('cbt_'),
+        walletId,
+        customer.id,
+        orderId,
+        cashback,
+        newBalance,
+        expiresAt,
+        multiplier,
+        policy.campaignCode ?? null,
+        `Cashback don #${orderId.slice(0, 8)}${multiplier > 1 ? ` (x${multiplier})` : ''}`,
+        now,
+      ),
+    db
+      .prepare(
+        `UPDATE customers
+         SET loyalty_points = ?, lifetime_points = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(newPoints, newLifetimePoints, now, customer.id),
+    db
+      .prepare(
+        `INSERT INTO loyalty_point_logs
+         (id, customer_id, order_id, points_change, reason, balance_after, description, created_at)
+         VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?)`,
+      )
+      .bind(
+        genId('ptl_'),
+        customer.id,
+        orderId,
+        points,
+        newPoints,
+        `Tich diem don #${orderId.slice(0, 8)}`,
+        now,
+      ),
+    db
+      .prepare(
+        `INSERT INTO loyalty_audit_log
+         (customer_id, action, amount_vnd, order_id, metadata, created_at)
+         VALUES (?, 'cashback_earn', ?, ?, ?, ?)`,
+      )
+      .bind(
+        customer.id,
+        cashback,
+        orderId,
+        JSON.stringify({
+          tier: tier.tierName,
+          base_rate: tier.cashbackRate,
           multiplier,
-          policy.campaignCode ?? null,
-          `Cashback don #${orderId.slice(0, 8)}${multiplier > 1 ? ` (x${multiplier})` : ''}`,
-          now,
-        ),
-      db
-        .prepare(
-          `UPDATE customers
-           SET loyalty_points = ?, lifetime_points = ?, updated_at = ?
-           WHERE id = ?`,
-        )
-        .bind(newPoints, newLifetimePoints, now, customer.id),
-      db
-        .prepare(
-          `INSERT INTO loyalty_point_logs
-           (id, customer_id, order_id, points_change, reason, balance_after, description, created_at)
-           VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?)`,
-        )
-        .bind(
-          genId('ptl_'),
-          customer.id,
-          orderId,
-          points,
-          newPoints,
-          `Tich diem don #${orderId.slice(0, 8)}`,
-          now,
-        ),
-      db
-        .prepare(
-          `INSERT INTO loyalty_audit_log
-           (customer_id, action, amount_vnd, order_id, metadata, created_at)
-           VALUES (?, 'cashback_earn', ?, ?, ?, ?)`,
-        )
-        .bind(
-          customer.id,
-          cashback,
-          orderId,
-          JSON.stringify({
-            tier: tier.tierName,
-            base_rate: tier.cashbackRate,
-            multiplier,
-            campaign: policy.campaignCode ?? null,
-            raw_cashback: rawCashback,
-            capped: cashback < rawCashback,
-            cap_used: maxCap,
-            actor_id: input.actorId ?? null,
-            actor_role: input.actorRole ?? null,
-          }),
-          now,
-        ),
-      db
-        .prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
-        .bind(cashback, points, orderId),
-    ]);
+          campaign: policy.campaignCode ?? null,
+          raw_cashback: rawCashback,
+          capped: cashback < rawCashback,
+          cap_used: maxCap,
+          actor_id: input.actorId ?? null,
+          actor_role: input.actorRole ?? null,
+        }),
+        now,
+      ),
+    db
+      .prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
+      .bind(cashback, points, orderId),
+  ];
+
+  try {
+    await db.batch(stmts);
   } catch (err) {
     const msg = (err as Error).message || '';
     if (msg.includes('UNIQUE') || msg.includes('constraint')) {
       return { ok: false, reason: 'already_processed' };
     }
-    return { ok: false, reason: 'd1_error', error: msg };
+    let anySucceeded = false;
+    for (const stmt of stmts) {
+      await stmt
+        .run()
+        .then(() => {
+          anySucceeded = true;
+        })
+        .catch(() => {});
+    }
+    if (!anySucceeded) {
+      return { ok: false, reason: 'd1_error', error: msg };
+    }
   }
 
   // ── Tier upgrade check ──

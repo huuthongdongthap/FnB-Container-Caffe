@@ -8,15 +8,34 @@ import { z } from 'zod';
 // SUBSCRIPTIONS — plans
 // ══════════════════════════════════════════════
 
-export const createPlanSchema = z.object({
+const planBaseSchema = z.object({
   name: z.string().min(1, 'Tên gói không được để trống'),
-  price: z.number().nonnegative(),
+  slug: z.string().optional(),
+  price: z.number().nonnegative().optional(),
+  monthly_price_vnd: z.number().nonnegative().optional(),
+  deposit_vnd: z.number().nonnegative().optional(),
+  container_size: z.string().optional(),
+  max_occupants: z.number().int().positive().optional(),
+  is_popular: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
   billing_cycle: z.string().optional(),
-  features: z.string().optional(),
+  features: z.union([z.string(), z.array(z.string()).transform((arr) => JSON.stringify(arr))]).optional(),
   description: z.string().optional()
 });
 
-export const updatePlanSchema = createPlanSchema.partial();
+export const createPlanSchema = planBaseSchema
+  .refine((data) => data.price !== undefined || data.monthly_price_vnd !== undefined, {
+    message: 'price hoặc monthly_price_vnd là bắt buộc',
+    path: ['price']
+  })
+  .transform((data) => ({
+    ...data,
+    price: data.price ?? data.monthly_price_vnd ?? 0,
+    monthly_price_vnd: data.monthly_price_vnd ?? data.price ?? 0
+  }));
+
+export const updatePlanSchema = planBaseSchema.partial();
 
 // ══════════════════════════════════════════════
 // SUBSCRIPTIONS — lifecycle

@@ -81,15 +81,17 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
     lines.push(fields.map(escapeCsvField).join(','));
   }
 
-  return lines.join('\n');
+  return '﻿' + lines.join('\n');
 }
 
 /**
- * Escape a CSV field: wrap in quotes if it contains comma, newline, or double-quote.
+ * Escape a CSV field: neutralize spreadsheet formula prefixes and wrap in quotes
+ * if it contains comma, newline, semicolon, or double-quote.
  */
 function escapeCsvField(value: string): string {
-  if (value.includes(',') || value.includes('\n') || value.includes('"') || value.includes(';')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const sanitized = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (sanitized.includes(',') || sanitized.includes('\n') || sanitized.includes('"') || sanitized.includes(';')) {
+    return `"${sanitized.replace(/"/g, '""')}"`;
   }
-  return value;
+  return sanitized;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowDownRight, ArrowUpRight, RefreshCw, Trash2 } from 'lucide-react';
 import type { IngredientItem } from './inventory-types';
 
@@ -26,13 +26,26 @@ export function InventoryMovementModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setType('in');
+      setQty('1');
+      setNotes('');
+      setError(null);
+    }
+  }, [isOpen, ingredient?.id]);
+
   if (!isOpen || !ingredient) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedQty = parseFloat(qty);
-    if (isNaN(parsedQty) || parsedQty <= 0) {
-      setError('Số lượng phải là số dương lớn hơn 0');
+    if (isNaN(parsedQty) || (type === 'adjustment' ? parsedQty === 0 : parsedQty <= 0)) {
+      setError(
+        type === 'adjustment'
+          ? 'Số lượng kiểm kê phải khác 0'
+          : 'Số lượng phải là số dương lớn hơn 0',
+      );
       return;
     }
 
@@ -41,7 +54,8 @@ export function InventoryMovementModal({
     try {
       // If type is out or waste, make quantity negative for reduction if API requires,
       // or pass positive quantity with type and let handler compute change
-      const signedQuantity = type === 'out' || type === 'waste' ? -parsedQty : parsedQty;
+      const signedQuantity =
+        type === 'out' || type === 'waste' ? -Math.abs(parsedQty) : parsedQty;
       await onSubmit({
         ingredientId: ingredient.id,
         type,
@@ -108,7 +122,7 @@ export function InventoryMovementModal({
               id="movement-qty"
               type="number"
               step="any"
-              min="0.01"
+              min={type === 'adjustment' ? undefined : '0.01'}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               required

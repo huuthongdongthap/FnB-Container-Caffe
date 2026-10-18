@@ -31,21 +31,28 @@ export function generateSlug(tableNumber: number | string, zone: string): string
 export async function bulkGenerateSlugs(
   db: import('@cloudflare/workers-types').D1Database,
   tables: CafeTable[]
-): Promise<Map<number, string>> {
-  const result = new Map<number, string>();
+): Promise<Map<number | string, string>> {
+  const result = new Map<number | string, string>();
 
   for (const table of tables) {
-    const idNum = typeof table.id === 'string' ? parseInt(table.id, 10) : Number(table.id);
+    const parsedNum = typeof table.id === 'string' ? parseInt(table.id, 10) : Number(table.id);
+    const idKey: number | string = !Number.isNaN(parsedNum) ? parsedNum : String(table.id);
     const desiredSlug = generateSlug(table.table_number, table.zone);
 
     // Try to find existing slug for this table
-    const existing = await db
-      .prepare('SELECT slug FROM table_qr_codes WHERE table_id = ?')
-      .bind(idNum)
-      .first<{ slug: string }>();
+    let existing: { slug: string } | null = null;
+    try {
+      existing = await db
+        .prepare('SELECT slug FROM table_qr_codes WHERE table_id = ?')
+        .bind(idKey)
+        .first<{ slug: string }>();
+    } catch {
+      existing = null;
+    }
 
     const slug = existing?.slug ?? desiredSlug;
-    result.set(idNum, slug);
+    result.set(idKey, slug);
+    result.set(String(table.id), slug);
 
     // Upsert: INSERT OR REPLACE
     try {
@@ -55,7 +62,7 @@ export async function bulkGenerateSlugs(
            VALUES (?, ?, datetime('now'))
            ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
         )
-        .bind(idNum, slug)
+        .bind(idKey, slug)
         .run();
     } catch (err) {
       if (String((err as Error)?.message || '').includes('column')) {
@@ -65,9 +72,10 @@ export async function bulkGenerateSlugs(
              VALUES (?, ?, datetime('now'))
              ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
           )
-          .bind(idNum, slug)
-          .run();
-      } else {
+          .bind(idKey, slug)
+          .run()
+          .catch(() => {});
+      } else if (!String((err as Error)?.message || '').includes('no such table')) {
         throw err;
       }
     }

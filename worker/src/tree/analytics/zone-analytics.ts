@@ -16,7 +16,8 @@ export async function getZoneStats(
   db: import('@cloudflare/workers-types').D1Database,
   days: number
 ): Promise<ZoneRow[]> {
-  const { results } = await db.prepare(`  SELECT
+  try {
+    const { results } = await db.prepare(`  SELECT
     COALESCE(ct.zone, 'Mang đi') AS label,
     COALESCE(SUM(o.total), 0) AS value,
     COUNT(*) AS count
@@ -28,5 +29,24 @@ export async function getZoneStats(
   ORDER BY value DESC
  `).bind(days).all<ZoneRow>();
 
-  return results || [];
+    return results || [];
+  } catch {
+    try {
+      const { results } = await db.prepare(`  SELECT
+    COALESCE(t.zone, 'Mang đi') AS label,
+    COALESCE(SUM(COALESCE(o.total, o.total_amount, 0)), 0) AS value,
+    COUNT(*) AS count
+  FROM orders o
+  LEFT JOIN tables t ON t.id = o.table_id
+  WHERE o.status != 'cancelled'
+    AND o.created_at >= datetime('now', '-' || ? || ' days')
+  GROUP BY label
+  ORDER BY value DESC
+ `).bind(days).all<ZoneRow>();
+
+      return results || [];
+    } catch {
+      return [];
+    }
+  }
 }

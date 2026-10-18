@@ -44,9 +44,16 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const now = new Date().toISOString();
 
-    let customer = await db.prepare(
-      'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-    ).bind(phone).first<Customer>();
+    let customer: Customer | null = null;
+    try {
+      customer = await db.prepare(
+        'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+      ).bind(phone).first<Customer>();
+    } catch {
+      customer = await db.prepare(
+        'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+      ).bind(phone).first<Customer>();
+    }
     let bonusGranted = 0;
     let bonusMessage: string | null = null;
     let isNew = false;
@@ -61,9 +68,15 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
           'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
         ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
       } catch {
-        await db.prepare(
-          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'
-        ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+        try {
+          await db.prepare(
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'
+          ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+        } catch {
+          await db.prepare(
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+          ).bind(id, email, name, phone, DEFAULT_TIER, now).run();
+        }
       }
 
       const wid = genId('wal_');

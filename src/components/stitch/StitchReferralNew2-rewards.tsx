@@ -48,12 +48,21 @@ export function FriendNetwork({
               <div className="h-10 w-10 shrink-0 overflow-hidden bg-[var(--aura-noir-deep,#0A1A2E)]"
                 style={{ borderRadius: '2px' }}
               >
-                <img
-                  className="h-full w-full object-cover transition-all duration-500 grayscale hover:grayscale-0"
-                  src={friend.avatarUrl}
-                  alt={friend.avatarAlt}
-                  loading="lazy"
-                />
+                {friend.avatarUrl?.trim() ? (
+                  <img
+                    className="h-full w-full object-cover transition-all duration-500 grayscale hover:grayscale-0"
+                    src={friend.avatarUrl}
+                    alt={friend.avatarAlt}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span
+                    className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase text-[var(--aura-text-secondary, #a0a8b0)]"
+                    aria-label={friend.avatarAlt || friend.name}
+                  >
+                    {friend.name?.charAt(0) || 'F'}
+                  </span>
+                )}
               </div>
               <div>
                 <p className={`${BODY_FONT} text-base font-medium text-[var(--aura-text-primary, #e8e8e8)]`}>

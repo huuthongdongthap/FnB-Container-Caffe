@@ -20,7 +20,7 @@ const STATIONS: { key: KitchenStation; label: string; emoji: string }[] = [
 ];
 
 const STATION_KEYWORDS: Record<Exclude<KitchenStation, 'all'>, string[]> = {
-  espresso: ['cà phê', 'coffee', 'espresso', 'latte', 'cappuccino', 'mocha', ' americano', 'macchiato', 'matcha', 'trà', 'tea'],
+  espresso: ['cà phê', 'coffee', 'espresso', 'latte', 'cappuccino', 'mocha', 'americano', 'macchiato', 'matcha', 'trà', 'tea'],
   food: ['bánh mì', 'sandwich', 'mì', 'phở', 'cơm', 'rice', 'noodle', 'salad', 'snack'],
   pastry: ['bánh', 'pastry', 'croissant', 'cookie', 'cake', 'tiramisu', 'brownie'],
   cold: ['sinh tố', 'smoothie', 'nước ép', 'juice', 'soda', 'frappe', 'đá', 'ice', 'cold brew'],

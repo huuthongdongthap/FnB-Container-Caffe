@@ -46,9 +46,15 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Cannot cancel order that has been served or completed' }, 409);
   }
 
-  await db.prepare(
-    'UPDATE orders SET status = \'cancelled\', cancelled_at = ?, updated_at = ? WHERE id = ?'
-  ).bind(now, now, id).run();
+  try {
+    await db.prepare(
+      'UPDATE orders SET status = \'cancelled\', cancelled_at = ?, updated_at = ? WHERE id = ?'
+    ).bind(now, now, id).run();
+  } catch {
+    await db.prepare(
+      'UPDATE orders SET status = \'cancelled\', updated_at = ? WHERE id = ?'
+    ).bind(now, id).run();
+  }
 
   if (c.env?.AUTH_KV) {
     let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
@@ -69,10 +75,20 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     // Column status/updated_at absent in canonical order_items schema
   }
 
-  await db.prepare(
-    `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(user?.id || 'system', user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run().catch(() => {});
+    } catch {
+      // Ignore audit log insert error if schema differs
+    }
+  }
 
   const updated = await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name

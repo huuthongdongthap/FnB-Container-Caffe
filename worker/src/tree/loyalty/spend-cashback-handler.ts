@@ -26,9 +26,12 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
 
-  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first<{ total_amount?: number; total?: number }>();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first<{ total_amount?: number; total?: number; customer_id?: string | null }>();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+  if (order.customer_id && order.customer_id !== cust.id) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
   }
 
   const orderTotal = Number(order.total_amount ?? order.total ?? 0);
@@ -61,7 +64,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
   ).bind(amount, amount, now, cust.id, amount).run();
 
-  if ((updateResult as unknown as { changes: number }).changes === 0) {
+  if ((updateResult.meta?.changes ?? (updateResult as unknown as { changes?: number }).changes) === 0) {
     return c.json({ success: false, error: 'So du khong du (race condition)', balance: wallet.balance }, 400);
   }
 

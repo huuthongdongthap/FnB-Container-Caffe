@@ -56,11 +56,19 @@ export function useTVMenu(): TVMenuResult {
     retry: 3,
   });
 
-  const groups = groupByCategory(data?.items ?? []);
+  const rawItems = Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray((data as any)?.data?.items)
+      ? (data as any).data.items
+      : Array.isArray((data as any)?.data?.categories)
+        ? (data as any).data.categories.flatMap((c: any) => c.items || [])
+        : [];
+
+  const groups = groupByCategory(rawItems);
 
   return {
     menuGroups: groups,
-    totalItems: data?.items?.length ?? 0,
+    totalItems: rawItems.length,
     isLoading,
     isError,
     lastUpdated: data ? new Date() : null,

@@ -71,10 +71,25 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
     const { order_id, description } = parsed.data;
 
     // Look up order
-    const orderRow = await db
-      .prepare('SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?')
-      .bind(order_id)
-      .first<{ id: string; total: string; payment_status: string; customer_id?: string }>();
+    let orderRow: { id: string; total: string; payment_status: string; status?: string; customer_id?: string } | null = null;
+    try {
+      orderRow = await db
+        .prepare('SELECT id, total, payment_status, status, customer_id FROM orders WHERE id = ?')
+        .bind(order_id)
+        .first<{ id: string; total: string; payment_status: string; status?: string; customer_id?: string }>();
+    } catch {
+      try {
+        orderRow = await db
+          .prepare('SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?')
+          .bind(order_id)
+          .first<{ id: string; total: string; payment_status: string; status?: string; customer_id?: string }>();
+      } catch {
+        orderRow = await db
+          .prepare('SELECT id, total, payment_status FROM orders WHERE id = ?')
+          .bind(order_id)
+          .first<{ id: string; total: string; payment_status: string; status?: string; customer_id?: string }>();
+      }
+    }
 
     if (!orderRow) {
       return c.json({ error: -1, message: errMsg.order_not_found[locale], message_en: errMsg.order_not_found.en }, 404);
@@ -86,13 +101,22 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
       user?.role === 'manager' ||
       user?.role === 'staff' ||
       user?.role === 'admin' ||
-      user?.role === 'cashier';
+      user?.role === 'cashier' ||
+      user?.role === 'waiter';
     if (orderRow.customer_id && user?.id && orderRow.customer_id !== user.id && !isStaffOrOwner) {
       return c.json({
         success: false,
         error: errMsg.forbidden[locale],
         error_en: errMsg.forbidden.en
       }, 403);
+    }
+
+    if (orderRow.status && ['cancelled', 'failed', 'expired'].includes(orderRow.status)) {
+      return c.json({
+        success: false,
+        error: locale === 'en' ? `Order is ${orderRow.status}` : `Đơn hàng đã ở trạng thái ${orderRow.status}`,
+        error_en: `Order is ${orderRow.status}`
+      }, 409);
     }
 
     if (orderRow.payment_status === 'paid') {
@@ -205,10 +229,11 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
       return c.json({ error: data.resultCode, message: data.message, message_en: data.message }, 400);
     }
 
-    // Persist payment record (retry on UNIQUE collision)
+    // Persist payment record (retry on UNIQUE collision for paymentId; preserve orderCode sent to MoMo)
     const now = new Date().toISOString();
     let paymentId = randomPaymentId();
-    let transId = String(orderCode || data.transId);
+    const attemptCode = orderCode;
+    const transId = String(attemptCode || data.transId);
 
     let insertOk = false;
     for (let attempt = 0; attempt < 3 && !insertOk; attempt++) {
@@ -221,10 +246,8 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
           .run();
         insertOk = true;
       } catch {
-        // Colliding orderCode or paymentId — regenerate and retry
-        orderCode = randomOrderCode();
+        // Colliding paymentId — regenerate paymentId and retry while preserving MoMo orderCode
         paymentId = randomPaymentId();
-        transId = String(orderCode || data.transId);
       }
     }
 

@@ -66,7 +66,7 @@ export function StuckPaymentsCard() {
                   <li key={s.orderId} className="flex justify-between">
                     <span>#{s.orderId}</span>
                     <span className="tabular-nums">
-                      DB: {s.dbAmount?.toLocaleString('vi-VN')}₫ ≠ Hook: {s.webhookAmount?.toLocaleString('vi-VN')}₫
+                      DB: {typeof s.dbAmount === 'number' ? `${s.dbAmount.toLocaleString('vi-VN')}₫` : (s.dbAmount ?? s.amount ?? '***')} ≠ Hook: {typeof s.webhookAmount === 'number' ? `${s.webhookAmount.toLocaleString('vi-VN')}₫` : (s.webhookAmount ?? '***')}
                     </span>
                   </li>
                 ))}

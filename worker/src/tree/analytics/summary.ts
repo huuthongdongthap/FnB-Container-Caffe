@@ -157,8 +157,45 @@ export async function getGrouped(
     throw new Error(`Unknown group: ${groupBy}`);
   }
 
-  const { results } = await db.prepare(sql).bind(days).all<GroupRow>();
-  const rows = results || [];
+  let rows: GroupRow[] = [];
+  try {
+    const { results } = await db.prepare(sql).bind(days).all<GroupRow>();
+    rows = results || [];
+  } catch {
+    if (groupBy === 'category') {
+      try {
+        const { results: orderRows } = await db.prepare(`
+          SELECT items FROM orders
+          WHERE status != 'cancelled'
+            AND created_at >= datetime('now', '-' || ? || ' days')
+        `).bind(days).all<{ items: string }>();
+        const catMap = new Map<string, { value: number; count: number }>();
+        for (const r of orderRows || []) {
+          try {
+            const parsed = JSON.parse(r.items || '[]');
+            if (!Array.isArray(parsed)) continue;
+            for (const item of parsed) {
+              const label = String(item.category || item.category_name || 'Uncategorized');
+              const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
+              const price = Number(item.price ?? item.unit_price ?? 0) || 0;
+              const subtotal = Number(item.subtotal ?? price * qty) || 0;
+              const cur = catMap.get(label) || { value: 0, count: 0 };
+              cur.value += subtotal;
+              cur.count += qty;
+              catMap.set(label, cur);
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+        rows = Array.from(catMap.entries())
+          .map(([label, v]) => ({ label, value: v.value, count: v.count }))
+          .sort((a, b) => b.value - a.value);
+      } catch {
+        rows = [];
+      }
+    }
+  }
 
   // Zero-fill hour groups for consistent charting
   if (groupBy === 'hour') {

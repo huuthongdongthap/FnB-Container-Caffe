@@ -39,10 +39,30 @@ export async function creditLoyaltyIfEligible(
 
   const orderRow = await db.prepare(
     'SELECT * FROM orders WHERE id = ?'
-  ).bind(orderId).first<{ id: string; total_amount?: number | null; total?: number | null; customer_id: string | null; status?: string }>();
+  ).bind(orderId).first<{
+    id: string;
+    total_amount?: number | null;
+    total?: number | null;
+    customer_id: string | null;
+    status?: string;
+    payment_status?: string;
+  }>();
 
   if (!orderRow || !orderRow.customer_id || orderRow.status === 'cancelled') {
     log.info('Loyalty credit skipped (no order, customer, or cancelled)', { orderId });
+    return;
+  }
+
+  if (
+    orderRow.status &&
+    ['pending', 'confirmed', 'preparing', 'ready', 'failed', 'expired'].includes(orderRow.status) &&
+    orderRow.payment_status !== 'paid'
+  ) {
+    log.info('Loyalty credit skipped (order not yet paid or completed)', {
+      orderId,
+      status: orderRow.status,
+      payment_status: orderRow.payment_status,
+    });
     return;
   }
 

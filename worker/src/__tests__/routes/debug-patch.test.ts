@@ -1,28 +1,13 @@
-import { it } from 'vitest';
+import { it, expect } from 'vitest';
 import { tablesRouter } from '@aura/domain-table';
 
 it('list all registered routes', async () => {
   const anyRouter = tablesRouter as any;
-  // Hono stores routes internally, try different property names
   const props = Object.getOwnPropertyNames(tablesRouter);
-  console.log('own props:', props);
-
-  // Try to find the route store
-  for (const p of props) {
-    try {
-      const v = (tablesRouter as any)[p];
-      if (Array.isArray(v)) {
-        console.log(`[${p}] array length:`, v.length);
-        v.forEach((item: any) => {
-          if (item && typeof item === 'object') {
-            const keys = Object.keys(item);
-            console.log(`  keys: ${keys.join(', ')}`);
-            if (item.method) console.log(`  method: ${item.method}`);
-            if (item.path) console.log(`  path: ${item.path}`);
-            if (item.route) console.log(`  route: ${item.route}`);
-          }
-        });
-      }
-    } catch (e) {}
-  }
+  expect(props.length).toBeGreaterThan(0);
+  expect(Array.isArray(anyRouter.routes)).toBe(true);
+  expect(anyRouter.routes.length).toBeGreaterThan(0);
+  const methods = anyRouter.routes.map((r: { method: string }) => r.method);
+  expect(methods).toContain('GET');
+  expect(methods).toContain('PATCH');
 });

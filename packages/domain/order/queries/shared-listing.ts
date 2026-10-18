@@ -30,9 +30,9 @@ const SORTABLE_COLUMNS: ReadonlySet<string> = new Set(['created_at', 'total', 's
  * Sort column comes from a user query param — invalid values fall back to
  * created_at rather than erroring, matching long-standing endpoint behavior.
  */
-function safeSortColumn(raw: string): string {
-  const bare = raw.includes('.') ? raw.split('.').pop()! : raw;
-  return SORTABLE_COLUMNS.has(bare) ? raw : 'created_at';
+export function safeSortColumn(raw: string, prefix = ''): string {
+  const col = raw.includes('.') ? raw.split('.').pop()! : raw;
+  return SORTABLE_COLUMNS.has(col) ? `${prefix}${col}` : `${prefix}created_at`;
 }
 
 export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters' | 'tenantId' | 'tableAlias'>): { clause: string; params: unknown[] } {
@@ -54,10 +54,13 @@ export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters' | 
   return { clause, params };
 }
 
-export function buildOrderTail(opts: Pick<OrderListOptions, 'sort' | 'order' | 'limit' | 'offset'>): string {
+export function buildOrderTail(
+  opts: Pick<OrderListOptions, 'sort' | 'order' | 'limit' | 'offset'> & { prefix?: string }
+): string {
   const sortBy = opts.sort ?? 'created_at';
   const direction = opts.order === 'DESC' ? 'DESC' : 'ASC';
   const limit = Math.max(1, Math.floor(opts.limit ?? 50));
   const offset = Math.max(0, Math.floor(opts.offset ?? 0));
-  return ` ORDER BY ${safeSortColumn(sortBy)} ${direction} LIMIT ${limit} OFFSET ${offset}`;
+  const prefix = opts.prefix ?? '';
+  return ` ORDER BY ${safeSortColumn(sortBy, prefix)} ${direction} LIMIT ${limit} OFFSET ${offset}`;
 }

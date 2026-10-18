@@ -54,7 +54,7 @@ export default function CampaignsManagerPage() {
     });
   }
 
-  function handleSave(extra?: { is_active?: number }) {
+  async function handleSave(extra?: { is_active?: number }) {
     if (!editingCampaign) return;
     const channels = Array.from(selectedChannels);
     if (channels.length === 0) return;
@@ -62,19 +62,31 @@ export default function CampaignsManagerPage() {
     if (extra?.is_active !== undefined && extra.is_active !== editingCampaign.is_active) {
       payload.is_active = extra.is_active;
     }
-    updateCampaign(editingCampaign.trigger, payload).then(() => {
+    try {
+      await updateCampaign(editingCampaign.trigger, payload);
       setEditingCampaign(null);
       setSelectedChannels(new Set());
-    });
+    } catch {
+      // Error is surfaced via saveError from useCampaignsAdmin
+    }
   }
 
-  function handleToggleActive(campaign: CampaignConfig) {
-    updateCampaign(campaign.trigger, { is_active: campaign.is_active ? 0 : 1 });
+  async function handleToggleActive(campaign: CampaignConfig) {
+    try {
+      await updateCampaign(campaign.trigger, { is_active: campaign.is_active ? 0 : 1 });
+    } catch {
+      // Error is surfaced via saveError from useCampaignsAdmin
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteTrigger) return;
-    deleteCampaign(deleteTrigger).then(() => setDeleteTrigger(null));
+    try {
+      await deleteCampaign(deleteTrigger);
+      setDeleteTrigger(null);
+    } catch {
+      // Error is surfaced via deleteError from useCampaignsAdmin
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────

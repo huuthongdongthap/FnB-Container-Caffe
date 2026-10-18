@@ -15,12 +15,21 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
     const token = authHeader.substring(7);
+    if (c.env.AUTH_KV) {
+      try {
+        if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
+          return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+        }
+      } catch {
+        // ignore KV error
+      }
+    }
     const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
     if (!payload) {
       return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
     }
     const role = payload.role as string;
-    if (role !== 'owner' && role !== 'manager' && role !== 'staff' && role !== 'admin') {
+    if (!['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'].includes(role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
@@ -84,12 +93,21 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
         return c.json({ success: false, error: 'Unauthorized' }, 401);
       }
       const token = authHeader.substring(7);
+      if (c.env.AUTH_KV) {
+        try {
+          if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
+            return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+          }
+        } catch {
+          // ignore KV error
+        }
+      }
       const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
       if (!payload) {
         return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
       }
       const role = payload.role as string;
-      if (role !== 'owner' && role !== 'manager' && role !== 'staff' && role !== 'admin') {
+      if (!['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'].includes(role)) {
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
     }
@@ -127,8 +145,17 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
       const { results: countResults } = await countStmt.all<{ total: number }>();
       const total = countResults?.[0]?.total || 0;
 
-      const dataStmt = db.prepare(dataQuery).bind(...params, limit, offset);
-      const { results } = await dataStmt.all<CustomerRecord>();
+      let results: CustomerRecord[] | undefined;
+      try {
+        const dataStmt = db.prepare(dataQuery).bind(...params, limit, offset);
+        const res = await dataStmt.all<CustomerRecord>();
+        results = res.results;
+      } catch {
+        const fallbackQuery = dataQuery.replace(PROFILE_SQL, 'SELECT c.* FROM customers c ');
+        const fallbackStmt = db.prepare(fallbackQuery).bind(...params, limit, offset);
+        const res = await fallbackStmt.all<CustomerRecord>();
+        results = res.results;
+      }
 
       return c.json({
         success: true,

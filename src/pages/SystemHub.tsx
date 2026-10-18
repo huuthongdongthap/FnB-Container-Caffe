@@ -73,7 +73,8 @@ export default function SystemHubPage() {
     const hasAuthToken =
       typeof window !== 'undefined' &&
       Boolean(
-        window.localStorage.getItem('auth_token') ||
+        window.localStorage.getItem('aura_auth_token') ||
+          window.localStorage.getItem('auth_token') ||
           window.localStorage.getItem('aura_access_token'),
       );
     if (!hasAuthToken) return;

@@ -75,7 +75,7 @@ router.use('/create', requireAuth(['owner', 'admin', 'customer']));
     if (!currentUser) {
       return c.json({ ok: false, error: 'unauthenticated' } as const, 401);
     }
-    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+    if (currentUser.role !== 'owner' && currentUser.role !== 'admin' && currentUser.role !== 'customer') {
       return c.json({ ok: false, error: 'forbidden' } as const, 403);
     }
 

@@ -45,7 +45,7 @@ export function registerWebPaymentHandlers(router: OpenAPIHono<{ Bindings: Env }
         return c.json({ success: false, error: 'Order not found' }, 404);
       }
 
-      const isStaffOrOwner = user.role === 'owner' || user.role === 'manager' || user.role === 'staff' || user.role === 'admin' || user.role === 'waiter';
+      const isStaffOrOwner = user.role === 'owner' || user.role === 'manager' || user.role === 'staff' || user.role === 'admin' || user.role === 'waiter' || user.role === 'cashier';
       if (
         !canAccessOrder(user, orderRow).allowed ||
         (!isStaffOrOwner && (!orderRow.customer_id || orderRow.customer_id !== user.id))

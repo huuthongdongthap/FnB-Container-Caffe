@@ -122,10 +122,21 @@ export async function writeCanonicalAuditLog(
 
       return { ok: true, record };
     } catch (fallbackErr) {
-      if (policy === 'strict_fail_closed') {
-        throw new Error(`Audit write failed under strict_fail_closed policy: ${String(fallbackErr || err)}`);
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          record.id, record.action, record.actor_id, record.resource_type,
+          record.resource_id, record.details, record.ip_address, record.created_at
+        ).run();
+
+        return { ok: true, record };
+      } catch (canonicalErr) {
+        if (policy === 'strict_fail_closed') {
+          throw new Error(`Audit write failed under strict_fail_closed policy: ${String(canonicalErr || fallbackErr || err)}`);
+        }
+        return { ok: false, record, error: String(canonicalErr || fallbackErr || err) };
       }
-      return { ok: false, record, error: String(fallbackErr || err) };
     }
   }
 }

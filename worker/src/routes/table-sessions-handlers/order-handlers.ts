@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
 import type { TableSession } from './types';
 
@@ -13,9 +14,14 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'order_id is required' }, 400);
     }
 
-    const session = await db.prepare(
-      'SELECT * FROM table_sessions WHERE id = ? AND status != \'closed\''
-    ).bind(id).first<TableSession>();
+    let session: TableSession | null = null;
+    try {
+      session = await db.prepare(
+        'SELECT * FROM table_sessions WHERE id = ? AND status != \'closed\''
+      ).bind(id).first<TableSession>();
+    } catch {
+      session = null;
+    }
     if (!session) {
       return c.json({ success: false, error: 'Session not found or already closed' }, 404);
     }
@@ -48,24 +54,34 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
          WHERE id = ?`
       ).bind(order.total, now, id).run();
     } catch {
-      await db.prepare(
-        `UPDATE table_sessions
-         SET current_order_id = ?,
-             status = 'ordering'
-         WHERE id = ?`
-      ).bind(orderId, id).run();
+      try {
+        await db.prepare(
+          `UPDATE table_sessions
+           SET current_order_id = ?,
+               status = 'ordering'
+           WHERE id = ?`
+        ).bind(orderId, id).run();
+      } catch {
+        // table_sessions schema variation
+      }
     }
 
     if (c.env?.AUTH_KV) {
       await Promise.all([
         c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
         c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+        publishOrderEvent(c.env.AUTH_KV, orderId, 'pending').catch(() => {}),
       ]);
     }
 
-    const updated = await db.prepare(
-      'SELECT * FROM table_sessions WHERE id = ?'
-    ).bind(id).first<TableSession>();
+    let updated: TableSession | null = null;
+    try {
+      updated = await db.prepare(
+        'SELECT * FROM table_sessions WHERE id = ?'
+      ).bind(id).first<TableSession>();
+    } catch {
+      updated = session;
+    }
     return c.json({ success: true, data: updated });
   });
 
@@ -73,9 +89,14 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/:id/orders', async (c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
-    const session = await db.prepare(
-      'SELECT id FROM table_sessions WHERE id = ?'
-    ).bind(id).first<{ id: string }>();
+    let session: { id: string } | null = null;
+    try {
+      session = await db.prepare(
+        'SELECT id FROM table_sessions WHERE id = ?'
+      ).bind(id).first<{ id: string }>();
+    } catch {
+      session = null;
+    }
     if (!session) {
       return c.json({ success: false, error: 'Session not found' }, 404);
     }

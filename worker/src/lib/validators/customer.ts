@@ -50,9 +50,14 @@ export const redeemRewardSchema = z.object({
 // ══════════════════════════════════════════════
 
 export const checkinSchema = z.object({
-  customer_id: z.string().min(1, 'customer_id là bắt buộc'),
+  customer_id: z.string().min(1, 'customer_id là bắt buộc').optional(),
+  phone: z.string().min(8, 'Số điện thoại không hợp lệ').max(20).optional(),
+  customer_phone: z.string().min(8, 'Số điện thoại không hợp lệ').max(20).optional(),
   customer_name: z.string().optional()
-});
+}).refine(
+  (d) => Boolean((d.customer_id && d.customer_id.trim().length > 0) || d.phone || d.customer_phone),
+  { message: 'customer_id là bắt buộc', path: ['customer_id'] }
+);
 
 // ── Guest QR check-in (no auth) ────────────────────────────────────
 export const guestCheckinSchema = z.object({

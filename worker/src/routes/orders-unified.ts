@@ -36,6 +36,7 @@ import { handlePosCheckout } from './orders-hono-handlers/checkout-handlers';
 import {
   handleListOrders,
   handleGetOrderById,
+  handleTrackOrder,
 } from './openapi-orders-handlers/order-read-handlers';
 import { handleGetOrderSummary } from './openapi-orders-handlers/order-summary-handlers';
 
@@ -52,13 +53,13 @@ ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
-ordersUnifiedRouter.get('/kds', requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']), handleGetKdsOrders);
-ordersUnifiedRouter.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin']), audit('order_create_checkout'), handlePosCheckout);
+ordersUnifiedRouter.get('/kds', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), handleGetKdsOrders);
+ordersUnifiedRouter.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
 
-ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'staff', 'admin']), handleGetOrderSummary);
+ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), handleGetOrderSummary);
 
 ordersUnifiedRouter.post('/', orderRateLimit, handleCreateOrder);
-ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin', 'kitchen', 'barista', 'chef', 'customer']), (c) => {
+ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), (c) => {
   if (c.req.path.startsWith('/api/kds/orders')) {
     return handleGetKdsOrders(c);
   }
@@ -67,15 +68,16 @@ ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter',
 
 // ── 2. Parameterized Routes with Sub-paths (/:id/...) ──
 ordersUnifiedRouter.get('/:id/events', handleOrderStreamEvents);
+ordersUnifiedRouter.get('/:id/track', handleTrackOrder);
 
-ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']), audit('order_status_change'), handleUpdateOrderStatus);
-ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), audit('order_status_change'), handleUpdateOrderStatus);
+ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin', 'customer']), handleCancelOrder);
-ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin', 'customer']), handleClaimOrder);
+ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
+ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──
-ordersUnifiedRouter.get('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin', 'kitchen', 'barista', 'chef', 'customer']), handleGetOrderById);
-ordersUnifiedRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'admin', 'kitchen', 'barista', 'chef']), handleUpdateOrder);
+ordersUnifiedRouter.get('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), handleGetOrderById);
+ordersUnifiedRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), handleUpdateOrder);
 
 export default ordersUnifiedRouter;

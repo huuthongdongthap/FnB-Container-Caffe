@@ -15,10 +15,10 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 	const { t } = useTranslation();
 
 	const statusLabel = (status: CafeTableRow['status']) =>
-		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { fallback: status });
+		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { defaultValue: status, fallback: status });
 
 	const clickStatusLabel = (key: string) =>
-		t(`admin.tableManagement.${key}`, { fallback: 'Cycle status' });
+		t(`admin.tableManagement.${key}`, { defaultValue: 'Cycle status', fallback: 'Cycle status' });
 
 	return (
 		<div className="rounded-xl border border-border bg-[var(--aura-bg-elevated)] p-4 flex flex-col items-center text-center transition-all hover:shadow-md">
@@ -34,7 +34,7 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 				<button
 					disabled={isUpdating}
 					onClick={() => {
-						const next = STATUS_OPTIONS.find((s) => s.value !== table.status);
+						const idx = STATUS_OPTIONS.findIndex((s) => s.value.toLowerCase() === String(table.status).toLowerCase()); const next = STATUS_OPTIONS[(idx + 1) % STATUS_OPTIONS.length];
 						if (next) onSetStatus(table.id, next.value);
 					}}
 					title={clickStatusLabel("clickCycleStatus")}

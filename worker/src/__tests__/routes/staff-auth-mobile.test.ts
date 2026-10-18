@@ -191,13 +191,32 @@ describe('staffMobileLogin', () => {
   });
 
   it('returns 200 + JWT for valid PIN', async () => {
-    const pinHash = `pin$pbkdf2$100000$${btoa('testsalt')}$${btoa('correcthash')}`;
+    const salt = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode('1234'),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    );
+    const saltB64 = btoa(String.fromCharCode(...salt));
+    const hashB64 = btoa(String.fromCharCode(...new Uint8Array(bits)));
+    const pinHash = `pin$pbkdf2$100000$${saltB64}$${hashB64}`;
     const ctx: any = mockContext({
       body: { device_token: 'tok_known', pin: '1234' },
       deviceByToken: deviceWithPin(pinHash),
     });
     const res = await staffMobileLogin(ctx);
-    expect([200, 401]).toContain(res.status);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(typeof body.token).toBe('string');
+    expect(body.token.length).toBeGreaterThan(10);
   });
 
   it('returns 500 on unexpected error without leaking internal message', async () => {
@@ -392,7 +411,7 @@ describe('registerStaffDevice', () => {
     expect(res.status).toBe(403);
   });
 
-  it('normalizes kitchen UI role to staff when registering a device', async () => {
+  it('preserves kitchen UI role when registering a device', async () => {
     const kv = createMockKV({ 'user:USR_2': JSON.stringify({ id: 'USR_2', name: 'Kitchen Staff' }) });
     const ctx: any = mockContext({
       user: { id: 'USR_1', role: 'manager' },
@@ -403,7 +422,7 @@ describe('registerStaffDevice', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.user.role).toBe('staff');
+    expect(body.user.role).toBe('kitchen');
   });
 });
 

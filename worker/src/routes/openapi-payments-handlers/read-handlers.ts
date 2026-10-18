@@ -58,11 +58,6 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       params.push(dateTo);
     }
 
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM payments ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
-
     const offset = (page - 1) * limit;
     const allowedSorts: Record<string, string> = {
       created_at: 'p.created_at',
@@ -74,12 +69,61 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const safeSort = allowedSorts[sort] || 'p.created_at';
     const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
     const orderClause = `${safeSort} ${safeDirection}`;
-    const rows = (await db.prepare(
-      `SELECT p.* FROM payments p
-       ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: PaymentRow[] };
+
+    const user = c.get('user') as { id?: string; role?: string } | undefined;
+    let total = 0;
+    let rows: { results: PaymentRow[] } = { results: [] };
+    let scopedByCustomer = false;
+
+    if (user?.role === 'customer') {
+      if (!user?.id) {
+        scopedByCustomer = true;
+      } else {
+        try {
+          const customerWhere = `${whereClause
+            .replace(/\border_id\b/g, 'p.order_id')
+            .replace(/\bmethod\b/g, 'p.method')
+            .replace(/\bstatus\b/g, 'p.status')
+            .replace(/\bcreated_at\b/g, 'p.created_at')} AND o.customer_id = ?`;
+          const customerParams = [...params, user.id];
+
+          const countResult = (await db.prepare(
+            `SELECT COUNT(*) as total FROM payments p JOIN orders o ON o.id = p.order_id ${customerWhere}`
+          ).bind(...customerParams).first()) as { total: number } | null;
+
+          const customerRows = (await db.prepare(
+            `SELECT p.* FROM payments p JOIN orders o ON o.id = p.order_id
+             ${customerWhere}
+             ORDER BY ${orderClause}
+             LIMIT ? OFFSET ?`
+          ).bind(...customerParams, limit, offset).all()) as { results: PaymentRow[] };
+
+          if (countResult !== null && customerRows?.results) {
+            total = countResult.total || 0;
+            rows = customerRows;
+            scopedByCustomer = true;
+          }
+        } catch {
+          scopedByCustomer = true;
+          total = 0;
+          rows = { results: [] };
+        }
+      }
+    }
+
+    if (!scopedByCustomer) {
+      const countResult = (await db.prepare(
+        `SELECT COUNT(*) as total FROM payments ${whereClause}`
+      ).bind(...params).first()) as { total: number } | null;
+      total = countResult?.total || 0;
+
+      rows = (await db.prepare(
+        `SELECT p.* FROM payments p
+         ${whereClause}
+         ORDER BY ${orderClause}
+         LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all()) as { results: PaymentRow[] };
+    }
 
     const payments = (rows.results || []).map((p) => ({
       id: p.id,

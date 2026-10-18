@@ -15,7 +15,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Returns chronological event feed for a customer.
    * Auth: owner, manager or staff only.
    */
-  router.get('/customers/:id/events', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
+  router.get('/customers/:id/events', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 
@@ -35,7 +35,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * GET /api/crm/customers/:id/profile
    * Unified CRM profile view (recent activity summary).
    */
-  router.get('/customers/:id/profile', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
+  router.get('/customers/:id/profile', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 
@@ -52,7 +52,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Unified CRM view — account + tier + band + preferences + recent events.
    * Auth: owner, manager or staff only.
    */
-  router.get('/customers/:id/360', requireAuth(['owner', 'manager', 'staff', 'admin']), async (c) => {
+  router.get('/customers/:id/360', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const customerId = c.req.param('id');
 
@@ -74,7 +74,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Get or create referral code + status for a customer.
    * Auth: owner, staff, or self.
    */
-  router.get('/customers/:id/referral', requireAuth(['customer', 'staff', 'manager', 'admin', 'owner']), async (c) => {
+  router.get('/customers/:id/referral', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
     const customerId = c.req.param('id');
     const auth = c.get('user');
 
@@ -94,7 +94,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
    * Body: { code } — redeem a referral code for the current customer.
    * Auth: self only.
    */
-  router.post('/customers/:id/referral/redeem', requireAuth(['customer', 'staff', 'owner']), async (c) => {
+  router.post('/customers/:id/referral/redeem', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
     const customerId = c.req.param('id');
     const auth = c.get('user');
 

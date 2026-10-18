@@ -15,7 +15,7 @@ export function validateAccessControl(
   auth: AccessControlContext,
   target: ResourceAccessTarget
 ): AccessDecision {
-  const isStaffRole = ['owner', 'manager', 'staff', 'waiter'].includes(auth.userRole || '');
+  const isStaffRole = ['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef'].includes(auth.userRole || '');
 
   // 1. Unauthenticated Check
   if (!auth.userId && !auth.userRole) {
@@ -56,7 +56,7 @@ export function validateAccessControl(
   }
 
   // 5. Customer IDOR Protection
-  if (auth.userRole === 'customer') {
+  if (auth.userRole === 'customer' || auth.userRole === 'guest') {
     if (target.ownerId && target.ownerId !== auth.userId) {
       return {
         allowed: false,

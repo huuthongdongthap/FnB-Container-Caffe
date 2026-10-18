@@ -52,8 +52,12 @@ export function InventorySuppliersTab({
                   <h4 className="font-semibold text-sm text-[var(--aura-text-primary)]">
                     {sup.name}
                   </h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300">
-                    Hoạt động
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    sup.is_active === 0 || (sup as any).is_active === false
+                      ? 'bg-rose-500/20 text-rose-300'
+                      : 'bg-emerald-500/20 text-emerald-300'
+                  }`}>
+                    {sup.is_active === 0 || (sup as any).is_active === false ? 'Tạm dừng' : 'Hoạt động'}
                   </span>
                 </div>
                 <div className="text-xs text-[var(--aura-text-muted)] space-y-1">
@@ -113,7 +117,7 @@ export function InventorySuppliersTab({
                         {po.order_date}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold">
-                        {formatVnd(po.total)}
+                        {formatVnd(po.total ?? (po as any).total_amount ?? (po as any).totalAmount ?? 0)}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${

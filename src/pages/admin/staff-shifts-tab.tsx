@@ -81,6 +81,13 @@ export function ShiftsTab() {
 
   const totalHoursToday = todayShifts.reduce((acc: number, s: ShiftRecord) => {
     if (s.hours_worked) return acc + s.hours_worked;
+    if (!s.clock_out && s.clock_in) {
+      const startTime = new Date(s.clock_in).getTime();
+      if (!Number.isNaN(startTime)) {
+        const elapsed = Math.max(0, (Date.now() - startTime) / 3_600_000);
+        return acc + Math.round(elapsed * 10) / 10;
+      }
+    }
     return acc;
   }, 0);
 

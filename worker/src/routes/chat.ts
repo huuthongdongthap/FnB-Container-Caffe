@@ -79,22 +79,41 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
     if (parsed.data.direction === 'admin') {
       const token = getAuthToken(c.req.raw);
       if (token && c.env.JWT_SECRET) {
-        const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
-        if (payload && ['owner', 'manager', 'staff', 'admin'].includes(String(payload.role || ''))) {
-          resolvedDirection = 'admin';
+        let isRevoked = false;
+        if (c.env.AUTH_KV) {
+          try {
+            isRevoked = Boolean(await c.env.AUTH_KV.get(`revoked:${token}`));
+          } catch {
+            isRevoked = false;
+          }
         }
-      } else if (!c.env.JWT_SECRET) {
-        resolvedDirection = 'admin';
+        if (!isRevoked) {
+          const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
+          if (payload && ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'].includes(String(payload.role || ''))) {
+            resolvedDirection = 'admin';
+          }
+        }
       }
     }
-    const result = await db.prepare(
-      'INSERT INTO contact_messages (name, phone, message, direction, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(name.trim(), phone.trim(), message.trim(), resolvedDirection, now).run();
+    let lastRowId: unknown = undefined;
+    try {
+      const result = await db.prepare(
+        'INSERT INTO contact_messages (name, phone, message, direction, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(name.trim(), phone.trim(), message.trim(), resolvedDirection, now).run();
+      lastRowId = result.meta?.last_row_id;
+    } catch {
+      const msgId = `MSG_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const category = resolvedDirection === 'admin' ? 'chat_admin' : 'chat';
+      await db.prepare(
+        'INSERT INTO contact_messages (id, name, phone, email, category, content, status, created_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)'
+      ).bind(msgId, name.trim(), phone.trim(), category, message.trim(), resolvedDirection === 'admin' ? 'read' : 'unread', now).run();
+      lastRowId = msgId;
+    }
 
     return jsonResponse({
       success: true,
       message: 'Tin nhan da duoc gui',
-      id: result.meta?.last_row_id
+      id: lastRowId
     }, 201);
   } catch (error) {
     log.error('Chat send message error:', { message: (error as Error).message });
@@ -105,21 +124,42 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
 async function getConversations(c: Context<{ Bindings: Env }>) {
   try {
     const db = c.env.AURA_DB;
-    const { results } = await db.prepare(
-      `SELECT
-        cm.phone,
-        cm.name,
-        cm.message AS last_message,
-        cm.direction AS last_direction,
-        cm.created_at AS last_message_at,
-        (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone) AS message_count,
-        (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone AND direction = 'customer' AND read_at IS NULL) AS unread_count
-      FROM contact_messages cm
-      WHERE cm.id IN (
-        SELECT MAX(id) FROM contact_messages GROUP BY phone
-      )
-      ORDER BY cm.created_at DESC`
-    ).all();
+    let results: unknown[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT
+          cm.phone,
+          cm.name,
+          cm.message AS last_message,
+          cm.direction AS last_direction,
+          cm.created_at AS last_message_at,
+          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone) AS message_count,
+          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone AND direction = 'customer' AND read_at IS NULL) AS unread_count
+        FROM contact_messages cm
+        WHERE cm.id IN (
+          SELECT MAX(id) FROM contact_messages GROUP BY phone
+        )
+        ORDER BY cm.created_at DESC`
+      ).all();
+      results = res.results || [];
+    } catch {
+      const res = await db.prepare(
+        `SELECT
+          cm.phone,
+          cm.name,
+          cm.content AS last_message,
+          CASE WHEN cm.category = 'chat_admin' THEN 'admin' ELSE 'customer' END AS last_direction,
+          cm.created_at AS last_message_at,
+          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone) AS message_count,
+          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone AND status = 'unread') AS unread_count
+        FROM contact_messages cm
+        WHERE cm.rowid IN (
+          SELECT MAX(rowid) FROM contact_messages GROUP BY phone
+        )
+        ORDER BY cm.created_at DESC`
+      ).all();
+      results = res.results || [];
+    }
 
     const conversations = (results as Array<Record<string, unknown>>).map((row) => ({
       phone: row.phone,
@@ -154,7 +194,13 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
         "UPDATE contact_messages SET read_at = ? WHERE phone = ? AND direction = 'customer' AND read_at IS NULL"
       ).bind(now, phone).run();
     } catch {
-      // Non-blocking if table or column varies
+      try {
+        await db.prepare(
+          "UPDATE contact_messages SET status = 'read' WHERE phone = ? AND status = 'unread'"
+        ).bind(phone).run();
+      } catch {
+        // Non-blocking if table or column varies
+      }
     }
     try {
       await db.prepare(
@@ -164,9 +210,22 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
       // Non-blocking
     }
 
-    const { results } = await db.prepare(
-      'SELECT id, name, phone, message, direction, created_at, read_at FROM contact_messages WHERE phone = ? ORDER BY created_at ASC'
-    ).bind(phone).all();
+    let results: unknown[] = [];
+    try {
+      const res = await db.prepare(
+        'SELECT id, name, phone, message, direction, created_at, read_at FROM contact_messages WHERE phone = ? ORDER BY created_at ASC'
+      ).bind(phone).all();
+      results = res.results || [];
+    } catch {
+      const res = await db.prepare(
+        `SELECT id, name, phone, content AS message,
+                CASE WHEN category = 'chat_admin' THEN 'admin' ELSE 'customer' END AS direction,
+                created_at,
+                CASE WHEN status = 'read' THEN created_at ELSE NULL END AS read_at
+           FROM contact_messages WHERE phone = ? ORDER BY created_at ASC`
+      ).bind(phone).all();
+      results = res.results || [];
+    }
 
     return jsonResponse({ success: true, data: results });
   } catch (error) {
@@ -183,8 +242,8 @@ export const chatRouter = new Hono<{ Bindings: Env }>();
 chatRouter.post('/messages', (c) => sendMessage(c));
 
 // Protected: get all conversations
-chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getConversations(c));
+chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getConversations(c));
 
 // Protected: get message history for a phone or conversation ID
-chatRouter.get('/conversations/:id/messages', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getMessageHistory(c));
-chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getMessageHistory(c));
+chatRouter.get('/conversations/:id/messages', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getMessageHistory(c));
+chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getMessageHistory(c));

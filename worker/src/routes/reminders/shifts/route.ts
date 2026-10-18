@@ -42,10 +42,27 @@ export async function sendShiftReminders(env: Record<string, unknown>): Promise<
     } catch (queryErr) {
       const msg = String((queryErr as Error)?.message || '');
       if (msg.includes('no such column') || msg.includes('no such table')) {
-        log.debug('staff_shifts reminder columns not present, skipping');
-        return { checked: 0, notified: 0, errors: 0 };
+        try {
+          const canonicalRes = await db
+            .prepare(
+              `SELECT s.id, COALESCE(u.name, s.user_id) as staff_name, COALESCE(u.role, 'staff') as role,
+                      (s.shift_date || 'T' || s.start_time || ':00') as clock_in_planned
+               FROM shifts s
+               LEFT JOIN users u ON u.id = s.user_id
+               WHERE s.status = 'scheduled'
+                 AND (s.shift_date || 'T' || s.start_time || ':00') >= ?
+                 AND (s.shift_date || 'T' || s.start_time || ':00') <= ?`
+            )
+            .bind(now.toISOString(), windowEnd)
+            .all<{ id: string; staff_name: string; role: string; clock_in_planned: string }>();
+          shifts = canonicalRes.results || [];
+        } catch {
+          log.debug('staff_shifts reminder columns not present, skipping');
+          return { checked: 0, notified: 0, errors: 0 };
+        }
+      } else {
+        throw queryErr;
       }
-      throw queryErr;
     }
 
     if (!shifts.length) {
@@ -84,7 +101,8 @@ export async function sendShiftReminders(env: Record<string, unknown>): Promise<
           await db
             .prepare('UPDATE staff_shifts SET reminder_sent = 1 WHERE id = ?')
             .bind(shift.id)
-            .run();
+            .run()
+            .catch(() => {});
         }
 
         log.info('Shift reminder processed', {

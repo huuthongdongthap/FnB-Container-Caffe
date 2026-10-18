@@ -17,6 +17,7 @@ export interface Ticket {
   table: string;
   type: 'DINE IN' | 'TOGO' | 'DELIVERY';
   status: TicketStatus;
+  rawStatus?: string;
   items: TicketItem[];
   elapsedSeconds: number;
   totalTimeSeconds?: number;

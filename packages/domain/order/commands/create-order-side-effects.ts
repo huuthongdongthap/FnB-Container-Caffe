@@ -70,6 +70,14 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     }
   }
 
+  if (!data.customer_id && customerIdForCapture) {
+    await db
+      .prepare('UPDATE orders SET customer_id = ? WHERE id = ?')
+      .bind(customerIdForCapture, orderId)
+      .run()
+      .catch(() => {});
+  }
+
   if (customerIdForCapture && ctx?.waitUntil) {
     const captureCustId = customerIdForCapture;
     ctx.waitUntil((async () => {

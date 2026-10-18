@@ -16,9 +16,22 @@ export const TABLE_STATUS_TRANSITIONS: Record<TableStatus, readonly TableStatus[
   Overdue: ['Available', 'Occupied', 'Reserved', 'Overdue'],
 } as const;
 
+export function normalizeTableStatus(status: unknown): TableStatus | null {
+  if (typeof status !== 'string') return null;
+  const lower = status.trim().toLowerCase();
+  if (lower === 'available') return 'Available';
+  if (lower === 'occupied') return 'Occupied';
+  if (lower === 'reserved') return 'Reserved';
+  if (lower === 'overdue') return 'Overdue';
+  return null;
+}
+
 export function canTransitionTo(
-  current: CafeTable['status'],
-  target: CafeTable['status'],
+  current: CafeTable['status'] | string,
+  target: CafeTable['status'] | string,
 ): boolean {
-  return TABLE_STATUS_TRANSITIONS[current].includes(target);
+  const normCurrent = normalizeTableStatus(current);
+  const normTarget = normalizeTableStatus(target);
+  if (!normCurrent || !normTarget) return false;
+  return TABLE_STATUS_TRANSITIONS[normCurrent].includes(normTarget);
 }

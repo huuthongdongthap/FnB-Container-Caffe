@@ -10,7 +10,7 @@ export function APILatencySection() {
   const retry = usePerformanceStore((s) => s.fetchAPILatency);
 
   if (loading && !apiLatency) return <LatencySkeleton />;
-  if (error) return <ErrorCard message={error} onRetry={retry} />;
+  if (error) return <ErrorCard message={error} onRetry={() => void retry()} />;
   if (!apiLatency) return <EmptyCard title="API Latency" />;
 
   const maxCount = Math.max(1, ...(apiLatency.requestCounts ?? []).map((d) => d.count));

@@ -6,6 +6,15 @@ import type {
   CustomerExportRow
 } from './types';
 
+// Helper: escape CSV cell per RFC 4180 when value contains comma, quote, or newline
+function escapeCsvCell(val: unknown): string {
+  const str = String(val ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 // Helper: create CSV response with UTF-8 BOM bytes for Excel compatibility
 function createCsvResponse(csvString: string, filename: string): Response {
   const encoder = new TextEncoder();
@@ -50,7 +59,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       ]);
 
       return createCsvResponse(
-        `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+        `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
         `orders-report-${from}-${to}.csv`
       );
     }
@@ -100,7 +109,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       ]);
 
       return createCsvResponse(
-        `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+        `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
         `revenue-report-${from}-${to}.csv`
       );
     }
@@ -128,7 +137,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       ]);
 
       return createCsvResponse(
-        `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+        `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
         `customers-report-${from}-${to}.csv`
       );
     }

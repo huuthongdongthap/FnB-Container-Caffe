@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useCartStore, type CartItem } from '@/hooks/stores/use-cart-store';
 import { API_BASE } from '@/lib/api-client';
 import { type SplitResult, type SplitConfirmPayload } from './split-bill-types';
-import { computeSplits, buildSplitOrders } from './split-bill-helpers';
+import { computeSplits, computeUnassignedItems, buildSplitOrders } from './split-bill-helpers';
 
 // Re-export types for backward compatibility
 export { SPLIT_COLORS, SPLIT_NAMES, type SplitResult, type SplitConfirmPayload } from './split-bill-types';
@@ -28,7 +28,20 @@ export function useSplitBill() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const setSplitCount = useCallback((count: number) => {
-    setSplitCountState(Math.max(2, Math.min(4, count)));
+    const nextCount = Math.max(2, Math.min(4, count));
+    setSplitCountState(nextCount);
+    setAssignments((prev) => {
+      let changed = false;
+      const next: SplitAssignment = {};
+      for (const [itemId, idx] of Object.entries(prev)) {
+        if (idx >= 0 && idx < nextCount) {
+          next[itemId] = idx;
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
     setError(null);
   }, []);
 
@@ -81,8 +94,8 @@ export function useSplitBill() {
 
   /** Items not assigned to any split. */
   const unassignedItems: CartItem[] = useMemo(
-    () => cartItems.filter((item) => assignments[item.id] === undefined),
-    [cartItems, assignments],
+    () => computeUnassignedItems(cartItems, assignments, splitCount),
+    [cartItems, assignments, splitCount],
   );
 
   const allAssigned = unassignedItems.length === 0;
@@ -108,10 +121,14 @@ export function useSplitBill() {
 
       try {
         const orders = buildSplitOrders(splits, formData, tableId);
+        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
 
         const res = await fetch(`${API_BASE}/api/orders/split`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          headers,
           body: JSON.stringify({ orders, table_id: tableId }),
         });
 
@@ -125,7 +142,7 @@ export function useSplitBill() {
 
         clearCart();
         setIsSubmitting(false);
-        return body;
+        return body.data ?? body;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
         setIsSubmitting(false);

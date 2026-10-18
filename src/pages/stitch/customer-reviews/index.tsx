@@ -7,6 +7,15 @@ import { FILTERS, REVIEWS } from './review-constants';
 import { ReviewCard } from './review-card';
 import { PenLine, Star, Sparkles } from 'lucide-react';
 
+function parseReviewDate(dateStr: string): number {
+  const m = dateStr.match(/(\d{1,2})\s+Thg\s+(\d{1,2}),\s*(\d{4})/i);
+  if (m) {
+    return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+  }
+  const t = Date.parse(dateStr);
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export default function CustomerReviews() {
   const [activeFilter, setActiveFilter] = useState<string>('Tất cả');
 
@@ -16,6 +25,9 @@ export default function CustomerReviews() {
     }
     if (activeFilter === 'Có ảnh') {
       return REVIEWS.filter((r) => r.photos && r.photos.length > 0);
+    }
+    if (activeFilter === 'Mới nhất') {
+      return [...REVIEWS].sort((a, b) => parseReviewDate(b.date) - parseReviewDate(a.date));
     }
     return REVIEWS;
   }, [activeFilter]);

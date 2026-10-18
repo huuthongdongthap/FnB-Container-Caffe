@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import { useMetricsStore, type MetricsRange } from '@/hooks/stores/admin/use-metrics-store';
+import { usePerformanceStore } from '@/hooks/stores/admin/use-performance-store';
 
 /* ═══════════════════════════════════════════════════════════════════
    RangeSelector — 24h / 7d / 30d tab bar for metrics dashboard.
@@ -22,7 +23,10 @@ export function RangeSelector() {
           key={r.key}
           role="tab"
           aria-selected={range === r.key}
-          onClick={() => setRange(r.key)}
+          onClick={() => {
+            setRange(r.key);
+            usePerformanceStore.getState()?.setRange?.(r.key);
+          }}
           className={cn(
             'px-4 py-2 text-sm font-medium rounded-md transition-colors',
             range === r.key

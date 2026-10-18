@@ -38,6 +38,7 @@ export function useCheckinApprovals() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [isFallbackMode, setIsFallbackMode] = useState(false);
 
   const fetchPendingCheckins = useCallback(async () => {
     setLoading(true);
@@ -48,8 +49,10 @@ export function useCheckinApprovals() {
       >('/api/admin/checkins');
       const rawList = Array.isArray(body) ? body : (body.checkins || body.data || []);
       setCheckins(rawList.map(normalizeCheckin));
+      setIsFallbackMode(false);
     } catch {
       setCheckins(MOCK_CHECKINS);
+      setIsFallbackMode(true);
     } finally {
       setLoading(false);
     }
@@ -61,33 +64,49 @@ export function useCheckinApprovals() {
 
   const handleApprove = useCallback(async (id: string) => {
     setActingId(id);
+    setError(null);
     try {
       await apiFetch(`/api/admin/checkins/${encodeURIComponent(id)}/approve`, { method: 'PATCH' });
-    } catch {
-      // Offline demo fallback updates local state
-    } finally {
       setCheckins((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
       );
       setSelectedCheckin(null);
+    } catch (err) {
+      if (isFallbackMode) {
+        setCheckins((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
+        );
+        setSelectedCheckin(null);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to approve check-in');
+      }
+    } finally {
       setActingId(null);
     }
-  }, []);
+  }, [isFallbackMode]);
 
   const handleReject = useCallback(async (id: string) => {
     setActingId(id);
+    setError(null);
     try {
       await apiFetch(`/api/admin/checkins/${encodeURIComponent(id)}/reject`, { method: 'PATCH' });
-    } catch {
-      // Offline demo fallback updates local state
-    } finally {
       setCheckins((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
       );
       setSelectedCheckin(null);
+    } catch (err) {
+      if (isFallbackMode) {
+        setCheckins((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
+        );
+        setSelectedCheckin(null);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to reject check-in');
+      }
+    } finally {
       setActingId(null);
     }
-  }, []);
+  }, [isFallbackMode]);
 
   const pendingCheckins = checkins.filter((c) => c.status === 'pending');
   const completedCheckins = checkins.filter((c) => c.status !== 'pending');

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 import { TABLE_STATUS_STYLES, STATUS_LABEL_KEY } from './GenerateQR-constants';
@@ -27,13 +27,27 @@ export function QrCard({
 	const { t } = useTranslation();
 	const statusLabel = t(statusKey ?? 'qrCodes.status.available');
 	const [resolvedSrc, setResolvedSrc] = useState<string | null>(qrPngUrl);
+	const retriedRef = useRef(false);
+	const objectUrlRef = useRef<string | null>(null);
 
 	useEffect(() => {
+		retriedRef.current = false;
+		if (objectUrlRef.current) {
+			URL.revokeObjectURL(objectUrlRef.current);
+			objectUrlRef.current = null;
+		}
 		setResolvedSrc(qrPngUrl);
+		return () => {
+			if (objectUrlRef.current) {
+				URL.revokeObjectURL(objectUrlRef.current);
+				objectUrlRef.current = null;
+			}
+		};
 	}, [qrPngUrl]);
 
 	const handleImgError = async () => {
-		if (qrPngUrl) {
+		if (qrPngUrl && !retriedRef.current) {
+			retriedRef.current = true;
 			try {
 				const res = await fetch(qrPngUrl, {
 					credentials: 'include',
@@ -41,7 +55,12 @@ export function QrCard({
 				});
 				if (res?.ok && typeof res.blob === 'function') {
 					const blob = await res.blob();
-					setResolvedSrc(URL.createObjectURL(blob));
+					if (objectUrlRef.current) {
+						URL.revokeObjectURL(objectUrlRef.current);
+					}
+					const objUrl = URL.createObjectURL(blob);
+					objectUrlRef.current = objUrl;
+					setResolvedSrc(objUrl);
 					return;
 				}
 			} catch {

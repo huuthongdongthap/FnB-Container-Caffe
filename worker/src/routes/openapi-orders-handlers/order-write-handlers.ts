@@ -55,20 +55,41 @@ export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
   });
   const customerId = ownership.customerId;
 
-  await db.prepare(
-    `INSERT INTO orders (id, order_number, table_id, location_id, customer_id, customer_name, customer_phone, customer_email, customer_loyalty_tier, customer_loyalty_points_earned, customer_locale, items, subtotal, discount_amount, tax_amount, total_amount, status, payment_status, notes, source, channel, happy_hour_applied, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    id, orderNumber, body.tableId || null, body.locationId, customerId,
-    body.customer?.name || null, body.customer?.phone || null, body.customer?.email || null,
-    body.customer?.loyaltyTier || null, body.customer?.loyaltyPointsEarned || 0,
-    body.customer?.locale || 'vi',
-    snapshot.itemsJson,
-    snapshot.subtotal, snapshot.discount, snapshot.service_fee, snapshot.total,
-    'pending', 'unpaid', body.notes || null, body.source || 'pos', body.channel || 'dine_in',
-    snapshot.items.some(i => i.price !== undefined && i.price < i.unitPriceCents) ? 1 : 0,
-    now, now
-  ).run();
+  try {
+    await db.prepare(
+      `INSERT INTO orders (id, order_number, table_id, location_id, customer_id, customer_name, customer_phone, customer_email, customer_loyalty_tier, customer_loyalty_points_earned, customer_locale, items, subtotal, discount_amount, tax_amount, total_amount, status, payment_status, notes, source, channel, happy_hour_applied, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, orderNumber, body.tableId || null, body.locationId, customerId,
+      body.customer?.name || null, body.customer?.phone || null, body.customer?.email || null,
+      body.customer?.loyaltyTier || null, body.customer?.loyaltyPointsEarned || 0,
+      body.customer?.locale || 'vi',
+      snapshot.itemsJson,
+      snapshot.subtotal, snapshot.discount, snapshot.service_fee, snapshot.total,
+      'pending', 'unpaid', body.notes || null, body.source || 'pos', body.channel || 'dine_in',
+      snapshot.items.some(i => i.price !== undefined && i.price < i.unitPriceCents) ? 1 : 0,
+      now, now
+    ).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO orders (id, customer_id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id,
+      customerId,
+      body.customer?.name || null,
+      body.customer?.phone || null,
+      body.tableId || null,
+      snapshot.itemsJson,
+      snapshot.total,
+      'pending',
+      body.paymentMethod || 'cash',
+      body.channel || 'dine_in',
+      body.notes || null,
+      now,
+      now
+    ).run();
+  }
 
   for (const item of snapshot.items) {
     try {
@@ -95,10 +116,21 @@ export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
     });
   }
 
-  await db.prepare(
-    `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_create', 'order', id, JSON.stringify(body), now).run();
+  const actorId = user?.id || 'system';
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, actorId, 'order_create', 'order', id, JSON.stringify(body), now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(actorId, actorId, 'order_create', 'order', id, JSON.stringify(body), now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
 
   const created = await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
@@ -129,6 +161,8 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
+  const canonicalUpdates: string[] = [];
+  const canonicalParams: (string | number | null)[] = [];
 
   if (body.status !== undefined) {
     if (existing.status !== body.status) {
@@ -143,14 +177,31 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
 
     updates.push('status = ?');
     params.push(body.status);
+    canonicalUpdates.push('status = ?');
+    canonicalParams.push(body.status);
     if (body.status === 'served') { updates.push('served_at = ?'); params.push(now); }
     else if (body.status === 'completed') { updates.push('completed_at = ?'); params.push(now); }
     else if (body.status === 'cancelled') { updates.push('cancelled_at = ?'); params.push(now); }
   }
-  if (body.notes !== undefined) { updates.push('notes = ?'); params.push(body.notes); }
+  if (body.notes !== undefined) {
+    updates.push('notes = ?');
+    params.push(body.notes);
+    canonicalUpdates.push('notes = ?');
+    canonicalParams.push(body.notes);
+  }
   if (body.customer !== undefined) {
-    if (body.customer.name !== undefined) { updates.push('customer_name = ?'); params.push(body.customer.name); }
-    if (body.customer.phone !== undefined) { updates.push('customer_phone = ?'); params.push(body.customer.phone); }
+    if (body.customer.name !== undefined) {
+      updates.push('customer_name = ?');
+      params.push(body.customer.name);
+      canonicalUpdates.push('customer_name = ?');
+      canonicalParams.push(body.customer.name);
+    }
+    if (body.customer.phone !== undefined) {
+      updates.push('customer_phone = ?');
+      params.push(body.customer.phone);
+      canonicalUpdates.push('customer_phone = ?');
+      canonicalParams.push(body.customer.phone);
+    }
     if (body.customer.email !== undefined) { updates.push('customer_email = ?'); params.push(body.customer.email); }
   }
 
@@ -158,8 +209,18 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
   params.push(now);
   params.push(id);
 
+  canonicalUpdates.push('updated_at = ?');
+  canonicalParams.push(now);
+  canonicalParams.push(id);
+
   if (updates.length > 1) {
-    await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    try {
+      await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+    } catch {
+      if (canonicalUpdates.length > 1) {
+        await db.prepare(`UPDATE orders SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+      }
+    }
     if (c.env?.AUTH_KV) {
       let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
       try {
@@ -172,10 +233,21 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  await db.prepare(
-    `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_update', 'order', id, JSON.stringify(body), now).run();
+  const actorId = user?.id || 'system';
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(actorId, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run().catch(() => {});
+    } catch {
+      // Ignore audit log error
+    }
+  }
 
   const updated = await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name

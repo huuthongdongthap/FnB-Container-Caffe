@@ -29,6 +29,7 @@ export interface KdsTransitionDb {
 export interface KdsTransitionOptions {
   kv?: { put(key: string, val: string, opts?: { expirationTtl?: number }): Promise<void> } | null;
   waitUntil?: (promise: Promise<unknown>) => void;
+  env?: Record<string, unknown>;
 }
 
 /**
@@ -112,6 +113,42 @@ export async function executeKdsStatusTransition(
       options.waitUntil(putPromise);
     } else {
       await putPromise.catch(() => {});
+    }
+  }
+
+  if (options?.env) {
+    const sideEffects = (async () => {
+      try {
+        const broadcaster = options.env?.ORDER_BROADCASTER as {
+          idFromName?: (name: string) => unknown;
+          get?: (id: unknown) => { fetch: (req: Request) => Promise<unknown> };
+        } | undefined;
+        if (broadcaster?.idFromName && broadcaster?.get) {
+          const doId = broadcaster.idFromName('global');
+          const stub = broadcaster.get(doId);
+          await stub.fetch(
+            new Request('https://do/broadcast', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'order_status_updated',
+                order_id: orderId,
+                status: targetStatus,
+                previous_status: order.status,
+                updated_at: now,
+              }),
+            })
+          );
+        }
+      } catch {
+        // Non-blocking broadcaster notification
+      }
+    })();
+
+    if (options.waitUntil) {
+      options.waitUntil(sideEffects);
+    } else {
+      await sideEffects;
     }
   }
 

@@ -115,17 +115,34 @@ export async function getCustomer360(
           created_at: string | null;
         }>(),
     )
+    .catch(() =>
+      db
+        .prepare(
+          `SELECT COALESCE(total, total_amount, 0) AS total, items, payment_method, created_at
+           FROM orders
+           WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?)
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(customerId, orderLimit)
+        .all<{
+          total: number | null;
+          items: string | null;
+          channel?: string | null;
+          payment_method: string | null;
+          created_at: string | null;
+        }>(),
+    )
     .catch((err) => {
       log.error('360_orders_failed', { customerId, error: String(err) });
       return { results: [] as Array<Record<string, unknown>> };
     });
 
   const orderRows = (orders?.results ?? []).map((r) => ({
-    total: (r.total as number) ?? 0,
-    items: r.items ?? undefined,
-    channel: r.channel as string | undefined,
-    payment_method: r.payment_method as string | undefined,
-    created_at: r.created_at as string | undefined,
+    total: Number((r as Record<string, unknown>).total ?? (r as Record<string, unknown>).total_amount ?? 0),
+    items: (r.items as string | null) ?? undefined,
+    channel: (r.channel as string | undefined) ?? undefined,
+    payment_method: (r.payment_method as string | undefined) ?? undefined,
+    created_at: (r.created_at as string | undefined) ?? undefined,
   }));
 
   const preferences = extractPreferences(orderRows);

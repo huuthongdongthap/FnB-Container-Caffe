@@ -8,7 +8,10 @@ export async function verifySignature(data: Record<string, unknown>, receivedSig
     'raw', encoder.encode(checksumKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
 
-  const sortedData = Object.keys(data).sort().map((k) => `${k}=${data[k]}`).join('&');
+  const sortedData = Object.keys(data).sort().map((k) => {
+    const val = data[k] === null || data[k] === undefined ? '' : data[k];
+    return `${k}=${val}`;
+  }).join('&');
   const computed = await crypto.subtle.sign('HMAC', key, encoder.encode(sortedData));
   const computedHex = Array.from(new Uint8Array(computed)).map((b) => b.toString(16).padStart(2, '0')).join('');
 

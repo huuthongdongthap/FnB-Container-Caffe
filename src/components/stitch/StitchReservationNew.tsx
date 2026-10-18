@@ -32,7 +32,8 @@ export function StitchReservationNew({
   zones = defaultZones,
   onBack,
   onClose,
-}: Readonly<StitchReservationNewProps>) {
+  onConfirmReservation,
+}: Readonly<StitchReservationNewProps & { onConfirmReservation?: () => void }>) {
   const { t } = useTranslation();
   const [selectedParty, setSelectedParty] = useState<number | string>(1);
   const [selectedDate, setSelectedDate] = useState(14);
@@ -44,6 +45,7 @@ export function StitchReservationNew({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    onConfirmReservation?.();
   };
 
   return (

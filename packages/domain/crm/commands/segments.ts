@@ -14,7 +14,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { KVNamespace } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
-import { computeFrequencyBand, DEFAULT_BAND_POLICY, type BandPolicy } from './frequency-band';
+import { computeFrequencyBand, resolveBandPolicy, DEFAULT_BAND_POLICY, type BandPolicy } from './frequency-band';
 
 const log = createLogger({ route: 'crm.segments' });
 
@@ -217,7 +217,7 @@ export async function buildSegment(
     };
   }
 
-  const policy = DEFAULT_BAND_POLICY;
+  const policy = await resolveBandPolicy(kv);
   const all = await scanCustomers(db);
   const matched: SegmentRow[] = [];
 
@@ -226,11 +226,14 @@ export async function buildSegment(
     const daysSinceLast = row.last_order_at
       ? (now.getTime() - new Date(row.last_order_at).getTime()) / MS_PER_DAY
       : Infinity;
+    const daysSinceFirst = row.first_order_at
+      ? (now.getTime() - new Date(row.first_order_at).getTime()) / MS_PER_DAY
+      : daysSinceLast;
 
     let inSegment = false;
     switch (key) {
       case 'new_first_week':
-        inSegment = daysSinceLast <= 7;
+        inSegment = daysSinceFirst <= 7;
         break;
       case 'regular':
         inSegment = band === 'regular' || band === 'resurrected';

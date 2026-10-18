@@ -58,6 +58,11 @@ export async function lookupProfile(
   const orderLimit = opts.orderLimit ?? 5;
 
   try {
+    const rawPhone = String(phone ?? '').trim();
+    const digits = rawPhone.replace(/\D/g, '');
+    const normalized =
+      digits.startsWith('84') && digits.length >= 11 ? '0' + digits.slice(2) : (digits || rawPhone);
+
     let identity: { customer_id: string; value?: string } | null = null;
     try {
       identity = await db
@@ -69,14 +74,29 @@ export async function lookupProfile(
         .bind(phone)
         .first<{ customer_id: string; value?: string }>();
     } catch {
-      identity = await db
-        .prepare(
-          `SELECT customer_id, value FROM customer_identities
-           WHERE type = 'phone' AND value = ?1
-           ORDER BY created_at DESC LIMIT 1`,
-        )
-        .bind(phone)
-        .first<{ customer_id: string; value?: string }>();
+      try {
+        identity = await db
+          .prepare(
+            `SELECT customer_id, value FROM customer_identities
+             WHERE type = 'phone' AND value = ?1
+             ORDER BY created_at DESC LIMIT 1`,
+          )
+          .bind(phone)
+          .first<{ customer_id: string; value?: string }>();
+      } catch {
+        identity = null;
+      }
+    }
+
+    if (!identity?.customer_id) {
+      try {
+        identity = await db
+          .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
+          .bind(normalized, rawPhone)
+          .first<{ customer_id: string; value?: string }>();
+      } catch {
+        identity = null;
+      }
     }
 
     if (!identity?.customer_id) {
