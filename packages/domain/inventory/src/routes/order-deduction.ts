@@ -80,13 +80,22 @@ export async function deductInventoryForOrder(
 
   for (const item of orderItems) {
     try {
-      let invItem = await env.AURA_DB.prepare(
-        `SELECT id, sku, name, current_stock, unit FROM inventory_items
-         WHERE active = 1 AND (sku = ? OR LOWER(name) LIKE ?)
-         LIMIT 1`
-      )
-        .bind(String(item.product_id), `%${(item.name || '').toLowerCase()}%`)
-        .first<{ id: string; sku: string; name: string; current_stock: number; unit: string }>();
+      const cleanName = (item.name || '').trim().toLowerCase();
+      let invItem = cleanName
+        ? await env.AURA_DB.prepare(
+            `SELECT id, sku, name, current_stock, unit FROM inventory_items
+             WHERE active = 1 AND (sku = ? OR LOWER(name) LIKE ?)
+             LIMIT 1`
+          )
+            .bind(String(item.product_id), `%${cleanName}%`)
+            .first<{ id: string; sku: string; name: string; current_stock: number; unit: string }>()
+        : await env.AURA_DB.prepare(
+            `SELECT id, sku, name, current_stock, unit FROM inventory_items
+             WHERE active = 1 AND sku = ?
+             LIMIT 1`
+          )
+            .bind(String(item.product_id))
+            .first<{ id: string; sku: string; name: string; current_stock: number; unit: string }>();
 
       if (!invItem) continue;
 

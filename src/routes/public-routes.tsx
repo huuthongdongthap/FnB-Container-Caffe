@@ -89,6 +89,7 @@ export const publicRoutes = [
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
   <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
   <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
+  <Route key="/:locale/pricing" path="/:locale/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/saas" element={<ProtectedRoute />}>
     <Route path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />
     <Route path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />

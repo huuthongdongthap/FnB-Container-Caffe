@@ -53,7 +53,19 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
      VALUES (?, 'referral_cashback', ?, ?, ?, ?)`
   ).bind(referrer.id, REFERRER_CASHBACK_VND, orderId, JSON.stringify({ referral_id: pending.id, referred_customer_id: customerId, order_amount: orderAmount }), now));
 
-  await db.batch(batch);
+  try {
+    await db.batch(batch);
+  } catch {
+    const fallbackBatch: ReturnType<typeof db.prepare>[] = [
+      db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id),
+      db.prepare(
+        `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
+         VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`
+      ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, now),
+      db.prepare('UPDATE referrals SET status = \'completed\' WHERE id = ?').bind(pending.id)
+    ];
+    await db.batch(fallbackBatch);
+  }
 
   return { success: true, referrer_id: referrer.id, cashback_awarded_vnd: REFERRER_CASHBACK_VND, new_balance: newBalance };
 }

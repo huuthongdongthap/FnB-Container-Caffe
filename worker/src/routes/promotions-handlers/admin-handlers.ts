@@ -7,9 +7,16 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/promotions — list all promotions
   router.get('/', async (c) => {
     const db = c.env.AURA_DB;
-    const { results } = await db.prepare(
-      'SELECT * FROM promotions ORDER BY created_at DESC'
-    ).all();
+    let results: unknown[] = [];
+    try {
+      const res = await db.prepare(
+        'SELECT * FROM promotions ORDER BY created_at DESC'
+      ).all();
+      results = res.results || [];
+    } catch {
+      const res = await db.prepare('SELECT * FROM promotions').all().catch(() => ({ results: [] }));
+      results = res.results || [];
+    }
     return c.json({ success: true, data: results, promotions: results });
   });
 
@@ -43,19 +50,34 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
     }
 
-    await db.prepare(
-      `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active)
-       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
-    ).bind(
-      code,
-      body.percent,
-      body.max_discount ?? 0,
-      body.min_order ?? 0,
-      body.usage_limit ?? 0,
-      body.starts_at ?? null,
-      body.expires_at ?? null,
-      body.is_active ?? 1
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
+      ).bind(
+        code,
+        body.percent,
+        body.max_discount ?? 0,
+        body.min_order ?? 0,
+        body.usage_limit ?? 0,
+        body.starts_at ?? null,
+        body.expires_at ?? null,
+        body.is_active ?? 1
+      ).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+      ).bind(
+        code,
+        body.percent,
+        body.max_discount ?? 0,
+        body.min_order ?? 0,
+        body.usage_limit ?? 0,
+        body.expires_at ?? null,
+        body.is_active ?? 1
+      ).run();
+    }
 
     const created = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
     return c.json({ success: true, data: created }, 201);
@@ -76,26 +98,47 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Phần trăm giảm phải từ 1-100' }, 400);
     }
 
-    await db.prepare(
-      `UPDATE promotions SET
-        percent = COALESCE(?, percent),
-        max_discount = COALESCE(?, max_discount),
-        min_order = COALESCE(?, min_order),
-        usage_limit = COALESCE(?, usage_limit),
-        starts_at = COALESCE(?, starts_at),
-        expires_at = COALESCE(?, expires_at),
-        is_active = COALESCE(?, is_active)
-       WHERE code = ?`
-    ).bind(
-      body.percent ?? null,
-      body.max_discount ?? null,
-      body.min_order ?? null,
-      body.usage_limit ?? null,
-      body.starts_at ?? null,
-      body.expires_at ?? null,
-      body.is_active ?? null,
-      code
-    ).run();
+    try {
+      await db.prepare(
+        `UPDATE promotions SET
+          percent = COALESCE(?, percent),
+          max_discount = COALESCE(?, max_discount),
+          min_order = COALESCE(?, min_order),
+          usage_limit = COALESCE(?, usage_limit),
+          starts_at = COALESCE(?, starts_at),
+          expires_at = COALESCE(?, expires_at),
+          is_active = COALESCE(?, is_active)
+         WHERE code = ?`
+      ).bind(
+        body.percent ?? null,
+        body.max_discount ?? null,
+        body.min_order ?? null,
+        body.usage_limit ?? null,
+        body.starts_at ?? null,
+        body.expires_at ?? null,
+        body.is_active ?? null,
+        code
+      ).run();
+    } catch {
+      await db.prepare(
+        `UPDATE promotions SET
+          percent = COALESCE(?, percent),
+          max_discount = COALESCE(?, max_discount),
+          min_order = COALESCE(?, min_order),
+          usage_limit = COALESCE(?, usage_limit),
+          expires_at = COALESCE(?, expires_at),
+          is_active = COALESCE(?, is_active)
+         WHERE code = ?`
+      ).bind(
+        body.percent ?? null,
+        body.max_discount ?? null,
+        body.min_order ?? null,
+        body.usage_limit ?? null,
+        body.expires_at ?? null,
+        body.is_active ?? null,
+        code
+      ).run();
+    }
 
     const updated = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
     return c.json({ success: true, data: updated });

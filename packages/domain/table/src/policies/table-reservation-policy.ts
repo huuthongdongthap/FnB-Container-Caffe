@@ -93,9 +93,15 @@ export async function updateReservationStatus(
   ).bind(targetStatus, notes || null, now, reservationId).run();
 
   if (targetStatus === 'cancelled') {
-    await db.prepare(
-      "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved'"
-    ).bind(now, rsv.table_id).run();
+    try {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved'"
+      ).bind(now, rsv.table_id).run();
+    } catch {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'"
+      ).bind(rsv.table_id).run();
+    }
   }
 
   return { ok: true, reservation: { ...rsv, status: targetStatus, updated_at: now } };
@@ -130,9 +136,15 @@ export async function seatTable(
     ).bind(now, input.reservationId).run();
   }
 
-  await db.prepare(
-    "UPDATE cafe_tables SET status = 'Occupied', updated_at = ? WHERE id = ?"
-  ).bind(now, table.id).run();
+  try {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Occupied', updated_at = ? WHERE id = ?"
+    ).bind(now, table.id).run();
+  } catch {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?"
+    ).bind(table.id).run();
+  }
 
   return {
     ok: true,
@@ -156,13 +168,19 @@ export async function releaseTable(
     return { ok: true, table, alreadyReleased: true };
   }
 
-  await db.prepare(
-    "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ?"
-  ).bind(now, table.id).run();
+  try {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ?"
+    ).bind(now, table.id).run();
+  } catch {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Available' WHERE id = ?"
+    ).bind(table.id).run();
+  }
 
   await db.prepare(
-    "UPDATE reservations SET status = 'completed', updated_at = ? WHERE table_id = ? AND status = 'seated'"
-  ).bind(now, table.id).run();
+    "UPDATE reservations SET status = 'completed', updated_at = ? WHERE (table_id = ? OR table_id = ?) AND status = 'seated'"
+  ).bind(now, table.id, String(table.table_number ?? table.id)).run();
 
   return { ok: true, table: { ...table, status: 'Available', updated_at: now } };
 }

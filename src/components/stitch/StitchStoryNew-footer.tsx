@@ -55,7 +55,7 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
         <button
          type="button"
           onClick={onCtaClick}
-          className="bg-[var(--aura-surface-dim)] hover:bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
+          className="bg-[var(--aura-chrome-bright)] hover:opacity-90 text-[var(--aura-noir-deep)] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
           style={{
             fontFamily: "var(--aura-font-body)",
             boxShadow: '0 10px 15px -3px color-mix(in srgb, var(--aura-surface-dim), transparent 90%), 0 4px 6px -4px color-mix(in srgb, var(--aura-surface-dim), transparent 90%)',
@@ -109,7 +109,7 @@ export function FooterSection() {
         {/* Brand column */}
         <div className="md:col-span-2">
           <div
-            className="text-[var(--aura-noir-void)] uppercase mb-6"
+            className="text-[var(--aura-chrome-bright)] uppercase mb-6"
             style={{ fontFamily: 'var(--aura-font-display)', fontSize: '24px' }}
           >
             AURA CAFE

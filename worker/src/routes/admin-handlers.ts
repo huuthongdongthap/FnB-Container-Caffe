@@ -103,12 +103,21 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
       .bind(id, email, name, phone, tier, 'admin', now, now)
       .run();
   } catch {
-    await db
-      .prepare(
-        'INSERT INTO customers (id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)'
-      )
-      .bind(id, name, phone, email, tier, now)
-      .run();
+    try {
+      await db
+        .prepare(
+          'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)'
+        )
+        .bind(id, email, name, phone, tier, now, now)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          'INSERT INTO customers (id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)'
+        )
+        .bind(id, name, phone, email, tier, now)
+        .run();
+    }
   }
 
   return Response.json(

@@ -37,7 +37,12 @@ export default function OrderQueueIndicator() {
       setLocalError(null);
       try {
         await flushQueuedOrders();
+        const { error: postSyncError, queuedOffline: stillQueued } = useOrderStore.getState();
         setSyncing(false);
+        if (postSyncError || stillQueued) {
+          setLocalError(postSyncError || 'Lỗi đồng bộ');
+          return;
+        }
         setShowSuccess(true);
         // Auto-dismiss after success
         const hideTimer = setTimeout(() => {
@@ -58,7 +63,12 @@ export default function OrderQueueIndicator() {
     setLocalError(null);
     try {
       await flushQueuedOrders();
+      const { error: postSyncError, queuedOffline: stillQueued } = useOrderStore.getState();
       setSyncing(false);
+      if (postSyncError || stillQueued) {
+        setLocalError(postSyncError || 'Lỗi đồng bộ');
+        return;
+      }
       setShowSuccess(true);
       setTimeout(() => {
         setDismissed(true);

@@ -172,3 +172,52 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
   }
   return { count: products.length };
 }
+
+export interface ModifierChoiceProjection {
+  id: string;
+  group_id: string;
+  option_name: string;
+  price_delta: number;
+  available: number;
+}
+
+/**
+ * Pure projection mapping from canonical ModifierChoice to customer-safe projection row.
+ * Uses option_name, price_delta, and available to match menu_modifiers projection contract.
+ */
+export function mapModifierChoiceToProjection(
+  choice: { id: string; group_id: string; name: string; price_delta: number; is_available?: number | boolean }
+): ModifierChoiceProjection {
+  const isAvailable = choice.is_available === undefined || choice.is_available === true || choice.is_available === 1;
+  return {
+    id: choice.id,
+    group_id: choice.group_id,
+    option_name: choice.name,
+    price_delta: Math.round(Number(choice.price_delta) || 0),
+    available: isAvailable ? 1 : 0,
+  };
+}
+
+/**
+ * Synchronize modifier choice to menu_modifiers projection if table exists.
+ */
+export async function syncModifierChoiceToMenuProjection(
+  db: D1Database,
+  choice: { id: string; group_id: string; name: string; price_delta: number; is_available?: number | boolean }
+): Promise<void> {
+  const proj = mapModifierChoiceToProjection(choice);
+  try {
+    await db.prepare(`
+      INSERT INTO menu_modifiers (id, group_id, option_name, price_delta, available, updated_at)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        group_id = excluded.group_id,
+        option_name = excluded.option_name,
+        price_delta = excluded.price_delta,
+        available = excluded.available,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(proj.id, proj.group_id, proj.option_name, proj.price_delta, proj.available).run();
+  } catch {
+    // Graceful fallback if menu_modifiers table does not exist
+  }
+}

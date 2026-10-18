@@ -29,9 +29,22 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
   const nextTier = await db.prepare('SELECT tier_name, min_points FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1')
     .bind(cust.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
 
-  const { results: activeRewards } = await db.prepare(
-    'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
-  ).bind(cust.id).all<{ cnt: number }>();
+  let activeRewards: { cnt: number }[] = [];
+  try {
+    const res = await db.prepare(
+      'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
+    ).bind(cust.id).all<{ cnt: number }>();
+    activeRewards = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(
+        'SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status = \'pending\''
+      ).bind(cust.id).all<{ cnt: number }>();
+      activeRewards = res.results || [];
+    } catch {
+      activeRewards = [];
+    }
+  }
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
   const expiring = await db.prepare(

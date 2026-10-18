@@ -2,10 +2,26 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
 import type { InvoiceRecord } from './invoice-history-types';
 import { getStatusLabel, formatCurrency, formatDate } from './invoice-history-types';
-import { API_BASE } from '@/lib/api-client';
+import { API_BASE, apiFetch } from '@/lib/api-client';
 
 function getInvoicePdfUrl(erpnextId: string): string {
   return `${API_BASE}/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`;
+}
+
+async function handleInvoicePdfDownload(
+  e: React.MouseEvent<HTMLAnchorElement>,
+  erpnextId: string,
+): Promise<void> {
+  e.preventDefault();
+  try {
+    const res = await apiFetch<{ success?: boolean; data?: { pdf_url?: string } }>(
+      `/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`,
+    );
+    const pdfUrl = res?.data?.pdf_url || getInvoicePdfUrl(erpnextId);
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+  } catch {
+    window.open(getInvoicePdfUrl(erpnextId), '_blank', 'noopener,noreferrer');
+  }
 }
 
 function truncateId(id: string): string {
@@ -69,14 +85,19 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                 {formatDate(inv.created_at)}
               </td>
               <td className="py-3 px-2 text-center">
-                <a
-                  href={getInvoicePdfUrl(inv.erpnext_id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
-                >
-                  PDF
-                </a>
+                {inv.erpnext_id ? (
+                  <a
+                    href={getInvoicePdfUrl(inv.erpnext_id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => void handleInvoicePdfDownload(e, inv.erpnext_id)}
+                    className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
+                  >
+                    PDF
+                  </a>
+                ) : (
+                  <span className="text-xs text-muted">---</span>
+                )}
               </td>
             </tr>
           ))}

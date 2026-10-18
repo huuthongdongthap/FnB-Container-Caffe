@@ -34,6 +34,7 @@ export function useOfflineSync() {
 
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  const syncingRef = useRef(false);
 
   /* ── Count pending ──────────────────────────────────────────── */
   const refreshPendingCount = useCallback(async () => {
@@ -74,27 +75,33 @@ export function useOfflineSync() {
 
   /* ── Flush entire queue ─────────────────────────────────────── */
   const syncAll = useCallback(async () => {
-    if (state.syncing || !state.isOnline) return;
+    const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : state.isOnline;
+    if (syncingRef.current || state.syncing || (!currentlyOnline && !state.isOnline)) return;
+    syncingRef.current = true;
     setState(s => ({ ...s, syncing: true, error: null }));
 
-    const pending = await offlineDb.getPendingOrders();
-    let synced = 0;
-    let failed = 0;
+    try {
+      const pending = await offlineDb.getPendingOrders();
+      let synced = 0;
+      let failed = 0;
 
-    for (const item of pending) {
-      const ok = await syncItem(item as QueuedItem);
-      if (ok) synced++;
-      else failed++;
-    }
+      for (const item of pending) {
+        const ok = await syncItem(item as QueuedItem);
+        if (ok) synced++;
+        else failed++;
+      }
 
-    if (mountedRef.current) {
-      setState(s => ({
-        ...s,
-        syncing: false,
-        pendingCount: failed,
-        lastSyncAt: Date.now(),
-        error: failed > 0 ? `${failed} orders chưa đồng bộ (có thể do offline)` : null,
-      }));
+      if (mountedRef.current) {
+        setState(s => ({
+          ...s,
+          syncing: false,
+          pendingCount: failed,
+          lastSyncAt: Date.now(),
+          error: failed > 0 ? `${failed} orders chưa đồng bộ (có thể do offline)` : null,
+        }));
+      }
+    } finally {
+      syncingRef.current = false;
     }
   }, [state.syncing, state.isOnline, syncItem]);
 

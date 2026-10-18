@@ -74,7 +74,12 @@ export function validatePayOSAccess(
   customerId: string | null,
   role?: string
 ): { allowed: boolean; reason?: 'forbidden' | 'already_paid' | 'invalid_total' } {
-  const isStaffOrOwner = role === 'owner' || role === 'manager' || role === 'staff';
+  const isStaffOrOwner =
+    role === 'owner' ||
+    role === 'manager' ||
+    role === 'staff' ||
+    role === 'admin' ||
+    role === 'cashier';
   if (orderRow.customer_id && customerId && orderRow.customer_id !== customerId && !isStaffOrOwner) {
     return { allowed: false, reason: 'forbidden' };
   }
@@ -123,10 +128,11 @@ export async function persistPaymentWithRetries(
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const attemptCode = attempt === 0 ? orderCode : generateOrderCode();
+      const attemptPaymentId = attempt === 0 ? paymentId : `${paymentId}_${attempt}`;
       await db.prepare(`
         INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
         VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
-      `).bind(paymentId, orderId, amount, String(attemptCode), activeCheckoutUrl, now).run();
+      `).bind(attemptPaymentId, orderId, amount, String(attemptCode), activeCheckoutUrl, now).run();
 
       return { ok: true, finalOrderCode: attemptCode, checkoutUrl: activeCheckoutUrl };
     } catch (insertErr) {

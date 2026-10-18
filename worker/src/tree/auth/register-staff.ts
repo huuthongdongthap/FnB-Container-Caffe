@@ -26,10 +26,19 @@ export async function registerStaff(request: Request, env: Record<string, unknow
 
     const hashedPassword = await hashPassword(password);
     const normalizedRoleInput = (role || '').trim().toLowerCase();
-    const assignedRole =
-      normalizedRoleInput === 'manager' || normalizedRoleInput === 'waiter' || normalizedRoleInput === 'staff'
-        ? normalizedRoleInput
-        : 'staff';
+    const allowedStaffRoles = new Set([
+      'manager',
+      'waiter',
+      'staff',
+      'kitchen',
+      'barista',
+      'chef',
+      'cashier',
+      'admin',
+    ]);
+    const assignedRole = allowedStaffRoles.has(normalizedRoleInput)
+      ? normalizedRoleInput
+      : 'staff';
     const effectiveTenantId = tenant_id || 'default';
     const now = new Date().toISOString();
 

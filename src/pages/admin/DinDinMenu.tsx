@@ -16,7 +16,7 @@ export default function DinDinMenu() {
     editingSection, editingItem, newItem, sectionName, d08Warning,
     setSectionName, setNewItem, setEditingSection, setEditingItem,
     loadConfig, addSection, startEditItem, saveItem,
-    removeItem, persistConfig,
+    removeItem, toggleAvailable, persistConfig,
   } = useDinDinMenu();
 
   useEffect(() => { void loadConfig(); }, [loadConfig]);
@@ -56,6 +56,7 @@ export default function DinDinMenu() {
           config={config}
           onStartEdit={startEditItem}
           onRemove={removeItem}
+          onToggleAvailable={toggleAvailable}
           onAddItem={(secIdx) => {
             setEditingSection(secIdx);
             setEditingItem(null);

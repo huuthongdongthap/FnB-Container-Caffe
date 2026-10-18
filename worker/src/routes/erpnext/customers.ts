@@ -32,16 +32,35 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
       const limit = parseInt(c.req.query('limit') || '50', 10);
       const offset = (page - 1) * limit;
 
-      const { results } = await db
-        .prepare(
-          'SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
-        )
-        .bind(limit, offset)
-        .all<{ id: string; name: string; phone: string | null; email: string | null; tax_id: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
+      let results: any[] = [];
+      let total = 0;
+      try {
+        const res = await db
+          .prepare(
+            'SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
+          )
+          .bind(limit, offset)
+          .all<{ id: string; name: string; phone: string | null; email: string | null; tax_id: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
+        results = res.results || [];
+        const countRes = await db.prepare('SELECT COUNT(*) as total FROM customers').first<{ total: number }>();
+        total = Number(countRes?.total ?? 0);
+      } catch {
+        try {
+          const res = await db
+            .prepare(
+              'SELECT id, name, phone, email, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
+            )
+            .bind(limit, offset)
+            .all();
+          results = res.results || [];
+          total = results.length;
+        } catch {
+          results = [];
+          total = 0;
+        }
+      }
 
-      const { total } = (await db.prepare('SELECT COUNT(*) as total FROM customers').first<{ total: number }>()) || { total: 0 };
-
-      return c.json({ success: true, data: results, pagination: { page, limit, total: (total as number) ?? 0 } });
+      return c.json({ success: true, data: results, pagination: { page, limit, total } });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ success: false, error: msg }, 500);

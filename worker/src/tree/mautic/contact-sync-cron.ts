@@ -28,16 +28,37 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
   const lastSyncTs: string | null = kv ? await kv.get('mautic_last_sync_ts') : null;
   const since = lastSyncTs || new Date(Date.now() - 3600000).toISOString();
 
-  const { results } = await db.prepare(
-    `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday,
-      (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-      (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
-      c.updated_at
-     FROM customers c
-     WHERE c.updated_at > ?
-     ORDER BY c.updated_at ASC
-     LIMIT 500`
-  ).bind(since).all();
+  let results: Record<string, unknown>[] | undefined;
+  try {
+    const res = await db.prepare(
+      `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday,
+        (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
+        (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+        c.updated_at
+       FROM customers c
+       WHERE c.updated_at > ?
+       ORDER BY c.updated_at ASC
+       LIMIT 500`
+    ).bind(since).all();
+    results = (res.results || []) as Array<Record<string, unknown>>;
+  } catch (err) {
+    const msg = String((err as Error)?.message || '');
+    if (msg.includes('column')) {
+      const res = await db.prepare(
+        `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
+          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+          c.created_at as updated_at
+         FROM customers c
+         WHERE c.created_at > ?
+         ORDER BY c.created_at ASC
+         LIMIT 500`
+      ).bind(since).all();
+      results = (res.results || []) as Array<Record<string, unknown>>;
+    } else {
+      throw err;
+    }
+  }
 
   const customers = (results || []) as Array<Record<string, unknown>>;
   if (customers.length === 0) {

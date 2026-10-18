@@ -6,13 +6,13 @@ import type { MiddlewareHandler } from 'hono';
 const log = createLogger({ route: 'verified-email' });
 
 export const requireVerifiedEmail: MiddlewareHandler = async (c, next) => {
-  const user = c.get('user') as { email_verified?: number } | undefined;
+  const user = c.get('user') as { email_verified?: number | boolean } | undefined;
 
   if (!user) {
     return c.json({ error: 'Unauthorized', message: 'Vui lòng đăng nhập' }, 401);
   }
 
-  if (user.email_verified !== 1) {
+  if (user.email_verified !== 1 && user.email_verified !== true) {
     log.warn('Unverified user attempted protected action', { userId: (user as Record<string, unknown>).id });
     return c.json(
       {

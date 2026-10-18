@@ -96,11 +96,11 @@ export async function listApplications(c: Context<{ Bindings: Env }>) {
     let query = 'SELECT id, full_name as fullName, phone, birth_year as birthYear, position, shifts, experience, note, status, created_at as createdAt, updated_at as updatedAt FROM recruitment_applications WHERE 1=1';
     const params: (string | number)[] = [];
 
-    if (status) {
+    if (status && status !== 'all') {
       query += ' AND status = ?';
       params.push(status);
     }
-    if (position) {
+    if (position && position !== 'all') {
       query += ' AND position = ?';
       params.push(position);
     }

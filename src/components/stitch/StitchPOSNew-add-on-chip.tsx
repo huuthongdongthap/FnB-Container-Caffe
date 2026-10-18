@@ -2,10 +2,14 @@
 
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
-import type { POSNewAddOn } from './StitchPOSNew-types';
+import { formatPosPrice, type POSNewAddOn } from './StitchPOSNew-types';
 
 export function AddOnChip({ addon, onAdd }: { addon: POSNewAddOn; onAdd: () => void }) {
   const { t } = useTranslation();
+  const formattedAddonPrice =
+    addon.price >= 1000
+      ? `+${formatPosPrice(addon.price)}`
+      : `+$${addon.price.toFixed(2)}`;
   return (
     <button
      type="button"
@@ -17,7 +21,7 @@ export function AddOnChip({ addon, onAdd }: { addon: POSNewAddOn; onAdd: () => v
       <div className="text-left">
         <p className="text-[13px] text-[var(--aura-text-primary, #eae1db)] font-body">{addon.name}</p>
         <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
-          +${addon.price.toFixed(2)}
+          {formattedAddonPrice}
         </p>
       </div>
     </button>

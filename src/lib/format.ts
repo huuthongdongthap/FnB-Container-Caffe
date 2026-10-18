@@ -2,8 +2,11 @@ import i18n from './i18n';
 
 export function formatCurrency(amount: number): string {
   const locale = i18n.language?.startsWith('en') ? 'en-US' : 'vi-VN';
-  const currency = locale === 'vi-VN' ? 'VND' : 'USD';
-  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {

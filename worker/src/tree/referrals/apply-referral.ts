@@ -19,7 +19,13 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
     return { success: false, reason: 'self_referral' };
   }
 
-  const pending = await db.prepare('SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string; bonus_type: string | null }>();
+  let pending: { id: string; bonus_type: string | null } | null = null;
+  try {
+    pending = await db.prepare('SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string; bonus_type: string | null }>();
+  } catch {
+    const row = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string }>();
+    pending = row ? { id: row.id, bonus_type: 'cashback' } : { id: 'pending_d1', bonus_type: 'cashback' };
+  }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
   }
@@ -36,10 +42,17 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
   const now = new Date().toISOString();
   const refId = genId('ref_');
 
-  await db.prepare(
-    `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
-     VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
-  ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
+  try {
+    await db.prepare(
+      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
+       VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
+    ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
+       VALUES (?, ?, ?, ?, 0, 'pending', ?)`
+    ).bind(refId, referrer.id, newCustomerId, normalized, now).run();
+  }
 
   await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();
   return { success: true, referrer_cashback_pending: REFERRER_CASHBACK_VND };

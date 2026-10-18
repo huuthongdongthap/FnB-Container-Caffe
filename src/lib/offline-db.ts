@@ -162,7 +162,8 @@ export class OfflineDB {
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor) return;
-        if (!preservedKeys.has(cursor.primaryKey as string) && (cursor.value as OfflineOrderRecord).createdAt) {
+        const key = String(cursor.primaryKey ?? '');
+        if (!preservedKeys.has(key) && !key.startsWith('_') && (cursor.value as OfflineOrderRecord).createdAt) {
           store.delete(cursor.primaryKey);
         }
         cursor.continue();

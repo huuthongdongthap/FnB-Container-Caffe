@@ -34,7 +34,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
     >
       <div className="flex justify-between items-center px-[64px] py-2 max-w-[1280px] mx-auto h-20">
         <div
-          className="uppercase tracking-tighter text-[var(--aura-noir-void)]"
+          className="uppercase tracking-tighter text-[var(--aura-chrome-bright)]"
           style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}
         >
           AURA CAFE
@@ -63,7 +63,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
         <button
          type="button"
           onClick={() => onNavClick?.('order')}
-          className="bg-[var(--aura-surface-dim)] text-[var(--aura-noir-deep)] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:bg-[var(--aura-chrome-bright)] transition-all"
+          className="bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:opacity-90 transition-all"
           style={{ fontFamily: "var(--aura-font-body)" }}
         >
           {t('storyNew.orderNow', { defaultValue: 'Order Now' })}

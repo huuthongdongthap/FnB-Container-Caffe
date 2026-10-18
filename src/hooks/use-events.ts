@@ -24,7 +24,8 @@ interface PretixEvent {
 
 interface PretixEventsResponse {
   success: boolean;
-  data?: PretixEvent[];
+  data?: PretixEvent[] | { results?: PretixEvent[] };
+  results?: PretixEvent[];
 }
 
 /** Adapter: pretix event shape → EventItem (best-effort, missing fields → defaults). */
@@ -61,9 +62,16 @@ export function useEvents() {
     queryFn: async () => {
       try {
         const res = await apiFetch<PretixEventsResponse>('/api/pretix/events', { silent: true });
-        const items = Array.isArray(res?.data)
-          ? res.data.map((e, i) => toEventItem(e, i)).filter((it) => it.title)
-          : [];
+        const rawList = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray((res?.data as { results?: PretixEvent[] } | undefined)?.results)
+            ? (res?.data as { results: PretixEvent[] }).results
+            : Array.isArray(res?.results)
+              ? res.results
+              : [];
+        const items = rawList
+          .map((e, i) => toEventItem(e, i))
+          .filter((it) => it.title);
         return items;
       } catch {
         // Pretix not configured or unreachable → render defaultData demo in page
@@ -75,8 +83,8 @@ export function useEvents() {
 
 export function useUpcomingEvents() {
   const { data: events, ...rest } = useEvents();
-  const now = new Date().toISOString();
-  const upcoming = (events ?? []).filter((e) => e.date >= now);
-  const past = (events ?? []).filter((e) => e.date < now);
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (events ?? []).filter((e) => !e.date || e.date.slice(0, 10) >= today);
+  const past = (events ?? []).filter((e) => Boolean(e.date) && e.date.slice(0, 10) < today);
   return { upcoming, past, ...rest };
 }

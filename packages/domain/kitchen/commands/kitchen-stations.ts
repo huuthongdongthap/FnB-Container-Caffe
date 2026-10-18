@@ -58,7 +58,7 @@ kitchenStationsRouter.get('/', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-kitchenStationsRouter.post('/', async (c) => {
+kitchenStationsRouter.post('/', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const name = String(body.name || '').trim();
@@ -75,13 +75,19 @@ kitchenStationsRouter.post('/', async (c) => {
   return c.json({ success: true, data: st }, 201);
 });
 
-kitchenStationsRouter.patch('/:id', async (c) => {
+kitchenStationsRouter.patch('/:id', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<KitchenStation>();
   if (!existing) return c.json({ success: false, error: 'Station not found' }, 404);
   const body = await c.req.json() as Record<string, unknown>;
   const now = new Date().toISOString();
+  const activeVal =
+    body.active == null
+      ? null
+      : body.active === false || body.active === 0 || body.active === '0'
+        ? 0
+        : 1;
   await db.prepare(
     `UPDATE kitchen_stations
      SET name = COALESCE(?, name), slug = COALESCE(?, slug),
@@ -92,14 +98,14 @@ kitchenStationsRouter.patch('/:id', async (c) => {
     body.name ? String(body.name) : null,
     body.slug ? String(body.slug) : null,
     body.sort_order != null ? Number(body.sort_order) : null,
-    body.active != null ? Number(body.active) : null,
+    activeVal,
     now, id
   ).run();
   const st = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<KitchenStation>();
   return c.json({ success: true, data: st });
 });
 
-kitchenStationsRouter.delete('/:id', async (c) => {
+kitchenStationsRouter.delete('/:id', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
   const existing = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(c.req.param('id')).first<{ id: string }>();
   if (!existing) return c.json({ success: false, error: 'Station not found' }, 404);
@@ -120,7 +126,7 @@ kitchenStationsRouter.get('/categories', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-kitchenStationsRouter.post('/categories', async (c) => {
+kitchenStationsRouter.post('/categories', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const categoryId = String(body.category_id || '').trim();
@@ -136,7 +142,7 @@ kitchenStationsRouter.post('/categories', async (c) => {
   return c.json({ success: true });
 });
 
-kitchenStationsRouter.delete('/categories/:categoryId/:stationId', async (c) => {
+kitchenStationsRouter.delete('/categories/:categoryId/:stationId', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
   await db.prepare(
     'DELETE FROM category_stations WHERE category_id = ? AND station_id = ?'

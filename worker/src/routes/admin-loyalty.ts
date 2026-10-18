@@ -268,7 +268,23 @@ adminLoyaltyRouter.get('/export', async(c) => {
         ).all<CustomerExportRow>();
         results = res.results || [];
       } catch {
-        results = [];
+        try {
+          const canonicalRes = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email,
+                   '' AS birthday,
+                   c.loyalty_tier AS tier,
+                   COALESCE(cw.balance, 0) AS cashback_balance,
+                   COALESCE(cw.total_spent, 0) AS total_spent,
+                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
+                   c.created_at
+            FROM customers c
+            LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+            ORDER BY c.created_at DESC
+          `).all<CustomerExportRow>();
+          results = canonicalRes.results || [];
+        } catch {
+          results = [];
+        }
       }
     }
   }

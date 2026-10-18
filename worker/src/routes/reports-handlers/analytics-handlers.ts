@@ -24,18 +24,48 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     ).bind(from, to).all<{ date: string; count: number; revenue: number }>();
 
     // Cashback earned by day
-    const { results: cashbackEarned } = await db.prepare(
-      `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
-       FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
-       GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all<{ date: string; amount: number }>();
+    let cashbackEarned: { date: string; amount: number }[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
+         FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
+         GROUP BY DATE(created_at) ORDER BY date`
+      ).bind(from, to).all<{ date: string; amount: number }>();
+      cashbackEarned = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as amount
+           FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'earn'
+           GROUP BY DATE(created_at) ORDER BY date`
+        ).bind(from, to).all<{ date: string; amount: number }>();
+        cashbackEarned = res.results || [];
+      } catch {
+        cashbackEarned = [];
+      }
+    }
 
     // Cashback redeemed by day
-    const { results: cashbackRedeemed } = await db.prepare(
-      `SELECT DATE(created_at) as date, COALESCE(SUM(discount_amount), 0) as amount
-       FROM promotion_redemptions WHERE DATE(created_at) BETWEEN ? AND ?
-       GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all<{ date: string; amount: number }>();
+    let cashbackRedeemed: { date: string; amount: number }[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT DATE(created_at) as date, COALESCE(SUM(discount_amount), 0) as amount
+         FROM promotion_redemptions WHERE DATE(created_at) BETWEEN ? AND ?
+         GROUP BY DATE(created_at) ORDER BY date`
+      ).bind(from, to).all<{ date: string; amount: number }>();
+      cashbackRedeemed = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT DATE(created_at) as date, COALESCE(SUM(ABS(amount)), 0) as amount
+           FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'spend'
+           GROUP BY DATE(created_at) ORDER BY date`
+        ).bind(from, to).all<{ date: string; amount: number }>();
+        cashbackRedeemed = res.results || [];
+      } catch {
+        cashbackRedeemed = [];
+      }
+    }
 
     // Merge into daily reports
     const signupMap = new Map((signups || []).map(s => [s.date, s.count]));
@@ -87,7 +117,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       ).first<{ count: number }>(),
       db.prepare(
         'SELECT COALESCE(SUM(reward_amount), 0) as total FROM checkins WHERE status = \'approved\''
-      ).first<{ total: number }>(),
+      ).first<{ total: number }>().catch(() =>
+        db.prepare(
+          'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE type = \'earn\''
+        ).first<{ total: number }>().catch(() => ({ total: 0 }))
+      ),
       db.prepare(
         'SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?'
       ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>(),

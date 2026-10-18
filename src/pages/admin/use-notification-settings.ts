@@ -39,13 +39,17 @@ export function useNotificationSettings() {
     setSaving(true);
     setSaved(false);
     try {
-      await apiFetch('/api/admin/notification-settings', {
+      const res = await apiFetch<{ success?: boolean }>('/api/admin/notification-settings', {
         method: 'PATCH',
         body: JSON.stringify({ [key]: next[key] }),
       });
+      if (res && res.success === false) {
+        throw new Error('Failed to save notification settings');
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
+      setSaved(false);
       setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
     } finally {
       setSaving(false);

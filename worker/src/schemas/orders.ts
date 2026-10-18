@@ -24,16 +24,16 @@ import {
  * prices are never echoed back.
  */
 export const OrderItemSchema = z.object({
-  id: z.string().uuid().optional(),
-  menuItemId: z.string().uuid(),
+  id: z.string().min(1).optional(),
+  menuItemId: z.string().min(1),
   name: z.string(),
   quantity: z.number().int().positive(),
   unitPriceCents: MoneySchema,
   subtotalCents: MoneySchema,
   modifiers: z.array(z.object({
-    modifierId: z.string().uuid(),
+    modifierId: z.string().min(1),
     modifierName: z.string(),
-    optionId: z.string().uuid(),
+    optionId: z.string().min(1),
     optionName: z.string(),
     priceAdjustment: z.number().int(),
   })).optional(),
@@ -42,7 +42,7 @@ export const OrderItemSchema = z.object({
 }).openapi('OrderItem');
 
 export const OrderPaymentSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   amount: MoneySchema,
   method: PaymentMethodEnum,
   status: PaymentStatusEnum,
@@ -53,7 +53,7 @@ export const OrderPaymentSchema = z.object({
 }).openapi('OrderPayment');
 
 export const OrderCustomerSchema = z.object({
-  id: z.string().uuid().nullable(),
+  id: z.string().min(1).nullable(),
   name: z.string().max(100).optional(),
   phone: z.string().max(20).optional(),
   email: z.string().email().optional(),
@@ -84,14 +84,14 @@ export const OrderItemInputSchema = z.object({
 }).openapi('OrderItemInput');
 
 export const OrderCreateSchema = z.object({
-  tableId: z.string().uuid().optional(),
-  locationId: z.string().uuid(),
+  tableId: z.string().min(1).optional(),
+  locationId: z.string().min(1),
   customer: OrderCustomerSchema.optional(),
   items: z.array(OrderItemInputSchema).min(1),
   channel: OrderChannelEnum.default('dine_in'),
   notes: z.string().max(1000).optional(),
   paymentMethod: PaymentMethodEnum.optional(),
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: z.string().min(1).optional(),
   source: z.enum(['pos', 'mobile', 'kiosk', 'admin', 'api']).default('pos'),
 }).openapi('OrderCreate');
 
@@ -102,11 +102,11 @@ export const OrderUpdateSchema = z.object({
 }).openapi('OrderUpdate');
 
 export const OrderResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   orderNumber: z.string().openapi({ example: 'ORD-20260826-001' }),
-  tableId: z.string().uuid().nullable(),
+  tableId: z.string().min(1).nullable(),
   table: ReferenceSchema.nullable().optional(),
-  locationId: z.string().uuid(),
+  locationId: z.string().min(1),
   customer: OrderCustomerSchema,
   items: z.array(OrderItemSchema),
   channel: OrderChannelEnum.default('dine_in'),
@@ -135,6 +135,8 @@ export const OrderResponseSchema = z.object({
  * margin inputs, procurement references) can never leak through a stray spread.
  */
 export const CustomerOrderItemSchema = z.object({
+  menuItemId: z.string().nullable().optional(),
+  product_id: z.string().nullable().optional(),
   name: z.string().openapi({ example: 'Cà phê đen đá' }),
   quantity: z.number().int().positive().openapi({ example: 2 }),
   unitPriceCents: MoneySchema.openapi({ example: 25000 }),
@@ -153,7 +155,7 @@ export const CustomerOrderItemSchema = z.object({
  * server-evaluated totals only — never a client-supplied price.
  */
 export const CustomerOrderResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   orderNumber: z.string().openapi({ example: 'ORD-20260826-001' }),
   table: ReferenceSchema.nullable().optional(),
   items: z.array(CustomerOrderItemSchema),
@@ -223,13 +225,13 @@ export const OrderRoutes = {
     tags: ['Orders'],
     request: {
       query: PaginationQuerySchema.extend({
-        tableId: z.string().uuid().optional(),
-        locationId: z.string().uuid().optional(),
+        tableId: z.string().min(1).optional(),
+        locationId: z.string().min(1).optional(),
         status: OrderStatusEnum.optional(),
         paymentStatus: PaymentStatusEnum.optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),
-        customerId: z.string().uuid().optional(),
+        customerId: z.string().min(1).optional(),
       }),
     },
     responses: {
@@ -300,7 +302,7 @@ export const OrderRoutes = {
     tags: ['Orders'],
     request: {
       query: z.object({
-        locationId: z.string().uuid().optional(),
+        locationId: z.string().min(1).optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),
       }),

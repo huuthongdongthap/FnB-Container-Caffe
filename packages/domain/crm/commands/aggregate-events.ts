@@ -43,33 +43,63 @@ export async function aggregateEvents(
         `SELECT id, 'CustomerIdentified' as type, 'identity' as source, created_at as timestamp,
                 json_object('identifier_type', identifier_type, 'identifier_value', identifier_value, 'is_primary', is_primary) as payload
          FROM customer_identities WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>(),
+      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch(() => ({ results: [] })),
 
       db.prepare(
         `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
                 'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
                 json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
-         FROM consents WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>(),
+         FROM consents WHERE customer_id = ? ORDER BY COALESCE(revoked_at, granted_at) DESC LIMIT ?`,
+      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch(() =>
+          db.prepare(
+            `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
+                    'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
+                    json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
+             FROM consents WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            .catch(() => ({ results: [] })),
+        ),
 
       db.prepare(
         `SELECT id, 'VisitRecorded' as type, 'visit' as source, visited_at as timestamp,
                 json_object('channel', channel, 'order_id', order_id, 'spent', spent) as payload
          FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT ?`,
-      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>(),
+      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch(() => ({ results: [] })),
 
       db.prepare(
         `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
                 json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
-         FROM orders WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
-      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>(),
+         FROM orders
+         WHERE customer_id = ? OR customer_phone = (SELECT phone FROM customers WHERE id = ?)
+         ORDER BY created_at DESC LIMIT ?`,
+      ).bind(customerId, customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch(() =>
+          db.prepare(
+            `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
+                    json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
+             FROM orders WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
+          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            .catch(() => ({ results: [] })),
+        ),
 
       db.prepare(
-        `SELECT id, CASE WHEN points > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
+        `SELECT id, CASE WHEN points_change > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
                 'loyalty' as source, created_at as timestamp,
-                json_object('points', points, 'reason', COALESCE(reason, 'unknown')) as payload
+                json_object('points', points_change, 'reason', COALESCE(reason, 'unknown')) as payload
          FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>(),
+      ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch(() =>
+          db.prepare(
+            `SELECT id, CASE WHEN points > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
+                    'loyalty' as source, created_at as timestamp,
+                    json_object('points', points, 'reason', COALESCE(reason, 'unknown')) as payload
+             FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            .catch(() => ({ results: [] })),
+        ),
     ]);
 
     // Normalize row shapes — handle both D1 .results and direct arrays.

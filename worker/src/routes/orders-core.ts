@@ -140,4 +140,4 @@ ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);
 ordersCoreRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersCoreRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersCoreRouter.get('/latest', handleLatestOrderTimestamp);
-ordersCoreRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff']), handleUpdateOrder);
+ordersCoreRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier']), handleUpdateOrder);

@@ -30,12 +30,38 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
   const leadTimeDays = Math.max(1, Math.min(14, parseInt(c.req.query('lead_time_days') || '2', 10)));
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  const { results: items } = await db.prepare(`
-    SELECT id, sku, name, current_stock, min_stock, max_stock, unit
-    FROM inventory_items
-    WHERE tenant_id = ? AND active = 1
-    ORDER BY sku ASC
-  `).bind(tenantId).all<InventoryRow>();
+  let items: InventoryRow[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT id, sku, name, current_stock, min_stock, unit
+      FROM inventory_items
+      WHERE tenant_id = ? AND active = 1
+      ORDER BY sku ASC
+    `).bind(tenantId).all<InventoryRow>();
+    items = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT id, sku, name, current_stock, min_stock, unit
+        FROM inventory_items
+        WHERE active = 1
+        ORDER BY sku ASC
+      `).all<InventoryRow>();
+      items = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(`
+          SELECT id, id AS sku, name, current_stock, min_stock, unit
+          FROM ingredients
+          WHERE is_active = 1
+          ORDER BY id ASC
+        `).all<InventoryRow>();
+        items = res.results || [];
+      } catch {
+        items = [];
+      }
+    }
+  }
 
   if (!items || items.length === 0) {
     return c.json({ success: true, data: [] });
@@ -43,17 +69,46 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
 
   const startDate = new Date(Date.now() - days * 86400000).toISOString();
 
-  // Query transaction depletion per item
-  const { results: depletions } = await db.prepare(`
-    SELECT inventory_item_id, SUM(ABS(quantity)) as total_depleted
-    FROM inventory_transactions
-    WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
-    GROUP BY inventory_item_id
-  `).bind(startDate).all<{ inventory_item_id: string; total_depleted: number }>();
+  // Query transaction depletion per item (with fallback across schema variants)
+  let depletions: { item_id: string; total_depleted: number }[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT item_id, SUM(ABS(quantity)) as total_depleted
+      FROM inventory_transactions
+      WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+      GROUP BY item_id
+    `).bind(startDate).all<{ item_id: string; total_depleted: number }>();
+    depletions = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT inventory_item_id as item_id, SUM(ABS(quantity)) as total_depleted
+        FROM inventory_transactions
+        WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+        GROUP BY inventory_item_id
+      `).bind(startDate).all<{ item_id: string; total_depleted: number }>();
+      depletions = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(`
+          SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
+          FROM stock_movements
+          WHERE created_at >= ? AND type IN ('out', 'waste', 'adjustment')
+          GROUP BY ingredient_id
+        `).bind(startDate).all<{ item_id: string; total_depleted: number }>();
+        depletions = res.results || [];
+      } catch {
+        depletions = [];
+      }
+    }
+  }
 
   const depletionMap = new Map<string, number>();
   for (const d of depletions || []) {
-    depletionMap.set(d.inventory_item_id, Number(d.total_depleted || 0));
+    const itemId = d.item_id || (d as unknown as { inventory_item_id?: string; ingredient_id?: string }).inventory_item_id || (d as unknown as { ingredient_id?: string }).ingredient_id;
+    if (itemId) {
+      depletionMap.set(itemId, Number(d.total_depleted || 0));
+    }
   }
 
   const forecastData: InventoryForecastItem[] = items.map((item) => {
@@ -81,6 +136,9 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
     const suggestedReorder = Math.max(0, Math.round((maxStock - currentStock + projectedDepletion) * 10) / 10);
 
     return {
+      id: item.id,
+      sku: item.sku,
+      name: item.name,
       item_id: item.id,
       item_sku: item.sku,
       item_name: item.name,
@@ -89,9 +147,10 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
       days_of_supply: daysOfSupply,
       risk_level: riskLevel,
       suggested_reorder_qty: suggestedReorder,
+      recommended_reorder_qty: suggestedReorder,
       unit: item.unit || 'phần',
       lead_time_days: leadTimeDays
-    };
+    } as unknown as InventoryForecastItem;
   });
 
   return c.json({ success: true, data: forecastData, evaluated_days: days });
@@ -103,26 +162,79 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const snapshotDate = new Date().toISOString().slice(0, 10);
 
-  // Call run-rate logic internally
-  const { results: items } = await db.prepare(`
-    SELECT id, sku, name, current_stock, min_stock, max_stock
-    FROM inventory_items WHERE tenant_id = ? AND active = 1
-  `).bind(tenantId).all<InventoryRow>();
+  // Call run-rate logic internally with schema fallbacks
+  let items: InventoryRow[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT id, sku, name, current_stock, min_stock
+      FROM inventory_items WHERE tenant_id = ? AND active = 1
+    `).bind(tenantId).all<InventoryRow>();
+    items = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT id, sku, name, current_stock, min_stock
+        FROM inventory_items WHERE active = 1
+      `).all<InventoryRow>();
+      items = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(`
+          SELECT id, id AS sku, name, current_stock, min_stock
+          FROM ingredients WHERE is_active = 1
+        `).all<InventoryRow>();
+        items = res.results || [];
+      } catch {
+        items = [];
+      }
+    }
+  }
 
   if (!items || items.length === 0) {
     return c.json({ success: true, message: 'No items to snapshot', count: 0 });
   }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const { results: depletions } = await db.prepare(`
-    SELECT inventory_item_id, SUM(ABS(quantity)) as total_depleted
-    FROM inventory_transactions
-    WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
-    GROUP BY inventory_item_id
-  `).bind(sevenDaysAgo).all<{ inventory_item_id: string; total_depleted: number }>();
+  let depletions: { item_id: string; total_depleted: number }[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT item_id, SUM(ABS(quantity)) as total_depleted
+      FROM inventory_transactions
+      WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+      GROUP BY item_id
+    `).bind(sevenDaysAgo).all<{ item_id: string; total_depleted: number }>();
+    depletions = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT inventory_item_id as item_id, SUM(ABS(quantity)) as total_depleted
+        FROM inventory_transactions
+        WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+        GROUP BY inventory_item_id
+      `).bind(sevenDaysAgo).all<{ item_id: string; total_depleted: number }>();
+      depletions = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(`
+          SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
+          FROM stock_movements
+          WHERE created_at >= ? AND type IN ('out', 'waste', 'adjustment')
+          GROUP BY ingredient_id
+        `).bind(sevenDaysAgo).all<{ item_id: string; total_depleted: number }>();
+        depletions = res.results || [];
+      } catch {
+        depletions = [];
+      }
+    }
+  }
 
   const depMap = new Map<string, number>();
-  for (const d of depletions || []) depMap.set(d.inventory_item_id, Number(d.total_depleted || 0));
+  for (const d of depletions || []) {
+    const itemId = d.item_id || (d as unknown as { inventory_item_id?: string; ingredient_id?: string }).inventory_item_id || (d as unknown as { ingredient_id?: string }).ingredient_id;
+    if (itemId) {
+      depMap.set(itemId, Number(d.total_depleted || 0));
+    }
+  }
 
   const stmts: import('@cloudflare/workers-types').D1PreparedStatement[] = [];
   let critical = 0;

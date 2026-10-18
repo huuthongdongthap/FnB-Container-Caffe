@@ -11,24 +11,31 @@ import { apiFetch } from '@/lib/api-client';
 const SUPPORTED_LOCALES = new Set(['vi', 'en']);
 
 export default function PricingPage(): ReactNode {
-  const { locale } = useParams<{ locale: string }>();
+  const { locale: paramLocale } = useParams<{ locale: string }>();
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const [tiers, setTiers] = useState<PricingTier[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fallbackLocale = SUPPORTED_LOCALES.has(i18n.resolvedLanguage ?? '')
+    ? (i18n.resolvedLanguage as string)
+    : SUPPORTED_LOCALES.has(i18n.language?.slice(0, 2) ?? '')
+      ? (i18n.language.slice(0, 2) as string)
+      : 'vi';
+  const locale = paramLocale && SUPPORTED_LOCALES.has(paramLocale) ? paramLocale : fallbackLocale;
+
   useEffect(() => {
-    if (!locale) {
+    if (paramLocale && !SUPPORTED_LOCALES.has(paramLocale)) {
       navigate('/pricing', { replace: true });
       return;
     }
-    if (SUPPORTED_LOCALES.has(locale) && i18n.resolvedLanguage !== locale) {
-      void i18n.changeLanguage(locale).catch(() => {});
+    if (paramLocale && SUPPORTED_LOCALES.has(paramLocale) && i18n.resolvedLanguage !== paramLocale) {
+      void i18n.changeLanguage(paramLocale).catch(() => {});
     }
-  }, [locale, i18n, navigate]);
+  }, [paramLocale, i18n, navigate]);
 
   useEffect(() => {
-    if (!locale || !SUPPORTED_LOCALES.has(locale)) return;
+    if (paramLocale && !SUPPORTED_LOCALES.has(paramLocale)) return;
 
     apiFetch<{ ok?: boolean; success?: boolean; data?: PricingTier[] }>('/api/saas/pricing', {
       headers: { 'Accept-Language': locale },
@@ -39,9 +46,9 @@ export default function PricingPage(): ReactNode {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [locale]);
+  }, [locale, paramLocale]);
 
-  if (!locale || !SUPPORTED_LOCALES.has(locale)) {
+  if (paramLocale && !SUPPORTED_LOCALES.has(paramLocale)) {
     return null;
   }
 

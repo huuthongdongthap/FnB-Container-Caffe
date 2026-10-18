@@ -16,7 +16,10 @@ export function registerEventHandlers(router: Hono): void {
 
     try {
       const events = await client.listEvents(organizer);
-      return c.json({ success: true, data: events });
+      const results = Array.isArray(events)
+        ? events
+        : ((events as unknown as { results?: unknown[] })?.results ?? []);
+      return c.json({ success: true, data: events, results });
     } catch {
       return c.json({ success: false, error: 'Failed to fetch events' }, 500);
     }

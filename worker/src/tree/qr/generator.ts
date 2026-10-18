@@ -48,14 +48,29 @@ export async function bulkGenerateSlugs(
     result.set(idNum, slug);
 
     // Upsert: INSERT OR REPLACE
-    await db
-      .prepare(
-        `INSERT INTO table_qr_codes (table_id, slug, updated_at)
-         VALUES (?, ?, datetime('now'))
-         ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
-      )
-      .bind(idNum, slug)
-      .run();
+    try {
+      await db
+        .prepare(
+          `INSERT INTO table_qr_codes (table_id, slug, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
+        )
+        .bind(idNum, slug)
+        .run();
+    } catch (err) {
+      if (String((err as Error)?.message || '').includes('column')) {
+        await db
+          .prepare(
+            `INSERT INTO table_qr_codes (table_id, slug, created_at)
+             VALUES (?, ?, datetime('now'))
+             ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
+          )
+          .bind(idNum, slug)
+          .run();
+      } else {
+        throw err;
+      }
+    }
   }
 
   return result;

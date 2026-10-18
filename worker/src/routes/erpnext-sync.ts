@@ -20,6 +20,39 @@ interface InventoryTxnRow {
   created_at: string;
 }
 
+async function writeSyncLog(
+  db: import('@cloudflare/workers-types').D1Database | undefined,
+  method: string,
+  endpoint: string,
+  requestBody: string,
+  responseBody: string | null,
+  error: string | null
+): Promise<void> {
+  if (!db) return;
+  const id = crypto.randomUUID();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO erpnext_sync_logs (id, method, endpoint, request_body, response_body, error)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(id, method, endpoint, requestBody, responseBody, error)
+      .run();
+  } catch {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(id, method, endpoint, requestBody, responseBody, error)
+        .run();
+    } catch {
+      // Non-blocking log write
+    }
+  }
+}
+
 const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
 
 export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
@@ -50,20 +83,14 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
 
       if (!client) {
         // no real ERPNext bindings → mock / idle mode — log shapes for replay
-        await db
-          .prepare(
-            `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-             VALUES (?, ?, ?, ?, ?, ?)`
-          )
-          .bind(
-            crypto.randomUUID(),
-            'GET',
-            '/api/erpnext/sync/inventory',
-            JSON.stringify({ count: transactions.length, since: cutoff }),
-            JSON.stringify({ mock: true, matched: transactions.length }),
-            null
-          )
-          .run();
+        await writeSyncLog(
+          db,
+          'GET',
+          '/api/erpnext/sync/inventory',
+          JSON.stringify({ count: transactions.length, since: cutoff }),
+          JSON.stringify({ mock: true, matched: transactions.length }),
+          null
+        );
 
         return c.json({
           success: true,
@@ -85,40 +112,28 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
 
           if (result.error) {
             failed++;
-            await db
-              .prepare(
-                `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-                 VALUES (?, ?, ?, ?, ?, ?)`
-              )
-              .bind(
-                crypto.randomUUID(),
-                'PUT',
-                `Bin/${itemCode}`,
-                JSON.stringify({ actual_qty: txn.quantity, txnId: txn.item_id }),
-                JSON.stringify(result.data ?? {}),
-                String((result.data as Record<string, string> | undefined)?.message || result.error || 'Unknown error')
-              )
-              .run();
+            await writeSyncLog(
+              db,
+              'PUT',
+              `Bin/${itemCode}`,
+              JSON.stringify({ actual_qty: txn.quantity, txnId: txn.item_id }),
+              JSON.stringify(result.data ?? {}),
+              String((result.data as Record<string, string> | undefined)?.message || result.error || 'Unknown error')
+            );
           } else {
             synced++;
           }
         } catch (e: unknown) {
           failed++;
           const msg = e instanceof Error ? e.message : String(e);
-          await db
-            .prepare(
-              `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-               VALUES (?, ?, ?, ?, ?, ?)`
-            )
-            .bind(
-              crypto.randomUUID(),
-              'PUT',
-              `Bin/${txn.sku || txn.item_id}`,
-              JSON.stringify({ actual_qty: txn.quantity }),
-              null,
-              msg
-            )
-            .run();
+          await writeSyncLog(
+            db,
+            'PUT',
+            `Bin/${txn.sku || txn.item_id}`,
+            JSON.stringify({ actual_qty: txn.quantity }),
+            null,
+            msg
+          );
         }
       }
 
@@ -140,7 +155,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       if (db) {
         try {
           const latestLog = await db
-            .prepare('SELECT created_at, error FROM erpnext_sync_log ORDER BY created_at DESC LIMIT 1')
+            .prepare('SELECT created_at, error FROM erpnext_sync_logs ORDER BY created_at DESC LIMIT 1')
             .first<{ created_at?: string; error?: string | null }>();
           if (latestLog?.created_at) {
             lastSync = latestLog.created_at;
@@ -149,7 +164,19 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
             errorMessage = latestLog.error;
           }
         } catch {
-          // Table may not exist in minimal test environment
+          try {
+            const latestLog = await db
+              .prepare('SELECT created_at, error FROM erpnext_sync_log ORDER BY created_at DESC LIMIT 1')
+              .first<{ created_at?: string; error?: string | null }>();
+            if (latestLog?.created_at) {
+              lastSync = latestLog.created_at;
+            }
+            if (latestLog?.error) {
+              errorMessage = latestLog.error;
+            }
+          } catch {
+            // Table may not exist in minimal test environment
+          }
         }
         try {
           const queueRow = await db
@@ -182,24 +209,14 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
   // POST /api/admin/erpnext-sync/sync-all — Trigger full entity sync
   app.post('/api/admin/erpnext-sync/sync-all', allow, async (c) => {
     const now = new Date().toISOString();
-    try {
-      await c.env.AURA_DB
-        ?.prepare(
-          `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          crypto.randomUUID(),
-          'POST',
-          '/api/admin/erpnext-sync/sync-all',
-          JSON.stringify({ entities: ['orders', 'products', 'customers', 'inventory', 'invoices'] }),
-          JSON.stringify({ synced: true, timestamp: now }),
-          null,
-        )
-        .run();
-    } catch {
-      // Non-blocking log write
-    }
+    await writeSyncLog(
+      c.env.AURA_DB,
+      'POST',
+      '/api/admin/erpnext-sync/sync-all',
+      JSON.stringify({ entities: ['orders', 'products', 'customers', 'inventory', 'invoices'] }),
+      JSON.stringify({ synced: true, timestamp: now }),
+      null
+    );
     return c.json({
       success: true,
       entity: 'all',
@@ -215,24 +232,14 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       return c.json({ success: false, error: `Unsupported sync entity: ${entity}` }, 400);
     }
     const now = new Date().toISOString();
-    try {
-      await c.env.AURA_DB
-        ?.prepare(
-          `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          crypto.randomUUID(),
-          'POST',
-          `/api/admin/erpnext-sync/${entity}`,
-          JSON.stringify({ entity }),
-          JSON.stringify({ synced: true, timestamp: now }),
-          null,
-        )
-        .run();
-    } catch {
-      // Non-blocking log write
-    }
+    await writeSyncLog(
+      c.env.AURA_DB,
+      'POST',
+      `/api/admin/erpnext-sync/${entity}`,
+      JSON.stringify({ entity }),
+      JSON.stringify({ synced: true, timestamp: now }),
+      null
+    );
     return c.json({
       success: true,
       entity,

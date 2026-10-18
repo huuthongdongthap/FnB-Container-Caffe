@@ -6,7 +6,7 @@
 
 ## Overview
 - **Priority**: P0
-- **Status**: Pending
+- **Status**: Completed
 - **Description**: Align Worker D1 SQL queries and Zod schemas with canonical D1 tables/columns (`worker/schema.sql` & `worker/db/migrations/*.sql`), fix `worker/src/lib/openapi.ts` so real OpenAPI routers are registered before 501 fallback stubs, and wire KV config into `birthday.ts` and read receipts into `chat.ts`.
 
 ## Key Insights
@@ -68,11 +68,11 @@
 5. Fix `orders-unified.ts`, `openapi-orders-handlers/helpers.ts`, `customer-menu.ts`, `customer-assistant.ts`, `menu-projection.ts`, and `reservations.ts`.
 
 ## Todo List
-- [ ] Mount real routers before 501 stubs in `worker/src/lib/openapi.ts`
-- [ ] Fix Inventory Zod ID schemas and D1 SQL queries (`purchase-order-handlers`, `ingredient-handlers`, `movement-handlers`, `po-waste-handlers`, `inventory-forecasting`)
-- [ ] Fix `recruitment.ts`, `birthday.ts` KV config, and `chat.ts` `read_at`
-- [ ] Fix `erpnext-invoices.ts`, `erpnext-sync.ts`, and `erpnext/*` SQL
-- [ ] Fix `orders-unified.ts`, `openapi-orders-handlers/helpers.ts`, `customer-menu.ts`, and `menu-projection.ts`
+- [x] Mount real routers before 501 stubs in `worker/src/lib/openapi.ts`
+- [x] Fix Inventory Zod ID schemas and D1 SQL queries (`purchase-order-handlers`, `ingredient-handlers`, `movement-handlers`, `po-waste-handlers`, `inventory-forecasting`)
+- [x] Fix `recruitment.ts`, `birthday.ts` KV config, and `chat.ts` `read_at`
+- [x] Fix `erpnext-invoices.ts`, `erpnext-sync.ts`, and `erpnext/*` SQL
+- [x] Fix `orders-unified.ts`, `openapi-orders-handlers/helpers.ts`, `customer-menu.ts`, and `menu-projection.ts`
 
 ## Success Criteria
 - Zero `no such table` / `no such column` errors across Inventory, Forecasting, ERPNext, Orders, Menu Projection, Recruitment, Birthday, and Chat routes.

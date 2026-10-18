@@ -34,21 +34,28 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
       const limit = parseInt(c.req.query('limit') || '100', 10);
 
       let query = 'SELECT id, amount, category, date, description, erpnext_id, sync_status, created_at FROM expenses WHERE 1=1';
-      const binds: unknown[] = [limit];
+      const binds: unknown[] = [];
 
       if (from) {
         query += ' AND date >= ?';
-        binds.unshift(from);
+        binds.push(from);
       }
       if (to) {
         query += ' AND date <= ?';
-        binds.unshift(to);
+        binds.push(to);
       }
 
       query += ' ORDER BY date DESC LIMIT ?';
+      binds.push(limit);
 
-      const stmt = db.prepare(query).bind(...binds);
-      const { results } = await stmt.all<{ id: string; amount: number; category: string; date: string; description: string | null; erpnext_id: string | null; sync_status: string; created_at: string }>();
+      let results: any[] = [];
+      try {
+        const stmt = db.prepare(query).bind(...binds);
+        const res = await stmt.all<{ id: string; amount: number; category: string; date: string; description: string | null; erpnext_id: string | null; sync_status: string; created_at: string }>();
+        results = res.results || [];
+      } catch {
+        results = [];
+      }
 
       return c.json({ success: true, data: results });
     } catch (err: unknown) {

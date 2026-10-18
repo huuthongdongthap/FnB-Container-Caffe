@@ -10,7 +10,7 @@ Use with <SWUpdatePrompt /> in main.tsx.
 export function useSWRegistration() {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
-  const { t } = useTranslation('pwa');
+  useTranslation();
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;

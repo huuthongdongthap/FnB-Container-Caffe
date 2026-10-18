@@ -113,13 +113,13 @@ export function ChatDetailView({
                 {localMessages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex ${msg.direction === 'customer' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex ${msg.direction === 'customer' ? 'justify-start' : 'justify-end'}`}
                   >
                     <div
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                         msg.direction === 'customer'
-                          ? 'rounded-br-md bg-blue-600 text-white'
-                          : 'rounded-bl-md bg-muted/20 text-foreground border border-border/60'
+                          ? 'rounded-bl-md bg-muted/20 text-foreground border border-border/60'
+                          : 'rounded-br-md bg-blue-600 text-white'
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">
@@ -128,8 +128,8 @@ export function ChatDetailView({
                       <p
                         className={`mt-1 text-[10px] ${
                           msg.direction === 'customer'
-                            ? 'text-blue-200'
-                            : 'text-muted'
+                            ? 'text-muted'
+                            : 'text-blue-200'
                         }`}
                       >
                         {new Date(msg.created_at).toLocaleTimeString('vi-VN', {

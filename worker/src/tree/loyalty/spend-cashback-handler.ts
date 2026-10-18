@@ -70,12 +70,22 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   } catch {
     await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => {});
   }
-  await db.prepare(
-    'INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, \'spend\', ?, ?, ?)'
-  ).bind(`cb_${Date.now()}`, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
-  await db.prepare(
-    'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), now).run();
+  try {
+    await db.prepare(
+      'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, ?, \'spend\', ?, ?, ?)'
+    ).bind(`cb_${Date.now()}`, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, now).run();
+  } catch {
+    await db.prepare(
+      'INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, \'spend\', ?, ?, ?)'
+    ).bind(`cb_${Date.now()}`, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
+  }
+  try {
+    await db.prepare(
+      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), now).run();
+  } catch {
+    // loyalty_audit_log table is optional in canonical D1 schema
+  }
 
   const updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
   return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet?.balance || 0 } });

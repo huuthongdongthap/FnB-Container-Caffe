@@ -33,6 +33,7 @@ export function LoyaltyPage({
   const { t } = useTranslation();
   const store = useLoyaltyStore();
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => (s as { token?: string | null }).token);
   const isAuthenticated = !!user;
 
   useEffect(() => {
@@ -42,9 +43,26 @@ export function LoyaltyPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
+  const resolveTierString = (val: unknown, fallback = 'bronze'): string => {
+    if (typeof val === 'string' && val.trim()) return val.trim();
+    if (
+      val &&
+      typeof val === 'object' &&
+      'tier_name' in val &&
+      typeof (val as { tier_name?: unknown }).tier_name === 'string'
+    ) {
+      return (val as { tier_name: string }).tier_name;
+    }
+    return fallback;
+  };
+
   /* ── Data (props override store) ─────────────────────────────── */
-  const points = propPoints ?? store.points;
-  const tier = propTier ?? store.tier;
+  const storeSummary = store as unknown as {
+    total_points?: number;
+    next_tier?: string | { tier_name?: string; min_points?: number } | null;
+  };
+  const points = propPoints ?? storeSummary.total_points ?? store.points ?? 0;
+  const tier = resolveTierString(propTier ?? store.tier, 'bronze');
   const rewards = propRewards ?? store.rewards;
   const history = propHistory ?? store.history;
   const storeError = store.error;
@@ -71,11 +89,24 @@ export function LoyaltyPage({
     sortedTiers.findIndex((item) => item.tier_name.toLowerCase() === normalizedTier),
   );
   const nextTierObj = sortedTiers[currentTierIdx + 1] ?? sortedTiers[sortedTiers.length - 1];
-  const targetPoints = nextTierObj && nextTierObj.min_points > 0 ? nextTierObj.min_points : 500;
+  const externalNextTierMinPoints =
+    storeSummary.next_tier &&
+    typeof storeSummary.next_tier === 'object' &&
+    typeof storeSummary.next_tier.min_points === 'number'
+      ? storeSummary.next_tier.min_points
+      : undefined;
+  const targetPoints =
+    externalNextTierMinPoints ??
+    (nextTierObj && nextTierObj.min_points > 0 ? nextTierObj.min_points : 500);
   const formattedTier = formatTierLabel(tier);
-  const nextTierName = currentTierIdx < sortedTiers.length - 1 && nextTierObj
-    ? formatTierLabel(nextTierObj.tier_name)
-    : 'Platinum';
+  const resolvedExternalNextTier = storeSummary.next_tier
+    ? resolveTierString(storeSummary.next_tier, '')
+    : '';
+  const nextTierName = resolvedExternalNextTier
+    ? formatTierLabel(resolvedExternalNextTier)
+    : currentTierIdx < sortedTiers.length - 1 && nextTierObj
+      ? formatTierLabel(nextTierObj.tier_name)
+      : 'Platinum';
   const pointsRemaining = Math.max(0, targetPoints - points);
   const progressPct = Math.min(100, Math.round((points / targetPoints) * 100));
   const resolvedTierLadder = sortedTiers.map((item) => ({
@@ -88,13 +119,47 @@ export function LoyaltyPage({
     checked: checkinDays[day] ?? false,
   }));
 
-  const mappedRewards: LoyaltyRewardItem[] = rewards.map((r, idx) => ({
-    id: r.id,
-    title: r.name,
-    pointsCost: r.cost,
-    imageUrl: REWARD_IMAGES[idx % REWARD_IMAGES.length] ?? '',
-    imageAlt: r.name,
-  }));
+  const mappedRewards: LoyaltyRewardItem[] = rewards.map((r, idx) => {
+    const rawReward = r as Reward & {
+      title?: string;
+      pointsCost?: number;
+      points_cost?: number;
+      points_required?: number;
+    };
+    const title = rawReward.name || rawReward.title || '';
+    return {
+      id: rawReward.id,
+      title,
+      pointsCost:
+        rawReward.cost ??
+        rawReward.pointsCost ??
+        rawReward.points_cost ??
+        rawReward.points_required ??
+        0,
+      imageUrl: REWARD_IMAGES[idx % REWARD_IMAGES.length] ?? '',
+      imageAlt: title,
+    };
+  });
+
+  const handleCheckIn = async () => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const activeToken = token ?? (useAuthStore.getState() as { token?: string | null }).token;
+      if (activeToken) {
+        headers.Authorization = `Bearer ${activeToken}`;
+      }
+      await fetch('/api/checkin', {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+      });
+    } catch {
+      // Non-fatal: refresh loyalty state afterward
+    }
+    if (isAuthenticated) {
+      await store.fetchLoyalty();
+    }
+  };
 
   const mappedHistory: LoyaltyHistoryEntry[] = history.map((h) => ({
     id: h.id,
@@ -143,6 +208,7 @@ export function LoyaltyPage({
           loadingState={loadingState}
           errorMessage={storeError || t('loyalty.errorDescription')}
           onClaimReward={(rewardId) => store.redeemReward(rewardId)}
+          onCheckIn={handleCheckIn}
         />
       </div>
     </>

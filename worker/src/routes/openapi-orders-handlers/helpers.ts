@@ -53,8 +53,19 @@ export function formatCustomerOrderItem(item: Row): CustomerOrderItem {
     ? Number(item.unit_price)
     : Math.round(subtotal / qty);
   const modifiers = parseModifiers(item.modifiers) as Array<Row>;
+  const includeCatalogRef =
+    item.menu_item_id !== undefined ||
+    item.menuItemId !== undefined ||
+    item.product_slug !== undefined;
+  const resolvedProductId = item.product_id ?? item.menu_item_id ?? item.menuItemId ?? item.id ?? null;
 
   return {
+    ...(includeCatalogRef
+      ? {
+          menuItemId: item.product_id ?? item.menu_item_id ?? item.id ?? null,
+          product_id: resolvedProductId,
+        }
+      : {}),
     name: item.product_name ?? item.name ?? '',
     quantity: qty,
     unitPriceCents: unitPrice,
@@ -92,7 +103,7 @@ export function formatOrder(order: Row, items: Row[], payments: Row[]) {
     subtotal: order.subtotal,
     discountAmount: order.discount_amount,
     taxAmount: order.tax_amount,
-    totalAmount: order.total_amount,
+    totalAmount: order.total_amount ?? order.total,
     orderNumber: order.order_number,
     paymentStatus: order.payment_status,
     servedAt: order.served_at,
@@ -126,7 +137,7 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
     subtotal: order.subtotal,
     discountAmount: order.discount_amount,
     taxAmount: order.tax_amount,
-    totalAmount: order.total_amount,
+    totalAmount: order.total_amount ?? order.total,
     status: order.status,
     paymentStatus: order.payment_status,
     notes: order.notes ?? null,
@@ -137,16 +148,44 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
 
 export async function fetchOrderItemsAndPayments(db: D1Database, orderId: string) {
   try {
-    const [items, payments] = await Promise.all([
-      db.prepare(
-        `SELECT oi.*, p.name as product_name, p.slug as product_slug
-         FROM order_items oi
-         LEFT JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ?`
-      ).bind(orderId).all().catch(() => ({ results: [] })),
-      db.prepare(
+    const fetchItems = async () => {
+      try {
+        return await db.prepare(
+          `SELECT oi.*, COALESCE(p.name, mi.name) as product_name, p.slug as product_slug, oi.product_id as menu_item_id
+           FROM order_items oi
+           LEFT JOIN products p ON oi.product_id = p.id
+           LEFT JOIN menu_items mi ON oi.product_id = mi.id
+           WHERE oi.order_id = ?`
+        ).bind(orderId).all();
+      } catch {
+        return await db.prepare(
+          `SELECT oi.*, p.name as product_name, p.slug as product_slug, oi.product_id as menu_item_id
+           FROM order_items oi
+           LEFT JOIN products p ON oi.product_id = p.id
+           WHERE oi.order_id = ?`
+        ).bind(orderId).all().catch(() => ({ results: [] }));
+      }
+    };
+
+    const fetchPayments = async () => {
+      try {
+        const txRows = await db.prepare(
+          'SELECT * FROM payment_transactions WHERE order_id = ?'
+        ).bind(orderId).all();
+        if (txRows?.results?.length) {
+          return txRows;
+        }
+      } catch {
+        // Fallback to legacy payments table when payment_transactions is unavailable
+      }
+      return await db.prepare(
         'SELECT * FROM payments WHERE order_id = ?'
-      ).bind(orderId).all().catch(() => ({ results: [] })),
+      ).bind(orderId).all().catch(() => ({ results: [] }));
+    };
+
+    const [items, payments] = await Promise.all([
+      fetchItems(),
+      fetchPayments(),
     ]);
 
     return {

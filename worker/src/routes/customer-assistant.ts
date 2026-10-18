@@ -48,18 +48,30 @@ export async function processCustomerQuery(
     const extractedId = data.order_id || q.match(/#?([a-zA-Z0-9_-]{5,32})/)?.[1];
 
     if (extractedId) {
-      orderRow = await db.prepare(
-        'SELECT id, status, total FROM orders WHERE tenant_id = ? AND (id = ? OR id LIKE ?) LIMIT 1'
-      ).bind(tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>();
+      try {
+        orderRow = await db.prepare(
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR ? = \'default\' OR tenant_id IS NULL) AND (id = ? OR id LIKE ?) LIMIT 1'
+        ).bind(tenantId, tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>();
+      } catch {
+        orderRow = await db.prepare(
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (id = ? OR id LIKE ?) LIMIT 1'
+        ).bind(extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null);
+      }
     } else if (data.phone) {
-      orderRow = await db.prepare(
-        'SELECT id, status, total FROM orders WHERE tenant_id = ? AND customer_phone = ? ORDER BY created_at DESC LIMIT 1'
-      ).bind(tenantId, data.phone).first<{ id: string; status: string; total: number }>();
+      try {
+        orderRow = await db.prepare(
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR ? = \'default\' OR tenant_id IS NULL) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
+        ).bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>();
+      } catch {
+        orderRow = await db.prepare(
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
+        ).bind(data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
+      }
     }
 
     if (orderRow) {
       const st = STATUS_MAP[orderRow.status] || orderRow.status;
-      reply = `Đơn hàng #${orderRow.id} (${orderRow.total.toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
+      reply = `Đơn hàng #${orderRow.id} (${Number(orderRow.total || 0).toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
     } else {
       reply = 'AURA chưa tìm thấy đơn hàng tương ứng. Bạn vui lòng cung cấp mã đơn hoặc số điện thoại đã đặt nhé!';
     }
@@ -67,11 +79,34 @@ export async function processCustomerQuery(
     intent = 'table_bill';
     const tbl = data.table_number || q.match(/bàn\s*([0-9a-zA-Z]+)/)?.[1];
     if (tbl) {
-      const activeOrder = await db.prepare(
-        'SELECT id, total, status FROM orders WHERE tenant_id = ? AND table_number = ? AND status NOT IN (\'completed\', \'cancelled\') LIMIT 1'
-      ).bind(tenantId, tbl).first<{ id: string; total: number; status: string }>();
+      let activeOrder: { id: string; total: number; status: string } | null = null;
+      try {
+        activeOrder = await db.prepare(
+          `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
+           FROM orders o
+           LEFT JOIN cafe_tables t ON o.table_id = t.id
+           WHERE (o.tenant_id = ? OR ? = 'default' OR o.tenant_id IS NULL)
+             AND (o.table_number = ? OR t.table_number = ? OR o.table_id = ?)
+             AND o.status NOT IN ('completed', 'cancelled')
+           ORDER BY o.created_at DESC
+           LIMIT 1`
+        ).bind(tenantId, tenantId, tbl, tbl, tbl).first<{ id: string; total: number; status: string }>();
+      } catch {
+        try {
+          activeOrder = await db.prepare(
+            `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
+             FROM orders o
+             WHERE (o.table_number = ? OR o.table_id = ?)
+               AND o.status NOT IN ('completed', 'cancelled')
+             ORDER BY o.created_at DESC
+             LIMIT 1`
+          ).bind(tbl, tbl).first<{ id: string; total: number; status: string }>();
+        } catch {
+          activeOrder = null;
+        }
+      }
       if (activeOrder) {
-        reply = `Bàn ${tbl} đang có đơn #${activeOrder.id} với tổng tiền ${activeOrder.total.toLocaleString('vi-VN')}đ (${STATUS_MAP[activeOrder.status] || activeOrder.status}).`;
+        reply = `Bàn ${tbl} đang có đơn #${activeOrder.id} với tổng tiền ${Number(activeOrder.total || 0).toLocaleString('vi-VN')}đ (${STATUS_MAP[activeOrder.status] || activeOrder.status}).`;
       } else {
         reply = `Bàn ${tbl} hiện không có hóa đơn chưa thanh toán.`;
       }

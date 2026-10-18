@@ -7,9 +7,10 @@ interface Props {
   onStartEdit: (secIdx: number, itIdx: number) => void;
   onRemove: (secIdx: number, itIdx: number) => void;
   onAddItem: (secIdx: number) => void;
+  onToggleAvailable?: (secIdx: number, itIdx: number) => void;
 }
 
-export function DinDinSectionList({ config, onStartEdit, onRemove, onAddItem }: Props) {
+export function DinDinSectionList({ config, onStartEdit, onRemove, onAddItem, onToggleAvailable }: Props) {
   const { t } = useTranslation('admin');
 
   return (
@@ -21,10 +22,14 @@ export function DinDinSectionList({ config, onStartEdit, onRemove, onAddItem }: 
             {section.items.map((item, itIdx) => (
               <div key={itIdx} className="flex items-center gap-3 text-sm">
                 <span className="flex-1 font-body text-[var(--aura-text-primary)]">{item.name}</span>
-                <span className="text-[var(--aura-text-secondary)]">₫{item.price.toLocaleString('vi-VN')}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                <span className="text-[var(--aura-text-secondary)]">₫{(item.price ?? 0).toLocaleString('vi-VN')}</span>
+                <button
+                  type="button"
+                  onClick={() => onToggleAvailable?.(secIdx, itIdx)}
+                  className={`text-xs px-2 py-1 rounded-full ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                >
                   {item.available ? '✓' : '✗'}
-                </span>
+                </button>
                 <button type="button" onClick={() => onStartEdit(secIdx, itIdx)} className="text-xs text-blue-400">{t('edit', { defaultValue: 'Sửa' })}</button>
                 <button type="button" onClick={() => onRemove(secIdx, itIdx)} className="text-xs text-red-400">{t('delete', { defaultValue: 'Xoá' })}</button>
               </div>

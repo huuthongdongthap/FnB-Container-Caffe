@@ -9,19 +9,44 @@ export const pushRouter = new Hono<{ Bindings: Env }>();
 // GET /api/push/list-subscriptions — list staff push subscriptions for admin UI
 pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'admin', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
-  const { results } = await db.prepare(
-    `SELECT id, customer_id, endpoint, user_agent, role, created_at
-     FROM push_subscriptions
-     WHERE role != 'customer'
-     ORDER BY created_at DESC`
-  ).all<{
+  let results: Array<{
     id: string;
     customer_id: string | null;
     endpoint: string;
     user_agent: string | null;
     role: string | null;
     created_at: string;
-  }>();
+  }> = [];
+  try {
+    const res = await db.prepare(
+      `SELECT id, customer_id, endpoint, user_agent, role, created_at
+       FROM push_subscriptions
+       WHERE role != 'customer'
+       ORDER BY created_at DESC`
+    ).all<{
+      id: string;
+      customer_id: string | null;
+      endpoint: string;
+      user_agent: string | null;
+      role: string | null;
+      created_at: string;
+    }>();
+    results = res.results || [];
+  } catch {
+    const res = await db.prepare(
+      `SELECT id, customer_id, endpoint, user_agent, 'staff' as role, created_at
+       FROM push_subscriptions
+       ORDER BY created_at DESC`
+    ).all<{
+      id: string;
+      customer_id: string | null;
+      endpoint: string;
+      user_agent: string | null;
+      role: string | null;
+      created_at: string;
+    }>().catch(() => ({ results: [] }));
+    results = res.results || [];
+  }
 
   const subscriptions = (results || []).map((row) => {
     const isManual = row.endpoint?.startsWith('https://manual.auraspace.local/');
@@ -68,17 +93,29 @@ pushRouter.post('/subscribe', async(c) => {
   const id = `SUB-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const now = new Date().toISOString();
 
-  await db.prepare(
-    `INSERT INTO push_subscriptions (id, customer_id, endpoint, auth_key, p256dh_key, user_agent, role, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(endpoint) DO UPDATE SET
-     auth_key = excluded.auth_key,
-     p256dh_key = excluded.p256dh_key,
-     customer_id = excluded.customer_id,
-     user_agent = excluded.user_agent,
-     role = excluded.role,
-     updated_at = excluded.updated_at`
-  ).bind(id, customer_id || null, endpoint, auth_key, p256dh_key, user_agent || null, role || 'customer', now, now).run();
+  try {
+    await db.prepare(
+      `INSERT INTO push_subscriptions (id, customer_id, endpoint, auth_key, p256dh_key, user_agent, role, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET
+       auth_key = excluded.auth_key,
+       p256dh_key = excluded.p256dh_key,
+       customer_id = excluded.customer_id,
+       user_agent = excluded.user_agent,
+       role = excluded.role,
+       updated_at = excluded.updated_at`
+    ).bind(id, customer_id || null, endpoint, auth_key, p256dh_key, user_agent || null, role || 'customer', now, now).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO push_subscriptions (id, customer_id, endpoint, auth_key, p256dh_key, user_agent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET
+       auth_key = excluded.auth_key,
+       p256dh_key = excluded.p256dh_key,
+       customer_id = excluded.customer_id,
+       user_agent = excluded.user_agent`
+    ).bind(id, customer_id || null, endpoint, auth_key, p256dh_key, user_agent || null, now).run();
+  }
 
   return c.json({ success: true, message: 'Subscribed' }, 201);
 });

@@ -116,6 +116,9 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
 
   fetchLogs: async () => {
     const { filters } = get();
+    if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
+      return;
+    }
     set({ loading: true, error: null });
 
     try {

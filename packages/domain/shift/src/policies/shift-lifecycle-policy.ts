@@ -14,7 +14,8 @@ import type {
 } from '../model/shift-pos-types';
 
 export function canStaffOperateShift(role: StaffRole): boolean {
-  return role === 'owner' || role === 'manager' || role === 'staff';
+  const roleStr = String(role);
+  return roleStr === 'owner' || roleStr === 'admin' || roleStr === 'manager' || roleStr === 'staff' || roleStr === 'cashier';
 }
 
 export async function openCanonicalShift(
@@ -127,7 +128,10 @@ export async function closeCanonicalShift(
   if (!canStaffOperateShift(input.closedByRole)) {
     return { ok: false, error: 'unauthorized_role' };
   }
-  if (input.closedByRole === 'staff' && shift.staff_id !== input.closedByStaffId) {
+  if (
+    (input.closedByRole === 'staff' || String(input.closedByRole) === 'cashier') &&
+    shift.staff_id !== input.closedByStaffId
+  ) {
     return { ok: false, error: 'unauthorized_shift_closer' };
   }
 

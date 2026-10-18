@@ -7,6 +7,32 @@ import type { HappyHourWindow, ModifierChoice } from '../model/catalog-types';
 const toHHMM = (d: Date): string =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
+const normalizeHHMM = (timeStr: string): string => {
+  const parts = String(timeStr || '').trim().split(':');
+  if (parts.length < 2) return String(timeStr || '').trim();
+  return `${(parts[0] ?? '').padStart(2, '0')}:${(parts[1] ?? '').padStart(2, '0')}`;
+};
+
+const parseApplyIds = (raw: string | null | undefined): string[] => {
+  if (!raw) return [];
+  const trimmed = String(raw).trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      // fall through to comma split
+    }
+  }
+  return trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+};
+
+export interface HappyHourMatchContext {
+  productId?: string | null;
+  categoryId?: string | null;
+}
+
 /**
  * Best-matching active happy-hour window for `now`, or null.
  * Ordering: priority DESC, then discount_rate DESC, then first occurrence.
@@ -14,18 +40,31 @@ const toHHMM = (d: Date): string =>
 export function happyHourDiscountFor(
   windows: ReadonlyArray<HappyHourWindow>,
   now: Date,
+  context?: HappyHourMatchContext,
 ): HappyHourWindow | null {
   const currentTime = toHHMM(now);
   const dayOfWeek = now.getDay();
   const matched = windows
-    .filter(
-      (w) =>
-        w.active === 1 &&
-        w.day_of_week === dayOfWeek &&
-        w.start_time <= w.end_time &&
-        currentTime >= w.start_time &&
-        currentTime < w.end_time,
-    )
+    .filter((w) => {
+      if (w.active !== 1 || w.day_of_week !== dayOfWeek) return false;
+      const start = normalizeHHMM(w.start_time);
+      const end = normalizeHHMM(w.end_time);
+      if (start > end || currentTime < start || currentTime >= end) return false;
+
+      const applyTo = (w.apply_to || 'all').toLowerCase();
+      if (applyTo === 'product_id' || applyTo === 'product' || applyTo === 'products') {
+        if (context?.productId) {
+          const ids = parseApplyIds(w.apply_ids);
+          if (ids.length > 0 && !ids.includes(context.productId)) return false;
+        }
+      } else if (applyTo === 'category_id' || applyTo === 'category' || applyTo === 'categories') {
+        if (context?.categoryId) {
+          const ids = parseApplyIds(w.apply_ids);
+          if (ids.length > 0 && !ids.includes(context.categoryId)) return false;
+        }
+      }
+      return true;
+    })
     .sort(
       (a, b) =>
         b.priority - a.priority || b.discount_rate - a.discount_rate,
@@ -64,6 +103,8 @@ export interface ResolveItemPriceInput {
   happyHourWindows: ReadonlyArray<HappyHourWindow>;
   now: Date;
   channelDeltas?: ChannelDeltaConfig;
+  productId?: string | null;
+  categoryId?: string | null;
 }
 
 /**
@@ -108,7 +149,10 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
   }
 
   // 4. Time rule (Happy Hour active window)
-  const hh = happyHourDiscountFor(happyHourWindows, now);
+  const hh = happyHourDiscountFor(happyHourWindows, now, {
+    productId: input.productId,
+    categoryId: input.categoryId,
+  });
   if (hh) {
     const rawRate = Number(hh.discount_rate) || 0;
     // Supports both 0..1 (e.g. 0.2 = 20%) and percentage 1..100 (e.g. 10 = 10%)

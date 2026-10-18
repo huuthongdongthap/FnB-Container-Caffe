@@ -78,6 +78,10 @@ const handleCreateLink = async (c: any) => {
     // ── COD short-circuit: skip PayOS, mark order as paid immediately ──
     const rawIsCod = Number(orderRow.is_cod ?? 0);
     if (rawIsCod === 1 || orderRow.payment_status === 'cod_pending') {
+      const isStaffActor = ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(user?.role || '');
+      if (user?.role === 'customer' || (orderRow.customer_id && !isStaffActor)) {
+        return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
+      }
       const now = new Date().toISOString();
       await db.prepare(
         'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
@@ -93,16 +97,17 @@ const handleCreateLink = async (c: any) => {
       `SELECT id, transaction_id, payment_url, status
        FROM payments WHERE order_id = ? AND method = 'payos' AND status IN ('pending', 'completed')
        ORDER BY created_at DESC LIMIT 1`
-    ).bind(order_id).first<{ id: string; transaction_id: string; payment_url: string; status: string }>();
+    ).bind(order_id).first<{ id: string; transaction_id: string; payment_url: string; checkout_url?: string; status: string }>();
 
     if (existingPayment) {
       if (existingPayment.status === 'completed') {
         return c.json({ success: false, error: errMsg.already_paid[locale] }, 409);
       }
+      const cachedUrl = existingPayment.payment_url || existingPayment.checkout_url || '';
       return c.json({
         success: true,
-        checkoutUrl: existingPayment.payment_url,
-        checkout_url: existingPayment.payment_url,
+        checkoutUrl: cachedUrl,
+        checkout_url: cachedUrl,
         orderCode: parseInt(existingPayment.transaction_id, 10),
         cached: true
       });

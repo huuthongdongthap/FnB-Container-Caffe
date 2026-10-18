@@ -21,6 +21,7 @@ export function formatDate(dateStr: string | null): string {
 function toDatetimeLocal(dateStr: string | null): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
@@ -60,7 +61,7 @@ export function usePromotionsManager() {
       };
 
       if (editingPromo) {
-        return apiFetch(`/api/promotions/${editingPromo.code}`, {
+        return apiFetch(`/api/promotions/${encodeURIComponent(editingPromo.code)}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
@@ -81,7 +82,7 @@ export function usePromotionsManager() {
 
   const deleteMutation = useMutation({
     mutationFn: (code: string) =>
-      apiFetch(`/api/promotions/${code}`, { method: 'DELETE' }),
+      apiFetch(`/api/promotions/${encodeURIComponent(code)}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-promotions'] });
       setDeleteCode(null);

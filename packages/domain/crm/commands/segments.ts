@@ -131,15 +131,19 @@ async function scanCustomers(db: D1Database): Promise<
     tier: string;
     lifetime_points: number;
     last_order_at: string | null;
+    first_order_at?: string | null;
+    order_count?: number;
   }>
 > {
   try {
     const { results } = await db
       .prepare(
         `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
-                MAX(o.created_at) as last_order_at
+                MAX(o.created_at) as last_order_at,
+                MIN(o.created_at) as first_order_at,
+                COUNT(o.id) as order_count
          FROM customers c
-         LEFT JOIN orders o ON o.customer_phone = c.phone
+         LEFT JOIN orders o ON (o.customer_id = c.id OR o.customer_phone = c.phone) AND o.status != 'cancelled'
          GROUP BY c.id`,
       )
       .all<{
@@ -149,6 +153,8 @@ async function scanCustomers(db: D1Database): Promise<
         tier: string;
         lifetime_points: number;
         last_order_at: string | null;
+        first_order_at?: string | null;
+        order_count?: number;
       }>();
     return results ?? [];
   } catch (err) {
@@ -169,6 +175,8 @@ function classify(
     tier: string;
     lifetime_points: number;
     last_order_at: string | null;
+    first_order_at?: string | null;
+    order_count?: number;
   },
   policy: BandPolicy,
   now: Date,
@@ -176,9 +184,9 @@ function classify(
   if (!row.last_order_at) return 'dormant';
   return computeFrequencyBand(
     {
-      firstOrderAt: row.last_order_at,
+      firstOrderAt: row.first_order_at ?? row.last_order_at,
       lastOrderAt: row.last_order_at,
-      orderCount: 0,
+      orderCount: Number(row.order_count ?? 1),
     },
     policy,
     now,

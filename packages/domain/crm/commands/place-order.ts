@@ -102,6 +102,13 @@ export async function placeOrder(
         .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
         .bind(line.menuItemId)
         .first<{ id: string; name: string; price: number; available: number | boolean }>();
+      if (!row) {
+        row = await db
+          .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+          .bind(line.menuItemId)
+          .first<{ id: string; name: string; price: number; available: number | boolean }>()
+          .catch(() => null);
+      }
     } catch (e) {
       return { ok: false, code: 'd1_error', error: `failed to read menu item: ${(e as Error).message}` };
     }
@@ -156,8 +163,31 @@ export async function placeOrder(
       input.customerId,
       now,
     ).run();
-  } catch (e) {
-    return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+  } catch {
+    try {
+      const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
+      await db.prepare(`
+        INSERT INTO orders (
+          id, order_number, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId,
+        orderNumber,
+        itemsJson,
+        totalCents,
+        'pending',
+        input.customerName ?? null,
+        input.customerPhone,
+        input.channel,
+        input.notes ?? null,
+        input.customerId,
+        now,
+        now,
+      ).run();
+    } catch (e) {
+      return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+    }
   }
 
   // ── Loyalty accrual (non-blocking) — failures swallowed ──

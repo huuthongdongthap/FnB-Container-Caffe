@@ -46,7 +46,15 @@ async function detectAndEnroll(
         const { results } = await db.prepare(fallbackQuery).bind(...queryParams).all();
         customers = (results || []) as Array<Record<string, unknown>>;
       } catch {
-        return { detected: 0, enrolled: 0 };
+        try {
+          const canonicalQuery = query
+            .replace('c.loyalty_tier', 'c.tier as loyalty_tier')
+            .replace('AND created_at > ?', 'AND enrolled_at > ?');
+          const { results } = await db.prepare(canonicalQuery).bind(...queryParams).all();
+          customers = (results || []) as Array<Record<string, unknown>>;
+        } catch {
+          return { detected: 0, enrolled: 0 };
+        }
       }
     } else {
       return { detected: 0, enrolled: 0 };

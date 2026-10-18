@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -16,7 +17,7 @@ interface EditModalProps {
   campaign: CampaignConfig | null;
   selectedChannels: Set<CampaignChannel>;
   onToggleChannel: (ch: CampaignChannel) => void;
-  onSave: () => void;
+  onSave: (payload?: { is_active?: number }) => void;
   onClose: () => void;
   isSaving: boolean;
 }
@@ -30,6 +31,11 @@ export function EditCampaignModal({
   isSaving,
 }: EditModalProps) {
   const { t } = useTranslation();
+  const [isActive, setIsActive] = useState<boolean>(Boolean(campaign?.is_active));
+
+  useEffect(() => {
+    setIsActive(Boolean(campaign?.is_active));
+  }, [campaign]);
 
   return (
     <Modal
@@ -108,19 +114,24 @@ export function EditCampaignModal({
             <label className="text-sm font-medium text-foreground">
               {t('campaigns.isActive')}
             </label>
-            <span
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                campaign.is_active ? 'bg-green-500' : 'bg-muted/50'
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              aria-label={t('campaigns.isActive')}
+              onClick={() => setIsActive((v) => !v)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                isActive ? 'bg-green-500' : 'bg-muted/50'
               }`}
             >
               <span
                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                  campaign.is_active
+                  isActive
                     ? 'translate-x-[22px]'
                     : 'translate-x-[2px]'
                 }`}
               />
-            </span>
+            </button>
           </div>
 
           {isSaving && (
@@ -132,7 +143,7 @@ export function EditCampaignModal({
               {t('campaigns.cancel')}
             </Button>
             <Button
-              onClick={onSave}
+              onClick={() => onSave({ is_active: isActive ? 1 : 0 })}
               loading={isSaving}
               disabled={isSaving || selectedChannels.size === 0}
             >

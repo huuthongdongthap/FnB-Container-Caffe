@@ -80,7 +80,23 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
           ? (data as Record<string, unknown>)
           : ((data as { data?: Record<string, unknown> }).data ?? {});
 
-      const referralCode: string = (raw.referral_code as string) ?? get().referralCode ?? '';
+      let referralCode: string = (raw.referral_code as string) ?? get().referralCode ?? '';
+      if (!referralCode) {
+        try {
+          const codeRes = await apiFetch<{ data?: { referral_code?: string; code?: string }; referral_code?: string; code?: string }>(
+            '/api/loyalty/referral/code',
+            { method: 'POST' },
+          );
+          referralCode =
+            codeRes?.data?.referral_code ??
+            codeRes?.data?.code ??
+            codeRes?.referral_code ??
+            codeRes?.code ??
+            '';
+        } catch {
+          // Non-fatal: code provisioning fallback optional
+        }
+      }
       const totalReferrals: number = (raw.total_referrals as number) ?? 0;
       const cashbackEarned: number = (raw.total_cashback_earned_vnd as number) ?? 0;
       const codeUsage: number = (raw.code_usage as number) ?? 0;
@@ -110,13 +126,13 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
   applyReferralCode: async (code: string) => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<{ message?: string }>('/api/loyalty/referral/apply', {
+      const body = await apiFetch<{ success?: boolean; error?: string; message?: string }>('/api/loyalty/referral/apply', {
         method: 'POST',
         body: JSON.stringify({ code }),
       });
 
-      if (body.message && !body.message.includes('success')) {
-        set({ loading: false, error: body.message || 'Invalid referral code' });
+      if (body.success === false || body.error) {
+        set({ loading: false, error: body.error || body.message || 'Invalid referral code' });
         return;
       }
 

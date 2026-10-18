@@ -39,10 +39,16 @@ async function findExistingEvent(
   db: D1Database,
   idempotencyKey: string
 ): Promise<string | null> {
-  const row = await db.prepare(
-    "SELECT id FROM customer_events WHERE payload LIKE ? LIMIT 1"
-  ).bind(`%"idempotency_key":"${idempotencyKey}"%`).first<{ id: string }>();
-  return row?.id ?? null;
+  const safeKey = idempotencyKey.replace(/[%"\\]/g, '');
+  if (!safeKey) return null;
+  try {
+    const row = await db.prepare(
+      "SELECT id FROM customer_events WHERE payload LIKE ? LIMIT 1"
+    ).bind(`%"idempotency_key":"${safeKey}"%`).first<{ id: string }>();
+    return row?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -57,9 +63,10 @@ export async function dispatchCustomerEvent(
     eventType,
     customerId,
     orderId,
-    payload: { ...payload, idempotency_key: input.idempotencyKey },
+    payload,
     idempotencyKey: input.idempotencyKey,
   });
+  (event.payload as Record<string, unknown>).idempotency_key = event.idempotencyKey;
 
   try {
     const existingId = await findExistingEvent(db, event.idempotencyKey);

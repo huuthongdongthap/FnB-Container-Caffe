@@ -45,11 +45,11 @@ tablesRouter.get('/', async (c) => {
   const rows = qrSecret
     ? await db.prepare('SELECT table_id, slug FROM table_qr_codes').all<QrCodeRow>()
     : { results: [] as QrCodeRow[] };
-  const slugMap = new Map(rows.results.map((r) => [r.table_id, r.slug]));
+  const slugMap = new Map<string | number, string>(rows.results.map((r) => [r.table_id, r.slug]));
 
   const data = await Promise.all(tables.map(async (t) => {
-    const idNum = typeof t.id === 'string' ? parseInt(t.id, 10) : Number(t.id);
-    const slug = slugMap.get(idNum);
+    const idNum = parseInt(String(t.id).replace(/\D/g, ''), 10);
+    const slug = slugMap.get(t.id) ?? slugMap.get(idNum) ?? slugMap.get(Number(t.table_number));
     return {
       ...t,
       qr_code_url: slug && qrSecret

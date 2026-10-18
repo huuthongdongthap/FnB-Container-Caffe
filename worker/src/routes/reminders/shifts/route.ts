@@ -75,10 +75,17 @@ export async function sendShiftReminders(env: Record<string, unknown>): Promise<
         }
 
         // Mark reminder_sent = 1 regardless — don't spam
-        await db
-          .prepare('UPDATE staff_shifts SET reminder_sent = 1, updated_at = ? WHERE id = ?')
-          .bind(now.toISOString(), shift.id)
-          .run();
+        try {
+          await db
+            .prepare('UPDATE staff_shifts SET reminder_sent = 1, updated_at = ? WHERE id = ?')
+            .bind(now.toISOString(), shift.id)
+            .run();
+        } catch {
+          await db
+            .prepare('UPDATE staff_shifts SET reminder_sent = 1 WHERE id = ?')
+            .bind(shift.id)
+            .run();
+        }
 
         log.info('Shift reminder processed', {
           staffName: shift.staff_name,

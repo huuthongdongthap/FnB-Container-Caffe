@@ -27,7 +27,10 @@ export interface APILatencyResponse {
   requestCounts: Array<{ date: string; count: number }>;
 }
 
+export type PerformanceRange = '24h' | '7d' | '30d';
+
 interface PerformanceState {
+  range: PerformanceRange;
   webVitals: WebVitalsResponse | null;
   apiLatency: APILatencyResponse | null;
   vitalsLoading: boolean;
@@ -36,11 +39,13 @@ interface PerformanceState {
   latencyError: string | null;
   _vitalsRequestId: number;
   _latencyRequestId: number;
-  fetchWebVitals: () => Promise<void>;
-  fetchAPILatency: () => Promise<void>;
+  setRange: (range: PerformanceRange) => void;
+  fetchWebVitals: (range?: PerformanceRange) => Promise<void>;
+  fetchAPILatency: (range?: PerformanceRange) => Promise<void>;
 }
 
 export const usePerformanceStore = create<PerformanceState>((set, get) => ({
+  range: '7d',
   webVitals: null,
   apiLatency: null,
   vitalsLoading: false,
@@ -50,12 +55,15 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   _vitalsRequestId: 0,
   _latencyRequestId: 0,
 
-  fetchWebVitals: async () => {
+  setRange: (range) => set({ range }),
+
+  fetchWebVitals: async (range) => {
+    const activeRange = range ?? get().range;
     const requestId = get()._vitalsRequestId + 1;
-    set({ vitalsLoading: true, vitalsError: null, _vitalsRequestId: requestId });
+    set({ vitalsLoading: true, vitalsError: null, _vitalsRequestId: requestId, ...(range ? { range } : {}) });
     try {
       const json = await apiFetch<Partial<WebVitalsResponse> & { metrics?: Array<{ name?: string; count?: number }> }>(
-        '/api/admin/metrics?filter=web_vital_*&range=7d',
+        `/api/admin/metrics?filter=web_vital_*&range=${encodeURIComponent(activeRange)}`,
       );
       if (get()._vitalsRequestId !== requestId) return;
       const fallbackVitals: Record<string, WebVitalData> = {};
@@ -85,12 +93,13 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     }
   },
 
-  fetchAPILatency: async () => {
+  fetchAPILatency: async (range) => {
+    const activeRange = range ?? get().range;
     const requestId = get()._latencyRequestId + 1;
-    set({ latencyLoading: true, latencyError: null, _latencyRequestId: requestId });
+    set({ latencyLoading: true, latencyError: null, _latencyRequestId: requestId, ...(range ? { range } : {}) });
     try {
       const json = await apiFetch<Partial<APILatencyResponse> & { latency?: { p50?: number; p95?: number; p99?: number } }>(
-        '/api/admin/metrics?filter=request_duration_ms&range=7d',
+        `/api/admin/metrics?filter=request_duration_ms&range=${encodeURIComponent(activeRange)}`,
       );
       if (get()._latencyRequestId !== requestId) return;
       set({

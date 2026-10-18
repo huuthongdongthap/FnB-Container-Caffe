@@ -28,7 +28,7 @@ export function MetricCards() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <MetricCard label="Orders" value={orders.toLocaleString('vi-VN')} icon={<ShoppingCart className="w-5 h-5" />} />
       <MetricCard label="Revenue" value={`${(revenue / 1000).toFixed(0)}K VND`} icon={<Banknote className="w-5 h-5" />} />
-      <MetricCard label="Success Rate" value={`${successRate}%`} icon={<CheckCircle className="w-5 h-5" />} />
+      <MetricCard label="Success Rate" value={successRate} icon={<CheckCircle className="w-5 h-5" />} />
       <MetricCard label="Latency" value={`p50: ${Math.round(p50)}ms / p95: ${Math.round(p95)}ms`} icon={<Zap className="w-5 h-5" />} />
     </div>
   );

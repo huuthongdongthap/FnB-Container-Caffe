@@ -62,15 +62,40 @@ export async function getCustomerAccount(
     }
 
     const [orders, consents, policy] = await Promise.all([
-      db.prepare(
-        `SELECT id, total_cents, status, created_at FROM orders
-         WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
-      ).bind(customer.phone, orderLimit).all<{ id: string; total_cents: number; status: string; created_at: string }>(),
+      db
+        .prepare(
+          `SELECT * FROM orders
+           WHERE customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone = ?)
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(customerId, customer.phone ?? '', orderLimit)
+        .all<Record<string, unknown>>()
+        .catch(() =>
+          db
+            .prepare(
+              `SELECT id, total_cents, status, created_at FROM orders
+               WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+            )
+            .bind(customer.phone, orderLimit)
+            .all<Record<string, unknown>>(),
+        ),
 
-      db.prepare(
-        `SELECT purpose, granted, updated_at FROM consents
-         WHERE customer_id = ? AND revoked_at IS NULL ORDER BY updated_at DESC`,
-      ).bind(customerId).all<{ purpose: string; granted: number; updated_at: string }>(),
+      db
+        .prepare(
+          `SELECT purpose, granted, COALESCE(revoked_at, granted_at) AS updated_at FROM consents
+           WHERE customer_id = ? AND revoked_at IS NULL ORDER BY granted_at DESC`,
+        )
+        .bind(customerId)
+        .all<{ purpose: string; granted: number; updated_at: string }>()
+        .catch(() =>
+          db
+            .prepare(
+              `SELECT purpose, granted, updated_at FROM consents
+               WHERE customer_id = ? AND revoked_at IS NULL ORDER BY updated_at DESC`,
+            )
+            .bind(customerId)
+            .all<{ purpose: string; granted: number; updated_at: string }>(),
+        ),
 
       loadPolicy(db).catch(() => null),
     ]);
@@ -88,10 +113,10 @@ export async function getCustomerAccount(
       lifetimePoints,
       nextTier,
       recentOrders: (orders.results || []).map((o) => ({
-        id: o.id,
-        totalCents: o.total_cents,
-        status: o.status,
-        placedAt: o.created_at,
+        id: String(o.id ?? ''),
+        totalCents: Number(o.total_cents ?? o.total ?? 0),
+        status: String(o.status ?? 'pending'),
+        placedAt: String(o.created_at ?? o.placed_at ?? ''),
       })),
       consents: (consents.results || []).map((c) => ({
         purpose: c.purpose,

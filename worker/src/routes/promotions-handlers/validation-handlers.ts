@@ -88,14 +88,30 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       : rawDiscount;
 
     // Increment usage
-    await db.prepare(
-      'UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ?'
-    ).bind(promo.id).run();
+    try {
+      if (promo.id !== undefined && promo.id !== null) {
+        await db.prepare(
+          'UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ?'
+        ).bind(promo.id).run();
+      } else {
+        await db.prepare(
+          'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ?'
+        ).bind(promo.code).run();
+      }
+    } catch {
+      await db.prepare(
+        'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ?'
+      ).bind(promo.code).run().catch(() => {});
+    }
 
     // Log redemption
-    await db.prepare(
-      'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(promo.id, promo.code, data.order_id, discountAmount, data.order_total, new Date().toISOString()).run();
+    try {
+      await db.prepare(
+        'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(promo.id ?? promo.code, promo.code, data.order_id, discountAmount, data.order_total, new Date().toISOString()).run();
+    } catch {
+      // promotion_redemptions table is optional in canonical D1 schema
+    }
 
     return c.json({
       success: true,

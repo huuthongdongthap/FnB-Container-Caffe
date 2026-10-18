@@ -76,5 +76,6 @@ export function mapOrderItemIcon(productName: string): DashOrderItem['icon'] {
 }
 
 export function mapOrderStatus(status: string): DashOrderItem['status'] {
+  if (status === 'cancelled') return ('cancelled' as unknown) as DashOrderItem['status'];
   return ['pending', 'confirmed', 'preparing'].includes(status) ? 'preparing' : 'delivered';
 }

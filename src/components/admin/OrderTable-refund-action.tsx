@@ -14,7 +14,8 @@ export function RefundAction({ order, userRole, onRefund, t }: RefundActionProps
   const refundStatus = ord.refund_status ?? null;
   const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'partial';
 
-  if (userRole !== 'staff' && userRole !== 'owner') {
+  const allowedRoles = ['owner', 'manager', 'admin', 'staff'];
+  if (!userRole || !allowedRoles.includes(userRole)) {
     return null;
   }
 

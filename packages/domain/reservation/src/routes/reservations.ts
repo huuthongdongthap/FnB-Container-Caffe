@@ -49,7 +49,7 @@ reservationsRouter.get('/availability', async (c) => {
     'SELECT * FROM cafe_tables ORDER BY zone ASC, table_number ASC'
   ).all<Record<string, unknown>>();
 
-  let query = "SELECT table_id, time FROM reservations WHERE date = ? AND status = 'confirmed'";
+  let query = "SELECT table_id, time FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')";
   const params: unknown[] = [date];
   if (time) {
     query += ' AND time = ?';
@@ -57,8 +57,11 @@ reservationsRouter.get('/availability', async (c) => {
   }
 
   const { results: reservations } = await db.prepare(query).bind(...params).all<{ table_id: string }>();
-  const bookedIds = new Set(reservations.map(r => r.table_id));
-  const data = tables.map(t => ({ ...t, available: !bookedIds.has(t.id as string) }));
+  const bookedIds = new Set(reservations.map(r => String(r.table_id)));
+  const data = tables.map(t => ({
+    ...t,
+    available: !bookedIds.has(String(t.id)) && !bookedIds.has(String(t.table_number)),
+  }));
 
   return c.json({ success: true, data });
 });
@@ -86,14 +89,15 @@ reservationsRouter.post('/', async (c) => {
   }
   const guests = guest_count || 2;
 
-  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(table_id).first<Record<string, unknown>>();
+  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?').bind(table_id, table_id).first<Record<string, unknown>>();
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
 
+  const canonicalTableId = String(table.id ?? table_id);
   const existing = await db.prepare(
-    "SELECT id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
-  ).bind(table_id, date, time).first<{ id: string }>();
+    "SELECT id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'seated')"
+  ).bind(canonicalTableId, date, time).first<{ id: string }>();
   if (existing) {
     return c.json({ success: false, error: 'Table already reserved for this time slot' }, 409);
   }
@@ -104,13 +108,15 @@ reservationsRouter.post('/', async (c) => {
   await db.prepare(
     `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
-  ).bind(id, table_id, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
+  ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
 
-  await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ?").bind(table_id).run();
+  if (date === today) {
+    await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ?").bind(canonicalTableId).run();
+  }
 
   return c.json({
     success: true,
-    data: { id, table_id, table_number: table.table_number, zone: table.zone, date, time, guest_count: guests }
+    data: { id, table_id: canonicalTableId, table_number: table.table_number, zone: table.zone, date, time, guest_count: guests }
   }, 201);
 });
 

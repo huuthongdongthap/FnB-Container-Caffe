@@ -3,6 +3,8 @@ import { Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuditStore } from '@/hooks/stores/admin/use-audit-store';
+import { API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 import { useTranslation } from 'react-i18next';
 import { buildCsv } from './AuditLogViewer-types';
 import { FilterPanel } from './AuditLogViewer-filter-panel';
@@ -39,8 +41,28 @@ export default function AuditLogViewerPage() {
   }, [hasNext, setFilter, filters.page]);
 
   /* ── Export CSV ── */
-  const handleExport = useCallback(() => {
-    const csv = buildCsv(entries, t);
+  const handleExport = useCallback(async () => {
+    let csv = '';
+    try {
+      const params = new URLSearchParams();
+      if (filters.actorId) params.set('actor_id', filters.actorId);
+      if (filters.action) params.set('action', filters.action);
+      if (filters.resourceType) params.set('resource_type', filters.resourceType);
+      if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+      if (filters.dateTo) params.set('date_to', filters.dateTo);
+      const res = await fetch(`${API_BASE}/api/admin/audit-logs/export?${params}`, {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        csv = await res.text();
+      }
+    } catch {
+      csv = '';
+    }
+    if (!csv) {
+      csv = buildCsv(entries, t);
+    }
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -48,7 +70,7 @@ export default function AuditLogViewerPage() {
     a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [entries, t]);
+  }, [entries, filters, t]);
 
   /* ── Date range validation ── */
   const dateRangeInvalid = !!(

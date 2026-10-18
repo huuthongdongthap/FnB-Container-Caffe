@@ -69,6 +69,13 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
 
     for (const order of orders) {
       const orderId = generateId('ORD_');
+      const itemsSubtotal = order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const shippingFee = parseInt(String(order.shipping_fee || 0), 10) || 0;
+      const discount = parseInt(String(order.discount || 0), 10) || 0;
+      const tipAmount = parseInt(String(order.tip || 0), 10) || 0;
+      const computedTotal = itemsSubtotal > 0
+        ? Math.max(0, itemsSubtotal + shippingFee - discount + tipAmount)
+        : parseInt(String(order.total), 10);
       const itemsJson = JSON.stringify(
         order.items.map((i) => ({
           id: i.id,
@@ -83,12 +90,13 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         INSERT INTO orders (
           id, items, total, status, customer_name, customer_phone,
           customer_email, customer_address, payment_method, payment_status,
-          shipping_fee, discount, notes, delivery_time, table_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          shipping_fee, discount, notes, delivery_time, table_id,
+          order_type, tip_amount, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         orderId,
         itemsJson,
-        parseInt(String(order.total)),
+        computedTotal,
         'pending',
         order.customer_name,
         order.customer_phone,
@@ -96,24 +104,30 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         order.customer_address || null,
         order.payment_method || 'cash',
         'unpaid',
-        parseInt(String(order.shipping_fee || 0)),
-        parseInt(String(order.discount || 0)),
+        shippingFee,
+        discount,
         order.notes || null,
         order.delivery_time || 'now',
-        resolvedTableId
+        resolvedTableId,
+        'dine_in',
+        tipAmount,
+        now,
+        now
       ).run();
 
       // Create payment record for each sub-order
       const paymentId = generateId('PAY_');
       await db.prepare(`
-        INSERT INTO payments (id, order_id, method, amount, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         paymentId,
         orderId,
         order.payment_method || 'cash',
-        parseInt(String(order.total)),
-        'pending'
+        computedTotal,
+        'pending',
+        now,
+        now
       ).run();
 
       createdOrders.push({
@@ -121,7 +135,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         status: 'pending',
         payment_status: 'unpaid',
         items: order.items,
-        total: parseInt(String(order.total)),
+        total: computedTotal,
         customer_name: order.customer_name,
         customer_phone: order.customer_phone,
         customer_address: order.customer_address || null,

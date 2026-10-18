@@ -19,7 +19,7 @@ export function Toggle({
         <label htmlFor={id} className="text-sm font-medium text-[var(--aura-text-primary)] cursor-pointer">
           {label}
         </label>
-        {hint && <p className="text-xs text-[var(--aura-chrome-dark)] mt-0.5">{hint}</p>}
+        {hint && <p className="text-xs text-on-surface-variant mt-0.5">{hint}</p>}
       </div>
       <button
         id={id}

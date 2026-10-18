@@ -179,9 +179,14 @@ export async function resolveServerProductPrice(
     happyHourWindows,
     now,
     channelDeltas,
+    productId: dbItem?.id || productId,
   });
 
-  const delta = channelDeltas?.[normChannel] ?? 0;
+  const rawDelta =
+    channelDeltas?.[normChannel] ??
+    (normChannel === 'online' ? channelDeltas?.delivery : (normChannel === 'delivery' ? channelDeltas?.online : 0)) ??
+    0;
+  const delta = Math.round(Number(rawDelta) || 0);
 
   return {
     id: dbItem?.id || productId,

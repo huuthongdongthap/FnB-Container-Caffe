@@ -14,8 +14,9 @@ customerMenuRouter.get('/', async (c) => {
   const category = c.req.query('category');
   const includeUnavailable = c.req.query('include_unavailable') === 'true';
   const locale = c.req.query('locale') || 'vi-VN';
+  const channel = c.req.query('channel');
 
-  const menu = await getCustomerMenu(db, { category, includeUnavailable, locale });
+  const menu = await getCustomerMenu(db, { category, includeUnavailable, locale, channel, now: new Date() });
   const allItems = menu.categories.flatMap((cat) => cat.items.map((item) => ({
     id: item.id,
     name: item.name,
@@ -45,7 +46,8 @@ customerMenuRouter.get('/', async (c) => {
 customerMenuRouter.get('/:id', async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const item = await getCustomerMenuItem(db, id);
+  const channel = c.req.query('channel');
+  const item = await getCustomerMenuItem(db, id, { channel, now: new Date() });
 
   if (!item) {
     return c.json({ success: false, error: 'Menu item not found' }, 404);

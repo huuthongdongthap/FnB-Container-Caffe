@@ -140,12 +140,30 @@ async function getConversations(c: Context<{ Bindings: Env }>) {
 
 async function getMessageHistory(c: Context<{ Bindings: Env }>) {
   try {
-    const phone = c.req.param('phone');
+    const phone = c.req.param('phone') || c.req.param('id');
     if (!phone || phone.length < 8) {
       return errorResponse('So dien thoai khong hop le', 400);
     }
 
     const db = c.env.AURA_DB;
+    const now = new Date().toISOString();
+
+    // Mark customer messages as read when staff views the conversation
+    try {
+      await db.prepare(
+        "UPDATE contact_messages SET read_at = ? WHERE phone = ? AND direction = 'customer' AND read_at IS NULL"
+      ).bind(now, phone).run();
+    } catch {
+      // Non-blocking if table or column varies
+    }
+    try {
+      await db.prepare(
+        "UPDATE chat_messages SET read_at = ? WHERE (conversation_id = ? OR phone = ?) AND sender_type = 'customer' AND read_at IS NULL"
+      ).bind(now, phone, phone).run();
+    } catch {
+      // Non-blocking
+    }
+
     const { results } = await db.prepare(
       'SELECT id, name, phone, message, direction, created_at, read_at FROM contact_messages WHERE phone = ? ORDER BY created_at ASC'
     ).bind(phone).all();
@@ -167,5 +185,6 @@ chatRouter.post('/messages', (c) => sendMessage(c));
 // Protected: get all conversations
 chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getConversations(c));
 
-// Protected: get message history for a phone
+// Protected: get message history for a phone or conversation ID
+chatRouter.get('/conversations/:id/messages', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getMessageHistory(c));
 chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff', 'admin']), (c) => getMessageHistory(c));

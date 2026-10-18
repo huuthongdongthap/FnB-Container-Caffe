@@ -29,7 +29,7 @@ export const ProductTranslationSchema = z.object({
 });
 
 export const ProductVariantSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().min(1).optional(),
   name: z.string().min(1).max(50).openapi({ example: 'Size L' }),
   priceAdjustment: z.number().int().openapi({ example: 5000, description: 'Price adjustment in VND (can be negative)' }),
   isDefault: z.boolean().default(false),
@@ -39,12 +39,12 @@ export const ProductVariantSchema = z.object({
 }).openapi('ProductVariant');
 
 export const ProductModifierSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().min(1).optional(),
   name: z.string().min(1).max(50).openapi({ example: 'Đường' }),
   type: z.enum(['single', 'multi']).openapi({ example: 'single' }),
   required: z.boolean().default(false),
   options: z.array(z.object({
-    id: z.string().uuid().optional(),
+    id: z.string().min(1).optional(),
     name: z.string().min(1).max(50),
     priceAdjustment: z.number().int().default(0),
     isDefault: z.boolean().default(false),
@@ -147,7 +147,7 @@ export const ProductRoutes = {
     tags: ['Products'],
     request: {
       query: PaginationQuerySchema.extend({
-        categoryId: z.string().uuid().optional(),
+        categoryId: z.string().min(1).optional(),
         status: ProductStatusEnum.optional(),
         locale: LocaleEnum.optional(),
         minPrice: z.coerce.number().int().nonnegative().optional(),

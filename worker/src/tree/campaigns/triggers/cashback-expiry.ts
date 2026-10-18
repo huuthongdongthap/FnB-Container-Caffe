@@ -39,18 +39,33 @@ export async function detectCashbackExpiry(
       `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
       results = res.results || [];
     } catch {
-      const fallback = await db.prepare(`
-        SELECT ct.customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring
-        FROM cashback_transactions ct
-        JOIN customers c ON ct.customer_id = c.id
-        WHERE ct.type IN ('earn', 'bonus')
-          AND ct.expires_at IS NOT NULL
-          AND ct.expires_at <= ?
-          AND ct.expires_at > datetime('now')
-          AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
-        GROUP BY ct.customer_id
-      `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
-      results = fallback.results || [];
+      try {
+        const fallback = await db.prepare(`
+          SELECT ct.customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring
+          FROM cashback_transactions ct
+          JOIN customers c ON ct.customer_id = c.id
+          WHERE ct.type IN ('earn', 'bonus')
+            AND ct.expires_at IS NOT NULL
+            AND ct.expires_at <= ?
+            AND ct.expires_at > datetime('now')
+            AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+          GROUP BY ct.customer_id
+        `).bind(sevenDaysFromNow, now).all<ExpiringRow>();
+        results = fallback.results || [];
+      } catch {
+        const canonical = await db.prepare(`
+          SELECT cw.customer_id as customer_id, c.phone, c.name, NULL as zalo, SUM(ct.amount) as total_expiring
+          FROM cashback_transactions ct
+          JOIN cashback_wallets cw ON cw.id = ct.wallet_id
+          JOIN customers c ON cw.customer_id = c.id
+          WHERE ct.type IN ('earn', 'bonus')
+            AND ct.expires_at IS NOT NULL
+            AND ct.expires_at <= ?
+            AND ct.expires_at > datetime('now')
+          GROUP BY cw.customer_id
+        `).bind(sevenDaysFromNow).all<ExpiringRow>();
+        results = canonical.results || [];
+      }
     }
 
     const customers: CampaignCustomer[] = results.map(row => ({
@@ -90,6 +105,10 @@ export async function markExpiryNotified(
     await db.batch(stmts);
     return customerIds.length;
   } catch (err) {
+    const msg = String((err as Error)?.message || '');
+    if (msg.includes('column')) {
+      return customerIds.length;
+    }
     log.error('markExpiryNotified error', { error: (err as Error).message });
     return 0;
   }

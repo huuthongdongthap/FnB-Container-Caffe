@@ -31,12 +31,28 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
 
       const limit = parseInt(c.req.query('limit') || '100', 10);
 
-      const { results } = await db
-        .prepare(
-          'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
-        )
-        .bind(limit)
-        .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
+      let results: any[] = [];
+      try {
+        const res = await db
+          .prepare(
+            'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
+          )
+          .bind(limit)
+          .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
+        results = res.results || [];
+      } catch {
+        try {
+          const res = await db
+            .prepare(
+              'SELECT id, name, tax_id, address, phone, is_active, created_at, updated_at FROM suppliers ORDER BY created_at DESC LIMIT ?'
+            )
+            .bind(limit)
+            .all();
+          results = res.results || [];
+        } catch {
+          results = [];
+        }
+      }
 
       return c.json({ success: true, data: results });
     } catch (err: unknown) {

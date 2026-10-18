@@ -131,12 +131,26 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/payout', requireAuth(['owner']), async (c) => {
     const db = c.env.AURA_DB;
     try {
-      const row = await db.prepare(`SELECT
-        COALESCE(SUM(CASE WHEN is_cod = 1 AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-        COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status = 'paid' THEN total ELSE 0 END), 0) AS payos_total,
-        COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
-        COUNT(*) AS total_orders
-        FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+      let row: { cod_total: number; payos_total: number; refunded_total: number; total_orders: number } | null = null;
+      try {
+        row = await db.prepare(`SELECT
+          COALESCE(SUM(CASE WHEN is_cod = 1 AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+          COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status = 'paid' THEN total ELSE 0 END), 0) AS payos_total,
+          COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+          COUNT(*) AS total_orders
+          FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+      } catch (queryErr) {
+        if (String((queryErr as Error)?.message || '').includes('column')) {
+          row = await db.prepare(`SELECT
+            COALESCE(SUM(CASE WHEN payment_method IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+            COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
+            COALESCE(SUM(CASE WHEN status = 'refunded' OR payment_status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+            COUNT(*) AS total_orders
+            FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+        } else {
+          throw queryErr;
+        }
+      }
 
       const net = (row?.cod_total || 0) + (row?.payos_total || 0) - (row?.refunded_total || 0);
       return c.json({

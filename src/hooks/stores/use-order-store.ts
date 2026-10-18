@@ -105,13 +105,29 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const pending = await offlineDb.getPendingOrders();
     if (pending.length === 0) { set({ queuedOffline: false }); return null; }
     let lastOrder: CustomerOrder | null = null;
-    for (const payload of pending as unknown as CreateOrderPayload[]) {
+    let allSucceeded = true;
+    for (const record of pending) {
       try {
-        const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(payload) });
-        lastOrder = body.data as CustomerOrder; set({ currentOrder: lastOrder, error: null });
-      } catch { set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false }); break; }
+        const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(record) });
+        lastOrder = body.data as CustomerOrder;
+        set({ currentOrder: lastOrder, error: null });
+        if (record.localId && typeof offlineDb.removeOrder === 'function') {
+          try { await offlineDb.removeOrder(record.localId); } catch { /* ignore */ }
+        }
+      } catch {
+        allSucceeded = false;
+        set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
+        break;
+      }
     }
-    try { if (lastOrder) await offlineDb.clearOrders(); set({ queuedOffline: false, loading: false }); } catch { /* retry next reconnect */ }
+    try {
+      if (allSucceeded && lastOrder) {
+        await offlineDb.clearOrders();
+        set({ queuedOffline: false, loading: false });
+      } else {
+        set({ loading: false });
+      }
+    } catch { /* retry next reconnect */ }
     return lastOrder;
   },
 }));

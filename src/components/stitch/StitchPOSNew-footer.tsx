@@ -53,7 +53,7 @@ export function POSFooter({
         </button>
         <button
          type="button"
-          onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/orders'))}
+          onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/shifts'))}
           className="bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] font-bold px-5 py-1.5 min-h-[36px] rounded-full text-[11px] active:scale-95 font-body"
           aria-label={t('posNew.endShift')}
         >

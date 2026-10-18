@@ -50,7 +50,9 @@ export function inventoryTransactions(app: Hono<AppContext>) {
 
     const id = crypto.randomUUID();
     const qty =
-      input.type === 'out' || input.type === 'waste' ? -Math.abs(input.quantity) : Math.abs(input.quantity);
+      input.type === 'out' || input.type === 'waste' || input.type === 'reserve'
+        ? -Math.abs(input.quantity)
+        : Math.abs(input.quantity);
     const newStock = Math.max(0, (item.current_stock || 0) + qty);
 
     if (newStock < (item.min_stock || 0) && input.type !== 'adjust') {

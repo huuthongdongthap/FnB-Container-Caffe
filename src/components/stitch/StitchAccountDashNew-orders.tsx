@@ -19,7 +19,7 @@ const iconMap: Record<DashOrderItem['icon'], React.ReactNode> = {
 };
 
 /* ─── Status Badge ─────────────────────────────────────────── */
-function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
+function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] | 'cancelled' }) {
   const { t } = useTranslation();
   const config = {
     preparing: {
@@ -30,8 +30,12 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
       label: t('stitch.accountDashboard.statusDelivered', 'Delivered'),
       class: 'bg-[rgba(var(--aura-chrome-light),0.1)] text-[var(--aura-chrome-bright)] border border-[rgba(var(--aura-chrome-light),0.2)]',
     },
+    cancelled: {
+      label: t('stitch.accountDashboard.statusCancelled', 'Cancelled'),
+      class: 'bg-[rgba(239,68,68,0.1)] text-[var(--aura-chrome-bright)] border border-[rgba(239,68,68,0.25)]',
+    },
   };
-  const c = config[status];
+  const c = config[status] ?? config.delivered;
   return (
     <span
       className={clsx(
@@ -73,7 +77,14 @@ function useReorder() {
     clearCart();
     for (const item of items) {
       const rawItem = item as unknown as Record<string, unknown>;
-      const resolvedProductId = String(rawItem.product_id ?? rawItem.productId ?? rawItem.id ?? '').trim();
+      const resolvedProductId = String(
+        rawItem.menuItemId ??
+          rawItem.menu_item_id ??
+          rawItem.product_id ??
+          rawItem.productId ??
+          rawItem.id ??
+          '',
+      ).trim();
       for (let i = 0; i < item.quantity; i++) {
         addItem({
           id: resolvedProductId || crypto.randomUUID(),

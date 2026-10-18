@@ -133,7 +133,8 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
 
   const access = canAccessOrder(user, { id: order.id, customer_id: order.customer_id });
   if (!access.allowed) {
-    return c.json({ success: false, error: access.reason || 'Forbidden' }, 403);
+    const status = !user ? 401 : 403;
+    return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 
   const scope = resolveCustomerScope(c);

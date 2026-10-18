@@ -33,6 +33,12 @@ export interface StitchPOSNewProps {
   brandName?: string;
   /** Tax rate as a decimal (e.g. 0.05 = 5 %) */
   taxRate?: number;
+  /** Discount amount to subtract before tax */
+  discount?: number;
+  /** Currently selected payment method */
+  paymentMethod?: 'payos' | 'cod';
+  /** Staff member name displayed in header */
+  staffName?: string;
   /** Fired when "Complete Order" is clicked; return false to keep cart on error */
   onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void | boolean | Promise<void | boolean>;
   /** Fired when a payment method is selected */
@@ -43,6 +49,11 @@ export interface StitchPOSNewProps {
   onCustomerFound?: (customer: POSCustomer) => void;
   /** Called when the cashier clears the customer */
   onClearCustomer?: () => void;
+  /** Header/Footer action callbacks */
+  onOpenSchedule?: () => void;
+  onOpenDrawer?: () => void;
+  onPrintReceipt?: () => void;
+  onEndShift?: () => void;
 }
 
 /* ─── Helpers & Constants ───────────────────────────────────────────── */

@@ -20,12 +20,16 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 interface StatsGridProps {
   stats: AdminStats | null | undefined;
+  loading?: boolean;
 }
 
-export function StatsGrid({ stats }: StatsGridProps) {
+export function StatsGrid({ stats, loading }: StatsGridProps) {
   const { t } = useTranslation('admin');
   return (
-    <div className="stagger-reveal mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div
+      className="stagger-reveal mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      aria-busy={loading || undefined}
+    >
       {STATS_CARDS.map((card) => (
         <StatsCard
           key={card.key}
@@ -88,7 +92,7 @@ interface RecentOrdersSectionProps {
   loading: boolean;
 }
 
-export function RecentOrdersSection({ orders, loading }: RecentOrdersSectionProps) {
+export function RecentOrdersSection({ orders = [], loading }: RecentOrdersSectionProps) {
   const { t } = useTranslation('admin');
   return (
     <div className="mb-6">
@@ -110,7 +114,7 @@ interface TopCustomersSectionProps {
   loading: boolean;
 }
 
-export function TopCustomersSection({ customers, loading }: TopCustomersSectionProps) {
+export function TopCustomersSection({ customers = [], loading }: TopCustomersSectionProps) {
   const { t } = useTranslation('admin');
   return (
     <div>

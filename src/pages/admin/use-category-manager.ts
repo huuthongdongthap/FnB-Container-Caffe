@@ -54,6 +54,9 @@ export function useCategoryManager() {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       setDeleteId(null);
     },
+    onError: (err: Error) => {
+      setErrors({ _form: err.message });
+    },
   });
 
   function openAddModal() {

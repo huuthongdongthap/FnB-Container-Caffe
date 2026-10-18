@@ -21,20 +21,31 @@ import {
 export default function AdminDashboardPage() {
   const { stats, loading: statsLoading, error: statsError, fetchDashboard } = useAdminDashboardStore();
   const { orders, loading: ordersLoading, fetchOrders } = useAdminOrdersStore();
-  const { customers, isLoadingCustomers } = useAdmin();
+  const { customers, isLoadingCustomers } = useAdmin({
+    enableStats: false,
+    enableOrders: false,
+    enableSyncStatus: false,
+  });
   const [period, setPeriod] = useState<Period>('daily');
   const { t } = useTranslation('admin');
 
   useEffect(() => {
-    fetchDashboard?.();
     fetchOrders?.();
-  }, [fetchDashboard, fetchOrders]);
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    if (period === 'daily') {
+      fetchDashboard?.();
+    } else {
+      fetchDashboard?.(period);
+    }
+  }, [fetchDashboard, period]);
 
   const {
     topProducts, peakHours, customerMetrics, dailyRevenue, zoneStats,
-    chartData, chartTotal, exporting, handleExport,
+    chartData, chartTotal, exporting, exportError, handleExport,
     topErrorMsg, peakErrorMsg, custErrorMsg, revErrorMsg, zoneErrorMsg,
-  } = useDashboardAnalytics(t);
+  } = useDashboardAnalytics(t, period);
 
   if (statsError) {
     return (
@@ -83,8 +94,14 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
+        {exportError && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+            {exportError}
+          </div>
+        )}
+
         <StuckPaymentsCard />
-        <StatsGrid stats={stats} />
+        <StatsGrid stats={stats} loading={statsLoading} />
 
         <div className="mb-6">
           <CustomerMetrics

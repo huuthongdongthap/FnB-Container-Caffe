@@ -7,7 +7,7 @@ interface AdminDashboardState {
   stats: AdminStats | null;
   loading: boolean;
   error: string | null;
-  fetchDashboard: () => Promise<void>;
+  fetchDashboard: (period?: string) => Promise<void>;
 }
 
 function normalizeDashboardStats(body: Record<string, unknown> | null | undefined): AdminStats {
@@ -43,10 +43,11 @@ export const useAdminDashboardStore = create<AdminDashboardState>((set) => ({
   loading: false,
   error: null,
 
-  fetchDashboard: async () => {
+  fetchDashboard: async (period?: string) => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<any>('/api/stats');
+      const endpoint = period ? `/api/stats?period=${encodeURIComponent(period)}` : '/api/stats';
+      const body = await apiFetch<any>(endpoint);
       set({
         stats: normalizeDashboardStats(body),
         loading: false,

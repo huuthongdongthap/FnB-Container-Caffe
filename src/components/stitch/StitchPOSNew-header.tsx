@@ -3,7 +3,15 @@
 import { useTranslation } from 'react-i18next';
 import { Clock, Terminal, PersonStanding } from 'lucide-react';
 
-export function POSHeader({ brandName }: { brandName: string }) {
+export function POSHeader({
+  brandName,
+  staffName = 'Julian R.',
+  onOpenSchedule,
+}: {
+  brandName: string;
+  staffName?: string;
+  onOpenSchedule?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <header
@@ -23,6 +31,7 @@ export function POSHeader({ brandName }: { brandName: string }) {
       <div className="flex items-center gap-5">
         <button
          type="button"
+          onClick={() => onOpenSchedule?.()}
           className="text-[var(--aura-text-muted, #8a7a6a)] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
           aria-label={t('posNew.schedule')}
         >
@@ -35,7 +44,7 @@ export function POSHeader({ brandName }: { brandName: string }) {
           aria-label={t('posNew.userProfile')}
         >
           <PersonStanding className="w-4 h-4 text-[var(--aura-primary, #f2c08d)]" />
-          <span className="text-[12px] font-body">Julian R.</span>
+          <span className="text-[12px] font-body">{staffName}</span>
         </div>
       </div>
     </header>

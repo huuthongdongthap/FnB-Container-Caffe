@@ -21,6 +21,8 @@ interface CartSidebarProps {
   subtotal: number;
   tax: number;
   total: number;
+  discount?: number;
+  paymentMethod?: 'payos' | 'cod';
   tableLabel: string;
   guestLabel: string;
   orderNumber: string;
@@ -40,6 +42,8 @@ export function CartSidebar({
   subtotal,
   tax,
   total,
+  discount = 0,
+  paymentMethod = 'payos',
   tableLabel,
   guestLabel,
   orderNumber,
@@ -52,6 +56,8 @@ export function CartSidebar({
   onClearCustomer,
 }: CartSidebarProps) {
   const { t } = useTranslation();
+  const formattedSubtotal = formatPosPrice(subtotal);
+  const isUsdSubtotal = formattedSubtotal.startsWith('$');
   return (
     <aside
       className={cn(
@@ -103,7 +109,7 @@ export function CartSidebar({
                     {item.name}
                   </h4>
                   <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
-                    {`${item.quantity} × ${formatPosPrice(item.price * item.quantity)}`}
+                    {`${item.quantity} × ${formatPosPrice(item.price)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -137,11 +143,23 @@ export function CartSidebar({
       <div className="px-6 py-4 bg-[rgba(var(--aura-noir-void),0.5)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex flex-col gap-2">
         <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
           <span>{t('posNew.subtotal')}</span>
-          <span aria-label={formatPosPrice(subtotal)}>
-            <span>{formatPosPrice(subtotal).slice(0, 1)}</span>
-            <span>{formatPosPrice(subtotal).slice(1)}</span>
+          <span aria-label={formattedSubtotal}>
+            {isUsdSubtotal ? (
+              <>
+                <span>{formattedSubtotal.slice(0, 1)}</span>
+                <span>{formattedSubtotal.slice(1)}</span>
+              </>
+            ) : (
+              formattedSubtotal
+            )}
           </span>
         </div>
+        {discount > 0 && (
+          <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+            <span>{t('posNew.discount', { defaultValue: 'Discount' })}</span>
+            <span>-{formatPosPrice(discount)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
           <span>{t('posNew.tax')}</span>
           <span>{formatPosPrice(tax)}</span>
@@ -157,7 +175,13 @@ export function CartSidebar({
         <div className="grid grid-cols-2 gap-3 mt-3">
           <button
            type="button"
-            className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(var(--aura-chrome-light),0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
+            aria-pressed={paymentMethod === 'payos'}
+            className={cn(
+              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow',
+              paymentMethod === 'payos'
+                ? 'border-[var(--aura-primary,#f2c08d)] ring-1 ring-[var(--aura-primary,#f2c08d)]'
+                : 'border-[rgba(var(--aura-chrome-light),0.15)]'
+            )}
             onClick={() => onPayment?.('payos')}
             aria-label={t('posNew.payos')}
           >
@@ -168,7 +192,13 @@ export function CartSidebar({
           </button>
           <button
            type="button"
-            className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(var(--aura-chrome-light),0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
+            aria-pressed={paymentMethod === 'cod'}
+            className={cn(
+              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow',
+              paymentMethod === 'cod'
+                ? 'border-[var(--aura-primary,#f2c08d)] ring-1 ring-[var(--aura-primary,#f2c08d)]'
+                : 'border-[rgba(var(--aura-chrome-light),0.15)]'
+            )}
             onClick={() => onPayment?.('cod')}
             aria-label={t('posNew.cod')}
           >

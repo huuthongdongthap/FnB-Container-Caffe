@@ -195,7 +195,16 @@ momoWebhookRouter.post('/', async(c) => {
 
           // No voucher reversal needed on success here — reversal lives in refunds flow.
         } catch {
-          // Non-blocking
+          try {
+            await db
+              .prepare(
+                'SELECT customer_id, discount_amount, total FROM orders WHERE id = ?'
+              )
+              .bind(payment.order_id)
+              .first<{ customer_id: string | null; discount_amount: number | null; total: number | null }>();
+          } catch {
+            // Non-blocking
+          }
         }
       })();
       sideEffects.push(loyaltyPromise);

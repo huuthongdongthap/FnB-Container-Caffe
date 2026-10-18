@@ -49,7 +49,7 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         }, 400);
       }
 
-      const result = await auditLogger.query({
+      let result = await auditLogger.query({
         actorId: actorId || undefined,
         action: action || undefined,
         resourceType: resourceType || undefined,
@@ -58,6 +58,60 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         page,
         pageSize
       });
+
+      // Fallback for case-insensitive / prefix / CRUD verb action filters (e.g. CREATE -> %.post)
+      if (action && result.rows.length === 0) {
+        try {
+          const conditions: string[] = [];
+          const params: unknown[] = [];
+          if (actorId) {
+            conditions.push('actor_id = ?');
+            params.push(actorId);
+          }
+          if (resourceType) {
+            conditions.push('resource_type = ?');
+            params.push(resourceType);
+          }
+          if (dateFrom) {
+            conditions.push('created_at >= ?');
+            params.push(dateFrom);
+          }
+          if (dateTo) {
+            conditions.push('created_at <= ?');
+            params.push(dateTo);
+          }
+
+          const upper = action.trim().toUpperCase();
+          const verbMethodMap: Record<string, string[]> = {
+            CREATE: ['%.post', '%create%'],
+            UPDATE: ['%.put', '%.patch', '%update%'],
+            DELETE: ['%.delete', '%delete%'],
+            LOGIN: ['%login%', '%auth%'],
+            EXPORT: ['%export%'],
+          };
+          const patterns = verbMethodMap[upper] ?? [`%${action.trim().toLowerCase()}%`];
+          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => 'LOWER(action) LIKE ?')];
+          conditions.push(`(${actionOrClauses.join(' OR ')})`);
+          params.push(action.trim(), ...patterns);
+
+          const whereClause = `WHERE ${conditions.join(' AND ')}`;
+          const offset = (page - 1) * pageSize;
+          const countRow = await c.env.AURA_DB.prepare(
+            `SELECT COUNT(*) as total FROM audit_logs ${whereClause}`
+          ).bind(...params).first<{ total: number }>();
+          const { results } = await c.env.AURA_DB.prepare(
+            `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+          ).bind(...params, pageSize, offset).all<typeof result.rows[number]>();
+          if (results && results.length > 0) {
+            result = {
+              rows: results,
+              total: countRow?.total ?? results.length,
+            };
+          }
+        } catch {
+          // Keep original result on fallback query error
+        }
+      }
 
       const response: PaginatedResponse<typeof result.rows[number]> = {
         rows: result.rows,

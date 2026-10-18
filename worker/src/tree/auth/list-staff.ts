@@ -31,7 +31,17 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
         }
         try {
           const u = JSON.parse(userStr);
-          if (u.role === 'staff' || u.role === 'manager' || u.role === 'waiter' || u.role === 'owner') {
+          if (
+            u.role === 'staff' ||
+            u.role === 'manager' ||
+            u.role === 'waiter' ||
+            u.role === 'owner' ||
+            u.role === 'admin' ||
+            u.role === 'kitchen' ||
+            u.role === 'barista' ||
+            u.role === 'chef' ||
+            u.role === 'cashier'
+          ) {
             users.push({
               id: u.id,
               email: u.email,
@@ -57,9 +67,18 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
     const dbx = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
     if (dbx) {
       try {
-        const { results: d1Users } = await dbx.prepare(
-          "SELECT id, email, name, phone, role, is_active, hire_date, created_at FROM users WHERE role IN ('owner', 'manager', 'staff', 'waiter')"
-        ).all<Record<string, unknown>>();
+        let d1Users: Record<string, unknown>[] | undefined;
+        try {
+          const res = await dbx.prepare(
+            "SELECT id, email, name, phone, role, is_active, hire_date, created_at FROM users WHERE role IN ('owner', 'admin', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier')"
+          ).all<Record<string, unknown>>();
+          d1Users = res.results;
+        } catch {
+          const res = await dbx.prepare(
+            "SELECT id, email, name, phone, role, is_active, created_at FROM users WHERE role IN ('owner', 'admin', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier')"
+          ).all<Record<string, unknown>>();
+          d1Users = res.results;
+        }
         const seenIds = new Set(users.map((u) => String(u.id)));
         const seenEmails = new Set(users.map((u) => String(u.email || '').toLowerCase()).filter(Boolean));
         for (const row of d1Users || []) {

@@ -137,10 +137,17 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
     }
 
     // Fire-and-forget last_login update
-    void c.env.AURA_DB
+    const loginNow = new Date().toISOString();
+    const updatePromise = c.env.AURA_DB
       .prepare('UPDATE staff_devices SET last_login_at = ?, updated_at = ? WHERE device_token = ?')
-      .bind(new Date().toISOString(), new Date().toISOString(), deviceToken)
-      .run();
+      .bind(loginNow, loginNow, deviceToken)
+      .run()
+      .catch(() => {});
+    try {
+      c.executionCtx?.waitUntil(updatePromise);
+    } catch {
+      void updatePromise;
+    }
 
     let staffEmail = '';
     let staffName = '';
@@ -151,8 +158,18 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
         staffEmail = parsedStaff.email || '';
         staffName = parsedStaff.name || '';
       }
+      if (!staffEmail && !staffName && c.env.AURA_DB) {
+        const d1Staff = await c.env.AURA_DB
+          .prepare('SELECT email, name FROM users WHERE id = ?')
+          .bind(device.staff_id)
+          .first<{ email?: string; name?: string }>();
+        if (d1Staff) {
+          staffEmail = d1Staff.email || '';
+          staffName = d1Staff.name || '';
+        }
+      }
     } catch {
-      // Ignore KV lookup error
+      // Ignore lookup error
     }
 
     const token = await generateJWT(
@@ -201,8 +218,18 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
         staffEmail = parsedStaff.email || '';
         staffName = parsedStaff.name || '';
       }
+      if (!staffEmail && !staffName && c.env.AURA_DB) {
+        const d1Staff = await c.env.AURA_DB
+          .prepare('SELECT email, name FROM users WHERE id = ?')
+          .bind(device.staff_id)
+          .first<{ email?: string; name?: string }>();
+        if (d1Staff) {
+          staffEmail = d1Staff.email || '';
+          staffName = d1Staff.name || '';
+        }
+      }
     } catch {
-      // Ignore KV lookup error
+      // Ignore lookup error
     }
 
     const newToken = await generateJWT(
@@ -226,7 +253,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     const rawBody = await c.req.json<Record<string, unknown>>();
     const body = {
       ...rawBody,
-      role: rawBody.role === 'kitchen' ? 'staff' : rawBody.role,
+      role: ['kitchen', 'barista', 'chef'].includes(String(rawBody.role)) ? 'staff' : rawBody.role,
     };
     const parsed = registerDeviceSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
@@ -260,7 +287,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
 
     if (callerRole === 'manager' && !['staff', 'waiter'].includes(role)) {
       return errorResponse('Manager chỉ đăng ký được bếp/phục vụ', 403);
-    } else if (!['owner', 'manager'].includes(callerRole)) {
+    } else if (!['owner', 'admin', 'manager'].includes(callerRole)) {
       return errorResponse('Chỉ owner hoặc manager đăng ký thiết bị', 403);
     }
 
@@ -298,6 +325,7 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
 
     const canDelete =
       callerRole === 'owner' ||
+      callerRole === 'admin' ||
       device.staff_id === callerId ||
       (callerRole === 'manager' && ['staff', 'waiter'].includes(device.role));
     if (!canDelete) return errorResponse('Không đủ quyền xóa thiết bị', 403);
@@ -322,13 +350,13 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
     if (!callerRole || !callerId) return errorResponse('Vui lòng đăng nhập', 401);
 
     let rows;
-    if (callerRole === 'owner') {
+    if (callerRole === 'owner' || callerRole === 'admin') {
       rows = await c.env.AURA_DB
         .prepare('SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices ORDER BY created_at DESC')
         .all();
     } else if (callerRole === 'manager') {
       rows = await c.env.AURA_DB
-        .prepare('SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE role IN ("staff","waiter") ORDER BY created_at DESC')
+        .prepare("SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE role IN ('staff','waiter') ORDER BY created_at DESC")
         .all();
     } else {
       rows = await c.env.AURA_DB

@@ -10,7 +10,7 @@ Calls skipWaiting() then reloads when the new SW takes control.
 
 export default function SWUpdatePrompt() {
   const { isUpdateAvailable, skipWaiting } = useSWRegistration();
-  const { t } = useTranslation('pwa');
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(false);
 
   if (!isUpdateAvailable || dismissed) return null;
@@ -19,7 +19,7 @@ export default function SWUpdatePrompt() {
     skipWaiting();
     // controllerchange fires → new SW controls → reload
     const handler = () => window.location.reload();
-    navigator.serviceWorker.addEventListener('controllerchange', handler, { once: true });
+    navigator.serviceWorker?.addEventListener('controllerchange', handler, { once: true });
   };
 
   return (

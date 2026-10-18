@@ -208,6 +208,7 @@ export class ErpnextAccountingClient {
       SET sync_status = 'failed',
           error_message = ?,
           attempts = attempts + 1,
+          last_synced_at = datetime('now'),
           updated_at = datetime('now')
       WHERE local_type = ? AND local_id = ?
     `).bind(error, 'order', orderId).run();

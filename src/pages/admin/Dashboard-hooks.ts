@@ -7,6 +7,7 @@ import {
   useZoneStats,
   downloadAnalyticsCsv,
 } from '@/hooks/use-analytics-data';
+import type { Period } from './Dashboard-constants';
 
 export interface DashboardAnalytics {
   topProducts: ReturnType<typeof useTopProducts>;
@@ -17,6 +18,7 @@ export interface DashboardAnalytics {
   chartData: { label: string; value: number }[];
   chartTotal: number;
   exporting: boolean;
+  exportError: string | null;
   handleExport: () => Promise<void>;
   topErrorMsg: string | null;
   peakErrorMsg: string | null;
@@ -28,13 +30,19 @@ export interface DashboardAnalytics {
 /**
  * Aggregates all analytics query hooks and derived state for the dashboard.
  */
-export function useDashboardAnalytics(t: (key: string) => string): DashboardAnalytics {
+export function useDashboardAnalytics(
+  t: (key: string) => string,
+  period: Period = 'daily',
+): DashboardAnalytics {
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const revenueRange = period === 'weekly' ? '7d' : period === 'monthly' ? '90d' : '30d';
 
   const topProducts = useTopProducts(10);
   const peakHours = usePeakHours(30);
   const customerMetrics = useCustomerMetrics();
-  const dailyRevenue = useDailyRevenue();
+  const dailyRevenue = useDailyRevenue(revenueRange);
   const zoneStats = useZoneStats(30);
 
   const chartData = (dailyRevenue.data || []).map((d) => ({
@@ -47,16 +55,17 @@ export function useDashboardAnalytics(t: (key: string) => string): DashboardAnal
   const handleExport = useCallback(async () => {
     if (exporting) return;
     setExporting(true);
+    setExportError(null);
     try {
       const end = new Date().toISOString().slice(0, 10);
       const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       await downloadAnalyticsCsv(start, end);
-    } catch {
-      // CSV export failed silently
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : t('exportError'));
     } finally {
       setExporting(false);
     }
-  }, [exporting]);
+  }, [exporting, t]);
 
   const topErrorMsg = topProducts.isError
     ? topProducts.error instanceof Error ? topProducts.error.message : t('topProductError')
@@ -83,6 +92,7 @@ export function useDashboardAnalytics(t: (key: string) => string): DashboardAnal
     chartData,
     chartTotal,
     exporting,
+    exportError,
     handleExport,
     topErrorMsg,
     peakErrorMsg,

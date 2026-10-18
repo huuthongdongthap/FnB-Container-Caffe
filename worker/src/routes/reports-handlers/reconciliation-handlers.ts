@@ -15,21 +15,52 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
     // ── Shifts with reconciliation data ──
-    const { results: shifts } = await db.prepare(
-      `SELECT s.id, DATE(s.created_at) AS shift_date,
-              COALESCE(sr.opening_float, 0) AS opening_float,
-              COALESCE(sr.actual_cash, 0) AS actual_cash,
-              COALESCE(sr.denominations, '{}') AS denominations
-       FROM shifts s
-       LEFT JOIN shift_reconciliations sr ON sr.shift_id = s.id
-       WHERE DATE(s.created_at) BETWEEN ? AND ?`
-    ).bind(from, to).all<{
+    let shifts: {
       id: string;
       shift_date: string;
       opening_float: number;
       actual_cash: number;
       denominations: string;
-    }>();
+    }[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT s.id, DATE(s.created_at) AS shift_date,
+                COALESCE(sr.opening_float, 0) AS opening_float,
+                COALESCE(sr.actual_cash, 0) AS actual_cash,
+                COALESCE(sr.denominations, '{}') AS denominations
+         FROM shifts s
+         LEFT JOIN shift_reconciliations sr ON sr.shift_id = s.id
+         WHERE DATE(s.created_at) BETWEEN ? AND ?`
+      ).bind(from, to).all<{
+        id: string;
+        shift_date: string;
+        opening_float: number;
+        actual_cash: number;
+        denominations: string;
+      }>();
+      shifts = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT s.id, DATE(COALESCE(s.clock_in, s.created_at)) AS shift_date,
+                  COALESCE(sr.opening_float, 0) AS opening_float,
+                  COALESCE(sr.actual_cash, 0) AS actual_cash,
+                  COALESCE(sr.denominations_json, '{}') AS denominations
+           FROM staff_shifts s
+           LEFT JOIN shift_reconciliations sr ON sr.shift_id = s.id
+           WHERE DATE(COALESCE(s.clock_in, s.created_at)) BETWEEN ? AND ?`
+        ).bind(from, to).all<{
+          id: string;
+          shift_date: string;
+          opening_float: number;
+          actual_cash: number;
+          denominations: string;
+        }>();
+        shifts = res.results || [];
+      } catch {
+        shifts = [];
+      }
+    }
 
     // ── Cash payments (orders with payment_method='cash' paid in period) ──
     const { results: cashPayments } = await db.prepare(

@@ -49,13 +49,28 @@ interface AdminResult {
   isLoadingSyncStatus: boolean;
 }
 
-export function useAdmin(): AdminResult {
+export interface UseAdminOptions {
+  enableStats?: boolean;
+  enableOrders?: boolean;
+  enableCustomers?: boolean;
+  enableSyncStatus?: boolean;
+}
+
+export function useAdmin(options: UseAdminOptions = {}): AdminResult {
+  const {
+    enableStats = true,
+    enableOrders = true,
+    enableCustomers = true,
+    enableSyncStatus = true,
+  } = options;
+
   const {
     data: stats,
     isLoading: isLoadingStats,
     error: statsError,
   } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
+    enabled: enableStats,
     queryFn: () =>
       apiFetch<AdminStats & { stats?: Record<string, unknown> }>('/api/stats').then((raw) => {
         if (typeof raw?.todayRevenue === 'number' && typeof raw?.todayOrders === 'number') {
@@ -83,6 +98,7 @@ export function useAdmin(): AdminResult {
     error: ordersError,
   } = useQuery<AdminOrder[]>({
     queryKey: ['admin-orders'],
+    enabled: enableOrders,
     queryFn: () =>
       apiFetch<{ orders?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/orders').then(
         (r) =>
@@ -132,6 +148,7 @@ export function useAdmin(): AdminResult {
     isLoading: isLoadingCustomers,
   } = useQuery<AdminCustomer[]>({
     queryKey: ['admin-customers'],
+    enabled: enableCustomers,
     queryFn: () =>
       apiFetch<{ customers?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/customers').then(
         (r) =>
@@ -158,6 +175,7 @@ export function useAdmin(): AdminResult {
     isLoading: isLoadingSyncStatus,
   } = useQuery<SyncStatusInfo>({
     queryKey: ['admin-sync-status'],
+    enabled: enableSyncStatus,
     queryFn: () => apiFetch<SyncStatusInfo>('/api/admin/erpnext-sync/status'),
     staleTime: 30_000,
     refetchInterval: 60_000,

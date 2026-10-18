@@ -285,9 +285,6 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
       updates.push(`${key} = ?`); params.push(bodyAny[key]);
     }
   }
-  if (bodyAny.notes !== undefined) {
-    updates.push('notes = ?'); params.push(bodyAny.notes);
-  }
 
   if (updates.length === 0) {
     return c.json({ success: false, error: 'No fields to update' }, 400);

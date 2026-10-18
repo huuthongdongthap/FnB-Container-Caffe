@@ -26,7 +26,7 @@ export function useProductManager() {
         slug: formData.slug,
         description: formData.description,
         price: Number(formData.price),
-        category_id: Number(formData.category_id),
+        category_id: String(formData.category_id),
         image_url: formData.image_url,
         is_available: formData.is_available ? 1 : 0,
         sort_order: Number(formData.sort_order),
@@ -58,6 +58,9 @@ export function useProductManager() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       setDeleteId(null);
+    },
+    onError: (err: Error) => {
+      setErrors({ _form: err.message });
     },
   });
 
@@ -100,7 +103,9 @@ export function useProductManager() {
       category_id: String(product.category_id),
       image_url: product.image_url,
       is_available: product.is_available === 1,
-      is_variable_price: false,
+      is_variable_price: Boolean(
+        (product as Product & { is_variable_price?: boolean | number }).is_variable_price,
+      ),
       sort_order: String(product.sort_order),
     });
     setErrors({});

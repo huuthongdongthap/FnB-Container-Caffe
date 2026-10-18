@@ -24,7 +24,7 @@ export default function BroadcastPage() {
   const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { data: segments = [], isLoading: segmentsLoading } = useSegments();
+  const { data: segments = [], isLoading: segmentsLoading, error: segmentsError } = useSegments();
   const sendMutation = useSendBroadcast();
 
   const selectedSegment = segments.find((s) => s.id === segment);
@@ -78,10 +78,10 @@ export default function BroadcastPage() {
             <p className="mt-1 text-sm text-muted">{t('broadcast.subtitle')}</p>
           </div>
 
-          {sendMutation.error && (
+          {(sendMutation.error || segmentsError) && (
             <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">
               <p className="font-medium">{t('broadcast.error')}</p>
-              <p className="text-sm">{sendMutation.error.message}</p>
+              <p className="text-sm">{(sendMutation.error || segmentsError)?.message}</p>
             </div>
           )}
 

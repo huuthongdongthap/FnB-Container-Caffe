@@ -23,7 +23,7 @@ const baseProductSchema = z.object({
   slug: z.string().optional(),
   description: z.string().optional(),
   compare_at_price: z.number().optional(),
-  category_id: z.string().optional(),
+  category_id: z.union([z.string(), z.number().transform(String)]).optional(),
   image_url: z.string().url().optional().or(z.literal('')),
   is_available: z.boolean().optional(),
   sort_order: z.number().int().optional()

@@ -33,17 +33,26 @@ export function StitchPOSNew({
   error = null,
   brandName = 'AURA CAFE',
   taxRate = 0.05,
+  discount = 0,
+  paymentMethod: externalPaymentMethod,
+  staffName,
   onCompleteOrder,
   onPayment,
   customer = null,
   onCustomerFound,
   onClearCustomer,
+  onOpenSchedule,
+  onOpenDrawer,
+  onPrintReceipt,
+  onEndShift,
 }: Readonly<StitchPOSNewProps>) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Coffee');
   const [cart, setCart] = useState<POSNewCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(true);
+  const [internalPaymentMethod, setInternalPaymentMethod] = useState<'payos' | 'cod'>('payos');
+  const activePaymentMethod = externalPaymentMethod ?? internalPaymentMethod;
 
   const categories = Array.from(
     new Set([
@@ -100,9 +109,15 @@ export function StitchPOSNew({
   };
 
   const subtotal = cart.reduce((acc, c) => acc + c.price * c.quantity, 0);
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax;
+  const discountedSubtotal = Math.max(0, subtotal - discount);
+  const tax = discountedSubtotal * taxRate;
+  const total = discountedSubtotal + tax;
   const cartItemCount = cart.reduce((a, c) => a + c.quantity, 0);
+
+  const handlePaymentSelect = (method: 'payos' | 'cod') => {
+    setInternalPaymentMethod(method);
+    onPayment?.(method);
+  };
 
   const handleCompleteOrder = async (completedCart: POSNewCartItem[], completedTotal: number) => {
     try {
@@ -160,7 +175,11 @@ export function StitchPOSNew({
       className="min-h-screen flex flex-col select-none"
       style={{ backgroundColor: 'var(--aura-bg-page, #16130f)', color: 'var(--aura-text-primary, #eae1db)', overflow: 'hidden', height: '100vh' }}
     >
-      <POSHeader brandName={brandName} />
+      <POSHeader
+        brandName={brandName}
+        staffName={staffName}
+        onOpenSchedule={onOpenSchedule}
+      />
 
       <main className="pt-16 flex h-screen w-full relative">
         <MenuSection
@@ -201,20 +220,27 @@ export function StitchPOSNew({
           subtotal={subtotal}
           tax={tax}
           total={total}
+          discount={discount}
+          paymentMethod={activePaymentMethod}
           tableLabel={tableLabel}
           guestLabel={guestLabel}
           orderNumber={orderNumber}
           cartOpen={cartOpen}
           setCartOpen={setCartOpen}
           onCompleteOrder={handleCompleteOrder}
-          onPayment={onPayment}
+          onPayment={handlePaymentSelect}
           customer={customer}
           onCustomerFound={onCustomerFound}
           onClearCustomer={onClearCustomer}
         />
       </main>
 
-      <POSFooter cartOpen={cartOpen} />
+      <POSFooter
+        cartOpen={cartOpen}
+        onOpenDrawer={onOpenDrawer}
+        onPrintReceipt={onPrintReceipt}
+        onEndShift={onEndShift}
+      />
       <style>{POS_STYLES}</style>
     </div>
   );

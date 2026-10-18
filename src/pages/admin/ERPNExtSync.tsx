@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAdmin } from '@/hooks/use-admin';
 import { SyncStatus } from '@/components/admin/SyncStatus';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -20,7 +21,12 @@ const MOCK_LOGS: SyncLogEntry[] = [
 
 export default function AdminERPNExtSyncPage() {
   const { t } = useTranslation('erpnextSync');
-  const { syncStatus, isLoadingSyncStatus } = useAdmin();
+  const queryClient = useQueryClient();
+  const { syncStatus, isLoadingSyncStatus } = useAdmin({
+    enableStats: false,
+    enableOrders: false,
+    enableCustomers: false,
+  });
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>(
     MOCK_LOGS.map((log) => ({ ...log, message: t(log.message) }))
   );
@@ -38,6 +44,7 @@ export default function AdminERPNExtSyncPage() {
     setSyncingEntity(entity);
     try {
       await apiFetch(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
+      void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
       appendLog({
         entity,
         action: 'sync',
@@ -55,6 +62,7 @@ export default function AdminERPNExtSyncPage() {
     setSyncingAll(true);
     try {
       await apiFetch('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
+      void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
       appendLog({
         entity: 'All',
         action: 'sync-all',

@@ -41,9 +41,27 @@ function getInitialTableId(): string | null {
   }
 }
 
+function extractBaseProductId(rawId: string, modifiers?: string[]): string {
+  if (!rawId) return '';
+  if (Array.isArray(modifiers) && modifiers.length > 0) {
+    const modSuffix = `-${modifiers.join('_')}`;
+    if (rawId.endsWith(modSuffix)) {
+      return rawId.slice(0, rawId.length - modSuffix.length).trim() || rawId;
+    }
+  }
+  const dashIdx = rawId.indexOf('-');
+  if (dashIdx > 0) {
+    const suffix = rawId.slice(dashIdx + 1);
+    if (/[\s()%_]/.test(suffix)) {
+      return rawId.slice(0, dashIdx).trim() || rawId;
+    }
+  }
+  return rawId;
+}
+
 function sanitizeCartItem(item: CartItem): CartItem {
   const rawId = item.productId || item.id || '';
-  const baseId = (rawId.includes('-') || rawId.includes('_')) ? rawId.split(/[-_]/)[0]?.trim() || rawId : rawId;
+  const baseId = extractBaseProductId(rawId, item.modifiers);
 
   // Ready to serve items check (bottled, snack, packaged)
   const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
@@ -97,7 +115,8 @@ function loadInitialItems(): CartItem[] {
       if (Array.isArray(items) && items.length > 0) {
         const migrated: CartItem[] = items.map((item: Record<string, unknown>) => {
           const rawId = String(item.productId || item.product_id || item.id || '');
-          const baseId = (rawId.includes('-') || rawId.includes('_')) ? rawId.split(/[-_]/)[0]?.trim() || rawId : rawId;
+          const rawMods = Array.isArray(item.modifiers) ? (item.modifiers as string[]) : undefined;
+          const baseId = extractBaseProductId(rawId, rawMods);
           const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
           return {
             id: isReadyToServe ? baseId : String(item.id || ''),

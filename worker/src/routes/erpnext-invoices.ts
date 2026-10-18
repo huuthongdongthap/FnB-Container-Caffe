@@ -25,7 +25,7 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
 
   try {
     const accountingClient = createErpnextAccountingClient(env);
-    if (!accountingClient) {
+    if (!accountingClient && path !== '/list') {
       return json({ success: false, error: 'ERPNext accounting not configured' }, 503);
     }
 
@@ -37,7 +37,7 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
         return json({ success: false, error: 'order id required' }, 400);
       }
 
-      const result = await accountingClient.processOrderToInvoice(body, env);
+      const result = await accountingClient!.processOrderToInvoice(body, env);
       return json({ success: true, data: result }, 201);
     }
 
@@ -48,35 +48,56 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
         return json({ success: false, error: 'Database not available' }, 503);
       }
 
-      const { results } = await db.prepare(`
-        SELECT
-          m.id,
-          m.local_id as order_id,
-          m.erpnext_id,
-          m.erpnext_model,
-          m.sync_status,
-          m.attempts,
-          m.error_message,
-          m.created_at,
-          m.last_synced_at,
-          o.customer_name,
-          o.total_amount,
-          o.customer_email,
-          o.customer_phone
-        FROM erpnext_mappings m
-        LEFT JOIN orders o ON o.id = m.local_id
-        WHERE m.local_type = ?
-        ORDER BY m.created_at DESC
-        LIMIT 100
-      `).bind('order').all();
+      let dataResults: any[] = [];
+      try {
+        const { results } = await db.prepare(`
+          SELECT
+            m.id,
+            m.local_id as order_id,
+            m.erpnext_id,
+            m.erpnext_model,
+            m.sync_status,
+            m.attempts,
+            m.created_at,
+            m.last_synced_at,
+            o.customer_name,
+            o.total_amount,
+            o.customer_email,
+            o.customer_phone
+          FROM erpnext_mappings m
+          LEFT JOIN orders o ON o.id = m.local_id
+          WHERE m.local_type = ?
+          ORDER BY m.created_at DESC
+          LIMIT 100
+        `).bind('order').all();
+        dataResults = results || [];
+      } catch {
+        try {
+          const { results } = await db.prepare(`
+            SELECT
+              m.id,
+              COALESCE(m.local_id, m.aura_order_id) as order_id,
+              COALESCE(m.erpnext_id, m.erpnext_invoice_id) as erpnext_id,
+              m.sync_status,
+              m.created_at,
+              m.last_synced_at
+            FROM erpnext_mappings m
+            ORDER BY m.created_at DESC
+            LIMIT 100
+          `).all();
+          dataResults = results || [];
+        } catch {
+          dataResults = [];
+        }
+      }
 
-      return json({ success: true, data: (results || []) });
+      return json({ success: true, data: dataResults });
     }
 
     // GET /api/erpnext-invoices/:orderId — get invoice by order ID
     if (method === 'GET' && path.match(/^\/[^/]+$/)) {
       const orderId = path.slice(1);
-      const invoice = await accountingClient.getInvoiceByOrderId(orderId, env);
+      const invoice = await accountingClient!.getInvoiceByOrderId(orderId, env);
 
       if (!invoice) {
         return json({ success: false, error: 'No invoice found for this order' }, 404);
@@ -90,14 +111,14 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
       const invoiceId = path.replace('/vat', '').slice(1);
       const body = await request.json() as { success: boolean; invoice_number?: string };
 
-      await accountingClient.updateInvoiceVAT(invoiceId, body);
+      await accountingClient!.updateInvoiceVAT(invoiceId, body);
       return json({ success: true, message: 'VAT status updated' });
     }
 
     // GET /api/erpnext-invoices/:id/pdf — generate PDF
     if (method === 'GET' && path.endsWith('/pdf')) {
       const invoiceId = path.replace('/pdf', '').slice(1);
-      const pdfInfo = await accountingClient.generateInvoicePDF(invoiceId);
+      const pdfInfo = await accountingClient!.generateInvoicePDF(invoiceId);
       return json({ success: true, data: pdfInfo });
     }
 
@@ -114,12 +135,12 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
 
       const retried: string[] = [];
       const failed: Array<{ orderId: string; error: string }> = [];
+      const body = await request.json().catch(() => ({}));
 
       for (const row of results || []) {
         try {
-          const body = await request.json().catch(() => ({}));
           const order: OrderInput = { id: row.local_id, ...(body as Record<string, unknown>) } as OrderInput;
-          await accountingClient.processOrderToInvoice(order, env);
+          await accountingClient!.processOrderToInvoice(order, env);
           retried.push(row.local_id);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);

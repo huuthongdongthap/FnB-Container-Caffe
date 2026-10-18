@@ -160,6 +160,12 @@ export async function mergeCustomerProfiles(
     await db.prepare('UPDATE orders SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
     await db.prepare('UPDATE visits SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
     await db.prepare('UPDATE customer_identities SET customer_id = ?, is_primary = 0 WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
+    try {
+      await db.prepare('UPDATE loyalty_point_logs SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
+      await db.prepare('UPDATE cashback_transactions SET customer_id = ? WHERE customer_id = ?').bind(primaryCustomerId, secondaryCustomerId).run();
+    } catch {
+      // Optional loyalty tables in partial environments
+    }
 
     await db.prepare(
       'UPDATE customers SET loyalty_points = loyalty_points + ?, lifetime_points = lifetime_points + ?, updated_at = ? WHERE id = ?'

@@ -128,7 +128,7 @@ export function EventsPage({
   onViewSchedule: _onViewSchedule,
   onNewsletterSubmit: _onNewsletterSubmit,
 }: Readonly<EventsPageProps>) {
-  const { t } = useTranslation('events');
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const hook = useUpcomingEvents();
   const isLoading = externalLoading ?? hook.isLoading;
@@ -153,8 +153,8 @@ export function EventsPage({
   return (
     <>
       <HelmetHead
-        title={t('seoTitle')}
-        description={t('seoDescription')}
+        title={t('events.seoTitle', { defaultValue: 'Events — AURA CAFE' })}
+        description={t('events.seoDescription', { defaultValue: 'Upcoming events and nocturnal sessions at AURA CAFE.' })}
         canonical="/events"
       />
       <StitchEventsNew2

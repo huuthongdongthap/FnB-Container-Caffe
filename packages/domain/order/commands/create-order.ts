@@ -76,6 +76,9 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       if (!tableRow && tableNum !== tableNum.toUpperCase()) {
         tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ?').bind(tableNum.toUpperCase()).first<{ id: string }>();
       }
+      if (!tableRow) {
+        tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE id = ?').bind(tableNum).first<{ id: string }>();
+      }
       if (tableRow) {
         resolvedTableId = tableRow.id;
         await db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND status = 'Available'").bind(tableRow.id).run();

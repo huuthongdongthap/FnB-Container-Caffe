@@ -50,9 +50,15 @@ export default function SalesReportsPage() {
   const comparison = useComparisonData(from, to);
   const groupedQ = useSalesGrouped(groupBy || 'day', from, to);
 
-  const { orders: recentOrders, loading: ordersLoading, fetchOrders } = useAdminOrdersStore();
-  const { error: dataError, fetchDashboard } = useAdminDashboardStore();
+  const { orders: recentOrders, loading: ordersLoading, error: ordersError, fetchOrders } = useAdminOrdersStore();
+  const { error: dashboardError, fetchDashboard } = useAdminDashboardStore();
   const { exportCsv, exporting, error: csvError } = useExportCsv(from, to);
+
+  const dataError =
+    ordersError ||
+    (overviewQ.error instanceof Error ? overviewQ.error.message : null) ||
+    (dailyQ.error instanceof Error ? dailyQ.error.message : null) ||
+    dashboardError;
 
   useEffect(() => {
     fetchOrders(1);
@@ -128,7 +134,15 @@ export default function SalesReportsPage() {
           {dataError && (
             <Card className="mb-6 p-4 text-sm text-red-500">
               {dataError}{' '}
-              <button onClick={fetchDashboard} className="underline">
+              <button
+                onClick={() => {
+                  fetchDashboard?.();
+                  fetchOrders?.(1);
+                  overviewQ.refetch();
+                  dailyQ.refetch();
+                }}
+                className="underline"
+              >
                 {t('salesReports.retry')}
               </button>
             </Card>

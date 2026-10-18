@@ -65,7 +65,7 @@ export function useExportCsv(from: string, to: string) {
     setExporting(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/reports/export?from=${from}&to=${to}&type=sales`, {
+      const res = await fetch(`${API_BASE}/api/reports/export?from=${from}&to=${to}&type=revenue`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });

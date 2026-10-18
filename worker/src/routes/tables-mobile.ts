@@ -5,8 +5,8 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'tables-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin', 'cashier'];
 
 const D1_TO_MOBILE_STATUS: Record<string, 'free' | 'occupied' | 'reserved'> = {
   available: 'free',

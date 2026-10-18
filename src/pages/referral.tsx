@@ -101,7 +101,7 @@ export function ReferralPage() {
   const rewardAmount = store.cashbackEarned > 0
     ? store.cashbackEarned
     : store.referralCount > 0
-      ? 15.0
+      ? store.referralCount * 10000
       : 0;
 
   const data: ReferralPageData | undefined = store.referralCode
@@ -147,6 +147,7 @@ export function ReferralPage() {
         loadingState={loadingState}
         errorMessage={errorMessage}
         onCopyCode={handleCopyCode}
+        onShareVia={handleCopyCode}
         onViewProfile={() => {
           navigate('/account');
         }}

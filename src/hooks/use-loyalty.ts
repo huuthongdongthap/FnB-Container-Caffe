@@ -63,8 +63,28 @@ export function useLoyalty() {
   return useQuery<LoyaltyData>({
     queryKey: ['loyalty'],
     queryFn: async () => {
-      const res = await apiFetch<ApiResponse<LoyaltyData>>('/api/loyalty');
-      return res.data;
+      const res = await apiFetch<
+        ApiResponse<
+          LoyaltyData & {
+            total_points?: number;
+            lifetime_points?: number;
+            tier_config?: { cashback_rate?: number };
+          }
+        >
+      >('/api/loyalty/summary');
+      const raw = res.data;
+      if (!raw) return raw;
+      return {
+        ...raw,
+        tier: raw.tier ?? 'bronze',
+        points: raw.points ?? raw.total_points ?? 0,
+        lifetimePoints: raw.lifetimePoints ?? raw.lifetime_points ?? raw.points ?? raw.total_points ?? 0,
+        spentVnd: raw.spentVnd ?? 0,
+        cashbackRate: raw.cashbackRate ?? raw.tier_config?.cashback_rate ?? 0,
+        birthdayBonus: raw.birthdayBonus ?? 0,
+      };
     },
   });
 }
+
+export const useLoyaltyQuery = useLoyalty;

@@ -55,7 +55,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       );
     }
 
-    if (type === 'revenue') {
+    if (type === 'revenue' || type === 'sales') {
       const { results } = await db.prepare(
         `SELECT DATE(created_at) as date,
                 COUNT(*) as orders,
@@ -67,11 +67,26 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       ).bind(from, to).all<RevenueExportRow>();
 
       // Get cashback earned per day separately
-      const { results: cashbackResults } = await db.prepare(
-        `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
-         FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
-         GROUP BY DATE(created_at)`
-      ).bind(from, to).all<{ date: string; amount: number }>();
+      let cashbackResults: { date: string; amount: number }[] = [];
+      try {
+        const res = await db.prepare(
+          `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
+           FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
+           GROUP BY DATE(created_at)`
+        ).bind(from, to).all<{ date: string; amount: number }>();
+        cashbackResults = res.results || [];
+      } catch {
+        try {
+          const res = await db.prepare(
+            `SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as amount
+             FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'earn'
+             GROUP BY DATE(created_at)`
+          ).bind(from, to).all<{ date: string; amount: number }>();
+          cashbackResults = res.results || [];
+        } catch {
+          cashbackResults = [];
+        }
+      }
 
       const cashbackMap = new Map((cashbackResults || []).map(c => [c.date, c.amount]));
 

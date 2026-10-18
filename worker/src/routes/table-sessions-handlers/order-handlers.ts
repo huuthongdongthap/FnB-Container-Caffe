@@ -38,14 +38,23 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       'UPDATE orders SET table_id = ?, updated_at = ? WHERE id = ?'
     ).bind(session.table_id, now, orderId).run();
 
-    await db.prepare(
-      `UPDATE table_sessions
-       SET order_count = order_count + 1,
-           total_amount = total_amount + ?,
-           status = 'ordering',
-           updated_at = ?
-       WHERE id = ?`
-    ).bind(order.total, now, id).run();
+    try {
+      await db.prepare(
+        `UPDATE table_sessions
+         SET order_count = order_count + 1,
+             total_amount = total_amount + ?,
+             status = 'ordering',
+             updated_at = ?
+         WHERE id = ?`
+      ).bind(order.total, now, id).run();
+    } catch {
+      await db.prepare(
+        `UPDATE table_sessions
+         SET current_order_id = ?,
+             status = 'ordering'
+         WHERE id = ?`
+      ).bind(orderId, id).run();
+    }
 
     if (c.env?.AUTH_KV) {
       await Promise.all([

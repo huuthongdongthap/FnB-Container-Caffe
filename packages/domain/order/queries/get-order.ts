@@ -12,7 +12,7 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const { results } = await db.prepare(
-      'SELECT id, status, total, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
+      'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
     ).bind(id).all<Record<string, unknown>>();
 
     if (!results || results.length === 0) {

@@ -49,21 +49,21 @@ export const ErrorResponseSchema = z.object({
     details: z.record(z.string(), z.unknown()).optional(),
   }),
   meta: z.object({
-    timestamp: z.string().datetime().openapi({ example: '2026-08-26T10:00:00Z' }),
-    requestId: z.string().uuid().optional(),
+    timestamp: z.string().min(1).openapi({ example: '2026-08-26T10:00:00Z' }),
+    requestId: z.string().min(1).optional(),
   }).optional(),
 });
 
 export const IdParamsSchema = z.object({
-  id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+  id: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
 });
 
 export const TableIdParamsSchema = z.object({
-  tableId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+  tableId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
 });
 
 export const LocationIdParamsSchema = z.object({
-  locationId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+  locationId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
 });
 
 // Locale enum for bilingual content
@@ -85,9 +85,9 @@ export const MoneySchema = z.number().int().nonnegative().openapi({
 });
 
 // Timestamp schemas
-export const DateTimeSchema = z.string().datetime().openapi({
+export const DateTimeSchema = z.string().min(1).openapi({
   example: '2026-08-26T10:30:00+07:00',
-  description: 'ISO 8601 datetime with timezone',
+  description: 'ISO 8601 or SQLite datetime string',
 });
 
 export const DateSchema = z.string().date().openapi({
@@ -103,7 +103,7 @@ export const SlugSchema = z.string().regex(/^[a-z0-9-]+$/).openapi({
 
 // Common ID reference
 export const ReferenceSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string(),
   slug: SlugSchema.optional(),
 });
@@ -119,7 +119,7 @@ export const DeviceFingerprintSchema = z.object({
 });
 
 // Webhook idempotency
-export const IdempotencyKeySchema = z.string().uuid().openapi({
+export const IdempotencyKeySchema = z.string().min(1).openapi({
   example: '550e8400-e29b-41d4-a716-446655440000',
   description: 'Unique key for idempotent operations',
 });

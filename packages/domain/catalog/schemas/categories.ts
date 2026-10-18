@@ -90,7 +90,7 @@ export const CategoryRoutes = {
     request: {
       query: PaginationQuerySchema.extend({
         type: CategoryTypeEnum.optional(),
-        parentId: z.string().uuid().optional(),
+        parentId: z.string().min(1).optional(),
         isActive: z.coerce.boolean().optional(),
         locale: LocaleEnum.optional(),
       }),

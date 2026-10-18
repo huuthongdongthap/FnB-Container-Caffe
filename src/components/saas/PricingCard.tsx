@@ -36,8 +36,17 @@ export default function PricingCard({ tier, locale }: Props): ReactNode {
 
   const name = isVi ? tier.nameVi : tier.nameEn;
   const description = isVi ? tier.descriptionVi : tier.descriptionEn;
-  const features = isVi ? tier.featuresVi : tier.featuresEn;
+  const rawFeatures = isVi ? tier.featuresVi : tier.featuresEn;
+  const features = Array.isArray(rawFeatures) ? rawFeatures : [];
   const cta = isVi ? tier.ctaTextVi : tier.ctaTextEn;
+  const priceVnd = Number(tier.priceVnd ?? 0);
+  const periodLabel = isVi
+    ? tier.billingPeriod === 'yearly'
+      ? '/ năm'
+      : '/ tháng'
+    : tier.billingPeriod === 'yearly'
+      ? '/ year'
+      : '/ month';
 
   const handleClick = () => {
     const target = tier.ctaLink?.startsWith('/') ? tier.ctaLink : `/${tier.ctaLink || 'subscribe'}`;
@@ -69,11 +78,11 @@ export default function PricingCard({ tier, locale }: Props): ReactNode {
 
       <div className="mb-6">
         <span className="font-heading text-4xl font-bold text-[#f5e6c8]">
-          {tier.priceVnd.toLocaleString('vi-VN')}
+          {priceVnd.toLocaleString('vi-VN')}
         </span>
         <span className="ml-1 text-sm text-[#8a7560]">₫</span>
         <p className="mt-1 text-xs text-[#8a7560]">
-          {tier.billingPeriod === 'yearly' ? '/ năm' : '/ tháng'}
+          {periodLabel}
         </p>
       </div>
 

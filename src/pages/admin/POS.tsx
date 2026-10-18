@@ -20,7 +20,13 @@ import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
-import type { POSNewMenuItem, POSNewCartItem } from '@/components/stitch/StitchPOSNew-types';
+import type { POSNewMenuItem, POSNewCartItem, POSNewAddOn } from '@/components/stitch/StitchPOSNew-types';
+
+const VND_POS_ADDONS: POSNewAddOn[] = [
+  { id: 'a1', name: 'Oat Milk', price: 10000 },
+  { id: 'a2', name: 'Double Shot', price: 15000 },
+  { id: 'a3', name: 'Vanilla Bean', price: 10000 },
+];
 
 /* ─── Main Page Component ────────────────────────────────────────────────── */
 export default function AdminPOSPage() {
@@ -161,6 +167,8 @@ export default function AdminPOSPage() {
     <div className="relative min-h-screen">
       <StitchPOSNew
         menuItems={stitchMenuItems}
+        addOns={VND_POS_ADDONS}
+        paymentMethod={paymentMethod === 'cod' ? 'cod' : 'payos'}
         loading={menuLoading}
         error={
           menuIsError
@@ -175,6 +183,8 @@ export default function AdminPOSPage() {
         customer={customer}
         onCustomerFound={setCustomer}
         onClearCustomer={() => setCustomer(null)}
+        onOpenSchedule={() => navigate('/admin/shifts')}
+        onEndShift={() => navigate('/admin/shifts')}
       />
 
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}

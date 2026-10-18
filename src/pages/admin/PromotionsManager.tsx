@@ -38,6 +38,12 @@ export default function PromotionsManagerPage() {
             <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
           </div>
 
+          {!modalOpen && errors._form && (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+              {errors._form}
+            </div>
+          )}
+
           <PromotionsList
             promotions={promotions}
             isLoading={query.isLoading}

@@ -19,6 +19,12 @@ function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}${rand}`.toUpperCase();
 }
 
+function padHHMM(t: string): string {
+  const parts = t.trim().split(':');
+  if (parts.length < 2) return t.trim();
+  return `${(parts[0] ?? '').padStart(2, '0')}:${(parts[1] ?? '').padStart(2, '0')}`;
+}
+
 // ── Happy Hour (Public Read, Staff Mutation) ─────────────────────────
 
 happyHourRouter.get('/happy-hour', async (c) => {
@@ -40,10 +46,15 @@ happyHourRouter.post('/happy-hour', staffAuth, async (c) => {
   if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
     return c.json({ success: false, error: 'day_of_week must be 0-6' }, 400);
   }
-  const startTime = String(body.start_time || '').trim();
-  const endTime = String(body.end_time || '').trim();
-  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(startTime) || !/^([01]?\d|2[0-3]):[0-5]\d$/.test(endTime)) {
+  const rawStart = String(body.start_time || '').trim();
+  const rawEnd = String(body.end_time || '').trim();
+  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(rawStart) || !/^([01]?\d|2[0-3]):[0-5]\d$/.test(rawEnd)) {
     return c.json({ success: false, error: 'start_time/end_time must be HH:MM' }, 400);
+  }
+  const startTime = padHHMM(rawStart);
+  const endTime = padHHMM(rawEnd);
+  if (startTime >= endTime) {
+    return c.json({ success: false, error: 'start_time must be before end_time' }, 400);
   }
   const discountRate = Number(body.discount_rate);
   if (isNaN(discountRate) || discountRate < 0 || discountRate > 1) {
@@ -52,7 +63,9 @@ happyHourRouter.post('/happy-hour', staffAuth, async (c) => {
   const id = makeId('HH');
   const now = new Date().toISOString();
   const applyTo = String(body.apply_to || 'all');
-  const applyIds = body.apply_ids ? JSON.stringify(body.apply_ids) : null;
+  const applyIds = body.apply_ids != null
+    ? (typeof body.apply_ids === 'string' ? body.apply_ids : JSON.stringify(body.apply_ids))
+    : null;
   await db.prepare(
     `INSERT INTO happy_hour_windows (id, name, day_of_week, start_time, end_time, discount_rate, apply_to, apply_ids, priority, active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -87,13 +100,13 @@ happyHourRouter.patch('/happy-hour/:id', staffAuth, async (c) => {
   ).bind(
     body.name ? String(body.name) : null,
     body.day_of_week != null ? Number(body.day_of_week) : null,
-    body.start_time ? String(body.start_time) : null,
-    body.end_time ? String(body.end_time) : null,
+    body.start_time ? padHHMM(String(body.start_time)) : null,
+    body.end_time ? padHHMM(String(body.end_time)) : null,
     body.discount_rate != null ? Number(body.discount_rate) : null,
     body.apply_to ? String(body.apply_to) : null,
-    body.apply_ids != null ? JSON.stringify(body.apply_ids) : null,
+    body.apply_ids != null ? (typeof body.apply_ids === 'string' ? body.apply_ids : JSON.stringify(body.apply_ids)) : null,
     body.priority != null ? Number(body.priority) : null,
-    body.active != null ? Number(body.active) : null,
+    body.active != null ? (typeof body.active === 'boolean' ? (body.active ? 1 : 0) : Number(body.active)) : null,
     now, id
   ).run();
   const win = await db.prepare('SELECT * FROM happy_hour_windows WHERE id = ?').bind(id).first<HappyHourWindow>();
@@ -114,6 +127,9 @@ happyHourRouter.get('/happy-hour/now', async (c) => {
   const { results } = await db.prepare(
     'SELECT * FROM happy_hour_windows WHERE active = 1'
   ).all<HappyHourWindow>();
-  const win = happyHourDiscountFor(results, new Date());
+  const win = happyHourDiscountFor(results, new Date(), {
+    productId: c.req.query('product_id') || null,
+    categoryId: c.req.query('category_id') || null,
+  });
   return c.json({ success: true, data: win });
 });

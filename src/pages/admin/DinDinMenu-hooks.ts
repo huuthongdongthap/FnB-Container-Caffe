@@ -119,9 +119,9 @@ export function useDinDinMenu() {
     setD08Warning(null);
     try {
       const savedBody = (await apiFetch<{ _d08Warning?: string }>('/api/admin/dindin/config', {
-      method: 'PUT',
-      body: JSON.stringify(cfg),
-    })) ?? {};
+        method: 'PUT',
+        body: JSON.stringify({ menu: { sections: cfg.sections }, sections: cfg.sections }),
+      })) ?? {};
       if (savedBody?._d08Warning) setD08Warning(savedBody._d08Warning);
       setSuccess(t('dindin.saved', { defaultValue: 'Đã lưu cấu hình menu' }));
     } catch (err) {

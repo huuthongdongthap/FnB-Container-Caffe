@@ -116,14 +116,31 @@ birthdayRouter.get('/check', async(c) => {
       return c.json({ success: true, data: { eligible: false, reason: 'No birthday on file' } });
     }
 
+    let discountPercent = 15;
+    let earlyWindowDays = 7;
+    let lateWindowDays = 7;
+    if (c.env.AUTH_KV) {
+      try {
+        const rawCfg = await c.env.AUTH_KV.get('config:birthday');
+        if (rawCfg) {
+          const cfg = JSON.parse(rawCfg);
+          if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
+          if (typeof cfg.earlyWindowDays === 'number') earlyWindowDays = cfg.earlyWindowDays;
+          if (typeof cfg.lateWindowDays === 'number') lateWindowDays = cfg.lateWindowDays;
+        }
+      } catch {
+        // Fallback to defaults
+      }
+    }
+
     const today = new Date();
     const birthday = new Date(customer.birthday);
     const isBirthdayMonth = today.getMonth() === birthday.getMonth();
     const isBirthdayDay = isBirthdayMonth && today.getDate() === birthday.getDate();
 
-    // Eligible during birthday month (7 days before and after)
-    const daysDiff = Math.abs(today.getDate() - birthday.getDate());
-    const isEligible = isBirthdayMonth && daysDiff <= 7;
+    // Eligible during configured birthday window
+    const dayDiff = today.getDate() - birthday.getDate();
+    const isEligible = isBirthdayMonth && (dayDiff >= -earlyWindowDays && dayDiff <= lateWindowDays);
 
     // Check if already redeemed this year
     const yearStart = `${today.getFullYear()}-01-01`;
@@ -151,7 +168,7 @@ birthdayRouter.get('/check', async(c) => {
         customer_id: customer.id,
         customer_name: customer.name,
         birthday: customer.birthday,
-        discount_percent: isEligible ? 15 : 0,
+        discount_percent: isEligible ? discountPercent : 0,
         is_birthday_today: isBirthdayDay
       }
     });
@@ -188,15 +205,28 @@ birthdayRouter.post('/redeem', async(c) => {
     return c.json({ success: false, error: 'Already redeemed this year' }, 400);
   }
 
+  let discountPercent = 15;
+  if (c.env.AUTH_KV) {
+    try {
+      const rawCfg = await c.env.AUTH_KV.get('config:birthday');
+      if (rawCfg) {
+        const cfg = JSON.parse(rawCfg);
+        if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   const id = `bday_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
 
   await db.prepare(
-    'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at) VALUES (?, ?, 15, ?, ?)'
-  ).bind(id, customer.id, data.order_id || null, now).run();
+    'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(id, customer.id, discountPercent, data.order_id || null, now).run();
 
   return c.json({
     success: true,
-    data: { id, customer_id: customer.id, discount_percent: 15, redeemed_at: now }
+    data: { id, customer_id: customer.id, discount_percent: discountPercent, redeemed_at: now }
   }, 201);
 });

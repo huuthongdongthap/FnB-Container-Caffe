@@ -17,7 +17,13 @@ import { Toggle } from './birthday-toggle';
 
 export default function AdminBirthdayConfigPage() {
   const { t } = useTranslation();
-  const { config, isLoading: loading, error, refetch, save, isSaving: sending } = useBirthdayAdmin();
+  const birthdayHook = useBirthdayAdmin() as ReturnType<typeof useBirthdayAdmin> & {
+    loading?: boolean;
+    sending?: boolean;
+  };
+  const { config, error, refetch, save } = birthdayHook;
+  const loading = birthdayHook.isLoading ?? birthdayHook.loading ?? false;
+  const sending = birthdayHook.isSaving ?? birthdayHook.sending ?? false;
   const [form, setForm] = useState<BirthdayConfig | null>(null);
   const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
 
@@ -77,7 +83,7 @@ export default function AdminBirthdayConfigPage() {
           {error && (
             <Card className="border-red-500/30 bg-red-500/5">
               <CardBody className="flex flex-col items-center gap-3 py-8">
-                <Badge color="error">Error</Badge>
+                <Badge variant="destructive">Error</Badge>
                 <p className="text-sm text-red-400">{t('adminBirthday.saveError')}</p>
                 <Button variant="secondary" size="sm" onClick={() => refetch()}>
                   {t('common.retry')}
@@ -103,11 +109,17 @@ export default function AdminBirthdayConfigPage() {
 
                 <div className="pt-3 space-y-1">
                   <label className="text-sm font-medium text-[var(--aura-text-primary)]">{t('adminBirthday.discountPercentLabel')}</label>
-                  <p className="text-xs text-[var(--aura-chrome-dark)]">{t('adminBirthday.discountHint')}</p>
+                  <p className="text-xs text-on-surface-variant">{t('adminBirthday.discountHint')}</p>
                   <Input
                     type="number"
+                    min={1}
+                    max={100}
                     value={form.discountPercent}
-                    onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      const clamped = Number.isNaN(raw) ? 1 : Math.min(100, Math.max(1, raw));
+                      setForm({ ...form, discountPercent: clamped });
+                    }}
                     className="bg-[var(--aura-noir-deep)] border-[var(--glass-border)] text-[var(--aura-chrome-bright)]"
                   />
                 </div>
@@ -116,8 +128,14 @@ export default function AdminBirthdayConfigPage() {
                   <label className="text-sm font-medium text-[var(--aura-text-primary)]">{t('adminBirthday.earlyWindowLabel')}</label>
                   <Input
                     type="number"
+                    min={0}
+                    max={30}
                     value={form.earlyWindowDays}
-                    onChange={(e) => setForm({ ...form, earlyWindowDays: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      const clamped = Number.isNaN(raw) ? 0 : Math.min(30, Math.max(0, raw));
+                      setForm({ ...form, earlyWindowDays: clamped });
+                    }}
                     className="bg-[var(--aura-noir-deep)] border-[var(--glass-border)] text-[var(--aura-chrome-bright)]"
                   />
                 </div>
@@ -126,13 +144,19 @@ export default function AdminBirthdayConfigPage() {
                   <label className="text-sm font-medium text-[var(--aura-text-primary)]">{t('adminBirthday.lateWindowLabel')}</label>
                   <Input
                     type="number"
+                    min={0}
+                    max={30}
                     value={form.lateWindowDays}
-                    onChange={(e) => setForm({ ...form, lateWindowDays: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      const clamped = Number.isNaN(raw) ? 0 : Math.min(30, Math.max(0, raw));
+                      setForm({ ...form, lateWindowDays: clamped });
+                    }}
                     className="bg-[var(--aura-noir-deep)] border-[var(--glass-border)] text-[var(--aura-chrome-bright)]"
                   />
                 </div>
 
-                <p className="text-xs text-[var(--aura-chrome-dark)] pt-1">{t('adminBirthday.windowHint')}</p>
+                <p className="text-xs text-on-surface-variant pt-1">{t('adminBirthday.windowHint')}</p>
 
                 <Toggle
                   id="free-item"

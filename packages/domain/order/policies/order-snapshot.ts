@@ -89,9 +89,11 @@ export async function calculateOrderSnapshot(
           if (prod?.category_id) {
             categoryId = prod.category_id;
           } else {
-            const menu = await db.prepare('SELECT category_id FROM menu_items WHERE id = ?')
-              .bind(lookupId).first<{ category_id: string }>();
-            if (menu?.category_id) categoryId = menu.category_id;
+            const menu = await db.prepare('SELECT category FROM menu_items WHERE id = ?')
+              .bind(lookupId).first<{ category?: string; category_id?: string }>();
+            if (menu?.category || menu?.category_id) {
+              categoryId = (menu.category || menu.category_id) ?? null;
+            }
           }
         } catch {
           // DB mock or missing column

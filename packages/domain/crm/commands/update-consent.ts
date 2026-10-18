@@ -20,7 +20,7 @@ export interface ConsentUpdate {
   source: string; // 'customer_portal' | 'checkout' | 'staff_action'
   policyVersion?: string;
   actorId: string; // customer.id or staff user id
-  actorRole: 'customer' | 'staff' | 'owner';
+  actorRole: 'customer' | 'staff' | 'owner' | 'manager' | 'admin';
 }
 
 export interface ConsentRow {
@@ -58,28 +58,47 @@ export async function updateConsent(
     const id = genId('c_');
     const now = new Date().toISOString();
     const granted = update.granted ? 1 : 0;
-    const grantedAt = update.granted ? now : null;
+    const grantedAt = now;
     const revokedAt = update.granted ? null : now;
 
-    await db
-      .prepare(
-        `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        update.customerId,
-        update.purpose,
-        granted,
-        update.source,
-        update.policyVersion ?? null,
-        grantedAt,
-        revokedAt,
-        update.actorId,
-        now,
-        now,
-      )
-      .run();
+    try {
+      await db
+        .prepare(
+          `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          update.customerId,
+          update.purpose,
+          granted,
+          update.source,
+          update.policyVersion ?? null,
+          grantedAt,
+          revokedAt,
+        )
+        .run();
+    } catch {
+      await db
+        .prepare(
+          `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          update.customerId,
+          update.purpose,
+          granted,
+          update.source,
+          update.policyVersion ?? null,
+          grantedAt,
+          revokedAt,
+          update.actorId,
+          now,
+          now,
+        )
+        .run();
+    }
 
     log.info('consent_updated', {
       customerId: update.customerId,

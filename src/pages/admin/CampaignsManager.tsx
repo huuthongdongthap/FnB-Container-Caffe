@@ -28,8 +28,10 @@ export default function CampaignsManagerPage() {
     statsLoading,
     updateCampaign,
     isSaving,
+    saveError,
     deleteCampaign,
     isDeleting,
+    deleteError,
   } = useCampaignsAdmin();
 
   const [editingCampaign, setEditingCampaign] = useState<CampaignConfig | null>(null);
@@ -52,11 +54,15 @@ export default function CampaignsManagerPage() {
     });
   }
 
-  function handleSave() {
+  function handleSave(extra?: { is_active?: number }) {
     if (!editingCampaign) return;
     const channels = Array.from(selectedChannels);
     if (channels.length === 0) return;
-    updateCampaign(editingCampaign.trigger, { channels }).then(() => {
+    const payload: { channels: CampaignChannel[]; is_active?: number } = { channels };
+    if (extra?.is_active !== undefined && extra.is_active !== editingCampaign.is_active) {
+      payload.is_active = extra.is_active;
+    }
+    updateCampaign(editingCampaign.trigger, payload).then(() => {
       setEditingCampaign(null);
       setSelectedChannels(new Set());
     });
@@ -94,6 +100,12 @@ export default function CampaignsManagerPage() {
               <Button size="sm" variant="secondary" onClick={() => refetch()}>
                 {t('campaigns.retry')}
               </Button>
+            </div>
+          )}
+
+          {(saveError || deleteError) && (
+            <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-300">
+              {(saveError || deleteError)?.message}
             </div>
           )}
 

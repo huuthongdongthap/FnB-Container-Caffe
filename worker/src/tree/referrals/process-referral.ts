@@ -26,7 +26,11 @@ export async function processReferralOnFirstOrder(db: D1Database, customerId: st
     'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(genId('ptl_'), referrer.id, POINTS, 'referral', newPoints, `Gi?i thi?u b?n: +${POINTS} di?m (legacy)`, now).run();
 
-  await db.prepare('UPDATE referrals SET status = ?, bonus_type = ? WHERE id = ?').bind('completed', 'points', pending.id).run();
+  try {
+    await db.prepare('UPDATE referrals SET status = ?, bonus_type = ? WHERE id = ?').bind('completed', 'points', pending.id).run();
+  } catch {
+    await db.prepare('UPDATE referrals SET status = ? WHERE id = ?').bind('completed', pending.id).run();
+  }
   await db.prepare('UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?').bind(POINTS, pending.referral_code).run();
 
   return { success: true, points_awarded: POINTS, new_balance: newPoints, new_lifetime_balance: newLifetimePoints };

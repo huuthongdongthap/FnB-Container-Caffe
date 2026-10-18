@@ -35,25 +35,41 @@ export async function getKdsMobile(
       return errorResponse('Không có quyền', 403);
     }
 
-    const orders = await context.env.AURA_DB
-      .prepare(
-        `SELECT o.id, o.table_id, o.items, o.status, o.created_at, o.updated_at,
-                COALESCE(t.table_number, t.id) as table_name
-         FROM orders o
-         LEFT JOIN cafe_tables t ON t.id = o.table_id
-         WHERE o.status IN ('pending','confirmed','preparing','ready')
-         ORDER BY o.created_at ASC`
-      )
-      .all();
+    let orders: { results: unknown[] };
+    try {
+      orders = await context.env.AURA_DB
+        .prepare(
+          `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.created_at, o.updated_at,
+                  COALESCE(t.table_number, t.id) as table_name
+           FROM orders o
+           LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
+           WHERE o.status IN ('pending','confirmed','preparing','ready')
+           ORDER BY o.created_at ASC`
+        )
+        .all();
+    } catch {
+      orders = await context.env.AURA_DB
+        .prepare(
+          `SELECT o.id, o.table_id, o.items, o.status, o.created_at, o.updated_at,
+                  COALESCE(t.table_number, t.id) as table_name
+           FROM orders o
+           LEFT JOIN cafe_tables t ON t.id = o.table_id
+           WHERE o.status IN ('pending','confirmed','preparing','ready')
+           ORDER BY o.created_at ASC`
+        )
+        .all();
+    }
 
     const rows = orders.results as Array<Record<string, unknown>>;
     return jsonResponse({
       success: true,
       orders: rows.map((r) => ({
         id: r.id as string,
+        order_number: (r.order_number as string | undefined) ?? undefined,
         table_id: r.table_id as string,
         table_name: r.table_name as string | null,
         items: parseKdsItems(r.items),
+        notes: (r.notes as string | null | undefined) ?? null,
         status: r.status as string,
         created_at: r.created_at as string,
         updated_at: r.updated_at as string,

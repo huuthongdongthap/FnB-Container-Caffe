@@ -5,8 +5,8 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin', 'cashier'];
 
 function normalizeOrderItems(raw: unknown): Array<Record<string, unknown>> {
   let parsed: unknown[] = [];

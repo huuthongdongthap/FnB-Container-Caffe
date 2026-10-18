@@ -92,14 +92,20 @@ export function useNotificationSubscriptions() {
       },
     }));
     try {
-      const resp = await apiFetch<{ success: boolean; message?: string }>(
+      const resp = await apiFetch<{
+        success: boolean;
+        message?: string;
+        sent?: number;
+        data?: { sent?: number };
+      }>(
         '/api/push/send-staff',
         {
           method: 'POST',
           body: JSON.stringify({ targetRole: role, name }),
         },
       );
-      if (resp.success) {
+      const sentCount = resp.data?.sent ?? resp.sent;
+      if (resp.success && (sentCount === undefined || sentCount > 0)) {
         setTestResults((prev) => ({
           ...prev,
           [name]: { ok: true, msg: isVi ? 'Đã gửi thử' : 'Sent' },
@@ -111,7 +117,13 @@ export function useNotificationSubscriptions() {
             ok: false,
             msg:
               resp.message ||
-              (isVi ? 'Gửi thất bại' : 'Send failed'),
+              (sentCount === 0
+                ? isVi
+                  ? 'Không có thiết bị nhận'
+                  : 'No active subscribers'
+                : isVi
+                  ? 'Gửi thất bại'
+                  : 'Send failed'),
           },
         }));
       }

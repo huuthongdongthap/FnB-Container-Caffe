@@ -22,7 +22,7 @@ export const TableTranslationSchema = z.object({
 });
 
 export const TableZoneSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string().min(1).max(50),
   slug: SlugSchema,
   description: z.string().optional(),
@@ -31,7 +31,7 @@ export const TableZoneSchema = z.object({
 }).openapi('TableZone');
 
 export const TableCreateSchema = z.object({
-  zoneId: z.string().uuid(),
+  zoneId: z.string().min(1),
   code: z.string().min(1).max(20).openapi({ example: 'A-01' }),
   name: z.string().min(1).max(50).optional(),
   capacity: z.number().int().positive().default(4),
@@ -46,7 +46,7 @@ export const TableCreateSchema = z.object({
 }).openapi('TableCreate');
 
 export const TableUpdateSchema = z.object({
-  zoneId: z.string().uuid().optional(),
+  zoneId: z.string().min(1).optional(),
   code: z.string().min(1).max(20).optional(),
   name: z.string().min(1).max(50).optional(),
   capacity: z.number().int().positive().optional(),
@@ -61,8 +61,8 @@ export const TableUpdateSchema = z.object({
 }).openapi('TableUpdate');
 
 export const TableResponseSchema = z.object({
-  id: z.string().uuid(),
-  zoneId: z.string().uuid(),
+  id: z.string().min(1),
+  zoneId: z.string().min(1),
   zone: TableZoneSchema.nullable().optional(),
   code: z.string(),
   name: z.string().nullable(),
@@ -74,8 +74,8 @@ export const TableResponseSchema = z.object({
   height: z.number().int().positive(),
   rotation: z.number().int(),
   translations: z.array(TableTranslationSchema),
-  currentSessionId: z.string().uuid().nullable().optional(),
-  currentOrderId: z.string().uuid().nullable().optional(),
+  currentSessionId: z.string().min(1).nullable().optional(),
+  currentOrderId: z.string().min(1).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
@@ -103,7 +103,7 @@ export const TableZoneUpdateSchema = z.object({
 }).openapi('TableZoneUpdate');
 
 export const TableZoneResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string(),
   slug: SlugSchema,
   description: z.string().nullable(),
@@ -134,7 +134,7 @@ export const TableRoutes = {
     tags: ['Tables'],
     request: {
       query: PaginationQuerySchema.extend({
-        zoneId: z.string().uuid().optional(),
+        zoneId: z.string().min(1).optional(),
         status: TableStatusEnum.optional(),
         capacity: z.coerce.number().int().positive().optional(),
       }),
@@ -250,7 +250,7 @@ export const TableRoutes = {
         content: {
           'application/json': {
             schema: z.object({
-              tableIds: z.array(z.string().uuid()).min(1),
+              tableIds: z.array(z.string().min(1)).min(1),
               status: TableStatusEnum,
             }),
           },

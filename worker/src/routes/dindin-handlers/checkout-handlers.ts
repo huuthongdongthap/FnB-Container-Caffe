@@ -14,6 +14,87 @@ import {
 } from './types';
 
 export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void {
+  // ── GET /checkouts ──────────────────────────────────────────────────────────
+  router.get('/checkouts', async (c) => {
+    let checkouts: Array<Record<string, unknown>> = [];
+    try {
+      const { results } = await c.env.AURA_DB.prepare(
+        "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+      ).all<{
+        id: string;
+        customer_name: string | null;
+        customer_phone: string | null;
+        payment_method: string | null;
+        items: string | null;
+        total: number | null;
+        status: string | null;
+        created_at: string | null;
+      }>();
+
+      for (const row of results || []) {
+        let parsedItems: Array<Record<string, unknown>> = [];
+        try {
+          const raw = JSON.parse(row.items || '[]');
+          if (Array.isArray(raw)) {
+            parsedItems = raw.map((it: Record<string, unknown>) => {
+              const qty = Math.max(1, Number(it.quantity ?? it.qty ?? 1));
+              return {
+                ...it,
+                id: String(it.product_id ?? it.id ?? ''),
+                name: String(it.name ?? ''),
+                price: Number(it.price ?? 0),
+                qty,
+                quantity: qty,
+              };
+            });
+          }
+        } catch {
+          parsedItems = [];
+        }
+        const printedState = await kvGet<{ printed?: boolean }>(c.env.AUTH_KV, `dindin:print:${row.id}`);
+        const qcState = await kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, `dindin:qc:${row.id}`);
+        checkouts.push({
+          id: row.id,
+          orderId: row.id,
+          sessionId: row.customer_phone || '',
+          payment_method: row.payment_method || 'cod',
+          paymentMethod: row.payment_method || 'cod',
+          items: parsedItems,
+          total: Number(row.total ?? 0),
+          status: row.status || 'pending',
+          printed: Boolean(printedState?.printed),
+          qcPassed: Boolean(qcState?.qcPassed || row.status === 'completed'),
+          created_at: row.created_at || new Date().toISOString(),
+          createdAt: row.created_at || new Date().toISOString(),
+        });
+      }
+    } catch {
+      checkouts = [];
+    }
+    return c.json({ success: true, data: checkouts, checkouts });
+  });
+
+  // ── POST /checkout/:orderId/print ───────────────────────────────────────────
+  router.post('/checkout/:orderId/print', async (c) => {
+    const { orderId } = c.req.param();
+    const printedAt = new Date().toISOString();
+    await kvSet(c.env.AUTH_KV, `dindin:print:${orderId}`, JSON.stringify({ printed: true, printedAt }), 86400);
+    return c.json({ success: true, orderId, printed: true, printedAt });
+  });
+
+  // ── POST /checkout/:orderId/qc ──────────────────────────────────────────────
+  router.post('/checkout/:orderId/qc', async (c) => {
+    const { orderId } = c.req.param();
+    const checkedAt = new Date().toISOString();
+    await kvSet(c.env.AUTH_KV, `dindin:qc:${orderId}`, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
+    try {
+      await execute(c.env.AURA_DB, 'UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'completed', checkedAt, orderId);
+    } catch {
+      // Best-effort DB status update
+    }
+    return c.json({ success: true, orderId, qcPassed: true, status: 'completed', checkedAt });
+  });
+
   // ── POST /checkout ──────────────────────────────────────────────────────────
   router.post('/checkout', async (c) => {
     try {

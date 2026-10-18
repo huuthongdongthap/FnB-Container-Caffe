@@ -12,6 +12,19 @@ interface CartActiveViewProps {
 }
 
 export function CartActiveView({ cart, itemId, itemQty, onItemIdChange, onItemQtyChange, onPatch, saving, t }: CartActiveViewProps) {
+  const rawTimestamp = (cart as DinDinCart & { updatedAt?: string }).updatedAt ?? cart.createdAt;
+  const formattedTimestamp = rawTimestamp
+    ? new Date(rawTimestamp).toLocaleString('vi-VN')
+    : '';
+  const computedTotal =
+    typeof cart.total === 'number' && !Number.isNaN(cart.total)
+      ? cart.total
+      : (cart.items ?? []).reduce((sum, it) => {
+          const itemAny = it as typeof it & { qty?: number };
+          const qty = itemAny.quantity ?? itemAny.qty ?? 1;
+          return sum + (it.price ?? 0) * qty;
+        }, 0);
+
   return (
     <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
       <div className="flex items-center justify-between">
@@ -19,25 +32,30 @@ export function CartActiveView({ cart, itemId, itemQty, onItemIdChange, onItemQt
           {t('dindin.activeCart', { defaultValue: 'Giỏ hiện tại' })} — #{cart.sessionId}
         </h2>
         <span className="text-xs text-[var(--aura-text-secondary)]">
-          {new Date(cart.createdAt ?? '').toLocaleString('vi-VN')}
+          {formattedTimestamp}
         </span>
       </div>
       <div className="space-y-2">
-        {(cart.items ?? []).map((item) => (
-          <div key={item.id} className="flex items-center gap-3 text-sm">
-            <span className="flex-1 text-[var(--aura-text-primary)]">{item.name}</span>
-            <span className="text-[var(--aura-text-secondary)]">₫{item.price.toLocaleString('vi-VN')}</span>
-            <input
-              type="number"
-              min={1}
-              value={item.quantity}
-              onChange={(e) => onItemQtyChange(Number(e.target.value))}
-              className="w-12 rounded-lg px-2 py-1 text-xs bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-center"
-            />
-            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('update', item.id); }} disabled={saving} className="text-xs text-blue-400 disabled:opacity-50">Cập nhật</button>
-            <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('remove', item.id); }} disabled={saving} className="text-xs text-red-400 disabled:opacity-50">{t('delete', { defaultValue: 'Xoá' })}</button>
-          </div>
-        ))}
+        {(cart.items ?? []).map((item) => {
+          const itemAny = item as typeof item & { qty?: number };
+          const resolvedQty = itemAny.quantity ?? itemAny.qty ?? 1;
+          const resolvedPrice = item.price ?? 0;
+          return (
+            <div key={item.id} className="flex items-center gap-3 text-sm">
+              <span className="flex-1 text-[var(--aura-text-primary)]">{item.name ?? item.id}</span>
+              <span className="text-[var(--aura-text-secondary)]">₫{resolvedPrice.toLocaleString('vi-VN')}</span>
+              <input
+                type="number"
+                min={1}
+                value={resolvedQty}
+                onChange={(e) => onItemQtyChange(Number(e.target.value))}
+                className="w-12 rounded-lg px-2 py-1 text-xs bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-center"
+              />
+              <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('update', item.id); }} disabled={saving} className="text-xs text-blue-400 disabled:opacity-50">Cập nhật</button>
+              <button type="button" onClick={() => { onItemIdChange(item.id); onPatch('remove', item.id); }} disabled={saving} className="text-xs text-red-400 disabled:opacity-50">{t('delete', { defaultValue: 'Xoá' })}</button>
+            </div>
+          );
+        })}
       </div>
       <div className="flex gap-2">
         <input
@@ -52,7 +70,7 @@ export function CartActiveView({ cart, itemId, itemQty, onItemIdChange, onItemQt
         </button>
       </div>
       <p className="text-right text-base font-semibold text-[var(--aura-text-primary)]">
-        Tổng: ₫{cart.total.toLocaleString('vi-VN')}
+        Tổng: ₫{computedTotal.toLocaleString('vi-VN')}
       </p>
     </div>
   );

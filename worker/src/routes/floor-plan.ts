@@ -38,21 +38,40 @@ floorPlanRouter.get('/', async (c) => {
   const zone = c.req.query('zone');
   const status = c.req.query('status');
 
-  let query = `SELECT t.*,
+  let filterSql = '';
+  const params: unknown[] = [];
+  if (zone) { filterSql += ' AND t.zone = ?'; params.push(zone); }
+  if (status) { filterSql += ' AND t.status = ?'; params.push(status); }
+  const orderSql = ' ORDER BY t.zone, t.table_number';
+
+  const query = `SELECT t.*,
          s.id AS session_id, s.status AS session_status, s.opened_at AS session_opened_at,
          s.order_count AS session_order_count, s.total_amount AS session_total_amount,
          s.customer_name AS session_customer_name
        FROM cafe_tables t
        LEFT JOIN table_sessions s
          ON s.table_id = t.id AND s.status = 'active'
-       WHERE 1=1`;
-  const params: unknown[] = [];
-  if (zone) { query += ' AND t.zone = ?'; params.push(zone); }
-  if (status) { query += ' AND t.status = ?'; params.push(status); }
-  query += ' ORDER BY t.zone, t.table_number';
+       WHERE 1=1${filterSql}${orderSql}`;
 
-  const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
-  const { results } = await stmt.all<Record<string, unknown>>();
+  let results: Record<string, unknown>[] = [];
+  try {
+    const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
+    const res = await stmt.all<Record<string, unknown>>();
+    results = res.results || [];
+  } catch {
+    const fallbackQuery = `SELECT t.*,
+         s.id AS session_id, s.status AS session_status, s.started_at AS session_opened_at,
+         CASE WHEN s.current_order_id IS NOT NULL THEN 1 ELSE 0 END AS session_order_count,
+         0 AS session_total_amount,
+         NULL AS session_customer_name
+       FROM cafe_tables t
+       LEFT JOIN table_sessions s
+         ON s.table_id = t.id AND s.status = 'active'
+       WHERE 1=1${filterSql}${orderSql}`;
+    const stmt = params.length ? db.prepare(fallbackQuery).bind(...params) : db.prepare(fallbackQuery);
+    const res = await stmt.all<Record<string, unknown>>();
+    results = res.results || [];
+  }
 
   const tables: FloorPlanTable[] = results.map((r) => {
     const hasSession = r.session_id != null;
@@ -119,9 +138,15 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
     'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
   ).bind(id).first<{ id: string }>();
   if (session) {
-    await db.prepare(
-      'UPDATE table_sessions SET status = \'no_show\', closed_at = ?, updated_at = ? WHERE id = ?'
-    ).bind(now, now, session.id).run();
+    try {
+      await db.prepare(
+        'UPDATE table_sessions SET status = \'no_show\', closed_at = ?, updated_at = ? WHERE id = ?'
+      ).bind(now, now, session.id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE table_sessions SET status = \'no_show\', ended_at = ? WHERE id = ?'
+      ).bind(now, session.id).run();
+    }
     await db.prepare(
       'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
     ).bind(id).run();
@@ -150,9 +175,15 @@ floorPlanRouter.post('/:id/release', async (c) => {
     'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
   ).bind(id).first<{ id: string }>();
   if (session) {
-    await db.prepare(
-      'UPDATE table_sessions SET status = \'closed\', closed_at = ?, updated_at = ? WHERE id = ?'
-    ).bind(now, now, session.id).run();
+    try {
+      await db.prepare(
+        'UPDATE table_sessions SET status = \'closed\', closed_at = ?, updated_at = ? WHERE id = ?'
+      ).bind(now, now, session.id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE table_sessions SET status = \'closed\', ended_at = ? WHERE id = ?'
+      ).bind(now, session.id).run();
+    }
   }
 
   return c.json({ success: true, message: `Table ${id} released` });

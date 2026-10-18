@@ -13,9 +13,11 @@ const SHARE_METHODS = [
 export function ReferralCodeBlock({
   code,
   onCopyCode,
+  onShareVia,
 }: {
   code: string;
   onCopyCode?: (code: string) => void;
+  onShareVia?: (method: string) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -76,6 +78,13 @@ export function ReferralCodeBlock({
               <button
                 key={method.key}
                 type="button"
+                onClick={() => {
+                  if (onShareVia) {
+                    onShareVia(method.key);
+                  } else {
+                    onCopyCode?.(method.key);
+                  }
+                }}
                 className="flex-shrink-0 flex items-center gap-1 px-6 py-2 rounded-full border border-white/[0.05] active:scale-95 transition-transform"
                 style={{
                   background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)',

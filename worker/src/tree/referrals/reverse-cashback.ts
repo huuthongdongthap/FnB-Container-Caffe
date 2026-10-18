@@ -37,6 +37,18 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
     'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).bind(referrerId, 'referral_reversed', DEBIT_VND, null, JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: DEBIT_VND }), now));
 
-  await db.batch(batch);
+  try {
+    await db.batch(batch);
+  } catch {
+    const fallbackBatch: ReturnType<typeof db.prepare>[] = [
+      db.prepare('UPDATE cashback_wallets SET balance = ?, total_spent = total_spent + ?, updated_at = ? WHERE id = ?').bind(newBalance, DEBIT_VND, now, wallet.id),
+      db.prepare(
+        `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
+         VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`
+      ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance, `Hoan ti?n referral (${referralId}): -${DEBIT_VND}d do don hang bi h?y`, now),
+      db.prepare('UPDATE referrals SET status = ? WHERE id = ?').bind('reversed', referralId)
+    ];
+    await db.batch(fallbackBatch);
+  }
   return { success: true, debited_vnd: DEBIT_VND, new_balance: newBalance };
 }

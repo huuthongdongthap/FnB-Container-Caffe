@@ -76,7 +76,11 @@ export function StitchReferralNew1({
         style={{ backgroundImage: 'radial-gradient(rgba(212, 165, 116, 0.05) 1px, transparent 1px)', backgroundSize: '24px 24px' }}
       >
         <HeroEarningsCard rewardAmount={data.rewardAmount} />
-        <ReferralCodeBlock code={data.referralCode} onCopyCode={onCopyCode} />
+        <ReferralCodeBlock
+          code={data.referralCode}
+          onCopyCode={onCopyCode}
+          onShareVia={onShareVia}
+        />
         <ProgressTracker current={data.currentReferrals} target={data.targetReferrals} percent={data.progressPercent} />
         <FriendNetwork friends={data.friends} onViewProfile={onViewProfile} />
         <RewardHistory history={data.rewardHistory} />

@@ -19,7 +19,7 @@ import {
  */
 
 export const PaymentIntentSchema = z.object({
-  orderId: z.string().uuid(),
+  orderId: z.string().min(1),
   amount: MoneySchema,
   method: PaymentMethodEnum,
   idempotencyKey: IdempotencyKeySchema,
@@ -29,7 +29,7 @@ export const PaymentIntentSchema = z.object({
 }).openapi('PaymentIntent');
 
 export const PaymentIntentResponseSchema = z.object({
-  paymentId: z.string().uuid(),
+  paymentId: z.string().min(1),
   paymentUrl: z.string().url().nullable(),
   qrCodeUrl: z.string().url().nullable(),
   deeplink: z.string().nullable(),
@@ -78,8 +78,8 @@ export const WebPaymentResponseSchema = z.object({
 }).openapi('WebPaymentResponse');
 
 export const PaymentResponseSchema = z.object({
-  id: z.string().uuid(),
-  orderId: z.string().uuid(),
+  id: z.string().min(1),
+  orderId: z.string().min(1),
   order: ReferenceSchema.nullable().optional(),
   amount: MoneySchema,
   method: PaymentMethodEnum,
@@ -105,15 +105,15 @@ export const PaymentListResponseSchema = z.object({
 }).openapi('PaymentListResponse');
 
 export const RefundRequestSchema = z.object({
-  paymentId: z.string().uuid(),
+  paymentId: z.string().min(1),
   amount: MoneySchema.optional(),
   reason: z.string().max(500).optional(),
   idempotencyKey: IdempotencyKeySchema,
 }).openapi('RefundRequest');
 
 export const RefundResponseSchema = z.object({
-  id: z.string().uuid(),
-  paymentId: z.string().uuid(),
+  id: z.string().min(1),
+  paymentId: z.string().min(1),
   amount: MoneySchema,
   reason: z.string().nullable(),
   status: z.enum(['pending', 'processing', 'completed', 'failed']),
@@ -194,7 +194,7 @@ export const PaymentRoutes = {
     security: [{ BearerAuth: [] }],
     request: {
       query: PaginationQuerySchema.extend({
-        orderId: z.string().uuid().optional(),
+        orderId: z.string().min(1).optional(),
         method: PaymentMethodEnum.optional(),
         status: PaymentStatusEnum.optional(),
         dateFrom: z.string().date().optional(),
@@ -228,7 +228,7 @@ export const PaymentRoutes = {
     security: [{ BearerAuth: [] }],
     request: {
       query: z.object({
-        locationId: z.string().uuid().optional(),
+        locationId: z.string().min(1).optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),
       }),

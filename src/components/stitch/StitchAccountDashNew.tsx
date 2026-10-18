@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Coffee } from 'lucide-react';
@@ -43,8 +43,14 @@ export function StitchAccountDashNew({
   const [error, setError] = useState<string | null>(null);
 
   const { items: favIds } = useFavoritesStore();
-  const { items: menuItems } = useMenuStore();
+  const { items: menuItems, fetchMenu } = useMenuStore();
   const { setGlassCardRef } = useDashMicroInteractions();
+
+  useEffect(() => {
+    if (favIds.length > 0 && menuItems.length === 0 && typeof fetchMenu === 'function') {
+      void fetchMenu();
+    }
+  }, [favIds.length, menuItems.length, fetchMenu]);
 
   const profile = profileProp ?? defaultProfile;
   const loyalty = loyaltyProp ?? defaultLoyalty;

@@ -113,7 +113,11 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
                     {
                       phone: customer.phone,
                       template_key: 'general_promotion',
-                      data: { name: customer.name || '' }
+                      data: {
+                        name: customer.name || '',
+                        title: body.title ?? '',
+                        message: body.message
+                      } as Record<string, string>
                     }
                   );
                   if (result.ok) {

@@ -28,7 +28,7 @@ function randomPaymentId(): string {
 }
 
 const createSchema = z.object({
-  order_id: z.string().uuid(),
+  order_id: z.string().min(1),
   description: z.string().max(25).optional(),
   customer_name: z.string().optional()
 });
@@ -81,7 +81,12 @@ const handleMomoCreate = async(c: Context<{ Bindings: Env }>) => {
     }
 
     const user = (c.get as any)('user') as { id?: string; role?: string } | undefined;
-    const isStaffOrOwner = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'staff' || user?.role === 'admin';
+    const isStaffOrOwner =
+      user?.role === 'owner' ||
+      user?.role === 'manager' ||
+      user?.role === 'staff' ||
+      user?.role === 'admin' ||
+      user?.role === 'cashier';
     if (orderRow.customer_id && user?.id && orderRow.customer_id !== user.id && !isStaffOrOwner) {
       return c.json({
         success: false,

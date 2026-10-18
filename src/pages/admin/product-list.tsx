@@ -23,9 +23,9 @@ interface ProductListProps {
 function renderSkeletonRows(count = 5) {
   return Array.from({ length: count }).map((_, i) => (
     <tr key={i}>
-      {Array.from({ length: 6 }).map((__, j) => (
+      {Array.from({ length: 5 }).map((__, j) => (
         <td key={j} className="px-4 py-3">
-          <Skeleton className={j === 5 ? 'h-8 w-20' : 'h-4 w-full'} />
+          <Skeleton className={j === 4 ? 'h-8 w-20' : 'h-4 w-full'} />
         </td>
       ))}
     </tr>
@@ -71,7 +71,7 @@ export function ProductList({
               {isLoading && renderSkeletonRows()}
               {!isLoading && isError && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-destructive">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-destructive">
                     {t('adminMenu.errorLoadingProducts')}{' '}
                     <button onClick={onRefetch} className="underline">{t('common.retry')}</button>
                   </td>
@@ -79,7 +79,7 @@ export function ProductList({
               )}
               {!isLoading && !isError && products.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
                     {t('adminMenu.emptyProducts')}
                   </td>
                 </tr>
@@ -102,7 +102,7 @@ export function ProductList({
                     {p.category_id ? categoriesById.get(p.category_id)?.name || `#${p.category_id}` : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge color={p.is_available ? 'success' : 'error'}>
+                    <Badge variant={p.is_available ? 'success' : 'destructive'}>
                       {p.is_available ? t('adminMenu.available') : t('adminMenu.soldOut')}
                     </Badge>
                   </td>

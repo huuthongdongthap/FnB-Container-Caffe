@@ -42,8 +42,10 @@ export {
   deleteProductProjection,
   syncCategorySlugToMenuProjection,
   reconcileAllMenuProjections,
+  mapModifierChoiceToProjection,
+  syncModifierChoiceToMenuProjection,
 } from './policies/menu-projection';
-export type { MenuItemProjection } from './policies/menu-projection';
+export type { MenuItemProjection, ModifierChoiceProjection } from './policies/menu-projection';
 
 // OpenAPI contracts
 export * from './schemas/products';

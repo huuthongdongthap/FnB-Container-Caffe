@@ -24,7 +24,7 @@ export const StaffCreateSchema = z.object({
   role: StaffRoleEnum.default('waiter'),
   locale: LocaleEnum.default('vi'),
   hourlyRate: MoneySchema.optional(),
-  locationId: z.string().uuid().optional(),
+  locationId: z.string().min(1).optional(),
 }).openapi('StaffCreate');
 
 export const StaffUpdateSchema = z.object({
@@ -35,12 +35,16 @@ export const StaffUpdateSchema = z.object({
   locale: LocaleEnum.optional(),
   isActive: z.boolean().optional(),
   hourlyRate: MoneySchema.optional(),
-  locationId: z.string().uuid().optional(),
+  locationId: z.string().min(1).optional(),
   avatarUrl: z.string().url().optional(),
 }).openapi('StaffUpdate');
 
+const StaffIdParamsSchema = z.object({
+  id: z.string().min(1).openapi({ example: 'USR_1724668200000_abc12' }),
+});
+
 export const StaffResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string(),
   email: z.string().email(),
   phone: z.string().nullable(),
@@ -48,7 +52,7 @@ export const StaffResponseSchema = z.object({
   locale: LocaleEnum,
   isActive: z.boolean(),
   hourlyRate: MoneySchema.nullable(),
-  locationId: z.string().uuid().nullable(),
+  locationId: z.string().min(1).nullable(),
   location: ReferenceSchema.nullable().optional(),
   avatarUrl: z.string().url().nullable(),
   lastLoginAt: DateTimeSchema.nullable(),
@@ -62,10 +66,10 @@ export const StaffListResponseSchema = z.object({
 }).openapi('StaffListResponse');
 
 export const ShiftSchema = z.object({
-  id: z.string().uuid(),
-  staffId: z.string().uuid(),
+  id: z.string().min(1),
+  staffId: z.string().min(1),
   staff: ReferenceSchema.nullable().optional(),
-  locationId: z.string().uuid(),
+  locationId: z.string().min(1),
   date: z.string().date(),
   startTime: z.string().time(),
   endTime: z.string().time(),
@@ -77,8 +81,8 @@ export const ShiftSchema = z.object({
 }).openapi('Shift');
 
 export const ShiftCreateSchema = z.object({
-  staffId: z.string().uuid(),
-  locationId: z.string().uuid(),
+  staffId: z.string().min(1),
+  locationId: z.string().min(1),
   date: z.string().date(),
   startTime: z.string().time(),
   endTime: z.string().time(),
@@ -87,7 +91,7 @@ export const ShiftCreateSchema = z.object({
 }).openapi('ShiftCreate');
 
 export const ShiftUpdateSchema = z.object({
-  staffId: z.string().uuid().optional(),
+  staffId: z.string().min(1).optional(),
   date: z.string().date().optional(),
   startTime: z.string().time().optional(),
   endTime: z.string().time().optional(),
@@ -102,26 +106,26 @@ export const ShiftListResponseSchema = z.object({
 }).openapi('ShiftListResponse');
 
 export const AttendanceSchema = z.object({
-  id: z.string().uuid(),
-  staffId: z.string().uuid(),
-  shiftId: z.string().uuid().nullable(),
+  id: z.string().min(1),
+  staffId: z.string().min(1),
+  shiftId: z.string().min(1).nullable(),
   checkIn: DateTimeSchema,
   checkOut: DateTimeSchema.nullable(),
   breakStart: DateTimeSchema.nullable(),
   breakEnd: DateTimeSchema.nullable(),
-  locationId: z.string().uuid(),
+  locationId: z.string().min(1),
   deviceFingerprint: z.string().nullable(),
   notes: z.string().max(500).optional(),
 }).openapi('Attendance');
 
 export const AttendanceCheckInSchema = z.object({
-  shiftId: z.string().uuid().optional(),
-  locationId: z.string().uuid(),
+  shiftId: z.string().min(1).optional(),
+  locationId: z.string().min(1),
   deviceFingerprint: z.string().optional(),
 }).openapi('AttendanceCheckIn');
 
 export const AttendanceCheckOutSchema = z.object({
-  attendanceId: z.string().uuid(),
+  attendanceId: z.string().min(1),
   deviceFingerprint: z.string().optional(),
 }).openapi('AttendanceCheckOut');
 
@@ -150,7 +154,7 @@ export const StaffRoutes = {
       query: PaginationQuerySchema.extend({
         role: StaffRoleEnum.optional(),
         isActive: z.coerce.boolean().optional(),
-        locationId: z.string().uuid().optional(),
+        locationId: z.string().min(1).optional(),
       }),
     },
     responses: {
@@ -164,7 +168,7 @@ export const StaffRoutes = {
     summary: 'Get staff by ID',
     tags: ['Staff'],
     security: [{ BearerAuth: [] }],
-    request: { params: IdParamsSchema },
+    request: { params: StaffIdParamsSchema },
     responses: {
       200: { description: 'Staff details', content: { 'application/json': { schema: SuccessResponseSchema(StaffResponseSchema) } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -189,7 +193,7 @@ export const StaffRoutes = {
     summary: 'Update staff',
     tags: ['Staff'],
     security: [{ BearerAuth: [] }],
-    request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: StaffUpdateSchema } } } },
+    request: { params: StaffIdParamsSchema, body: { content: { 'application/json': { schema: StaffUpdateSchema } } } },
     responses: {
       200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(StaffResponseSchema) } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -201,7 +205,7 @@ export const StaffRoutes = {
     summary: 'Delete staff (soft delete - deactivate)',
     tags: ['Staff'],
     security: [{ BearerAuth: [] }],
-    request: { params: IdParamsSchema },
+    request: { params: StaffIdParamsSchema },
     responses: {
       200: { description: 'Deactivated', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -216,8 +220,8 @@ export const StaffRoutes = {
       security: [{ BearerAuth: [] }],
       request: {
         query: PaginationQuerySchema.extend({
-          staffId: z.string().uuid().optional(),
-          locationId: z.string().uuid().optional(),
+          staffId: z.string().min(1).optional(),
+          locationId: z.string().min(1).optional(),
           dateFrom: z.string().date().optional(),
           dateTo: z.string().date().optional(),
           status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
@@ -287,8 +291,8 @@ export const StaffRoutes = {
       security: [{ BearerAuth: [] }],
       request: {
         query: PaginationQuerySchema.extend({
-          staffId: z.string().uuid().optional(),
-          locationId: z.string().uuid().optional(),
+          staffId: z.string().min(1).optional(),
+          locationId: z.string().min(1).optional(),
           dateFrom: z.string().date().optional(),
           dateTo: z.string().date().optional(),
         }),

@@ -85,12 +85,12 @@ export async function getCustomer360(
 
   const orders = await db
     .prepare(
-      `SELECT total, items, channel, payment_method, created_at
+      `SELECT total, items, order_type as channel, payment_method, created_at
        FROM orders
-       WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?)
+       WHERE customer_id = ? OR customer_phone = (SELECT phone FROM customers WHERE id = ?)
        ORDER BY created_at DESC LIMIT ?`,
     )
-    .bind(customerId, orderLimit)
+    .bind(customerId, customerId, orderLimit)
     .all<{
       total: number | null;
       items: string | null;
@@ -98,6 +98,23 @@ export async function getCustomer360(
       payment_method: string | null;
       created_at: string | null;
     }>()
+    .catch(() =>
+      db
+        .prepare(
+          `SELECT total, items, channel, payment_method, created_at
+           FROM orders
+           WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?)
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(customerId, orderLimit)
+        .all<{
+          total: number | null;
+          items: string | null;
+          channel: string | null;
+          payment_method: string | null;
+          created_at: string | null;
+        }>(),
+    )
     .catch((err) => {
       log.error('360_orders_failed', { customerId, error: String(err) });
       return { results: [] as Array<Record<string, unknown>> };

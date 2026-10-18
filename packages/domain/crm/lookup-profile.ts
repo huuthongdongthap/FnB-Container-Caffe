@@ -58,14 +58,26 @@ export async function lookupProfile(
   const orderLimit = opts.orderLimit ?? 5;
 
   try {
-    const identity = await db
-      .prepare(
-        `SELECT customer_id, value FROM customer_identities
-         WHERE type = 'phone' AND value = ?1
-         ORDER BY created_at DESC LIMIT 1`,
-      )
-      .bind(phone)
-      .first<{ customer_id: string; value: string }>();
+    let identity: { customer_id: string; value?: string } | null = null;
+    try {
+      identity = await db
+        .prepare(
+          `SELECT customer_id, identifier_value AS value FROM customer_identities
+           WHERE identifier_type = 'phone' AND identifier_value = ?1
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(phone)
+        .first<{ customer_id: string; value?: string }>();
+    } catch {
+      identity = await db
+        .prepare(
+          `SELECT customer_id, value FROM customer_identities
+           WHERE type = 'phone' AND value = ?1
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(phone)
+        .first<{ customer_id: string; value?: string }>();
+    }
 
     if (!identity?.customer_id) {
       return EMPTY;
@@ -73,8 +85,7 @@ export async function lookupProfile(
 
     const customer = await db
       .prepare(
-        `SELECT id, name, phone, email, tier, total_visits, last_visit_at
-         FROM customers WHERE id = ?1`,
+        `SELECT * FROM customers WHERE id = ?1`,
       )
       .bind(identity.customer_id)
       .first<{
@@ -82,9 +93,10 @@ export async function lookupProfile(
         name: string | null;
         phone: string | null;
         email: string | null;
-        tier: string;
-        total_visits: number;
-        last_visit_at: string | null;
+        tier?: string | null;
+        loyalty_tier?: string | null;
+        total_visits?: number | null;
+        last_visit_at?: string | null;
       }>();
 
     if (!customer) {
@@ -117,21 +129,31 @@ export async function lookupProfile(
 
     const orders = await db
       .prepare(
-        `SELECT id, total_cents, placed_at FROM orders
+        `SELECT * FROM orders
          WHERE customer_id = ?1
-         ORDER BY placed_at DESC LIMIT ?2`,
+         ORDER BY created_at DESC LIMIT ?2`,
       )
       .bind(customer.id, orderLimit)
-      .all<{ id: string; total_cents: number; placed_at: string }>();
+      .all<Record<string, unknown>>()
+      .catch(() =>
+        db
+          .prepare(
+            `SELECT id, total_cents, placed_at FROM orders
+             WHERE customer_id = ?1
+             ORDER BY placed_at DESC LIMIT ?2`,
+          )
+          .bind(customer.id, orderLimit)
+          .all<Record<string, unknown>>(),
+      );
 
     return {
       customerId: customer.id,
       name: customer.name,
       phone: customer.phone,
       email: customer.email,
-      tier: customer.tier,
-      totalVisits: customer.total_visits,
-      lastVisitAt: customer.last_visit_at,
+      tier: customer.tier ?? customer.loyalty_tier ?? 'member',
+      totalVisits: customer.total_visits ?? visits.results.length,
+      lastVisitAt: customer.last_visit_at ?? visits.results[0]?.visited_at ?? null,
       consentMarketing,
       consentOrder,
       recentVisits: visits.results.map((v) => ({
@@ -139,9 +161,9 @@ export async function lookupProfile(
         channel: v.channel,
       })),
       recentOrders: orders.results.map((o) => ({
-        id: o.id,
-        totalCents: o.total_cents,
-        placedAt: o.placed_at,
+        id: String(o.id ?? ''),
+        totalCents: Number(o.total_cents ?? o.total ?? 0),
+        placedAt: String(o.placed_at ?? o.created_at ?? ''),
       })),
       found: true,
     };

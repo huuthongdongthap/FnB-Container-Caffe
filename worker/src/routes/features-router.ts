@@ -74,7 +74,7 @@ import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Admin Protected (Kitchen/Barista/Chef scoped strictly to /api/admin/orders*)
-  const adminOrderAuth = requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']);
+  const adminOrderAuth = requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']);
   const adminGeneralAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
   app.use('/api/admin/*', async (c, next) => {
     if (c.req.path === '/api/admin/orders' || c.req.path.startsWith('/api/admin/orders/')) {
@@ -145,7 +145,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/products', productsRouter);
   app.route('/api/catalog', catalogRouter);
   app.route('/api/tables', tablesRouter);
-  app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter']));
+  app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter', 'cashier']));
   app.route('/api/table-sessions', tableSessionsRouter);
   app.route('/api/menu-modifiers', menuModifiersRouter);
   app.route('/api/kitchen-stations', kitchenStationsRouter);
@@ -165,7 +165,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/promotions', promotionsRouter);
   app.route('/api/signage', signageRouter);
   app.route('/api/pretix', pretixRouter);
-  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier']));
   reconciliationRoutes(app as any);
   app.route('/api/shifts', shiftsRouter);
   app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));
@@ -217,7 +217,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     await c.env.AUTH_KV?.put('config:notification_settings', JSON.stringify(next));
     return c.json({ success: true, ...next });
   });
-  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'admin', 'staff']), async (c) => {
+  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier']), async (c) => {
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
     const user = (c as unknown as { get: (k: string) => { id?: string } | undefined }).get('user');
     const key = `config:staff_notification_settings:${user?.id || 'default'}`;

@@ -111,9 +111,14 @@ export async function updateOrder(
     log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
   }
 
-      const refRow = await db.prepare(
-        'SELECT id FROM referrals WHERE first_order_id = ? AND status = \'completed\''
-      ).bind(id).first<{ id: string }>();
+      let refRow: { id: string } | null = null;
+      try {
+        refRow = await db.prepare(
+          'SELECT id FROM referrals WHERE first_order_id = ? AND status = \'completed\''
+        ).bind(id).first<{ id: string }>();
+      } catch {
+        // Ignore if referrals table does not include first_order_id column
+      }
       if (refRow) {
         try {
           const { reverseReferralCashback } = await import('worker/src/routes/referrals');
@@ -125,14 +130,17 @@ export async function updateOrder(
     }
 
     if (body.payment_status) {
-      await db.prepare(`
-        UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE order_id = ?
-      `).bind(
-        body.payment_status === 'paid' ? 'completed' : body.payment_status,
-        id
-      ).run();
-
+      try {
+        await db.prepare(`
+          UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE order_id = ?
+        `).bind(
+          body.payment_status === 'paid' ? 'completed' : body.payment_status,
+          id
+        ).run();
+      } catch {
+        // Non-blocking if legacy payments table is absent
+      }
     }
 
     if (env.AUTH_KV) {
@@ -222,7 +230,7 @@ if (['served', 'completed'].includes(body.status as string)) {
             }
 
             const orderRow = await db.prepare(
-              'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total_amount, subtotal, tax, created_at, notes FROM orders WHERE id = ?'
+              'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total, shipping_fee, discount, created_at, notes FROM orders WHERE id = ?'
             ).bind(id).first<Record<string, unknown>>();
 
             if (!orderRow) {

@@ -11,6 +11,7 @@
  */
 'use client';
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /* ─── Types & Hooks ──────────────────────────────────────────── */
@@ -51,14 +52,30 @@ export function StitchEventsNew2({
   onFilterByType,
 }: Readonly<StitchEventsNew2Props>) {
   const { t } = useTranslation();
-  const { activeMonth, handleMonthChange } = useStitchEvents({
+  const [hasSelectedMonth, setHasSelectedMonth] = useState(Boolean(externalActiveMonth));
+  const { activeMonth, handleMonthChange: baseHandleMonthChange } = useStitchEvents({
     activeMonth: externalActiveMonth,
     onMonthChange,
   });
 
+  const handleMonthChange = (key: string) => {
+    setHasSelectedMonth(true);
+    baseHandleMonthChange(key);
+  };
+
   const defaultData: EventsNew2PageData = createDefaultEventsData(t as (key: string, options?: unknown) => string);
   const data = externalData ?? defaultData;
   const errorMessage = externalErrMsg ?? '';
+
+  const shouldFilterByMonth = Boolean(externalActiveMonth) || hasSelectedMonth;
+  const visibleFeaturedEvents =
+    shouldFilterByMonth && activeMonth && activeMonth !== 'all'
+      ? data.featuredEvents.filter((ev) =>
+          ev.dateLabel?.toLowerCase().startsWith(activeMonth.toLowerCase()),
+        )
+      : data.featuredEvents;
+  const displayedEvents =
+    visibleFeaturedEvents.length > 0 ? visibleFeaturedEvents : data.featuredEvents;
 
   /* ─── Loading State ─────────────────────────────────────────── */
   if (loadingState === 'loading') {
@@ -117,7 +134,7 @@ export function StitchEventsNew2({
             {t('events.featured')}
           </h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {data.featuredEvents.map((event) => (
+            {displayedEvents.map((event) => (
               <EventCardItem
                 key={event.id}
                 event={event}

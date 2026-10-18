@@ -56,9 +56,15 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       const id = genId('CUS_');
       const email = `${phone}@loyalty.aura`;
       const name = validated.name || 'Thành viên';
-      await db.prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
-      ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
+      try {
+        await db.prepare(
+          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
+        ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
+      } catch {
+        await db.prepare(
+          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'
+        ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+      }
 
       const wid = genId('wal_');
       await db.prepare(

@@ -48,7 +48,7 @@ export async function resolveServerOrderOwnership(
   const { actor, clientSuppliedCustomerId, customerPhone, db } = input;
   const role = actor?.role;
 
-  if (role && ['owner', 'manager', 'staff'].includes(role)) {
+  if (role && ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(role)) {
     if (clientSuppliedCustomerId) {
       return { customerId: clientSuppliedCustomerId, stage: 'customer_profile', isGuest: false, resolvedVia: 'staff_override' };
     }
@@ -81,7 +81,7 @@ export function canAccessOrder(
   order: { id: string; customer_id?: string | null }
 ): { allowed: boolean; reason?: string } {
   const role = actor?.role;
-  if (role && ['owner', 'manager', 'staff'].includes(role)) {
+  if (role && ['owner', 'manager', 'staff', 'admin', 'cashier'].includes(role)) {
     return { allowed: true };
   }
   if (role === 'customer' && actor?.id) {
@@ -116,7 +116,7 @@ export interface ClaimGuestOrderResult {
 
 export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<ClaimGuestOrderResult> {
   const { db, orderId, actor } = input;
-  if (!actor || !actor.id || (actor.role !== 'customer' && !['owner', 'manager', 'staff'].includes(actor.role || ''))) {
+  if (!actor || !actor.id || (actor.role !== 'customer' && !['owner', 'manager', 'staff', 'admin', 'cashier'].includes(actor.role || ''))) {
     return { success: false, error: 'Unauthorized: authentication required to claim an order', statusCode: 401 };
   }
 

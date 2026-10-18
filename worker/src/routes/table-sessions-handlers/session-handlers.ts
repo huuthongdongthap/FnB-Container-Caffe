@@ -24,9 +24,19 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
       query += ' AND status = ?'; params.push(status);
     }
 
+    const baseQuery = query;
     query += ' ORDER BY opened_at DESC';
-    const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
-    const { results } = await stmt.all<TableSession>();
+    let results: TableSession[] = [];
+    try {
+      const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
+      const res = await stmt.all<TableSession>();
+      results = res.results || [];
+    } catch {
+      const fallbackQuery = `${baseQuery} ORDER BY started_at DESC`;
+      const stmt = params.length ? db.prepare(fallbackQuery).bind(...params) : db.prepare(fallbackQuery);
+      const res = await stmt.all<TableSession>();
+      results = res.results || [];
+    }
     return c.json({ success: true, data: results });
   });
 
@@ -74,19 +84,26 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     const id = makeSessionId();
     const now = new Date().toISOString();
 
-    await db.prepare(
-      `INSERT INTO table_sessions (id, table_id, customer_id, customer_name, customer_phone, status, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
-    ).bind(
-      id,
-      tableId,
-      body.customer_id || null,
-      body.customer_name || null,
-      body.customer_phone || null,
-      body.notes || null,
-      now,
-      now
-    ).run();
+    try {
+      await db.prepare(
+        `INSERT INTO table_sessions (id, table_id, customer_id, customer_name, customer_phone, status, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
+      ).bind(
+        id,
+        tableId,
+        body.customer_id || null,
+        body.customer_name || null,
+        body.customer_phone || null,
+        body.notes || null,
+        now,
+        now
+      ).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO table_sessions (id, table_id, status, started_at, created_at)
+         VALUES (?, ?, 'active', ?, ?)`
+      ).bind(id, tableId, now, now).run();
+    }
 
     // Mark the table occupied.
     await db.prepare(
@@ -124,14 +141,23 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     const now = new Date().toISOString();
     const closedAt = (nextStatus === 'closed' || nextStatus === 'no_show') ? now : session.closed_at;
 
-    await db.prepare(
-      `UPDATE table_sessions
-       SET status = COALESCE(?, status),
-           closed_at = COALESCE(?, closed_at),
-           notes = COALESCE(?, notes),
-           updated_at = ?
-       WHERE id = ?`
-    ).bind(nextStatus || null, closedAt, body.notes || null, now, id).run();
+    try {
+      await db.prepare(
+        `UPDATE table_sessions
+         SET status = COALESCE(?, status),
+             closed_at = COALESCE(?, closed_at),
+             notes = COALESCE(?, notes),
+             updated_at = ?
+         WHERE id = ?`
+      ).bind(nextStatus || null, closedAt, body.notes || null, now, id).run();
+    } catch {
+      await db.prepare(
+        `UPDATE table_sessions
+         SET status = COALESCE(?, status),
+             ended_at = COALESCE(?, ended_at)
+         WHERE id = ?`
+      ).bind(nextStatus || null, closedAt, id).run();
+    }
 
     // Free the table when the session ends.
     if (nextStatus === 'closed' || nextStatus === 'no_show') {

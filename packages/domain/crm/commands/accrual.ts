@@ -91,6 +91,14 @@ export async function applyAccrual(
     if (existing) {
       return { ok: false, reason: 'already_processed' };
     }
+    const existingLog = await db
+      .prepare(`SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'purchase' LIMIT 1`)
+      .bind(orderId)
+      .first<{ id: string }>()
+      .catch(() => null);
+    if (existingLog) {
+      return { ok: false, reason: 'already_processed' };
+    }
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `idempotency check failed: ${(e as Error).message}` };
   }
@@ -151,9 +159,9 @@ export async function applyAccrual(
         .prepare(
           `INSERT INTO cashback_wallets
            (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 0, ?, ?)`,
+           VALUES (?, ?, 0, 0, 0, ?, ?)`,
         )
-        .bind(walletId, customer.id, newBalance, cashback, now, now)
+        .bind(walletId, customer.id, now, now)
         .run();
     } catch (e) {
       return { ok: false, reason: 'd1_error', error: `failed to create wallet: ${(e as Error).message}` };

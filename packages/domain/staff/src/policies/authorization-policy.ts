@@ -8,11 +8,128 @@ import type {
   ResourceContext,
   ActionType,
   AuthorizationDecision,
+  ResourceType,
 } from '../model/authorization-types';
+
+export type RoleType =
+  | 'guest'
+  | 'customer'
+  | 'waiter'
+  | 'staff'
+  | 'barista'
+  | 'kitchen'
+  | 'chef'
+  | 'cashier'
+  | 'manager'
+  | 'admin'
+  | 'owner';
+
+export const ROLE_HIERARCHY: Record<RoleType, number> = {
+  guest: 0,
+  customer: 10,
+  waiter: 20,
+  kitchen: 30,
+  barista: 30,
+  chef: 30,
+  cashier: 30,
+  staff: 30,
+  manager: 50,
+  admin: 90,
+  owner: 100,
+};
+
+export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, ActionType[]>>> = {
+  guest: {
+    catalog: ['read'],
+    reservation: ['read', 'create'],
+    order: ['read', 'create'],
+    payment: ['create'],
+    table: ['read'],
+  },
+  customer: {
+    catalog: ['read'],
+    reservation: ['read', 'create', 'update'],
+    order: ['read', 'create', 'update'],
+    payment: ['create'],
+  },
+  waiter: {
+    catalog: ['read'],
+    table: ['read', 'update'],
+    order: ['read', 'create', 'update'],
+    reservation: ['read', 'create', 'update'],
+  },
+  kitchen: {
+    catalog: ['read'],
+    table: ['read'],
+    order: ['read', 'update'],
+    shift: ['read', 'create', 'operate', 'update'],
+    inventory: ['read'],
+  },
+  barista: {
+    catalog: ['read'],
+    table: ['read'],
+    order: ['read', 'update'],
+    shift: ['read', 'create', 'operate', 'update'],
+    inventory: ['read'],
+  },
+  chef: {
+    catalog: ['read'],
+    table: ['read'],
+    order: ['read', 'update'],
+    shift: ['read', 'create', 'operate', 'update'],
+    inventory: ['read'],
+  },
+  cashier: {
+    catalog: ['read'],
+    table: ['read', 'update'],
+    order: ['read', 'create', 'update'],
+    shift: ['read', 'create', 'operate', 'update'],
+    payment: ['read', 'create'],
+  },
+  staff: {
+    catalog: ['read', 'create', 'update'],
+    table: ['read', 'update'],
+    order: ['read', 'create', 'update'],
+    shift: ['read', 'create', 'operate', 'update'],
+    inventory: ['read'],
+    payment: ['read', 'create'],
+  },
+  manager: {
+    catalog: ['read', 'create', 'update', 'delete', 'operate'],
+    table: ['read', 'create', 'update', 'delete', 'operate'],
+    order: ['read', 'create', 'update', 'delete', 'operate'],
+    reservation: ['read', 'create', 'update', 'delete', 'operate'],
+    shift: ['read', 'create', 'update', 'delete', 'operate'],
+    inventory: ['read', 'create', 'update', 'delete', 'operate'],
+    payment: ['read', 'create', 'update', 'delete', 'operate'],
+    staff: ['read', 'create', 'update', 'operate'],
+  },
+  admin: {
+    catalog: ['read', 'create', 'update', 'delete', 'operate'],
+    table: ['read', 'create', 'update', 'delete', 'operate'],
+    order: ['read', 'create', 'update', 'delete', 'operate'],
+    reservation: ['read', 'create', 'update', 'delete', 'operate'],
+    shift: ['read', 'create', 'update', 'delete', 'operate'],
+    inventory: ['read', 'create', 'update', 'delete', 'operate'],
+    payment: ['read', 'create', 'update', 'delete', 'operate'],
+    staff: ['read', 'create', 'update', 'delete', 'operate'],
+  },
+  owner: {
+    catalog: ['read', 'create', 'update', 'delete', 'operate'],
+    table: ['read', 'create', 'update', 'delete', 'operate'],
+    order: ['read', 'create', 'update', 'delete', 'operate'],
+    reservation: ['read', 'create', 'update', 'delete', 'operate'],
+    shift: ['read', 'create', 'update', 'delete', 'operate'],
+    inventory: ['read', 'create', 'update', 'delete', 'operate'],
+    payment: ['read', 'create', 'update', 'delete', 'operate'],
+    staff: ['read', 'create', 'update', 'delete', 'operate'],
+  },
+};
 
 export function isHQSuperAdmin(actor?: ActorContext | null): boolean {
   if (!actor) return false;
-  return actor.role === 'owner' && (!actor.tenantId || actor.tenantId === 'default' || actor.tenantId === 'hq');
+  const roleStr = String(actor.role);
+  return (roleStr === 'owner' || roleStr === 'admin') && (!actor.tenantId || actor.tenantId === 'default' || actor.tenantId === 'hq');
 }
 
 export function validateOperatingUnitScope(
@@ -125,8 +242,9 @@ export function authorizeAction(
     };
   }
 
-  // 6. Staff (Kitchen / Counter / Operations) Boundaries
-  if (role === 'staff') {
+  // 6. Staff (Kitchen / Counter / Operations / Barista / Chef / Cashier) Boundaries
+  const roleStr = String(role);
+  if (roleStr === 'staff' || roleStr === 'barista' || roleStr === 'kitchen' || roleStr === 'chef' || roleStr === 'cashier') {
     if (resource.type === 'catalog' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'table' && ['read', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'order' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
@@ -146,7 +264,7 @@ export function authorizeAction(
   }
 
   // 7. Manager Boundaries
-  if (role === 'manager') {
+  if (roleStr === 'manager') {
     if (['table', 'order', 'reservation', 'shift', 'inventory', 'catalog'].includes(resource.type)) {
       return { allowed: true };
     }
@@ -160,8 +278,8 @@ export function authorizeAction(
     };
   }
 
-  // 8. Tenant Owner
-  if (role === 'owner') {
+  // 8. Tenant Owner & Admin
+  if (roleStr === 'owner' || roleStr === 'admin') {
     return { allowed: true };
   }
 
