@@ -62,7 +62,16 @@ interface OrderRow {
   created_at: string;
 }
 
-const TERMINAL_STATUSES = new Set(['served', 'picked_up', 'delivered', 'completed', 'cancelled', 'rejected']);
+/**
+ * Fulfillment-view terminal set: orders that no longer occupy the kitchen queue.
+ *
+ * This is a *fulfillment* vocabulary, not the order lifecycle vocabulary — it
+ * includes statuses that never block a backend transition (`picked_up`,
+ * `rejected`) and is used only to suppress the queue-depth lookup below.
+ * Do not read it as an order-lifecycle guard; for that use
+ * `packages/domain/order/model/order-state-machine.ts`.
+ */
+const FULFILLMENT_SETTLED_STATUSES = new Set(['served', 'picked_up', 'delivered', 'completed', 'cancelled', 'rejected']);
 
 /**
  * Compute the fulfillment view for one order.
@@ -94,10 +103,10 @@ export async function getFulfillment(
   }
 
   const channel = (row.channel === 'delivery' ? 'delivery' : 'pickup') as FulfillmentChannel;
-  const isTerminal = TERMINAL_STATUSES.has(row.status);
+  const isSettled = FULFILLMENT_SETTLED_STATUSES.has(row.status);
 
   let queueDepth = 0;
-  if (!isTerminal) {
+  if (!isSettled) {
     try {
       const q = await db
         .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
@@ -109,13 +118,13 @@ export async function getFulfillment(
     }
   }
 
-  const etaMinutes = isTerminal ? 0 : BASELINE_PREP_MINUTES + queueDepth * MINUTES_PER_PENDING;
-  const etaAt = isTerminal
+  const etaMinutes = isSettled ? 0 : BASELINE_PREP_MINUTES + queueDepth * MINUTES_PER_PENDING;
+  const etaAt = isSettled
     ? null
     : new Date(Date.now() + etaMinutes * 60_000).toISOString();
 
   // Pickup point is only relevant for active pickup orders.
-  const pickupPoint = !isTerminal && channel === 'pickup' ? await resolvePickupPoint(kv) : null;
+  const pickupPoint = !isSettled && channel === 'pickup' ? await resolvePickupPoint(kv) : null;
 
   return {
     ok: true,

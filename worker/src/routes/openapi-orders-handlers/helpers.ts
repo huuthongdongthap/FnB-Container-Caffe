@@ -1,9 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { OrderItem, CustomerOrderItem } from '../../schemas/orders';
 
-/** Order statuses from which no further lifecycle movement is possible. */
-const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded']);
-
 type Row = Record<string, any>;
 
 function parseModifiers(raw: unknown): unknown[] {
@@ -199,5 +196,3 @@ export async function fetchOrderItemsAndPayments(db: D1Database, orderId: string
     };
   }
 }
-
-export { TERMINAL_STATUSES };

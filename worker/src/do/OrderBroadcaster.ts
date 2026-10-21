@@ -1,19 +1,5 @@
-/**
- * OrderBroadcaster Durable Object — single source of truth for realtime order state.
- *
- * Persistence contract:
- *   CF Workers auto-serializes `this.state` (structured clone) on every mutation.
- *   Non-structured keys (raw event payloads) go through `this.ctx.storage.put()`.
- *
- * State shape:
- *   {
- *     clients: Record<clientId, { role: string, orderIds: string[] }>,
- *     orders:  Record<orderId, OrderEvent>,
- *     seq:     number   // monotonically increments per broadcast
- *   }
- */
-
-// ── Types ────────────────────────────────────────────────────────────
+/** Durable realtime order snapshots. D1 remains the transactional source of truth. */
+import { parseOrderBroadcast } from './order-broadcast-event';
 
 export interface OrderEvent {
   orderId: string;
@@ -26,133 +12,170 @@ export interface OrderEvent {
   table_id?: string | null;
   createdAt: number;
   updatedAt: number;
-  seq?: number; // assigned by broadcast(); reflects position in stream
+  seq?: number;
 }
-
-export interface ClientInfo {
-  role: string;
-  orderIds: string[];
-}
-
+export interface ClientInfo { role: string; orderIds: string[] }
 export interface OrderBroadcasterState {
   clients: Record<string, ClientInfo>;
   orders: Record<string, OrderEvent>;
   seq: number;
 }
+interface SnapshotStorage {
+  get<T>(key: string): Promise<T | undefined>;
+  put(key: string, value: unknown): Promise<unknown>;
+}
+const STATE_KEY = 'order-broadcaster:state';
 
-// ── Class ─────────────────────────────────────────────────────────────
+/**
+ * Eviction bounds for the in-memory order map.
+ *
+ * `TTL_MS` retires closed orders 24h after their last update. Only terminal
+ * orders age out: an active order is one a client may still be waiting on, and
+ * the KDS dashboard needs it until it closes.
+ * `MAX_ORDERS` caps retention under sustained pressure. Past the cap the oldest
+ * entries go first, but the order written in the current tick is always kept —
+ * dropping it would make its own broadcast a no-op.
+ */
+const MAX_ORDERS = 500;
+const TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * Cache-eviction terminal set. `delivered` is terminal *here* even though the
+ * backend lifecycle still allows delivered → completed: once an order reaches
+ * the customer it no longer needs a live SSE slot.
+ *
+ * Members must match a status a broadcast can actually carry. The order
+ * lifecycle (`ORDER_STATUSES`) is the canonical source; `refunded` lives only
+ * on `payment_status` and no code path broadcasts it as an order status, so
+ * leaving it out keeps a settlement from pinning a cache slot.
+ */
+const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'delivered', 'failed', 'expired']);
 
-export class OrderBroadcaster {
-  // CF Workers inject state (auto-persisted) + ctx (for storage API).
-  // For testing we accept any object that satisfies the same interface.
-
-  private state: OrderBroadcasterState;
-  private storage?: { put(_key: string, _value: string): Promise<void> };
-
-  /**
-   * @param state  — structured state (CF: this.state; test: proxy)
-   * @param ctx    — execution context (CF: DurableObjectState; test: { storage: { put } })
-   */
-  constructor(state: OrderBroadcasterState, storage?: { put(_key: string, _value: string): Promise<void> }) {
-    this.state = state;
-    this.storage = storage;
-    // Ensure all maps exist on re-hydration (CF re-calls constructor with loaded state)
-    this.state.clients = this.state.clients ?? {};
-    this.state.orders = this.state.orders ?? {};
-    this.state.seq = this.state.seq ?? 0;
+/**
+ * Bounds retention: terminal orders past the TTL are dropped, then — only if
+ * still over the cap — the oldest remaining entries are dropped too.
+ */
+function evictStaleOrders(
+  orders: Record<string, OrderEvent>,
+  keepOrderId: string
+): Record<string, OrderEvent> {
+  const now = Date.now();
+  const pruned: Record<string, OrderEvent> = {};
+  for (const [key, order] of Object.entries(orders)) {
+    if (key === keepOrderId || !TERMINAL_STATUSES.has(order.status)) {
+      pruned[key] = order;
+      continue;
+    }
+    const age = now - (order.updatedAt ?? order.createdAt ?? now);
+    if (age <= TTL_MS) {
+      pruned[key] = order;
+    }
   }
 
-  // ── Broadcast ──────────────────────────────────────────────────────
+  const keys = Object.keys(pruned);
+  if (keys.length <= MAX_ORDERS) {
+    return pruned;
+  }
+
+  const overflow = keys.length - MAX_ORDERS;
+  // Oldest first, so the freshest orders are the ones that survive.
+  keys.sort((a, b) => (pruned[a].updatedAt ?? pruned[a].createdAt ?? 0) - (pruned[b].updatedAt ?? pruned[b].createdAt ?? 0));
+  let dropped = 0;
+  for (const key of keys) {
+    if (dropped >= overflow) break;
+    if (key === keepOrderId) continue;
+    delete pruned[key];
+    dropped++;
+  }
+  return pruned;
+}
+
+export class OrderBroadcaster {
+  /** Live state — the object the runtime (or fixture) handed us. */
+  private state: OrderBroadcasterState;
+  private snapshotStorage?: SnapshotStorage;
+  private ready: Promise<void> = Promise.resolve();
+  private pending: Promise<void> = Promise.resolve();
 
   /**
-   * Persist an order event, increment sequence, and return the assigned seq.
-   * Caller (fetch handler) is responsible for WS fan-out.
-   *
-   * Throws if ctx.storage.put fails — caller catches and logs to KV.
+   * CF hands a DO its own `state` — which owns `storage` and
+   * `blockConcurrencyWhile` — so the init argument doubles as the state we
+   * mutate. A test fixture supplies the same shape inline.
    */
-  async broadcast(event: OrderEvent): Promise<{ event: OrderEvent; seq: number }> {
-    const prevSeq = this.state.seq;
-    const prevOrder = this.state.orders[event.orderId];
+  constructor(input: DurableObjectState) {
+    this.state = input as unknown as OrderBroadcasterState;
+    this.state.clients ??= {};
+    this.state.orders ??= {};
+    this.state.seq ??= 0;
 
-    this.state.seq++;
-    const seq = this.state.seq;
-
-    // Attach seq to the event for getState correlation
-    const persisted: OrderEvent = { ...event, seq };
-
-    // Structured write — CF runtime auto-persists this.state
-    this.state.orders[event.orderId] = persisted;
-
-    // Non-structured write — survives eviction independently
-    if (this.storage) {
-      try {
-        await this.storage.put(`order:${event.orderId}`, JSON.stringify(persisted));
-      } catch (err) {
-        this.state.seq = prevSeq;
-        if (prevOrder !== undefined) {
-          this.state.orders[event.orderId] = prevOrder;
-        } else {
-          delete this.state.orders[event.orderId];
+    const storage = input.storage;
+    if (typeof storage?.get === 'function') {
+      this.snapshotStorage = storage;
+      const hydrate = async () => {
+        const saved = await storage.get<OrderBroadcasterState>(STATE_KEY);
+        if (saved && saved.orders && Number.isFinite(saved.seq)) {
+          this.state.orders = saved.orders;
+          this.state.seq = saved.seq;
         }
-        throw err;
-      }
+      };
+      this.ready = input.blockConcurrencyWhile ? input.blockConcurrencyWhile(hydrate) : hydrate();
     }
+  }
 
-    // Prune terminal orders past 200 items to prevent memory bloat
-    const keys = Object.keys(this.state.orders);
-    if (keys.length > 200) {
-      const terminal = new Set(['completed', 'cancelled', 'delivered']);
-      for (const k of keys) {
-        if (terminal.has(this.state.orders[k]?.status) && k !== event.orderId) {
-          delete this.state.orders[k];
-          if (Object.keys(this.state.orders).length <= 200) break;
-        }
+  /** Serialize writes and publish memory only after storage succeeds. */
+  broadcast(event: OrderEvent): Promise<{ event: OrderEvent; seq: number }> {
+    const task = this.pending.then(async () => {
+      await this.ready;
+      const parsed = parseOrderBroadcast(event);
+      if (!parsed) throw new Error('Invalid order event');
+      const seq = this.state.seq + 1;
+      const persisted = { ...parsed, seq };
+      const merged = { ...this.state.orders, [parsed.orderId]: persisted };
+      // Bounded retention: TTL for closed orders, then a hard cap by age.
+      const orders = evictStaleOrders(merged, parsed.orderId);
+      if (this.snapshotStorage) {
+        // `clients` is deliberately empty: a registration is a live WebSocket
+        // handle, and one that outlived a DO restart would point at a socket
+        // that no longer exists. Clients re-register on reconnect.
+        await this.snapshotStorage.put(STATE_KEY, { clients: {}, orders, seq });
       }
-    }
-
-    return { event: persisted, seq };
+      this.state.orders = orders;
+      this.state.seq = seq;
+      return { event: persisted, seq };
+    });
+    this.pending = task.then(() => {}, () => {});
+    return task;
   }
 
   async fetch(request: Request): Promise<Response> {
+    await this.ready;
     const url = new URL(request.url);
-    if (url.pathname === '/state') {
+    // Only binding-origin requests can mutate; public realtime proxies keep their original path/host.
+    if (url.hostname === 'do' && url.pathname === '/broadcast' && request.method === 'POST') {
+      let body: unknown;
+      try { body = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
+      const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+      const id = fields.orderId ?? fields.order_id;
+      const previous = typeof id === 'string' ? this.state.orders[id] : undefined;
+      const event = parseOrderBroadcast(body, previous);
+      if (!event) return new Response('Invalid order event', { status: 400 });
+      try {
+        const result = await this.broadcast(event);
+        return Response.json({ success: true, seq: result.seq });
+      } catch { return new Response('Order broadcast unavailable', { status: 503 }); }
+    }
+    if (url.pathname === '/state' && request.method === 'GET') {
       const since = Number(url.searchParams.get('since') || '0');
-      return new Response(JSON.stringify(this.getState(since)), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return Response.json(this.getState(Number.isFinite(since) && since >= 0 ? since : 0));
     }
     return new Response('Not found', { status: 404 });
   }
 
-  // ── Client lifecycle ───────────────────────────────────────────────
-
-  register(clientId: string, role: string, orderIds: string[]): void {
-    this.state.clients[clientId] = { role, orderIds };
-  }
-
-  unregister(clientId: string): void {
-    delete this.state.clients[clientId];
-  }
-
-  // ── State query (diff-sync) ────────────────────────────────────────
-
-  /**
-   * Returns all orders whose seq > sinceSeq, ordered by seq ascending.
-   * Used by reconnecting clients to fetch missed events.
-   */
+  register(clientId: string, role: string, orderIds: string[]): void { this.state.clients[clientId] = { role, orderIds }; }
+  unregister(clientId: string): void { delete this.state.clients[clientId]; }
   getState(sinceSeq: number): OrderEvent[] {
-    return Object.values(this.state.orders)
-      .filter((o) => (o.seq ?? 0) > sinceSeq)
+    return Object.values(this.state.orders).filter(order => (order.seq ?? 0) > sinceSeq)
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   }
-
-  // ── Helpers (used by fetch() handler, not exposed to tests directly) ──
-
-  getClient(clientId: string): ClientInfo | undefined {
-    return this.state.clients[clientId];
-  }
-
-  getAllClients(): Record<string, ClientInfo> {
-    return { ...this.state.clients };
-  }
+  getClient(clientId: string): ClientInfo | undefined { return this.state.clients[clientId]; }
+  getAllClients(): Record<string, ClientInfo> { return { ...this.state.clients }; }
 }

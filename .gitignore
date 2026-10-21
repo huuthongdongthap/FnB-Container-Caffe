@@ -36,3 +36,16 @@ worker/backups/
 checkpoint*.sql
 *.dump.sql
 *.sql.bak
+
+# test-run and debug artifacts (regenerated on demand, never source)
+*.log
+all-results.json
+failed-suites.json
+
+# one-off repair/patch/debug scripts (kept in git only if they are real tooling)
+/fix_*.py
+/fix-*.py
+/repair_*.py
+/tables_*.py
+/tmp_*.py
+/debug_*.py
