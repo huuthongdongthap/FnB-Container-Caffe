@@ -21,6 +21,8 @@ import { customerMenuRouter } from './routes/customer-menu';
 import { authEndpointsRouter } from './routes/auth-endpoints';
 import { staffMobileRouter } from './routes/staff-mobile';
 import { ordersUnifiedRouter } from './routes/orders-unified';
+import { kdsOrdersRouter } from './routes/kds-orders';
+import { KDS_ROLES } from './routes/orders-hono-handlers/kds-handlers';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { registerFeatureRoutes } from './routes/features-router';
@@ -89,13 +91,13 @@ app.onError(errorHandler);
 app.route('/api/menu', customerMenuRouter);
 
 // ── Orders KDS & Realtime ──
-const kdsRoles = ['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier'];
-app.use('/api/orders/kds', requireAuth(kdsRoles));
-app.use('/api/orders/kds/*', requireAuth(kdsRoles));
+
+app.use('/api/orders/kds', requireAuth(KDS_ROLES));
+app.use('/api/orders/kds/*', requireAuth(KDS_ROLES));
 app.use('/api/orders/kds', tenantMiddleware);
 app.use('/api/orders/kds/*', tenantMiddleware);
-app.use('/api/kds/orders', requireAuth(kdsRoles));
-app.use('/api/kds/orders/*', requireAuth(kdsRoles));
+app.use('/api/kds/orders', requireAuth(KDS_ROLES));
+app.use('/api/kds/orders/*', requireAuth(KDS_ROLES));
 app.use('/api/kds/orders', tenantMiddleware);
 app.use('/api/kds/orders/*', tenantMiddleware);
 const codCollectionRoles = ['owner', 'manager', 'cashier', 'admin'];
@@ -104,7 +106,9 @@ app.use('/api/orders/:id/mark-cod-paid', tenantMiddleware);
 app.route('/api/orders', ordersUnifiedRouter);
 // Mount the static SSE endpoint before the dynamic /:id order routes.
 app.route('/api/kds/orders', kdsStreamRouter);
-app.route('/api/kds/orders', ordersUnifiedRouter);
+// The KDS queue is the only other consumer of this prefix, so it gets its own
+// router instead of re-mounting the whole unified orders surface here.
+app.route('/api/kds/orders', kdsOrdersRouter);
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 
 // ── Auth & Mobile ──

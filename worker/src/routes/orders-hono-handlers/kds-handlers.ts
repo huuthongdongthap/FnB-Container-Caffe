@@ -1,17 +1,18 @@
+import { collectCodPayment } from '../../../../packages/domain/kitchen/commands/collect-cod-payment';
 import type { Hono, Context } from 'hono';
 import { updateOrderStatusSchema, zodErrorResponse } from '../../lib/validators';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { audit } from '../../middleware/audit-log';
-import { buildOrderTail, isTerminal, publishOrderEvent } from '@aura/domain-order';
+import { buildOrderTail, publishOrderEvent } from '@aura/domain-order';
 import { executeKdsStatusTransition, buildIndexFromDbRows } from '@aura/domain-kitchen';
-import { ALLOWED_KDS_STATUSES, type OrderRecord, type OrderItem, type KdsOrder } from './types';
+import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 
 export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const raw = c.req.query('status') || 'pending';
-  const status = ALLOWED_KDS_STATUSES.includes(raw as typeof ALLOWED_KDS_STATUSES[number]) ? raw : 'pending';
   const stationId = c.req.query('station_id') || c.req.query('station');
+  const tenantId = getTenantId(c);
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
@@ -25,9 +26,11 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const { results } = await db.prepare(
-    `SELECT * FROM orders WHERE status IN (?, 'confirmed', 'preparing')${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
-  ).bind(status).all<OrderRecord>();
+  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const statement = db.prepare(
+    `SELECT * FROM orders WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
+  );
+  const { results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>();
 
   const kdsOrders: KdsOrder[] = [];
   for (const order of results || []) {
@@ -68,10 +71,10 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   return c.json({ success: true, data: kdsOrders });
 }
 
-export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>) {
+export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, forcedStatus?: unknown) {
   const db = c.env.AURA_DB;
-  const id = c.req.param('id');
-  const body = await c.req.json() as Record<string, unknown>;
+  const id = c.req.param('id')!;
+  const body = typeof forcedStatus === 'string' ? { status: forcedStatus } : await c.req.json().catch(() => null);
   const parsed = updateOrderStatusSchema.safeParse(body);
   if (!parsed.success) {
     return zodErrorResponse(c, parsed.error);
@@ -94,7 +97,9 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>) {
     status,
     user?.role,
     {
+      tenantId: getTenantId(c),
       kv: c.env.AUTH_KV,
+      env: c.env as unknown as Record<string, unknown>,
       waitUntil: waitUntilFn,
     }
   );
@@ -111,77 +116,25 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>) {
 }
 
 export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
-  const db = c.env.AURA_DB;
   const id = c.req.param('id');
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
-
-  let order: { total: number; status: string; payment_status: string; is_cod: number } | null = null;
-  try {
-    order = await db.prepare(
-      'SELECT total, status, payment_status, is_cod FROM orders WHERE id = ?'
-    ).bind(id).first<{ total: number; status: string; payment_status: string; is_cod: number }>();
-  } catch {
-    const fallback = await db.prepare(
-      'SELECT total, status, payment_status, payment_method FROM orders WHERE id = ?'
-    ).bind(id).first<{ total: number; status: string; payment_status: string; payment_method?: string }>();
-    if (fallback) {
-      order = {
-        total: fallback.total,
-        status: fallback.status,
-        payment_status: fallback.payment_status,
-        is_cod: (fallback.payment_method === 'cod' || fallback.payment_method === 'cash') ? 1 : 0,
-      };
-    }
+  const result = await collectCodPayment(c.env.AURA_DB, id, getTenantId(c));
+  if (result.success === false) return c.json({ success: false, error: result.error }, result.statusCode);
+  if (!result.idempotent && c.env.AUTH_KV) {
+    await publishOrderEvent(c.env.AUTH_KV, id, result.status, { previousStatus: result.status }).catch(() => {});
   }
-
-  if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
-  if (order.status === 'cancelled') return c.json({ success: false, error: 'Cannot mark cancelled order as paid' }, 409);
-  if (isTerminal(order.status) && order.status !== 'completed') {
-    return c.json({ success: false, error: `Cannot mark ${order.status} order as paid` }, 409);
-  }
-  if ((order.is_cod ?? 0) !== 1 && order.payment_status !== 'cod_pending') {
-    return c.json({ success: false, error: 'Not a COD order' }, 409);
-  }
-  if (order.payment_status === 'paid') {
-    return c.json({ success: true, message: 'Already paid', order_id: id });
-  }
-
-  const now = new Date().toISOString();
-  try {
-    await db.prepare(
-      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
-    ).bind(now, now, id).run();
-  } catch {
-    await db.prepare(
-      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', updated_at = ? WHERE id = ?'
-    ).bind(now, id).run();
-  }
-  try {
-    await db.prepare(
-      'UPDATE payments SET status = \'completed\', updated_at = ? WHERE order_id = ? AND method = \'cod\''
-    ).bind(now, id).run();
-  } catch {
-    await db.prepare(
-      'UPDATE payments SET status = \'completed\' WHERE order_id = ? AND method = \'cod\''
-    ).bind(id).run().catch(() => {});
-  }
-
-  if (c.env?.AUTH_KV) {
-    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
-    try {
-      if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
-    } catch { /* executionCtx may be absent in testing */ }
-    await publishOrderEvent(c.env.AUTH_KV, id, 'completed', {
-      previousStatus: order.status,
-      waitUntil: waitUntilFn,
-    });
-  }
-  return c.json({ success: true, message: 'Marked as paid', order_id: id });
+  return c.json({ success: true, message: result.idempotent ? 'Already paid' : 'Marked as paid', order_id: id });
 }
 
+/**
+ * Every role that may read the kitchen queue or advance an order's status.
+ * Single source of truth — the mounts in index.ts and orders-unified.ts, the
+ * KDS queue router, and this file all guard with the same set.
+ */
+export const KDS_ROLES = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
+
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
-  const kdsRoles = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
-  app.get('/kds', requireAuth(kdsRoles), handleGetKdsOrders);
-  app.patch('/:id/status', requireAuth(kdsRoles), audit('order_status_change'), handleUpdateOrderStatus);
+  app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
+  app.patch('/:id/status', requireAuth(KDS_ROLES), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
   app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 }

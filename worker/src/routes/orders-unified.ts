@@ -28,6 +28,7 @@ import {
 
 import {
   handleGetKdsOrders,
+  KDS_ROLES,
   handleUpdateOrderStatus,
   handleMarkCodPaid,
 } from './orders-hono-handlers/kds-handlers';
@@ -53,7 +54,7 @@ ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
-ordersUnifiedRouter.get('/kds', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), handleGetKdsOrders);
+ordersUnifiedRouter.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
 // POS checkout is staff-only, but a stuck till retrying in a loop must still be
 // throttled before it reaches order creation.
 ordersUnifiedRouter.post('/checkout', rateLimitMiddleware(POS_CHECKOUT_RATE_LIMIT), requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
@@ -61,12 +62,7 @@ ordersUnifiedRouter.post('/checkout', rateLimitMiddleware(POS_CHECKOUT_RATE_LIMI
 ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), handleGetOrderSummary);
 
 ordersUnifiedRouter.post('/', orderRateLimit, handleCreateOrder);
-ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), (c) => {
-  if (c.req.path.startsWith('/api/kds/orders')) {
-    return handleGetKdsOrders(c);
-  }
-  return handleListOrders(c);
-});
+ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), handleListOrders);
 
 // ── 2. Parameterized Routes with Sub-paths (/:id/...) ──
 // Tracking links are shared, so these stay reachable without credentials — but
