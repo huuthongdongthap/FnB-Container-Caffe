@@ -7,6 +7,12 @@
 import type { JwtPayload } from '../types/api';
 
 const JWT_DEFAULT_TTL_SECONDS = 86400 * 7; // 7 days
+const JWT_CLOCK_SKEW_SECONDS = 60; // 60 seconds tolerance
+
+interface VerifyJWTOptions {
+  expectedAudience?: string;
+  expectedIssuer?: string;
+}
 
 function validateJWTSecret(secret: string): void {
   if (!secret || typeof secret !== 'string' || secret.length < 16) {
@@ -86,7 +92,8 @@ export async function generateJWT(
 
 export async function verifyJWT(
   token: string,
-  secret: string
+  secret: string,
+  options: VerifyJWTOptions = {}
 ): Promise<JwtPayload | null> {
   validateJWTSecret(secret);
   try {
@@ -119,7 +126,25 @@ export async function verifyJWT(
 
     const payload = JSON.parse(base64UrlDecode(payloadBase64)) as JwtPayload;
 
-    if (payload.exp && payload.exp < Date.now() / 1000) {
+    const now = Date.now() / 1000;
+
+    // exp validation with clock skew
+    if (payload.exp && payload.exp < now - JWT_CLOCK_SKEW_SECONDS) {
+      return null;
+    }
+
+    // nbf validation with clock skew
+    if (payload.nbf && payload.nbf > now + JWT_CLOCK_SKEW_SECONDS) {
+      return null;
+    }
+
+    // aud validation
+    if (options.expectedAudience && payload.aud && payload.aud !== options.expectedAudience) {
+      return null;
+    }
+
+    // iss validation
+    if (options.expectedIssuer && payload.iss && payload.iss !== options.expectedIssuer) {
       return null;
     }
 
@@ -129,13 +154,17 @@ export async function verifyJWT(
   }
 }
 
-export function getAuthToken(request: Request): string | null {
+/**
+ * Token presented explicitly by the caller: the Authorization header or the
+ * ?token= query parameter. EventSource cannot set headers, so the query
+ * parameter is how SSE authenticates — and Safari ITP blocks cross-origin
+ * cookies, so it is also the reliable path there.
+ */
+function getExplicitToken(request: Request): string | null {
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
-  // URL query parameter fallback — browser EventSource (SSE) cannot set custom headers,
-  // and Safari ITP blocks cross-origin cookies.
   try {
     const url = new URL(request.url);
     const tokenParam = url.searchParams.get('token');
@@ -143,16 +172,42 @@ export function getAuthToken(request: Request): string | null {
       return tokenParam;
     }
   } catch {}
-  // Cookie fallback — EventSource (SSE) cannot set Authorization headers,
-  // so the web client authenticates via the login session cookie.
-  const cookie = request.headers.get('Cookie');
-  if (cookie) {
-    const match = cookie.match(/(?:^|;\s*)access_token=([^\s;]+)/);
-    if (match && match[1]) {
-      return match[1];
-    }
-  }
   return null;
+}
+
+/** Token the browser sent implicitly, from the login session cookie. */
+function getCookieToken(request: Request): string | null {
+  const cookie = request.headers.get('Cookie');
+  if (!cookie) return null;
+  const match = cookie.match(/(?:^|;\s*)access_token=([^\s;]+)/);
+  return match && match[1] ? match[1] : null;
+}
+
+/** True when the only credential on the request is the session cookie. */
+export function isCookieAuthenticated(request: Request): boolean {
+  return getExplicitToken(request) === null && getCookieToken(request) !== null;
+}
+
+/**
+ * Cookie-authenticated requests are trusted for reads only.
+ *
+ * The session cookie is SameSite=None because the storefront and the worker sit
+ * on different origins, so a cross-site form post carries it too. A cookie by
+ * itself proves possession, not intent: the browser attaches it without the
+ * caller choosing to send it. State-changing calls must therefore name their
+ * credential — an Authorization header or the SSE token parameter — which a
+ * third-party page cannot read from our origin.
+ */
+export function cookieWriteBlockReason(method: string, request: Request): string | null {
+  const normalised = method.toUpperCase();
+  if (normalised === 'GET' || normalised === 'HEAD' || normalised === 'OPTIONS') return null;
+  return isCookieAuthenticated(request)
+    ? 'Yêu cầu thay đổi dữ liệu cần xác thực bằng token'
+    : null;
+}
+
+export function getAuthToken(request: Request): string | null {
+  return getExplicitToken(request) ?? getCookieToken(request);
 }
 
 // ── Password hashing (PBKDF2 + legacy SHA-256) ──

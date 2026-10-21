@@ -1,10 +1,15 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 import { existsSync, copyFileSync } from 'fs';
 
 const __rootDir = new URL('.', import.meta.url).pathname;
+
+// The config module loads before Vite's own env system is up, so import.meta.env
+// is undefined here. loadEnv reads .env* directly and is the only supported way
+// to seed the dev proxy target.
+const DEFAULT_WORKER_ORIGIN = 'http://localhost:8787';
 
 export default defineConfig({
   plugins: [
@@ -84,15 +89,23 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    port: 5173,
-    host: true,
-    proxy: {
-      '/api': {
-        target: 'https://aura-space-worker.sadec-marketing-hub.workers.dev',
-        changeOrigin: true,
-        secure: false,
+  server: ({ mode }) => {
+    const env = loadEnv(mode, __rootDir, 'VITE_');
+    // VITE_API_BASE is the origin the browser calls. It is deliberately empty in
+    // .env.local so the client walks through this same-origin proxy instead of
+    // addressing the worker cross-origin — so the proxy target needs its own
+    // variable and must not fall back to a value the client overwrote.
+    const workerTarget = env.VITE_DEV_PROXY_TARGET || DEFAULT_WORKER_ORIGIN;
+    return {
+      port: 5173,
+      host: true,
+      proxy: {
+        '/api': {
+          target: workerTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
-    },
+    };
   },
 });

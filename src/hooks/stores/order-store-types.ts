@@ -21,6 +21,8 @@ export interface CustomerOrder {
   totalAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  paymentMethod?: string;
+  estimatedMinutes?: number;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -84,6 +86,9 @@ export type OrderStatus =
   | 'refunded';
 
 export type PaymentStatus =
+  | 'unpaid'
+  | 'paid'
+  | 'cod_pending'
   | 'pending'
   | 'processing'
   | 'completed'
@@ -101,10 +106,14 @@ export interface OrderState {
   loading: boolean;
   error: string | null;
   pollingId: number | null;
+  /** Guards against a second poller being stacked on top of the first. */
+  isPolling: boolean;
   eventSource: EventSource | null;
+  /** Cancels the in-flight poll fetch so its late response is discarded. */
+  abortController: AbortController | null;
   queuedOffline: boolean;
 
-  createOrder: (payload: CreateOrderPayload) => Promise<CustomerOrder | null>;
+  createOrder: (payload: CreateOrderPayload, idempotencyKey?: string) => Promise<CustomerOrder | null>;
   fetchOrder: (id: string) => Promise<void>;
   startPolling: (id: string) => void;
   stopPolling: () => void;

@@ -100,9 +100,13 @@ export async function apiFetch<T = unknown>(
   // Network-level fetch — catches Safari "Load failed" / Chrome "Failed to fetch"
   let res: Response;
   try {
+    // Credentials are omitted on purpose. The session cookie is SameSite=None so
+    // a cross-site write would otherwise present it and be treated as the user;
+    // this client never reads that cookie back, it names its credential with an
+    // Authorization header instead. SSE keeps the cookie via EventSource's own
+    // separate withCredentials flag, which reads are allowed to use.
     res = await fetch(url, {
       ...fetchOptions,
-      credentials: 'include', // Send cookies cross-origin
       headers,
     });
   } catch (networkErr) {

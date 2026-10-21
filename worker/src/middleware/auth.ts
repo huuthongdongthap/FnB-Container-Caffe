@@ -4,7 +4,7 @@
  */
 
 import type { Env } from '../types/env';
-import { verifyJWT, getAuthToken } from '../lib/jwt';
+import { verifyJWT, getAuthToken, cookieWriteBlockReason } from '../lib/jwt';
 
 export interface AuthUser {
   id: string;
@@ -52,13 +52,25 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
       return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
     }
 
+    // A state-changing call authenticated only by the session cookie is a CSRF
+    // attempt: no first-party caller sends one (the client posts with a Bearer
+    // header, SSE only reads). Reject before touching the token so the failure
+    // names the missing intent rather than a bad credential.
+    const writeBlockReason = cookieWriteBlockReason(c.req.method, c.req.raw);
+    if (writeBlockReason) {
+      return c.json({ success: false, error: writeBlockReason }, 403);
+    }
+
     const token = getAuthToken(c.req.raw);
 
     if (!token) {
       return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
     }
 
-    const payload = await verifyJWT(token, (c.env as Env).JWT_SECRET);
+    const payload = await verifyJWT(token, (c.env as Env).JWT_SECRET, {
+      expectedAudience: (c.env as Env).JWT_AUDIENCE,
+      expectedIssuer: (c.env as Env).JWT_ISSUER,
+    });
     if (!payload) {
       return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
     }
@@ -97,11 +109,20 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
 export function optionalAuth(): import('hono').MiddlewareHandler<{ Bindings: Env }> {
   return async(c, next) => {
     const jwtSecret = (c.env as Env)?.JWT_SECRET;
-    if (jwtSecret) {
+    // Optional auth can sit on a read that the caller only reaches when signed
+    // in — order tracking and the order stream are the cases here, and both are
+    // GET, where the session cookie is the credential EventSource can actually
+    // send. On a write the same cookie would confer authority the caller never
+    // named, so a write is left unauthenticated and the route decides.
+    const blockCookieWrite = cookieWriteBlockReason(c.req.method, c.req.raw) !== null;
+    if (jwtSecret && !blockCookieWrite) {
       const token = getAuthToken(c.req.raw);
       if (token) {
         try {
-          const payload = await verifyJWT(token, jwtSecret);
+          const payload = await verifyJWT(token, jwtSecret, {
+          expectedAudience: (c.env as Env).JWT_AUDIENCE,
+          expectedIssuer: (c.env as Env).JWT_ISSUER,
+        });
           if (payload) {
             const authKv = (c.env as Env)?.AUTH_KV;
             const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;

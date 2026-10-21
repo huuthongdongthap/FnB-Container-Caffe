@@ -85,30 +85,53 @@ describe('usePaymentStore', () => {
     expect(s.error).toContain('Network');
   });
 
-  it('createPaymentLink(): works without explicit token (cookie auth)', async () => {
-    // Cookie auth: backend reads httpOnly cookie automatically
-    mockFetch(200, { checkout_url: 'https://payos.vn/checkout/cookie' });
+  it('createPaymentLink(): works without a stored token (guest checkout)', async () => {
+    // Guest checkout: no Authorization header, and no cookie credentials either
+    mockFetch(200, { checkout_url: 'https://payos.vn/checkout/guest' });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
 
-    expect(url).toBe('https://payos.vn/checkout/cookie');
+    expect(url).toBe('https://payos.vn/checkout/guest');
     const s = usePaymentStore.getState();
     expect(s.error).toBeNull();
   });
 
-  /* ── TDD: Cookie auth credentials (Phase 1 baseline) ── */
-  it('createPaymentLink(): sends cookie credentials and Content-Type', async () => {
+  /* ── Credentials must be explicit, not a browser-attached cookie ── */
+  it('createPaymentLink(): omits cookie credentials and sends Bearer auth', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true, status: 200,
       json: () => Promise.resolve({ checkout_url: 'https://payos.vn/test' }),
     });
     vi.stubGlobal('fetch', fetchSpy);
+    const token = 'test-bearer-token';
+    vi.spyOn(window.localStorage, 'getItem').mockImplementation((key: string) =>
+      key === 'aura_auth_token' ? token : null
+    );
 
     await usePaymentStore.getState().createPaymentLink('ORD_99', 75000);
 
     const options = fetchSpy.mock.calls[0]?.[1];
-    expect(options?.credentials).toBe('include');
+    // The session cookie is SameSite=None, so attaching it to a write would let
+    // a cross-site page spend the user's authority. The client names its
+    // credential instead, which the worker requires on mutating methods.
+    expect(options?.credentials).toBeUndefined();
+    expect(options?.headers?.['Authorization']).toBe(`Bearer ${token}`);
     expect(options?.headers?.['Content-Type']).toBe('application/json');
+  });
+
+  it('createPaymentLink(): works without a stored token but still sends no cookie', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ checkout_url: 'https://payos.vn/test' }),
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.spyOn(window.localStorage, 'getItem').mockReturnValue(null);
+
+    await usePaymentStore.getState().createPaymentLink('ORD_99', 75000);
+
+    const options = fetchSpy.mock.calls[0]?.[1];
+    expect(options?.credentials).toBeUndefined();
+    expect(options?.headers?.['Authorization']).toBeUndefined();
   });
 
   /* ── TDD: Retry behavior baseline (Phase 1) ── */
