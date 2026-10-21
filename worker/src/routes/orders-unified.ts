@@ -6,9 +6,9 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
-import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../middleware/rate-limit';
+import { rateLimitMiddleware, ORDER_RATE_LIMIT, POS_CHECKOUT_RATE_LIMIT } from '../middleware/rate-limit';
 
 import {
   orderRateLimit,
@@ -54,7 +54,9 @@ ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
 ordersUnifiedRouter.get('/kds', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), handleGetKdsOrders);
-ordersUnifiedRouter.post('/checkout', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
+// POS checkout is staff-only, but a stuck till retrying in a loop must still be
+// throttled before it reaches order creation.
+ordersUnifiedRouter.post('/checkout', rateLimitMiddleware(POS_CHECKOUT_RATE_LIMIT), requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
 
 ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), handleGetOrderSummary);
 
@@ -67,8 +69,11 @@ ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter',
 });
 
 // ── 2. Parameterized Routes with Sub-paths (/:id/...) ──
-ordersUnifiedRouter.get('/:id/events', handleOrderStreamEvents);
-ordersUnifiedRouter.get('/:id/track', handleTrackOrder);
+// Tracking links are shared, so these stay reachable without credentials — but
+// optionalAuth populates c.get('user') when a token is present so the handler's
+// ownership check can tell a returning customer from an anonymous guest.
+ordersUnifiedRouter.get('/:id/events', optionalAuth(), handleOrderStreamEvents);
+ordersUnifiedRouter.get('/:id/track', optionalAuth(), handleTrackOrder);
 
 ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), audit('order_status_change'), handleUpdateOrderStatus);
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);

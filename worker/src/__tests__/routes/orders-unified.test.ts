@@ -19,7 +19,7 @@ function makeTestEnv() {
       run: async () => ({ success: true, changes: 1, lastRowId: 1 }),
       first: async () => {
         if (_sql.includes('COUNT(*) as total FROM orders')) return { total: 10 };
-        if (_sql.includes('SUM(total_amount) as revenue')) return { revenue: 500000 };
+        if (_sql.includes('SUM(COALESCE(total_amount, total)) as revenue')) return { revenue: 500000 };
         if (_sql.includes('FROM cafe_tables WHERE table_number = ?')) return { id: 'tbl-1', table_number: '1' };
         if (_sql.includes('FROM products') || _sql.includes('FROM menu_items')) {
           return { id: 'prod-1', name: 'Cafe Sua Da', price: 35000, is_available: 1, available: 1 };
@@ -73,7 +73,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
         body: JSON.stringify({
           customer_name: 'Guest Diner',
           customer_phone: '0909999888',
-          items: [{ name: 'Cafe Sua', qty: 1, price: 30000 }],
+          items: [{ product_id: 'prod-1', name: 'Cafe Sua', qty: 1, price: 30000 }],
           fulfillment_type: 'TAKEAWAY',
         }),
       }),
@@ -82,7 +82,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
     expect(res.status).toBe(201);
     const data = await res.json() as any;
     expect(data.success).toBe(true);
-    expect(data.total).toBe(30000);
+    expect(data.total).toBe(35000);
+    expect(data.payment_method).toBe('cod');
   });
 
   it('routes GET /api/orders/summary to summary handler (not captured by /:id)', async () => {
@@ -101,7 +102,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
     expect(data.data).toHaveProperty('totalRevenue', 500000);
   });
 
-  it('routes GET /api/orders/:id/events to SSE stream without requiring authentication', async () => {
+  it('routes GET /api/orders/:id/events to the SSE stream for a guest order', async () => {
     const env = makeTestEnv();
     const res = await app.fetch(
       new Request('https://test.aura/api/orders/ORD-123/events'),
@@ -131,6 +132,47 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
     expect([200, 201]).toContain(res.status);
     const data = await res.json() as any;
     expect(data.success || data.ok).toBeTruthy();
+    expect(data.data.payment_status).toBe('unpaid');
+  });
+
+  it('rejects unsupported payment methods on public, guest, and staff order APIs', async () => {
+    const env = makeTestEnv();
+    const unsupported = ['momo', 'apple_pay', 'google_pay'];
+    const staffToken = await generateJWT({ sub: 'staff-1', role: 'cashier', name: 'Cashier' }, TEST_SECRET);
+
+    for (const payment_method of unsupported) {
+      const customerOrder = await app.fetch(new Request('https://test.aura/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest', customer_phone: '0901112233', payment_method,
+          total: 35000, order_type: 'takeaway',
+          items: [{ name: 'Cafe Sua Da', product_id: 'prod-1', quantity: 1, price: 35000 }],
+        }),
+      }), env);
+      expect(customerOrder.status).toBe(400);
+
+      const guestCheckout = await app.fetch(new Request('https://test.aura/api/orders/guest-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest', customer_phone: '0901112233', payment_method,
+          items: [{ name: 'Cafe Sua Da', qty: 1, price: 35000 }],
+          fulfillment_type: 'TAKEAWAY',
+        }),
+      }), env);
+      expect(guestCheckout.status).toBe(400);
+
+      const staffCheckout = await app.fetch(new Request('https://test.aura/api/orders/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${staffToken}` },
+        body: JSON.stringify({
+          payment_method,
+          items: [{ product_id: 'prod-1', quantity: 1, price: 35000 }],
+        }),
+      }), env);
+      expect(staffCheckout.status).toBe(400);
+    }
   });
 
   it('enforces authentication on protected staff endpoints', async () => {
@@ -258,8 +300,9 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
         body: JSON.stringify({
           customer_name: 'Diner',
           customer_phone: '0901234567',
-          payment_method: 'cash',
+          payment_method: 'cod',
           order_type: 'dine_in',
+          table_id: '1',
           items: [{ name: 'Cafe Sua Da', product_id: 'prod-1', quantity: 1, price: 35000 }],
         }),
       }),
@@ -298,8 +341,9 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
         body: JSON.stringify({
           customer_name: 'Table 3 Guest',
           customer_phone: '0901234567',
-          payment_method: 'cash',
+          payment_method: 'cod',
           order_type: 'dine_in',
+          table_id: '1',
           items: [{ name: 'Cold Brew', product_id: 'prod-1', quantity: 1, price: 45000 }],
         }),
       }),

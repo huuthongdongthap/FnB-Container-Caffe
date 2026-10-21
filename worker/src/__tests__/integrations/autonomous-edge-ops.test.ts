@@ -8,7 +8,7 @@
  * 4. Container Edge IoT Telemetry & Watchdog: heartbeat ingestion, thermal/power anomaly detection, Telegram escalation, container health matrix.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMockEnv, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import app from '../../index';
@@ -52,6 +52,17 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEnv = createMockEnv();
+  });
+
+  // The watchdog escalates CRITICAL alerts to Telegram, which is a real HTTP
+  // call. Stubbing fetch keeps the suite offline and deterministic — otherwise
+  // the request races a 5s network timeout and fails intermittently.
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('1. Dynamic Pricing & Margin Floor Protection', () => {

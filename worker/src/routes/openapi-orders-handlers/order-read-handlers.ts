@@ -4,6 +4,7 @@ import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import { handleGetOrderSummary } from './order-summary-handlers';
 import { canAccessOrder } from '@aura/domain-order';
 
@@ -12,10 +13,10 @@ export { handleGetOrderSummary };
 const STAFF_ROLES = ['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier'];
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
-  total_amount: 'o.total_amount',
+  total_amount: 'COALESCE(o.total_amount, o.total)',
   status: 'o.status',
   order_number: 'o.order_number',
-  total: 'o.total_amount',
+  total: 'COALESCE(o.total_amount, o.total)',
 };
 
 function resolveCustomerScope(c: Context<{ Bindings: Env }>): { allowAll: boolean; owner: string | null } {
@@ -38,6 +39,36 @@ function projectForActor(
   return scope.allowAll ? full(order, items, payments) : guest(order, items);
 }
 
+/**
+ * Fetches a single order with its table name.
+ *
+ * tenant_id is dropped from the WHERE clause only for HQ aggregate reads ('*').
+ * The join to cafe_tables is best-effort: a schema without that table falls back
+ * to a bare select, but never past the tenant boundary.
+ */
+async function fetchOrderForRead(
+  db: ReturnType<typeof getDatabase>,
+  id: string,
+  tenantId: string
+): Promise<Record<string, any> | null> {
+  const scoped = tenantId !== '*';
+  let order: Record<string, any> | null = null;
+  try {
+    order = (await db.prepare(
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+       FROM orders o
+       LEFT JOIN cafe_tables t ON o.table_id = t.id
+       WHERE o.id = ?${scoped ? ' AND o.tenant_id = ?' : ''}`
+    ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
+    return order;
+  } catch {
+    order = (await db.prepare(
+      `SELECT * FROM orders WHERE id = ?${scoped ? ' AND tenant_id = ?' : ''}`
+    ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
+    return order;
+  }
+}
+
 export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
   const query = ((c.req as any).valid ? (c.req as any).valid('query') : null) || c.req.query();
@@ -46,6 +77,8 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
 
   let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
+  const tenantId = getTenantId(c);
+  if (tenantId !== '*') { whereClause += ' AND o.tenant_id = ?'; params.push(tenantId); }
 
   if (scope.allowAll) {
     if (customerId) {
@@ -119,13 +152,9 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
   const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
   const user = c.get('user');
+  const tenantId = getTenantId(c);
 
-  const order = (await db.prepare(
-    `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o
-     LEFT JOIN cafe_tables t ON o.table_id = t.id
-     WHERE o.id = ?`
-  ).bind(id).first()) as Record<string, any> | null;
+  const order = await fetchOrderForRead(db, id, tenantId);
 
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
@@ -149,23 +178,22 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
 export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
   const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
+  const user = c.get('user');
+  const tenantId = getTenantId(c);
 
-  let order: Record<string, any> | null = null;
-  try {
-    order = (await db.prepare(
-      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-       FROM orders o
-       LEFT JOIN cafe_tables t ON o.table_id = t.id
-       WHERE o.id = ?`
-    ).bind(id).first()) as Record<string, any> | null;
-  } catch {
-    order = (await db.prepare(
-      'SELECT * FROM orders WHERE id = ?'
-    ).bind(id).first()) as Record<string, any> | null;
-  }
+  const order = await fetchOrderForRead(db, id, tenantId);
 
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+
+  // The tracking link is shareable, so it must not double as an enumeration
+  // oracle: an anonymous caller resolves guest orders only, and a signed-in
+  // customer resolves their own orders only.
+  const access = canAccessOrder(user, { id: order.id, customer_id: order.customer_id });
+  if (!access.allowed) {
+    const status = !user ? 401 : 403;
+    return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 
   const { items } = await fetchOrderItemsAndPayments(db, id);

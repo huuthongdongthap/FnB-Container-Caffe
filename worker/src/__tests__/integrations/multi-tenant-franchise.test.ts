@@ -349,19 +349,30 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
     it('authorizes HQ admin role across franchise, edge telemetry, demand forecast, and dynamic pricing routers', async () => {
       const boundTenants: string[] = [];
+      const tenantBinds: string[] = [];
       const mockDb = {
-        prepare: vi.fn(() => ({
-          bind: vi.fn((...args: unknown[]) => {
-            if (typeof args[0] === 'string') {
-              boundTenants.push(args[0]);
-            }
-            return {
-              all: vi.fn().mockResolvedValue({ results: [] }),
-              first: vi.fn().mockResolvedValue(null),
-              run: vi.fn().mockResolvedValue({ success: true })
-            };
-          })
-        }))
+        prepare: (sql: string) => {
+          // A privileged cross-tenant read also lands in the audit log; only the
+          // tenant bindings of the reads/writes themselves are confined here.
+          const isAuditWrite = /INSERT INTO audit_logs/i.test(sql);
+          const stmt = {
+            bind: vi.fn((...args: unknown[]) => {
+              const first = args[0];
+              if (typeof first === 'string') {
+                boundTenants.push(first);
+                if (!isAuditWrite && (first.startsWith('tenant_') || first === '*')) {
+                  tenantBinds.push(first);
+                }
+              }
+              return {
+                all: vi.fn().mockResolvedValue({ results: [] }),
+                first: vi.fn().mockResolvedValue(null),
+                run: vi.fn().mockResolvedValue({ success: true })
+              };
+            })
+          };
+          return stmt as any;
+        }
       };
 
       const env = createMockEnv({
@@ -383,7 +394,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         expect(res.status).toBe(200);
       }
 
-      expect(boundTenants).toEqual([
+      // Every protected route binds the requested tenant — none fall back to
+      // 'default' or to the admin's own tenant.
+      expect(tenantBinds).toEqual([
         'tenant_sadec_02',
         'tenant_sadec_02',
         'tenant_sadec_02',

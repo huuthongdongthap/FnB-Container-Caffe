@@ -15,7 +15,6 @@ import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { isTerminal, canAccessOrder, projectCustomerOrderPayload } from '@aura/domain-order';
 import { appendEventToLog, getEventsAfter, fetchOrderRecord } from './order-stream-log';
-import { getAuthToken, verifyJWT } from '../lib/jwt';
 
 interface OrderEvent {
   orderId: string;
@@ -31,30 +30,25 @@ export const orderStreamRouter = new Hono<{ Bindings: Env }>();
 export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise<Response> = async (c) => {
   const db = c.env.AURA_DB;
   const kv = c.env.AUTH_KV;
-  const orderId = c.req.param('id');
-  const lastEventId = c.req.header('Last-Event-ID') || c.req.query('lastEventId');
+  const orderId = c.req.param('id')!;
+  const lastEventId = c.req.header('Last-Event-ID') || c.req.query('lastEventId') || '';
 
   if (!kv) return c.json({ error: 'KV not available' }, 500);
 
-  let order = await db.prepare('SELECT id, customer_id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status?: string }>();
+  let order = await db.prepare('SELECT id, customer_id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status: string }>();
   if (!order) {
-    order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status?: string }>();
+    order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status: string }>();
   }
   if (!order) return c.json({ error: 'Order not found' }, 404);
 
-  let user = c.get('user' as any) as { id?: string; role?: string } | undefined;
-  if (!user) {
-    const token = getAuthToken(c.req.raw);
-    if (token && c.env.JWT_SECRET) {
-      const payload = await verifyJWT(token, c.env.JWT_SECRET);
-      if (payload) user = { id: payload.id || (payload as any).sub, role: payload.role };
-    }
-  }
+  // optionalAuth on the route resolves the identity when a token is present and
+  // leaves it undefined for anonymous guests.
+  const user = c.get('user' as any) as { id?: string; role?: string } | undefined;
 
   const access = canAccessOrder(user, order);
   if (!access.allowed) return c.json({ error: access.reason || 'Forbidden' }, 403);
 
-  let currentStatus = '';
+  let currentStatus = order.status || '';
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -81,7 +75,8 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
       if (lastEventId) {
         const replayedEvents = await getEventsAfter(kv, orderId, lastEventId);
         for (const ev of replayedEvents) {
-          send(ev.type, ev.data, ev.eventId);
+          const eventId: string = ev.eventId;
+          send(ev.type, ev.data, eventId);
           if (ev.type === 'update_order' && typeof ev.data === 'object' && ev.data && 'status' in ev.data) {
             currentStatus = String((ev.data as { status: string }).status);
           }
@@ -120,7 +115,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
 
             if (!shouldFetch) {
               const dbOrder = await db.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; status: string }>();
-              if (dbOrder && dbOrder.status !== currentStatus) shouldFetch = true;
+              if (dbOrder && (dbOrder.status ?? '') !== currentStatus) shouldFetch = true;
             }
 
             if (shouldFetch) {

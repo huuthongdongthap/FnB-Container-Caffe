@@ -14,6 +14,62 @@ export interface RateLimitConfig {
   errorMessage: string;
 }
 
+/** Rate limit response headers — RFC 9331 naming so clients can self-throttle. */
+export const RATE_LIMIT_HEADERS = {
+  limit: 'X-RateLimit-Limit',
+  remaining: 'X-RateLimit-Remaining',
+  reset: 'X-RateLimit-Reset',
+  retryAfter: 'Retry-After',
+} as const;
+
+/**
+ * Resolves the caller's network address.
+ * Cloudflare sets cf-connecting-ip at the edge; x-forwarded-for is only trusted
+ * when the request did not come through the CF proxy.
+ */
+function resolveClientIp(c: Context<{ Bindings: Env }>): string {
+  return c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
+}
+
+/**
+ * Reads a context value when the context supports it.
+ * `c.get` is absent from hand-built mock contexts in unit tests, and Hono's
+ * typed key map rejects dynamic keys, so read through the raw signatures.
+ */
+function readContextValue(c: Context<{ Bindings: Env }>, key: string): unknown {
+  const getter = (c as unknown as { get?: (k: string) => unknown }).get;
+  if (typeof getter !== 'function') return undefined;
+  return getter.call(c, key);
+}
+
+/**
+ * Builds the rate limit key from the most specific identity available.
+ *
+ * Keying on IP alone buckets every user behind one NAT or mobile carrier into a
+ * single counter, so a busy office locks out everyone. An authenticated user is
+ * the true identity; tenant is next best; IP is the last resort for guests.
+ */
+function buildRateLimitKey(
+  c: Context<{ Bindings: Env }>,
+  config: RateLimitConfig
+): string {
+  const user = readContextValue(c, 'user') as { id?: string; tenantId?: string } | undefined;
+  const tenantId = readContextValue(c, 'tenantId') as string | undefined;
+
+  if (user?.id) {
+    return `${config.keyPrefix}:user:${user.id}`;
+  }
+  if (tenantId && tenantId !== 'default') {
+    return `${config.keyPrefix}:tenant:${tenantId}:ip:${resolveClientIp(c)}`;
+  }
+  return `${config.keyPrefix}:ip:${resolveClientIp(c)}`;
+}
+
+/** Absolute epoch seconds at which the window expires, given now. */
+function resetInSeconds(windowSec: number): number {
+  return Math.floor(Date.now() / 1000) + windowSec;
+}
+
 export const AUTH_RATE_LIMIT: RateLimitConfig = {
   max: 20,
   windowSec: 300,
@@ -26,6 +82,18 @@ export const ORDER_RATE_LIMIT: RateLimitConfig = {
   windowSec: 600,
   keyPrefix: 'rate:order',
   errorMessage: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.'
+};
+
+/**
+ * POS checkout is staff-driven and bursts during a rush, so it gets a higher
+ * ceiling than the customer-facing order limit — never zero. Keyed per user,
+ * which keeps one cashier's retry loop from throttling the next till.
+ */
+export const POS_CHECKOUT_RATE_LIMIT: RateLimitConfig = {
+  max: 60,
+  windowSec: 60,
+  keyPrefix: 'rate:pos-checkout',
+  errorMessage: 'Quá nhiều giao dịch. Vui lòng thử lại sau ít phút.'
 };
 
 export const RECRUITMENT_RATE_LIMIT: RateLimitConfig = {
@@ -59,7 +127,7 @@ export async function checkRateLimit(
   if (!isProd && (ip === '127.0.0.1' || ip === 'localhost' || isTestBypass)) {
     return true;
   }
-  const key = `${config.keyPrefix}:${ip}`;
+  const key = buildRateLimitKey(c, config);
   const count = Number(await c.env.AUTH_KV.get(key) || 0);
   if (count >= config.max) {
     return false;
@@ -72,7 +140,17 @@ export function rateLimitMiddleware(config: RateLimitConfig) {
   return async(c: Context<{ Bindings: Env }>, next: Next) => {
     const allowed = await checkRateLimit(c, config);
     if (!allowed) {
-      return c.json({ ok: false, error: config.errorMessage }, 429);
+      // Headers ride on the response so the caller's client can back off.
+      const response = c.json({ ok: false, error: config.errorMessage }, 429);
+      try {
+        response.headers.set(RATE_LIMIT_HEADERS.limit, String(config.max));
+        response.headers.set(RATE_LIMIT_HEADERS.remaining, '0');
+        response.headers.set(RATE_LIMIT_HEADERS.reset, String(resetInSeconds(config.windowSec)));
+        response.headers.set(RATE_LIMIT_HEADERS.retryAfter, String(config.windowSec));
+      } catch {
+        // Mocked/immutable response in unit tests — the 429 body is what matters.
+      }
+      return response;
     }
     await next();
   };

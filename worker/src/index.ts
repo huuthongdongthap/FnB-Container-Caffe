@@ -9,7 +9,9 @@ import { errorHandler } from './middleware/error-handler';
 import { correlationId } from './middleware/correlation-id';
 import { requestMetrics } from './middleware/request-metrics';
 import { securityHeaders } from './middleware/security-headers';
+import { orderBodyLimit, authBodyLimit } from './middleware/body-limit';
 import { requireAuth } from './middleware/auth';
+import { tenantMiddleware } from './middleware/tenant';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { handleScheduled } from './scheduled';
 import type { Env } from './types/env';
@@ -52,8 +54,8 @@ const ALLOWED_ORIGIN_PATTERNS = [
 
 app.use('/*', cors({
   origin: (origin: string) => {
-    if (!origin) return '';
-    return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
+    if (!origin) return false;
+    return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : false;
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [
@@ -75,16 +77,34 @@ app.use('/*', cors({
 app.use('*', correlationId());
 app.use('*', securityHeaders());
 app.use('*', requestMetrics());
+// Body ceilings go before the routers so an oversized payload is rejected
+// before any route handler pays to parse it.
+app.use('/api/orders/*', orderBodyLimit());
+app.use('/api/orders', orderBodyLimit());
+app.use('/api/kds/orders/*', orderBodyLimit());
+app.use('/api/auth/*', authBodyLimit());
 app.onError(errorHandler);
 
 // ── Menu & Unified Orders Router (Single Runtime Owner) ──
 app.route('/api/menu', customerMenuRouter);
-app.route('/api/orders', ordersUnifiedRouter);
 
 // ── Orders KDS & Realtime ──
-app.use('/api/kds/orders/*', requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef']));
-app.route('/api/kds/orders', ordersUnifiedRouter);
+const kdsRoles = ['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier'];
+app.use('/api/orders/kds', requireAuth(kdsRoles));
+app.use('/api/orders/kds/*', requireAuth(kdsRoles));
+app.use('/api/orders/kds', tenantMiddleware);
+app.use('/api/orders/kds/*', tenantMiddleware);
+app.use('/api/kds/orders', requireAuth(kdsRoles));
+app.use('/api/kds/orders/*', requireAuth(kdsRoles));
+app.use('/api/kds/orders', tenantMiddleware);
+app.use('/api/kds/orders/*', tenantMiddleware);
+const codCollectionRoles = ['owner', 'manager', 'cashier', 'admin'];
+app.use('/api/orders/:id/mark-cod-paid', requireAuth(codCollectionRoles));
+app.use('/api/orders/:id/mark-cod-paid', tenantMiddleware);
+app.route('/api/orders', ordersUnifiedRouter);
+// Mount the static SSE endpoint before the dynamic /:id order routes.
 app.route('/api/kds/orders', kdsStreamRouter);
+app.route('/api/kds/orders', ordersUnifiedRouter);
 app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 
 // ── Auth & Mobile ──
