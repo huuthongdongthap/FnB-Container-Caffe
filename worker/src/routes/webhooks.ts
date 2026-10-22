@@ -1,5 +1,5 @@
 /**
- * Webhook Routes — PayOS & MoMo IPN Handler barrel re-export
+ * Webhook Routes — PayOS IPN Handler barrel re-export
  * Split into worker/src/routes/webhooks-handlers/
  * - helpers.ts: Logger and constant-time HMAC-SHA256 signature verification
  * - notifications.ts: Telegram and Email receipt notifications

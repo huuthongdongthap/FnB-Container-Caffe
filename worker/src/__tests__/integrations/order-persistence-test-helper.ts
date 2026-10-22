@@ -57,12 +57,7 @@ export function makePersistenceTestEnv() {
     };
     return stmt as any;
   };
-  db.batch = async (stmts: any[]) => {
-    for (const s of stmts) {
-      if (s._sql) insertLogs.push({ sql: s._sql, binds: s._binds || [] });
-    }
-    return [{ success: true, changes: 1, meta: { changes: 1 } }] as any;
-  };
+  db.batch = async statements => Promise.all(statements.map(statement => statement.run()));
 
   const store = new Map<string, string>();
   return {

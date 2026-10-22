@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Payment Intent Lifecycle Contract Tests
  * Verifies:
@@ -11,39 +12,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { paymentRouter } from '@aura/domain-payment';
+import { paymentSqliteDB, payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 
 function makeTestEnv(dbConfig: {
-  order?: { id: string; total: number; payment_status: string; customer_id?: string | null; is_cod?: number } | null;
+  order?: { id: string; total: number; payment_status: string; payment_method?: string; customer_id?: string | null; is_cod?: number } | null;
   existingPayment?: { id: string; transaction_id: string; payment_url: string; status: string } | null;
 }) {
-  const executedStatements: Array<{ sql: string; binds: unknown[] }> = [];
-
-  const db = {
-    prepare: (sql: string) => {
-      let binds: unknown[] = [];
-      const stmt = {
-        bind: (...args: unknown[]) => {
-          binds = args;
-          return stmt;
-        },
-        first: async () => {
-          if (sql.includes('FROM orders WHERE id = ?')) {
-            return dbConfig.order ?? null;
-          }
-          if (sql.includes('FROM payments WHERE order_id = ?')) {
-            return dbConfig.existingPayment ?? null;
-          }
-          return null;
-        },
-        run: async () => {
-          executedStatements.push({ sql, binds });
-          return { success: true, changes: 1, lastRowId: 1 };
-        },
-        all: async () => ({ results: [], success: true }),
-      };
-      return stmt as any;
-    },
-  };
+  const fixture = paymentSqliteDB();
+  const executedStatements = fixture.executedStatements;
+  if (dbConfig.order) fixture.seed('orders', dbConfig.order);
+  if (dbConfig.order && dbConfig.existingPayment) fixture.seed('payments', {
+    ...dbConfig.existingPayment, order_id: dbConfig.order.id, amount: dbConfig.order.total, method: 'payos' });
+  const db = fixture.db;
 
   const app = new Hono<{ Bindings: any }>();
   app.route('/api/payment', paymentRouter);
@@ -68,7 +48,7 @@ describe('Payment Intent Lifecycle Contract', () => {
 
   it('rejects tampered amount that does not match server order total', async () => {
     const { app, env } = makeTestEnv({
-      order: { id: 'ORD_101', total: 65000, payment_status: 'unpaid', is_cod: 0 },
+      order: { id: 'ORD_101', total: 65000, payment_status: 'unpaid', payment_method: 'payos', is_cod: 0 },
     });
 
     const res = await app.fetch(
@@ -91,7 +71,7 @@ describe('Payment Intent Lifecycle Contract', () => {
 
   it('rejects payment request if order is already paid with HTTP 409', async () => {
     const { app, env } = makeTestEnv({
-      order: { id: 'ORD_102', total: 50000, payment_status: 'paid', is_cod: 0 },
+      order: { id: 'ORD_102', total: 50000, payment_status: 'paid', payment_method: 'payos', is_cod: 0 },
     });
 
     const res = await app.fetch(
@@ -110,7 +90,7 @@ describe('Payment Intent Lifecycle Contract', () => {
 
   it('returns cached checkout URL for existing pending payment idempotently', async () => {
     const { app, env } = makeTestEnv({
-      order: { id: 'ORD_103', total: 75000, payment_status: 'unpaid', is_cod: 0 },
+      order: { id: 'ORD_103', total: 75000, payment_status: 'unpaid', payment_method: 'payos', is_cod: 0 },
       existingPayment: {
         id: 'PAY_EXISTING',
         transaction_id: '998877',
@@ -138,17 +118,13 @@ describe('Payment Intent Lifecycle Contract', () => {
 
   it('derives authoritative amount from server order total when creating link', async () => {
     const { app, env, executedStatements } = makeTestEnv({
-      order: { id: 'ORD_104', total: 80000, payment_status: 'unpaid', is_cod: 0 },
+      order: { id: 'ORD_104', total: 80000, payment_status: 'unpaid', payment_method: 'payos', is_cod: 0 },
       existingPayment: null,
     });
 
     // Mock PayOS API fetch response
-    global.fetch = vi.fn().mockResolvedValue({
-      json: async () => ({
-        code: '00',
-        data: { checkoutUrl: 'https://pay.payos.vn/web/new-link', paymentLinkId: 'plink_1' },
-      }),
-    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) =>
+      payosCheckoutResponse(JSON.parse(String(init?.body)), 'checksum_key_123456789012345678', 'new-link'));
 
     const res = await app.fetch(
       new Request('https://test.aura/api/payment/create-link', {
@@ -165,16 +141,17 @@ describe('Payment Intent Lifecycle Contract', () => {
     expect(body.checkoutUrl).toBe('https://pay.payos.vn/web/new-link');
 
     // Verify insertion into canonical payments table with server total 80000
-    const insertPayment = executedStatements.find(s => s.sql.includes('INSERT INTO payments'));
+    const insertPayment = executedStatements.find(s => s.sql.includes('INSERT OR IGNORE INTO payments'));
     expect(insertPayment).toBeDefined();
     expect(insertPayment?.binds[1]).toBe('ORD_104');
     expect(insertPayment?.binds[2]).toBe(80000); // Server authoritative total
-    expect(insertPayment?.binds[4]).toBe('https://pay.payos.vn/web/new-link');
+    const updateUrl = executedStatements.find(s => s.sql.includes('SET payment_url = ?'));
+    expect(updateUrl?.binds[0]).toBe('https://pay.payos.vn/web/new-link');
   });
 
   it('rejects order with invalid or sub-minimum total (< 1000 VND)', async () => {
     const { app, env } = makeTestEnv({
-      order: { id: 'ORD_105', total: 500, payment_status: 'unpaid', is_cod: 0 },
+      order: { id: 'ORD_105', total: 500, payment_status: 'unpaid', payment_method: 'payos', is_cod: 0 },
     });
 
     const res = await app.fetch(

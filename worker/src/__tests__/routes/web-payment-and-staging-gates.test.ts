@@ -1,13 +1,9 @@
 /**
- * Web Payment Fail-Closed Security, Staging Gate Accuracy & Migration Topology Tests
+ * Supported Payment Method Schemas, Staging Gate Accuracy & Migration Topology Tests
  *
  * Verifies:
- * 1. POST /api/payments/payment-request (OpenAPI & domain webPaymentRouter):
- *    - Rejects unauthenticated requests with 401.
- *    - Rejects orders not owned by the authenticated customer with 403.
- *    - Rejects malformed tokens with 400.
- *    - Fails closed (422 PAYMENT_VERIFICATION_UNAVAILABLE) on forged/unverified
- *      Apple Pay and Google Pay tokens without marking orders as paid or inserting payments.
+ * 1. New order and payment-intent schemas accept only PayOS and COD, and the
+ *    removed Apple Pay / Google Pay payment-request route is unavailable.
  * 2. Staging Gates (scripts/verify-staging-gates.mjs):
  *    - GATE_2_BUNDLE_BUILD fails when dist/ artifacts are stale (older than src/).
  *    - GATE_3_ROLLBACK_READINESS fails when .down.sql count < forward .sql count.
@@ -36,8 +32,9 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockDB } from '../test-utils';
-import { webPaymentRouter } from '@aura/domain-payment';
+import { createMockEnv } from '../test-utils';
+import { PaymentIntentSchema } from '../../schemas/payments';
+import { OrderCreateSchema } from '../../schemas/orders';
 import {
   evaluateGoLiveGates,
   inspectRollbackCapabilities,
@@ -51,296 +48,70 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../..');
 const TEST_SECRET = 'test-jwt-secret-at-least-16-chars';
-const ORDER_OWNER_A = 'a1111111-1111-4111-8111-111111111111';
-const ORDER_GUEST = 'b2222222-2222-4222-8222-222222222222';
 
-function createPaymentTestHarness() {
-  const store = new Map<string, string>();
-  const db = createMockDB();
-  const orders: Record<string, { id: string; customer_id: string | null; total: number; status: string; payment_status: string }> = {
-    [ORDER_OWNER_A]: {
-      id: ORDER_OWNER_A,
-      customer_id: 'cust-a',
-      total: 65000,
-      status: 'pending',
-      payment_status: 'pending',
-    },
-    [ORDER_GUEST]: {
-      id: ORDER_GUEST,
-      customer_id: null,
-      total: 45000,
-      status: 'pending',
-      payment_status: 'pending',
-    },
-  };
-  const insertedPayments: unknown[] = [];
+describe('Supported payment methods', () => {
+  const unsupportedMethods = ['cash', 'card', 'momo', 'zalopay', 'apple_pay', 'google_pay'];
 
-  db.prepare = ((sql: string) => {
-    let boundArgs: unknown[] = [];
-    const stmt = {
-      _sql: sql,
-      bind: (...args: unknown[]) => {
-        boundArgs = args;
-        return stmt;
-      },
-      first: async () => {
-        if (sql.includes('FROM orders WHERE id = ?')) {
-          const id = String(boundArgs[0]);
-          return orders[id] ? { ...orders[id] } : null;
-        }
-        return null;
-      },
-      all: async () => ({ results: [], success: true }),
-      run: async () => {
-        if (sql.includes('INSERT INTO payments')) {
-          insertedPayments.push(boundArgs);
-        }
-        if (sql.includes('UPDATE orders') && sql.includes("payment_status = 'paid'")) {
-          const orderId = String(boundArgs[boundArgs.length - 1]);
-          if (orders[orderId]) {
-            orders[orderId].payment_status = 'paid';
-          }
-        }
-        return { success: true, changes: 1, lastRowId: 1 };
-      },
-    };
-    return stmt as any;
-  }) as any;
-
-  const env = {
-    ...createMockEnv(),
-    AURA_DB: db,
-    AUTH_KV: {
-      get: async (k: string) => store.get(k) ?? null,
-      put: async (k: string, v: string) => { store.set(k, v); },
-      delete: async (k: string) => { store.delete(k); },
-    } as any,
-    JWT_SECRET: TEST_SECRET,
-  } as any;
-
-  return { env, orders, insertedPayments };
-}
-
-describe('Priority 1: Apple Pay / Google Pay Web Payment Fail-Closed Security', () => {
-  const fakeApplePayToken = {
-    paymentData: {
-      data: 'forged-encrypted-payload',
-      signature: 'forged-pkcs7-signature',
-      version: 'EC_v1',
-      header: {
-        ephemeralPublicKey: 'forged-ephemeral-key',
-        publicKeyHash: 'forged-key-hash',
-        transactionId: 'tx-fake-1',
-      },
-    },
-    paymentMethod: {
-      displayName: 'Visa 1234',
-      network: 'Visa',
-      type: 'debit',
-    },
-    transactionIdentifier: 'tx-fake-1',
-  };
-
-  const fakeGooglePayToken = {
-    signature: 'forged-google-signature',
-    protocolVersion: 'ECv2',
-    signedMessage: '{"encryptedMessage":"forged","ephemeralPublicKey":"forged","tag":"forged"}',
-    intermediateSigningKey: {
-      signedKey: '{"keyValue":"forged","keyExpiration":"9999999999999"}',
-      signatures: ['forged-intermediate-sig'],
-    },
-  };
-
-  it('rejects unauthenticated requests to POST /api/payments/payment-request with 401', async () => {
-    const { env, orders, insertedPayments } = createPaymentTestHarness();
-
-    const openApiRes = await app.fetch(
-      new Request('https://test.aura/api/payments/payment-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_method: 'apple_pay',
-          payment_token: fakeApplePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
-      }),
-      env
-    );
-    expect(openApiRes.status).toBe(401);
-
-    const domainRes = await webPaymentRouter.request(
-      '/payment-request',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_token: fakeApplePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
-      },
-      env
-    );
-    expect(domainRes.status).toBe(401);
-
-    expect(orders[ORDER_OWNER_A].payment_status).toBe('pending');
-    expect(insertedPayments).toHaveLength(0);
+  it('accepts only PayOS and COD for new payment intents', () => {
+    for (const method of ['payos', 'cod']) {
+      expect(PaymentIntentSchema.safeParse({
+        orderId: 'ORD_1', amount: 1000, method, idempotencyKey: 'test-key',
+      }).success).toBe(true);
+    }
+    for (const method of unsupportedMethods) {
+      expect(PaymentIntentSchema.safeParse({
+        orderId: 'ORD_1', amount: 1000, method, idempotencyKey: 'test-key',
+      }).success).toBe(false);
+    }
   });
 
-  it('rejects authenticated customer attempting to pay for another user or unowned order with 403', async () => {
-    const { env, orders, insertedPayments } = createPaymentTestHarness();
-    const attackerToken = await generateJWT(
-      { sub: 'cust-attacker', role: 'customer', name: 'Attacker' },
-      TEST_SECRET
-    );
-
-    // 1. Order belonging to cust-a
-    const openApiResOther = await app.fetch(
-      new Request('https://test.aura/api/payments/payment-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${attackerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_method: 'google_pay',
-          payment_token: fakeGooglePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
-      }),
-      env
-    );
-    expect(openApiResOther.status).toBe(403);
-
-    // 2. Order with null customer_id (guest order not owned by cust-attacker)
-    const openApiResGuest = await app.fetch(
-      new Request('https://test.aura/api/payments/payment-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${attackerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_GUEST,
-          payment_method: 'google_pay',
-          payment_token: fakeGooglePayToken,
-          amount: 45000,
-          currency: 'VND',
-        }),
-      }),
-      env
-    );
-    expect(openApiResGuest.status).toBe(403);
-
-    // 3. Domain router IDOR check
-    const domainResOther = await webPaymentRouter.request(
-      '/payment-request',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${attackerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_token: fakeGooglePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
-      },
-      env
-    );
-    expect(domainResOther.status).toBe(403);
-
-    expect(orders[ORDER_OWNER_A].payment_status).toBe('pending');
-    expect(orders[ORDER_GUEST].payment_status).toBe('pending');
-    expect(insertedPayments).toHaveLength(0);
+  it('accepts only PayOS and COD for new orders', () => {
+    const baseOrder = { locationId: 'loc_main', items: [{ menuItemId: 'prod_coffee', quantity: 1 }] };
+    for (const paymentMethod of ['payos', 'cod']) {
+      expect(OrderCreateSchema.safeParse({ ...baseOrder, paymentMethod }).success).toBe(true);
+    }
+    for (const paymentMethod of unsupportedMethods) {
+      expect(OrderCreateSchema.safeParse({ ...baseOrder, paymentMethod }).success).toBe(false);
+    }
   });
 
-  it('fails closed (422) on forged Apple Pay and Google Pay tokens and never marks order as paid', async () => {
-    const { env, orders, insertedPayments } = createPaymentTestHarness();
-    const ownerToken = await generateJWT(
-      { sub: 'cust-a', role: 'customer', name: 'Customer A' },
+  it('removes the Apple Pay and Google Pay payment-request route', async () => {
+    const token = await generateJWT(
+      { id: 'cust-a', sub: 'cust-a', role: 'customer', email: 'a@test.aura', name: 'Customer A' },
       TEST_SECRET
     );
-
-    // 1. OpenAPI route with forged Apple Pay token
-    const appleRes = await app.fetch(
+    const response = await app.fetch(
       new Request('https://test.aura/api/payments/payment-request', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${ownerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_method: 'apple_pay',
-          payment_token: fakeApplePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ order_id: 'ORD_1', amount: 1000, currency: 'VND' }),
       }),
-      env
+      createMockEnv({ JWT_SECRET: TEST_SECRET }) as any
     );
-    expect(appleRes.status).toBe(422);
-    const appleBody = (await appleRes.json()) as any;
-    expect(appleBody.success).toBe(false);
-    expect(appleBody.code).toBe('PAYMENT_VERIFICATION_UNAVAILABLE');
+    expect(response.status).toBe(404);
+  });
 
-    // 2. OpenAPI route with forged Google Pay token
-    const googleRes = await app.fetch(
-      new Request('https://test.aura/api/payments/payment-request', {
+  it('does not mount MoMo create or webhook endpoints', async () => {
+    const env = createMockEnv({ JWT_SECRET: TEST_SECRET }) as any;
+    const createResponse = await app.fetch(
+      new Request('https://test.aura/api/payment/momo/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${ownerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_method: 'google_pay',
-          payment_token: fakeGooglePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: 'ORD_1', amount: 1000 }),
       }),
-      env
+      env,
     );
-    expect(googleRes.status).toBe(422);
-    const googleBody = (await googleRes.json()) as any;
-    expect(googleBody.success).toBe(false);
-    expect(googleBody.code).toBe('PAYMENT_VERIFICATION_UNAVAILABLE');
-
-    // 3. Domain router with forged Apple Pay token
-    const domainRes = await webPaymentRouter.request(
-      '/payment-request',
-      {
+    const webhookResponse = await app.fetch(
+      new Request('https://test.aura/api/webhook/momo', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${ownerToken}`,
-        },
-        body: JSON.stringify({
-          order_id: ORDER_OWNER_A,
-          payment_token: fakeApplePayToken,
-          amount: 65000,
-          currency: 'VND',
-        }),
-      },
-      env
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: 'ORD_1' }),
+      }),
+      env,
     );
-    expect(domainRes.status).toBe(422);
-    const domainBody = (await domainRes.json()) as any;
-    expect(domainBody.success).toBe(false);
-    expect(domainBody.code).toBe('PAYMENT_VERIFICATION_UNAVAILABLE');
 
-    // Order must remain unpaid and zero payment rows inserted
-    expect(orders[ORDER_OWNER_A].payment_status).toBe('pending');
-    expect(insertedPayments).toHaveLength(0);
+    expect(createResponse.status).toBe(404);
+    expect(webhookResponse.status).toBe(404);
   });
 });
 
@@ -877,7 +648,7 @@ exit 0
     }
   });
 
-  it('evaluates the real repository and reports 3-tier static command detection across pages, worker, and d1, with 7/36 .down.sql file presence and 0/36 safe content reversibility on the primary target', () => {
+  it('reports current static rollback detection and incomplete primary migration coverage', () => {
     const capabilities = inspectRollbackCapabilities(
       resolve(REPO_ROOT, 'scripts/deploy-rollback.sh')
     );
@@ -913,9 +684,9 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 36,
+        forwardCount: 37,
         downCount: 7,
-        missingDownCount: 29,
+        missingDownCount: 30,
         safeReversibleCount: 0,
         unsafeDownCount: 7,
         fileCoverageComplete: false,
@@ -969,7 +740,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 7/36 .down.sql files present (29 missing), 0/36 safely reversible without data-loss/schema-drift hazards (7 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 7/37 .down.sql files present (30 missing), 0/37 safely reversible without data-loss/schema-drift hazards (7 existing .down.sql flagged'
     );
   });
 });
@@ -987,9 +758,9 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(36);
+    expect(canonicalDir.forwardCount).toBe(37);
     expect(canonicalDir.downCount).toBe(7);
-    expect(canonicalDir.missingDownCount).toBe(29);
+    expect(canonicalDir.missingDownCount).toBe(30);
   });
 
   it('enforces fail-closed migration execution in deploy-cloudflare.sh, worker/scripts/apply-migrations.sh, and scripts/deploy-branded.sh (default deploy runs zero D1 commands; migration runner requires explicit forward migration selection)', () => {

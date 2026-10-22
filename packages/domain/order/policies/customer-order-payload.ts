@@ -28,6 +28,8 @@ export interface CustomerOrderPayload {
   orderNumber: string;
   status: string;
   paymentStatus: string;
+  paymentMethod?: string;
+  estimatedMinutes?: number;
   channel: string;
   table: { id: string; name: string } | null;
   items: CustomerOrderItemPayload[];
@@ -108,6 +110,8 @@ export function projectCustomerOrderPayload(
     orderNumber: String(order.order_number || order.orderNumber || order.id || ''),
     status: String(order.status || 'pending'),
     paymentStatus: String(order.payment_status || order.paymentStatus || 'pending'),
+    paymentMethod: typeof (order.payment_method ?? order.paymentMethod) === 'string' ? String(order.payment_method ?? order.paymentMethod) : undefined,
+    estimatedMinutes: typeof order.estimated_minutes === 'number' ? order.estimated_minutes : undefined,
     channel: String(order.order_type || order.channel || 'dine_in'),
     table,
     items,

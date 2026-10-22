@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createOrder } from '../commands/create-order';
+import { orderCreationIdempotency } from '../policies/order-creation-scope';
 
 function createMockEnv(overrides: Record<string, unknown> = {}) {
   const store = new Map<string, string>();
@@ -18,6 +19,7 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
   };
 
   let insertCount = 0;
+  const requests = new Map<string, { fingerprint: unknown; response_body: unknown }>();
   const db = {
     prepare: (sql: string) => {
       const stmt = {
@@ -28,6 +30,7 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
           return stmt;
         },
         first: async <T = unknown>() => {
+          if (sql.includes('FROM order_creation_requests')) return (requests.get(String(stmt._binds[0])) || null) as T;
           if (sql.includes('FROM cafe_tables WHERE table_number = ?')) {
             return { id: 'tbl_b02', table_number: 'B02' } as T;
           }
@@ -37,6 +40,9 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
           return null as T;
         },
         run: async () => {
+          if (sql.includes('INSERT INTO order_creation_requests')) {
+            requests.set(String(stmt._binds[0]), { fingerprint: stmt._binds[1], response_body: stmt._binds[3] });
+          }
           if (sql.includes('INSERT INTO orders')) {
             insertCount++;
           }
@@ -47,7 +53,7 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
       };
       return stmt;
     },
-    batch: async (stmts: unknown[] = []) => stmts.map(() => ({ success: true, changes: 1 })),
+    batch: async (stmts: { run(): Promise<unknown> }[] = []) => Promise.all(stmts.map(statement => statement.run())),
     exec: async () => ({ count: 0, duration: 0 }),
     dump: async () => new Uint8Array(),
   };
@@ -92,9 +98,10 @@ describe('createOrder - Idempotency-Key KV Caching', () => {
     expect(env.getInsertCount()).toBe(1);
 
     // Verify written to KV
-    const cached = await env.AUTH_KV.get(`order:idempotency:${idempotencyKey}`, 'json');
+    const scoped = await orderCreationIdempotency('default', undefined, idempotencyKey, baseOrder);
+    const cached = await env.AUTH_KV.get(scoped.key, 'json');
     expect(cached).not.toBeNull();
-    expect((cached as any).data.total).toBe(70000);
+    expect((cached as any).body.data.total).toBe(70000);
   });
 
   it('second request with same Idempotency-Key returns cached response with X-Cache: HIT and avoids duplicate DB insert', async () => {

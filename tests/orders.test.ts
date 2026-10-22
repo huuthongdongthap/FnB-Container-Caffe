@@ -10,6 +10,7 @@ globalThis.fetch = vi.fn();
 function createMockD1(seedData: Record<string, any[]> = {}) {
   const tables: Record<string, any[]> = {
     orders: [...(seedData.orders || [])],
+    products: [{ id: 'coffee', name: 'Coffee', price: 25000, available: 1 }],
     payments: [...(seedData.payments || [])],
     customers: [...(seedData.customers || [])],
     referrals: [...(seedData.referrals || [])],
@@ -87,7 +88,7 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
       };
       return stmt;
     }),
-    batch: vi.fn(async () => [{ success: true }]),
+    batch: vi.fn(async (statements: { run(): Promise<unknown> }[]) => Promise.all(statements.map(statement => statement.run()))),
   };
 }
 
@@ -113,7 +114,7 @@ describe('createOrder', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Coffee', qty: 2, price: 25000 }],
+        items: [{ product_id: 'coffee', name: 'Coffee', qty: 2, price: 25000 }],
         total: 50000,
         customer_name: 'Alice',
         customer_phone: '09123456789',
@@ -134,7 +135,7 @@ describe('createOrder', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Coffee', qty: 2, price: 25000 }],
+        items: [{ product_id: 'coffee', name: 'Coffee', qty: 2, price: 25000 }],
         customer_name: 'Alice',
         customer_phone: '09123456789',
         payment_method: 'cod',
@@ -153,7 +154,7 @@ describe('createOrder', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Coffee', qty: 2, price: 25000 }],
+        items: [{ product_id: 'coffee', name: 'Coffee', qty: 2, price: 25000 }],
         total: 50000,
         customer_name: 'Alice',
         customer_phone: '09123456789',
@@ -184,7 +185,7 @@ describe('getOrder', () => {
   test('returns 200 with order data', async () => {
     const env = {
       AURA_DB: createMockD1({
-        orders: [{ id: 'ORD_1', status: 'pending', total: '50000', payment_status: 'unpaid', customer_name: 'Alice', customer_phone: '09123456789', items: '[{"name":"Coffee","qty":2}]', created_at: '2026-01-01' }],
+        orders: [{ id: 'ORD_1', tenant_id: 'default', status: 'pending', total: '50000', payment_status: 'unpaid', customer_name: 'Alice', customer_phone: '09123456789', items: '[{"name":"Coffee","qty":2}]', created_at: '2026-01-01' }],
         payments: [{ id: 'PAY_1', order_id: 'ORD_1', method: 'cod', amount: 50000, status: 'pending' }],
       }),
     };
@@ -212,7 +213,7 @@ describe('updateOrder', () => {
   test('updates order status successfully', async () => {
     const env = {
       AURA_DB: createMockD1({
-        orders: [{ id: 'ORD_1', status: 'pending', customer_email: null, customer_phone: null }],
+        orders: [{ id: 'ORD_1', tenant_id: 'default', status: 'pending', customer_email: null, customer_phone: null }],
       }),
     };
     const req = new Request('http://localhost/api/orders/ORD_1', {
@@ -230,7 +231,7 @@ describe('updateOrder', () => {
   test('returns 400 on invalid status transition', async () => {
     const env = {
       AURA_DB: createMockD1({
-        orders: [{ id: 'ORD_1', status: 'cancelled' }],
+        orders: [{ id: 'ORD_1', tenant_id: 'default', status: 'cancelled' }],
       }),
     };
     const req = new Request('http://localhost/api/orders/ORD_1', {
@@ -242,7 +243,7 @@ describe('updateOrder', () => {
     const res = await updateOrder(req, env, 'ORD_1');
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/Invalid transition/i);
+    expect(body.error).toMatch(/Invalid transition|Cannot transition terminal order/i);
   });
 
   test('returns 404 when order not found', async () => {
@@ -265,7 +266,7 @@ describe('getAdminOrders', () => {
     const env = {
       AURA_DB: createMockD1({
         orders: [
-          { id: 'ORD_1', status: 'pending', total: '50000', payment_status: 'unpaid', customer_name: 'Alice', customer_phone: '09123456789', items: '[]', created_at: '2026-01-01' },
+          { id: 'ORD_1', tenant_id: 'default', status: 'pending', total: '50000', payment_status: 'unpaid', customer_name: 'Alice', customer_phone: '09123456789', items: '[]', created_at: '2026-01-01' },
         ],
       }),
     };

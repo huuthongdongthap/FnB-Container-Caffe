@@ -19,6 +19,7 @@
     "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:local-flow": "node scripts/local-payment-flow/run.mjs",
     "test:coverage": "vitest run --coverage",
     "test:ci": "vitest run --coverage",
     "dev": "vite",

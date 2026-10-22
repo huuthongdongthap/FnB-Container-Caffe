@@ -81,7 +81,7 @@ function makeMockDb(customHandlers?: Array<{ match: (sql: string) => boolean; ro
       };
       return stmt;
     },
-    batch: async () => [],
+    batch: async (statements: { run(): Promise<unknown> }[]) => Promise.all(statements.map(statement => statement.run())),
   } as unknown as D1Database & { _inserts: typeof insertLogs; _queries: string[] };
 
   return db;
@@ -274,14 +274,14 @@ describe('Order Snapshot Contract Integration', () => {
     // Verify order_items insert only uses the 7 canonical columns
     const itemInsert = db._inserts.find(i => i.sql.startsWith('INSERT INTO order_items'));
     if (itemInsert) {
-      expect(itemInsert.sql).toBe(
+      expect(itemInsert.sql.replace(/\s+/g, ' ')).toBe(
         'INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
       );
       expect(itemInsert.args.length).toBe(7);
     }
   });
 
-  it('resiliently resolves composite product IDs with modifier slugs from mobile clients', async () => {
+  it('rejects unknown composite IDs rather than resolving an attacker-controlled prefix', async () => {
     const db = makeMockDb();
     const env = makeEnv(db);
 
@@ -305,9 +305,9 @@ describe('Order Snapshot Contract Integration', () => {
       env, { waitUntil: () => {} } as any
     );
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     const body = await res.json() as any;
-    expect(body.success).toBe(true);
-    expect(body.data.total).toBe(25000);
+    expect(body.success).toBe(false);
+    expect(db._inserts.filter(row => /INSERT INTO (orders|order_items|payments)\b/.test(row.sql))).toHaveLength(0);
   });
 });

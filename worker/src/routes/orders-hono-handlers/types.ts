@@ -53,6 +53,5 @@ export interface KdsOrder {
   created_at: string;
 }
 
-// Allowed statuses for the KDS status query parameter — used for input validation only.
-// The SQL filter always includes 'preparing' regardless, so staff see in-flight + next-up orders.
-export const ALLOWED_KDS_STATUSES = ['pending', 'preparing', 'served', 'completed', 'cancelled'] as const;
+// Active statuses shown in the KDS queue.
+export const ALLOWED_KDS_STATUSES = ['pending', 'confirmed', 'preparing', 'ready'] as const;

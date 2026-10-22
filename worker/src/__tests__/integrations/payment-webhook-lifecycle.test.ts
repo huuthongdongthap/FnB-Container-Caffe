@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Payment Webhook Lifecycle Contract Tests
  * Verifies:
@@ -47,9 +48,8 @@ describe('Payment Webhook Lifecycle Contract', () => {
     const body = await res.json() as { error: number };
     expect(body.error).toBe(0);
 
-    const payUpdate = executedStatements.find(s => s.sql.includes('UPDATE payments SET status = ?'));
+    const payUpdate = executedStatements.find(s => s.sql.includes("UPDATE payments SET status = 'completed'"));
     expect(payUpdate).toBeDefined();
-    expect(payUpdate?.binds[0]).toBe('completed');
 
     const orderUpdate = executedStatements.find(s => s.sql.includes('UPDATE orders SET payment_status'));
     expect(orderUpdate).toBeDefined();
@@ -63,7 +63,7 @@ describe('Payment Webhook Lifecycle Contract', () => {
 
     const payload = {
       success: false,
-      data: { orderCode: 22222, amount: 45000, status: 'FAILED', code: '01' },
+      data: { orderCode: 12345, amount: 45000, description: 'Order 12345', status: 'FAILED', code: '01' },
     };
 
     const res = await app.fetch(
@@ -96,7 +96,7 @@ describe('Payment Webhook Lifecycle Contract', () => {
 
     const payload = {
       success: false,
-      data: { orderCode: 33333, amount: 30000, status: 'EXPIRED' },
+      data: { orderCode: 12345, amount: 30000, description: 'Order 12345', status: 'EXPIRED' },
     };
 
     const res = await app.fetch(
@@ -128,7 +128,7 @@ describe('Payment Webhook Lifecycle Contract', () => {
 
     const payload = {
       success: true,
-      data: { orderCode: 44444, amount: 50000, code: '00' },
+      data: { orderCode: 12345, amount: 50000, description: 'Order 12345', code: '00' },
     };
 
     const res = await app.fetch(
@@ -157,7 +157,7 @@ describe('Payment Webhook Lifecycle Contract', () => {
 
     const payload = {
       success: true,
-      data: { orderCode: 55555, amount: 10000, code: '00' },
+      data: { orderCode: 12345, amount: 10000, description: 'Order 12345', code: '00' },
     };
 
     const res = await app.fetch(

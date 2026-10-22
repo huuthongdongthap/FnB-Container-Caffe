@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Webhook Routes Tests — POST /api/webhooks/payos
  *
@@ -8,58 +9,25 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { TextEncoder, TextDecoder } from 'util';
+import { createHmac } from 'node:crypto';
+import { paymentSqliteDB } from '../worker/src/__tests__/helpers/payment-sqlite-db';
 
 // ── Polyfills ─────────────────────────────────────────────────────
 (globalThis as any).TextEncoder = TextEncoder;
 (globalThis as any).TextDecoder = TextDecoder;
-
-// ── Mock Web Crypto API ───────────────────────────────────────────
-delete (globalThis as any).crypto;
-(globalThis as any).crypto = {
-  subtle: {
-    importKey: vi.fn(async () => ({ type: 'secret', algorithm: { name: 'HMAC', hash: 'SHA-256' } })),
-    sign: vi.fn(async () => new Uint8Array(32).fill(97)),
-  },
-};
 
 // ── Track D1 call order to debug ──────────────────────────────────
 let d1Calls: string[] = [];
 
 // ── Mock D1 Database ──────────────────────────────────────────────
 function createMockD1(seedData: Record<string, any[]> = {}) {
-  const tableData: Record<string, any[]> = {};
-  ['payments', 'orders'].forEach(t => { tableData[t] = [...(seedData[t] || [])]; });
-
-  function getPrimaryTable(sql: string) {
-    const fromMatch = sql.match(/\bFROM\s+(\w+)/i);
-    return fromMatch ? fromMatch[1] : null;
+  const fixture = paymentSqliteDB();
+  for (const table of ['orders', 'payments'] as const) {
+    for (const row of seedData[table] || []) fixture.seed(table, table === 'orders' ? { total: seedData.payments?.find((payment) => payment.order_id === row.id)?.amount, ...row } : row);
   }
-
-  const db = {
-    prepare: vi.fn((q: string) => {
-      d1Calls.push('PREP: ' + q.substring(0, 100));
-      const stmt: any = {
-        _sql: q, _bindValues: [] as any[],
-        bind: vi.fn(function (...vals: any[]) {
-          this._bindValues.push(...vals);
-          d1Calls.push('  BIND: ' + vals.join(','));
-          return this;
-        }),
-        first: vi.fn(async function () {
-          d1Calls.push('  FIRST');
-          const table = getPrimaryTable(q);
-          const rows = (table && tableData[table]) ? tableData[table] : [];
-          return rows[0] || null;
-        }),
-        run: vi.fn(async () => {
-          d1Calls.push('  RUN');
-          return { success: true };
-        }),
-      };
-      return stmt;
-    }),
-  };
-  return db;
+  const prepare = fixture.db.prepare;
+  fixture.db.prepare = ((sql: string) => { d1Calls.push('PREP: ' + sql); return prepare(sql); }) as any;
+  return fixture.db;
 }
 
 let webhookRouter: any;
@@ -75,8 +43,9 @@ async function mountRouter() {
   webhookRouter = mod.webhookRouter;
 }
 
-function validSignature(): string {
-  return '61'.repeat(32);
+function validSignature(data: Record<string, unknown>): string {
+  const canonical = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('&');
+  return createHmac('sha256', 'test-checksum-key').update(canonical).digest('hex');
 }
 
 describe('POST /payos', () => {
@@ -126,11 +95,12 @@ describe('POST /payos', () => {
             order_id: 'ord-1',
             status: 'pending',
             amount: 50000,
+            method: 'payos',
             transaction_id: '12345',
           },
         ],
         orders: [
-          { id: 'ord-1', payment_status: 'pending', customer_name: 'Test' },
+          { id: 'ord-1', payment_status: 'unpaid', payment_method: 'payos', customer_name: 'Test' },
         ],
       }),
       PAYOS_CHECKSUM_KEY: 'test-checksum-key',
@@ -146,7 +116,7 @@ describe('POST /payos', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          signature: validSignature(),
+          signature: validSignature({ orderCode: 12345, amount: 50000, description: 'Test order', code: '00' }),
           success: true,
           data: { orderCode: 12345, amount: 50000, description: 'Test order', code: '00' },
         }),
@@ -202,7 +172,7 @@ describe('POST /payos', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        signature: validSignature(),
+        signature: validSignature({ orderCode: 99999, amount: 50000, description: 'Test' }),
         success: true,
         data: { orderCode: 99999, amount: 50000, description: 'Test' },
       }),
@@ -223,11 +193,12 @@ describe('POST /payos', () => {
             order_id: 'ord-2',
             status: 'completed',
             amount: 30000,
+            method: 'payos',
             transaction_id: '67890',
           },
         ],
         orders: [
-          { id: 'ord-2', payment_status: 'paid', customer_name: 'Test' },
+          { id: 'ord-2', payment_status: 'paid', payment_method: 'payos', customer_name: 'Test' },
         ],
       }),
       PAYOS_CHECKSUM_KEY: 'test-checksum-key',
@@ -242,7 +213,7 @@ describe('POST /payos', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        signature: validSignature(),
+        signature: validSignature({ orderCode: 67890, amount: 30000, description: 'Test', code: '00' }),
         success: true,
         data: { orderCode: 67890, amount: 30000, description: 'Test', code: '00' },
       }),
@@ -251,5 +222,32 @@ describe('POST /payos', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message).toMatch(/already processed/i);
+  });
+
+  test('does not settle an order when the transaction result code is not successful', async () => {
+    env = {
+      AURA_DB: createMockD1({
+        payments: [{
+          id: 'pay_failed', order_id: 'ord-failed', status: 'pending', amount: 30000,
+          method: 'payos', transaction_id: '99887',
+        }],
+        orders: [{ id: 'ord-failed', payment_status: 'unpaid', payment_method: 'payos' }],
+      }),
+      PAYOS_CHECKSUM_KEY: 'test-checksum-key',
+    };
+    await mountRouter();
+
+    const res = await webhookRouter.request('/payos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        signature: validSignature({ orderCode: 99887, amount: 30000, description: 'Failed transfer', code: '01' }),
+        success: true,
+        data: { orderCode: 99887, amount: 30000, description: 'Failed transfer', code: '01' },
+      }),
+    }, env, { waitUntil: vi.fn() });
+
+    expect(res.status).toBe(200);
+    expect(d1Calls.some(call => call.includes('UPDATE orders'))).toBe(false);
   });
 });

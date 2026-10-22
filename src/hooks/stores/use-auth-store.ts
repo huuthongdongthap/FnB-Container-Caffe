@@ -14,7 +14,8 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'customer' | 'staff' | 'manager' | 'owner';
+  role: 'customer' | 'staff' | 'manager' | 'owner' | 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'barista' | 'chef';
+  tenantId?: string;
   phone?: string;
 }
 
@@ -29,6 +30,7 @@ interface AuthResponse {
 }
 
 interface AuthState {
+  sessionVersion: number;
   user: AuthUser | null;
   loading: boolean;
   error: string | null;
@@ -52,6 +54,7 @@ function getInitialUser(): AuthUser | null {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: getInitialUser(),
+  sessionVersion: 0,
   loading: false,
   error: null,
 
@@ -76,7 +79,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
           } catch { /* storage quota or restricted */ }
         }
-        set({ user: resolvedUser, loading: false, error: null });
+        set(state => ({ user: resolvedUser, loading: false, error: null, sessionVersion: state.sessionVersion + 1 }));
       } else {
         await get().fetchMe();
       }
@@ -106,7 +109,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
           } catch { /* storage quota or restricted */ }
         }
-        set({ user: resolvedUser, loading: false, error: null });
+        set(state => ({ user: resolvedUser, loading: false, error: null, sessionVersion: state.sessionVersion + 1 }));
       } else {
         await get().fetchMe();
       }
@@ -116,17 +119,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    } catch { /* best-effort */ }
-
+    // Begin the authenticated revoke request, then hide private state immediately.
+    const revoke = apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
       } catch { /* restricted */ }
     }
-    set({ user: null, loading: false, error: null });
+    set(state => ({ user: null, loading: false, error: null, sessionVersion: state.sessionVersion + 1 }));
+    await revoke;
   },
 
   fetchMe: async () => {
@@ -140,7 +142,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
           } catch { /* restricted */ }
         }
-        set({ user: resolvedUser, loading: false, error: null });
+        set(state => ({ user: resolvedUser, loading: false, error: null, sessionVersion: state.sessionVersion + 1 }));
       } else {
         set({ loading: false, error: null });
       }

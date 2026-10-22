@@ -213,7 +213,7 @@ else
     echo "  Created $ENV_FILE from .env.example"
     echo ""
     echo "  ATTENTION: Edit $ENV_FILE and set real credentials before proceeding:"
-    echo "    - VNPAY, MoMo, PayOS payment credentials"
+    echo "    - PayOS credentials (COD needs no provider credentials)"
     echo "    - SendGrid API key"
     echo "    - Analytics IDs (VITE_GA_MEASUREMENT_ID, VITE_FB_PIXEL_ID)"
     echo ""

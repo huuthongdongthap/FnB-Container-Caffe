@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { createOrder, updateOrder, getLatestOrderTimestamp, splitOrders } from '@aura/domain-order';
 import { requireAuth } from '../middleware/auth';
+import { getTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 
 export const ordersCoreRouter = new Hono<{ Bindings: Env }>();
@@ -71,23 +72,6 @@ export const handleSyncOrders = async (c: import('hono').Context<{ Bindings: Env
   delete orderPayload.createdAt;
   delete orderPayload.offlineCreatedAt;
 
-  // KV Idempotency cache check
-  const authKv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-  const idemKey = localId ? `order:idempotency:offline:${localId}` : undefined;
-
-  if (idemKey && authKv) {
-    const cached = await authKv.get(idemKey, 'json');
-    if (cached) {
-      return c.json({
-        success: true,
-        ok: true,
-        cached: true,
-        localId,
-        ...(cached as Record<string, unknown>),
-      }, 200, { 'X-Cache': 'HIT' });
-    }
-  }
-
   // Inject Idempotency-Key header for createOrder
   const headers = new Headers(c.req.raw.headers);
   headers.set('Content-Type', 'application/json');
@@ -119,11 +103,7 @@ export const handleSyncOrders = async (c: import('hono').Context<{ Bindings: Env
       order: resData.data ?? resData,
     };
 
-    if (idemKey && authKv) {
-      await authKv.put(idemKey, JSON.stringify(syncResponse), { expirationTtl: 86400 });
-    }
-
-    return c.json(syncResponse, res.status as 200 | 201);
+    return c.json(syncResponse, res.status as 200 | 201, res.headers.get('X-Cache') ? { 'X-Cache': 'HIT' } : undefined);
   }
 
   return res;
@@ -133,7 +113,8 @@ export const handleSplitOrders = (c: import('hono').Context<{ Bindings: Env }>) 
 export const handleLatestOrderTimestamp = (c: import('hono').Context<{ Bindings: Env }>) => getLatestOrderTimestamp(c.req.raw, c.env);
 export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) => {
   const user = c.get('user');
-  return updateOrder(c.req.raw, c.env, c.req.param('id'), user?.role);
+  const orderId = c.req.param('id')!;
+  return updateOrder(c.req.raw, c.env, orderId, user?.role, getTenantId(c));
 };
 
 ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);

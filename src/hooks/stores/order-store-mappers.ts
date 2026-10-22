@@ -25,6 +25,9 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  unpaid: 'Chưa thanh toán',
+  paid: 'Đã thanh toán',
+  cod_pending: 'COD — chưa thu tiền',
   pending: 'Chờ thanh toán',
   processing: 'Đang xử lý',
   completed: 'Đã thanh toán',

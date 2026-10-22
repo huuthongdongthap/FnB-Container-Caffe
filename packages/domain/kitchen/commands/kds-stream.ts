@@ -16,6 +16,7 @@
 
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
+import { getTenantId } from 'worker/src/middleware/tenant';
 
 // Max SSE connection duration: 120s — client reconnects naturally after.
 const SSE_TIMEOUT_MS = 120_000;
@@ -75,6 +76,7 @@ function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
  */
 kdsStreamRouter.get('/stream', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   if (!db) {
     return c.json({ error: 'DB not available' }, 500);
   }
@@ -96,11 +98,14 @@ kdsStreamRouter.get('/stream', async(c) => {
       };
 
       const queryActiveOrders = async(): Promise<KdsStreamOrder[]> => {
-        const { results } = await db.prepare(
+        const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+        const statement = db.prepare(
           `SELECT id, customer_name, table_id, items, status, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
            ORDER BY created_at ASC LIMIT 50`
-        ).all<OrderRecord>();
+        );
+        const { results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>();
         return (results || []).map(mapKdsOrder);
       };
 

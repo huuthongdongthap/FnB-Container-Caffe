@@ -7,7 +7,7 @@ export const PAYOS_API = 'https://api-merchant.payos.vn/v2/payment-requests';
 
 export const refundRequestSchema = z.object({
   paymentId: z.union([z.string(), z.number()]),
-  amount: z.number().positive('Số tiền hoàn phải lớn hơn 0 / Amount must be positive'),
+  amount: z.number().int().positive('Số tiền hoàn phải lớn hơn 0 / Amount must be positive'),
   reason: z.string().min(1, 'Lý do hoàn tiền là bắt buộc / Reason is required')
 });
 

@@ -1,12 +1,8 @@
 /**
  * PayOS Helper utilities
- * Signature generation & payment persistence with collision retries.
+ * Signature generation and order validation. Provider attempts are reserved before fetching.
  */
 
-import type { D1Database } from '@cloudflare/workers-types';
-import { createLogger } from 'worker/src/middleware/logger';
-
-const log = createLogger({ route: 'payos-helpers' });
 export const PAYOS_API = 'https://api-merchant.payos.vn/v2/payment-requests';
 
 export const PAYOS_ERROR_MESSAGES = {
@@ -92,71 +88,4 @@ export function validatePayOSAccess(
     return { allowed: false, reason: 'invalid_total' };
   }
   return { allowed: true };
-}
-
-export interface SavePaymentParams {
-  db: D1Database;
-  orderId: string;
-  amount: number;
-  initialOrderCode: number;
-  checkoutUrl: string;
-  payosPayload: Record<string, unknown>;
-  checksumKey: string;
-  clientId: string;
-  apiKey: string;
-  cancelUrl: string;
-  description: string;
-  returnUrl: string;
-}
-
-export async function persistPaymentWithRetries(
-  params: SavePaymentParams
-): Promise<{ ok: boolean; finalOrderCode: number; checkoutUrl: string }> {
-  const {
-    db, orderId, amount, initialOrderCode, checkoutUrl, payosPayload,
-    checksumKey, clientId, apiKey, cancelUrl, description, returnUrl,
-  } = params;
-
-  const randBytes = new Uint8Array(4);
-  crypto.getRandomValues(randBytes);
-  const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  const paymentId = `pay_${Date.now()}_${randHex.slice(0, 5)}`;
-  const now = new Date().toISOString();
-
-  let orderCode = initialOrderCode;
-  let activeCheckoutUrl = checkoutUrl;
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const attemptCode = orderCode;
-      const attemptPaymentId = attempt === 0 ? paymentId : `${paymentId}_${attempt}`;
-      await db.prepare(`
-        INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
-        VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
-      `).bind(attemptPaymentId, orderId, amount, String(attemptCode), activeCheckoutUrl, now).run();
-
-      return { ok: true, finalOrderCode: attemptCode, checkoutUrl: activeCheckoutUrl };
-    } catch (insertErr) {
-      const insertErrMsg = (insertErr as Error).message || '';
-      if (!insertErrMsg.includes('UNIQUE constraint')) throw insertErr;
-      log.warn('PayOS orderCode collision', { attempt: attempt + 1 });
-      orderCode = generateOrderCode();
-      const newSig = await buildPayOSSignature(
-        { amount, cancelUrl, description, orderCode, returnUrl },
-        checksumKey
-      );
-      payosPayload.orderCode = orderCode;
-      payosPayload.signature = newSig;
-      const retryRes = await fetch(PAYOS_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
-        body: JSON.stringify(payosPayload)
-      });
-      const retryData = await retryRes.json() as { code: string; desc?: string; data?: { checkoutUrl: string } };
-      if (retryData.code !== '00') return { ok: false, finalOrderCode: orderCode, checkoutUrl: '' };
-      activeCheckoutUrl = retryData.data?.checkoutUrl || activeCheckoutUrl;
-    }
-  }
-
-  return { ok: false, finalOrderCode: orderCode, checkoutUrl: activeCheckoutUrl };
 }

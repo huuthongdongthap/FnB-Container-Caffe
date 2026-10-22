@@ -21,6 +21,7 @@ function snapshotMockDB() {
       bind(...args: unknown[]) { this._binds = args; return this; },
       first: async() => {
         // table_id resolution
+        if (sql.includes('FROM products WHERE id = ?')) return { id: 'coffee', name: 'Coffee', price: 35000, available: 1 };
         if (sql.includes('FROM cafe_tables WHERE table_number')) {
           return { id: 'TBL_001' };
         }
@@ -46,7 +47,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Ca Phe Sua', qty: 2, price: 35000 }],
+        items: [{ product_id: 'coffee', name: 'Ca Phe Sua', qty: 2, price: 35000 }],
         total: 70000,
         customer_name: 'Nguyen Van A',
         customer_phone: '0912345678',
@@ -138,7 +139,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Tra Chanh', qty: 1, price: 15000 }],
+        items: [{ product_id: 'coffee', name: 'Tra Chanh', qty: 1, price: 15000 }],
         total: 15000,
         customer_name: 'Test',
         customer_phone: '0900000000',

@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
-import { canTransition, canActorTransition, toActorRole, publishOrderEvent, canAccessOrder } from '@aura/domain-order';
+import { executeKdsStatusTransition } from '@aura/domain-kitchen';
+import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
 import { fetchOrderItemsAndPayments, formatOrder } from './helpers';
 
@@ -11,15 +12,15 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { id: string; status: string; customer_id?: string | null } | null;
+  const tenantId = getTenantId(c);
+  const customer = user?.role === 'customer';
+  const clause = customer ? ' AND customer_id = ?' : tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const scope = customer ? [user.id] : tenantId === '*' ? [] : [tenantId];
+  const existing = (await db.prepare(`SELECT * FROM orders WHERE id = ?${clause}`).bind(id, ...scope).first()) as {
+    id: string; status: string; customer_id?: string | null; tenant_id?: string;
+  } | null;
   if (!existing) {
     return c.json({ success: false, error: 'Order not found' }, 404);
-  }
-
-  // Ownership scope
-  const access = canAccessOrder(user, existing);
-  if (!access.allowed) {
-    return c.json({ success: false, error: access.reason || 'Forbidden' }, 403);
   }
 
   // Idempotent cancellation
@@ -32,40 +33,13 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     });
   }
 
-  // Dual gate: structural legality then role authorization
-  const structural = canTransition(existing.status, 'cancelled');
-  if (!structural.ok) {
-    return c.json({ success: false, error: structural.error }, 400);
-  }
-  const authCheck = canActorTransition(toActorRole(user?.role), existing.status, 'cancelled');
-  if (!authCheck.ok) {
-    return c.json({ success: false, error: authCheck.error }, 403);
-  }
-
-  if (['served', 'delivered', 'completed', 'failed', 'expired'].includes(existing.status)) {
-    return c.json({ success: false, error: 'Cannot cancel order that has been served or completed' }, 409);
-  }
-
-  try {
-    await db.prepare(
-      'UPDATE orders SET status = \'cancelled\', cancelled_at = ?, updated_at = ? WHERE id = ?'
-    ).bind(now, now, id).run();
-  } catch {
-    await db.prepare(
-      'UPDATE orders SET status = \'cancelled\', updated_at = ? WHERE id = ?'
-    ).bind(now, id).run();
-  }
-
-  if (c.env?.AUTH_KV) {
-    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
-    try {
-      if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
-    } catch { /* executionCtx may be absent in testing */ }
-    await publishOrderEvent(c.env.AUTH_KV, id, 'cancelled', {
-      previousStatus: existing.status,
-      waitUntil: waitUntilFn,
-    });
-  }
+  // All aliases share tenant confinement, role/state validation and compare-and-set.
+  const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
+    tenantId: customer ? existing.tenant_id || 'default' : tenantId,
+    kv: c.env.AUTH_KV,
+    env: c.env as unknown as Record<string, unknown>,
+  });
+  if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
 
   try {
     await db.prepare(
@@ -92,10 +66,14 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
 
   const updated = await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o
-     LEFT JOIN cafe_tables t ON o.table_id = t.id
-     WHERE o.id = ?`
+       FROM orders o
+       LEFT JOIN cafe_tables t ON o.table_id = t.id
+       WHERE o.id = ?`
   ).bind(id).first();
+
+  if (!updated) {
+    return c.json({ success: false, error: 'Order not found after cancellation' }, 404);
+  }
 
   const { items: orderItems, payments } = await fetchOrderItemsAndPayments(db, id);
   return c.json({

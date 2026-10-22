@@ -2,18 +2,18 @@ import type { Hono } from 'hono';
 import { requireAuth } from '../../middleware/auth';
 import type { Env } from '../../types/env';
 import { log } from './helpers';
+import { canAccessPaymentOrder, FINANCIAL_ROLES } from '../../../../packages/domain/payment/policies/payment-access';
 
 export function registerRefundReadHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/payments/refunds/:paymentId
-  router.get('/refunds/:paymentId', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
+  router.get('/refunds/:paymentId', requireAuth(FINANCIAL_ROLES), async (c) => {
     const db = c.env.AURA_DB;
     const paymentId = c.req.param('paymentId');
 
     try {
       const payment = await db.prepare(
-        `SELECT id, order_id, method, amount, status, transaction_id,
-                refund_status, refund_amount, refund_reason, created_at, updated_at
-         FROM payments WHERE id = ?`
+        `SELECT p.*, o.tenant_id, o.customer_id FROM payments p
+         JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
       ).bind(paymentId).first<{
         id: string;
         order_id: string;
@@ -26,9 +26,11 @@ export function registerRefundReadHandlers(router: Hono<{ Bindings: Env }>): voi
         refund_reason: string | null;
         created_at: string;
         updated_at: string;
+        tenant_id: string | null;
+        customer_id: string | null;
       }>();
 
-      if (!payment) {
+      if (!payment || !canAccessPaymentOrder(c, payment)) {
         return c.json({ success: false, error: 'Không tìm thấy thanh toán / Payment not found' }, 404);
       }
 

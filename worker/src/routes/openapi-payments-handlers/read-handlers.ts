@@ -2,202 +2,52 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
-import { canAccessOrder } from '@aura/domain-order';
+import { canAccessPaymentOrder, paymentTenantScope } from '../../../../packages/domain/payment/policies/payment-access';
 
-interface PaymentRow {
-  id: string;
-  order_id: string;
-  method: string;
-  amount: number;
-  status: string;
-  transaction_id: string | null;
-  payment_url: string | null;
-  created_at: string;
-  updated_at: string;
-  [key: string]: unknown;
-}
+type PaymentRow = Record<string, any>;
+const paymentResponse = (p: PaymentRow) => ({
+  id: p.id, orderId: p.order_id, order: { id: p.order_id }, amount: p.amount, method: p.method,
+  status: p.status, transactionId: p.transaction_id, payosOrderCode: Number(p.transaction_id) || null,
+  payosPaymentLinkId: null, qrCodeUrl: p.payment_url, deeplink: null,
+  paidAt: p.status === 'completed' ? p.updated_at : null,
+  failedAt: p.status === 'failed' ? p.updated_at : null, failureReason: null,
+  refundedAmount: p.refund_amount || (p.status === 'refunded' ? p.amount : 0),
+  refundedAt: p.refunded_at || (p.status === 'refunded' ? p.updated_at : null),
+  metadata: null, createdAt: p.created_at, updatedAt: p.updated_at,
+});
 
 export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
-  // GET /api/payments - List payments
   router.openapi(PaymentRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const query = c.req.valid('query' as never) as {
-      page?: number;
-      limit?: number;
-      sort?: string;
-      order?: string;
-      orderId?: string;
-      method?: string;
-      status?: string;
-      dateFrom?: string;
-      dateTo?: string;
-    };
+    const query = c.req.valid('query' as never);
     const { page = 1, limit = 20, sort = 'created_at', order = 'desc', orderId, method, status, dateFrom, dateTo } = query;
-
-    let whereClause = 'WHERE 1=1';
+    const conditions = ['1=1'];
     const params: (string | number)[] = [];
-
-    if (orderId) {
-      whereClause += ' AND order_id = ?';
-      params.push(orderId);
+    const tenant = paymentTenantScope(c);
+    if (tenant !== null) { conditions.push("COALESCE(o.tenant_id, 'default') = ?"); params.push(tenant); }
+    const user = c.get('user');
+    if (!user) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    if (user.role === 'customer') { conditions.push('o.customer_id = ?'); params.push(user.id); }
+    for (const [column, value] of [['p.order_id', orderId], ['p.method', method], ['p.status', status]] as const) {
+      if (value) { conditions.push(`${column} = ?`); params.push(value); }
     }
-    if (method) {
-      whereClause += ' AND method = ?';
-      params.push(method);
-    }
-    if (status) {
-      whereClause += ' AND status = ?';
-      params.push(status);
-    }
-    if (dateFrom) {
-      whereClause += ' AND date(created_at) >= ?';
-      params.push(dateFrom);
-    }
-    if (dateTo) {
-      whereClause += ' AND date(created_at) <= ?';
-      params.push(dateTo);
-    }
-
-    const offset = (page - 1) * limit;
-    const allowedSorts: Record<string, string> = {
-      created_at: 'p.created_at',
-      amount: 'p.amount',
-      status: 'p.status',
-      payment_method: 'p.method',
-      updated_at: 'p.updated_at',
-    };
-    const safeSort = allowedSorts[sort] || 'p.created_at';
-    const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
-    const orderClause = `${safeSort} ${safeDirection}`;
-
-    const user = c.get('user') as { id?: string; role?: string } | undefined;
-    let total = 0;
-    let rows: { results: PaymentRow[] } = { results: [] };
-    let scopedByCustomer = false;
-
-    if (user?.role === 'customer') {
-      if (!user?.id) {
-        scopedByCustomer = true;
-      } else {
-        try {
-          const customerWhere = `${whereClause
-            .replace(/\border_id\b/g, 'p.order_id')
-            .replace(/\bmethod\b/g, 'p.method')
-            .replace(/\bstatus\b/g, 'p.status')
-            .replace(/\bcreated_at\b/g, 'p.created_at')} AND o.customer_id = ?`;
-          const customerParams = [...params, user.id];
-
-          const countResult = (await db.prepare(
-            `SELECT COUNT(*) as total FROM payments p JOIN orders o ON o.id = p.order_id ${customerWhere}`
-          ).bind(...customerParams).first()) as { total: number } | null;
-
-          const customerRows = (await db.prepare(
-            `SELECT p.* FROM payments p JOIN orders o ON o.id = p.order_id
-             ${customerWhere}
-             ORDER BY ${orderClause}
-             LIMIT ? OFFSET ?`
-          ).bind(...customerParams, limit, offset).all()) as { results: PaymentRow[] };
-
-          if (countResult !== null && customerRows?.results) {
-            total = countResult.total || 0;
-            rows = customerRows;
-            scopedByCustomer = true;
-          }
-        } catch {
-          scopedByCustomer = true;
-          total = 0;
-          rows = { results: [] };
-        }
-      }
-    }
-
-    if (!scopedByCustomer) {
-      const countResult = (await db.prepare(
-        `SELECT COUNT(*) as total FROM payments ${whereClause}`
-      ).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
-
-      rows = (await db.prepare(
-        `SELECT p.* FROM payments p
-         ${whereClause}
-         ORDER BY ${orderClause}
-         LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: PaymentRow[] };
-    }
-
-    const payments = (rows.results || []).map((p) => ({
-      id: p.id,
-      orderId: p.order_id,
-      order: { id: p.order_id },
-      amount: p.amount,
-      method: p.method,
-      status: p.status,
-      transactionId: p.transaction_id,
-      payosOrderCode: p.transaction_id ? parseInt(p.transaction_id, 10) || null : null,
-      payosPaymentLinkId: null,
-      qrCodeUrl: p.payment_url,
-      deeplink: null,
-      paidAt: p.status === 'completed' ? p.updated_at : null,
-      failedAt: p.status === 'failed' ? p.updated_at : null,
-      failureReason: null,
-      refundedAmount: p.status === 'refunded' ? p.amount : 0,
-      refundedAt: p.status === 'refunded' ? p.updated_at : null,
-      metadata: null,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-    }));
-
-    return c.json({
-      success: true,
-      data: { payments, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
-    });
+    if (dateFrom) { conditions.push('date(p.created_at) >= ?'); params.push(dateFrom); }
+    if (dateTo) { conditions.push('date(p.created_at) <= ?'); params.push(dateTo); }
+    const from = `FROM payments p JOIN orders o ON o.id = p.order_id WHERE ${conditions.join(' AND ')}`;
+    const count = await db.prepare(`SELECT COUNT(*) as total ${from}`).bind(...params).first<{ total: number }>();
+    const allowedSorts: Record<string, string> = { created_at: 'p.created_at', amount: 'p.amount', status: 'p.status', payment_method: 'p.method', updated_at: 'p.updated_at' };
+    const rows = await db.prepare(`SELECT p.* ${from} ORDER BY ${allowedSorts[sort] || 'p.created_at'} ${order.toLowerCase() === 'asc' ? 'ASC' : 'DESC'} LIMIT ? OFFSET ?`)
+      .bind(...params, limit, (page - 1) * limit).all<PaymentRow>();
+    const total = count?.total || 0;
+    return c.json({ success: true, data: { payments: rows.results.map(paymentResponse), meta: { page, limit, total, totalPages: Math.ceil(total / limit) } } });
   });
 
-  // GET /api/payments/:id - Get payment by ID
   router.openapi(PaymentRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param' as never) as { id: string };
-
-    const payment = (await db.prepare(
-      'SELECT p.* FROM payments p WHERE p.id = ?'
-    ).bind(id).first()) as PaymentRow | null;
-
-    if (!payment) {
-      return c.json({ success: false, error: 'Payment not found' }, 404);
-    }
-
-    const order = (await db.prepare(
-      'SELECT id, customer_id FROM orders WHERE id = ?'
-    ).bind(payment.order_id).first()) as { id: string; customer_id?: string | null } | null;
-
-    const user = c.get('user') as { id?: string; role?: string } | undefined;
-    if (order && !canAccessOrder(user, order).allowed) {
-      return c.json({ success: false, error: 'Forbidden' }, 403);
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        id: payment.id,
-        orderId: payment.order_id,
-        order: { id: payment.order_id },
-        amount: payment.amount,
-        method: payment.method,
-        status: payment.status,
-        transactionId: payment.transaction_id,
-        payosOrderCode: payment.transaction_id ? parseInt(payment.transaction_id, 10) || null : null,
-        payosPaymentLinkId: null,
-        qrCodeUrl: payment.payment_url,
-        deeplink: null,
-        paidAt: payment.status === 'completed' ? payment.updated_at : null,
-        failedAt: payment.status === 'failed' ? payment.updated_at : null,
-        failureReason: null,
-        refundedAmount: payment.status === 'refunded' ? payment.amount : 0,
-        refundedAt: payment.status === 'refunded' ? payment.updated_at : null,
-        metadata: null,
-        createdAt: payment.created_at,
-        updatedAt: payment.updated_at,
-      },
-    });
+    const payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
+      .bind(id).first<PaymentRow>();
+    if (!payment || !canAccessPaymentOrder(c, payment)) return c.json({ success: false, error: 'Payment not found' }, 404);
+    return c.json({ success: true, data: paymentResponse(payment) });
   });
 }

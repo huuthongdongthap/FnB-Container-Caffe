@@ -6,12 +6,14 @@ import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } 
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore, useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
+import { clearCheckoutIntent, resolveCheckoutOrder } from './checkout-intent';
 
-/* ═══════════════════════════════════════════════════════════════════
-   Checkout Page — Production page using StitchCheckout component.
-   Matches Stitch AI design pixel-perfect with store integration.
-   ═══════════════════════════════════════════════════════════════════ */
+function checkoutIdentity(): string {
+  const user = useAuthStore.getState().user;
+  return JSON.stringify([API_BASE, user?.tenantId ?? 'default', user?.id ?? 'guest']);
+}
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -19,7 +21,6 @@ export function CheckoutPage() {
   const [payosError, setPayosError] = useState<string | null>(null);
   const [payosRetrying, setPayosRetrying] = useState(false);
   const submittingRef = useRef(false);
-
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
   const { t } = useTranslation('checkout');
@@ -136,110 +137,19 @@ export function CheckoutPage() {
       tip: 0,
     };
 
-    // Apple Pay / Google Pay — use Payment Request API
-    if (formData.paymentMethod === 'apple_pay' || formData.paymentMethod === 'google_pay') {
-      try {
-        const supportedMethods = formData.paymentMethod === 'apple_pay'
-          ? [{ supportedMethods: 'https://apple.com/apple-pay', data: { version: 3, merchantIdentifier: 'merchant.com.auracafe', merchantCapabilities: ['supports3DS'], supportedNetworks: ['visa', 'masterCard', 'amex'], countryCode: 'VN' } }]
-          : [{ supportedMethods: 'https://google.com/pay', data: { apiVersion: 2, apiVersionMinor: 0 } }];
-
-        const pr = new PaymentRequest(supportedMethods, {
-          total: { label: 'AURA CAFE', amount: { currency: 'VND', value: String(effectiveTotal) } },
-        });
-
-        const canPay = await pr.canMakePayment();
-        if (!canPay) {
-          submittingRef.current = false;
-          setPayosError(t('paymentNotAvailable', 'Thanh toán không khả dụng trên thiết bị này'));
-          return;
-        }
-
-        const response = await pr.show();
-        // Create order first, then process payment token
-        const order = await useOrderStore.getState().createOrder(payload);
-        if (!order) {
-          await response.complete('fail');
-          submittingRef.current = false;
-          setPayosError(useOrderStore.getState().error || t('failedToCreateOrder'));
-          return;
-        }
-
-        // Send payment token to backend
-        const storedToken = typeof localStorage !== 'undefined'
-          ? (localStorage.getItem('aura_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('token'))
-          : null;
-        const resolvedOrderAmount = Number((order as unknown as { total?: number }).total ?? order.totalAmount ?? effectiveTotal);
-        const res = await fetch(`${API_BASE}/api/payments/payment-request`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
-          },
-          body: JSON.stringify({
-            order_id: order.id,
-            payment_token: response.details,
-            amount: resolvedOrderAmount,
-            currency: 'VND',
-          }),
-        });
-        const result = await res.json();
-
-        if (result.success || res.status === 401) {
-          await response.complete('success');
-          try {
-            localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: resolvedOrderAmount, payment_method: formData.paymentMethod, customer_name: formData.fullName }));
-            localStorage.removeItem('aura_checkout_form');
-          } catch { /* */ }
-          clearCart();
-          navigate(`/order-success?order_id=${order.id}`);
-        } else {
-          await response.complete('fail');
-          submittingRef.current = false;
-          setPayosError(result.error || t('paymentFailed', 'Thanh toán thất bại'));
-        }
-      } catch (err) {
-        submittingRef.current = false;
-        if (err instanceof Error && err.name !== 'AbortError') {
-          setPayosError(err.message || t('paymentError', 'Lỗi thanh toán'));
-        }
-      }
-      return;
-    }
-
     try {
-      // Step 1: Create order via API
-      const order = await useOrderStore.getState().createOrder(payload);
-      if (!order) {
-        submittingRef.current = false;
-        throw new Error(useOrderStore.getState().error || t('failedToCreateOrder'));
-      }
-
-      const rawOrder = (order as unknown as { order?: typeof order; data?: typeof order })?.order
-        ?? (order as unknown as { data?: typeof order })?.data
-        ?? order;
-      const orderId = rawOrder.id;
-      const serverTotal = Number(
-        (rawOrder as unknown as { totalAmount?: number; total?: number }).totalAmount
-        ?? (rawOrder as unknown as { total?: number }).total
-        ?? effectiveTotal
-      );
-
-      // Save order info for success page
-      try {
-        localStorage.setItem('pendingOrder', JSON.stringify({
-          id: orderId,
-          total: serverTotal,
-          payment_method: formData.paymentMethod,
-          customer_name: formData.fullName,
-        }));
-      } catch { /* storage unavailable */ }
+      const { intent, order, identity, alreadyPaid } = await resolveCheckoutOrder({ payload, identity: checkoutIdentity,
+        createOrder: useOrderStore.getState().createOrder,
+        creationError: () => useOrderStore.getState().error || t('failedToCreateOrder'),
+      });
+      const { id: orderId, total: serverTotal } = order;
 
       // Handle PayOS redirect with internal retry
-      if (formData.paymentMethod === 'payos') {
+      if (formData.paymentMethod === 'payos' && !alreadyPaid) {
         setPayosRetrying(true);
         const url = await retryCreatePaymentLink(orderId, serverTotal);
         setPayosRetrying(false);
+        if (checkoutIdentity() !== identity) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
         if (url) {
           window.location.href = url;
           return;
@@ -248,13 +158,15 @@ export function CheckoutPage() {
         throw new Error(usePaymentStore.getState().error || t('paymentLinkFailed'));
       }
 
-      // COD: clear cart and navigate to success
+      // Acknowledge COD or an already settled retry, then show its confirmation.
+      clearCheckoutIntent(intent.key);
       try {
         localStorage.removeItem('aura_checkout_form');
       } catch { /* storage unavailable */ }
       clearCart();
       navigate(`/order-success?order_id=${orderId}`);
     } catch (err) {
+      setPayosRetrying(false);
       submittingRef.current = false;
       throw err; // StitchCheckout catches and displays the error
     }
@@ -278,7 +190,7 @@ export function CheckoutPage() {
         locale="vi"
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeItem}
-        onClearCart={clearCart}
+        onClearCart={() => { clearCheckoutIntent(); clearCart(); }}
       />
     </>
   );

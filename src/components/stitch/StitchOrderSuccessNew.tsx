@@ -124,13 +124,16 @@ export function StitchOrderSuccessNew({
       {/* ═══════════ MAIN CONTENT ═════════════════════════════════════ */}
       <main className="w-full max-w-md px-5 pt-24 pb-8 flex flex-col gap-8 items-center">
         {/* Wait time display */}
-        <WaitTimeDisplay estimatedMinutes={order.estimatedMinutes} />
+        <WaitTimeDisplay estimatedMinutes={order.estimatedMinutes} status={order.status} paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} />
 
         {/* Order summary glass card */}
         <OrderSummaryCard
           orderId={order.orderId}
           items={order.items}
           total={order.total}
+          status={order.status}
+          paymentStatus={order.paymentStatus}
+          paymentMethod={order.paymentMethod}
           formatFn={fmt}
           pointsEarned={order.pointsEarned}
           cashbackEarned={order.cashbackEarned}

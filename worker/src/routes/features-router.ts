@@ -1,3 +1,4 @@
+import { handleUpdateOrderStatus } from './orders-hono-handlers/kds-handlers';
 /**
  * Feature Routes Registration (Admin, CRM, Reports, Signage, Webhooks, SaaS, etc.)
  */
@@ -5,7 +6,7 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { tenantMiddleware } from '../middleware/tenant';
-import { getAdminOrders, getStats, publishOrderEvent } from '@aura/domain-order';
+import { getAdminOrders, getStats } from '@aura/domain-order';
 import { paymentRouter, nowPaymentsIPN } from '@aura/domain-payment';
 import { refundRouter } from './refunds';
 import { pushRouter } from './push';
@@ -88,41 +89,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     const effectiveTenant = isHQ ? (c.req.query('tenant_id') || undefined) : user?.tenantId;
     return getAdminOrders(c.req.raw, c.env, effectiveTenant);
   });
-  app.patch('/api/admin/orders/:id/status', async (c) => {
-    const orderId = c.req.param('id');
-    const body = (await c.req.json().catch(() => ({}))) as { status?: string };
-    const status = String(body.status || '').trim();
-    const validStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivering', 'delivered', 'completed', 'cancelled']);
-    if (!orderId || !status || !validStatuses.has(status)) {
-      return c.json({ success: false, error: 'valid order id and status are required' }, 400);
-    }
-    const now = new Date().toISOString();
-    const res = await c.env.AURA_DB
-      .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
-      .bind(status, now, orderId)
-      .run();
-    if (res?.meta && typeof res.meta.changes === 'number' && res.meta.changes === 0) {
-      return c.json({ success: false, error: 'Order not found' }, 404);
-    }
-    await publishOrderEvent(c.env.AUTH_KV, orderId, status).catch(() => {});
-    return c.json({ success: true, id: orderId, status, updated_at: now });
-  });
-  app.post('/api/admin/orders/:id/complete', async (c) => {
-    const orderId = c.req.param('id');
-    if (!orderId) {
-      return c.json({ success: false, error: 'order id is required' }, 400);
-    }
-    const now = new Date().toISOString();
-    const res = await c.env.AURA_DB
-      .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
-      .bind('completed', now, orderId)
-      .run();
-    if (res?.meta && typeof res.meta.changes === 'number' && res.meta.changes === 0) {
-      return c.json({ success: false, error: 'Order not found' }, 404);
-    }
-    await publishOrderEvent(c.env.AUTH_KV, orderId, 'completed').catch(() => {});
-    return c.json({ success: true, id: orderId, status: 'completed', updated_at: now });
-  });
+  // Every alias uses the same tenant-scoped state machine and compare-and-set.
+  app.patch('/api/admin/orders/:id/status', handleUpdateOrderStatus);
+  app.post('/api/admin/orders/:id/complete', (c) => handleUpdateOrderStatus(c, 'completed'));
   app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
   app.post('/api/admin/customers', (c) => createAdminCustomer(c.req.raw, c.env));
   app.patch('/api/admin/customers/:id', (c) => updateAdminCustomer(c.req.raw, c.env, c.req.param('id')));

@@ -16,6 +16,7 @@ function orderMockDB() {
         this._binds = args; return this;
       },
       first: async() => {
+        if (sql.includes('FROM products WHERE id = ?')) return { id: 'coffee', name: 'Coffee', price: 35000, available: 1 };
         if (sql.includes('FROM orders WHERE id = ?')) {
           return { id: 'ORD_1', items: '[{"name":"Coffee","qty":2,"price":35000}]', total: 70000, status: 'pending', payment_method: 'cod', payment_status: 'unpaid', customer_name: 'Test', customer_phone: '0912345678', customer_email: null, created_at: new Date().toISOString() };
         }
@@ -50,7 +51,7 @@ describe('createOrder', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Coffee', qty: 2, price: 35000 }],
+        items: [{ product_id: 'coffee', name: 'Coffee', qty: 2, price: 35000 }],
         total: 70000,
         customer_name: 'Test User',
         customer_phone: '0912345678',
@@ -70,7 +71,7 @@ describe('createOrder', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{ name: 'Coffee', qty: 1, price: 35000 }],
+        items: [{ product_id: 'coffee', name: 'Coffee', qty: 1, price: 35000 }],
         total: 35000,
         customer_name: 'Test',
         customer_phone: '0912345678',
@@ -117,6 +118,17 @@ describe('updateOrder', () => {
       body: JSON.stringify({ status: 'paid' })
     });
     const res = await updateOrder(req, env, 'ORD_1');
+    expect(res.status).toBe(400);
+  });
+
+  it('does not allow generic order updates to mark payment as paid', async() => {
+    const env = { ...createMockEnv(), AURA_DB: orderMockDB() };
+    const req = new Request('https://test.aura/api/orders/ORD_1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_status: 'paid' }),
+    });
+    const res = await updateOrder(req, env, 'ORD_1', 'kitchen');
     expect(res.status).toBe(400);
   });
 });

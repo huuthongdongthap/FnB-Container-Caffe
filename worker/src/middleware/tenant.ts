@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 import { createLogger } from './logger';
+import { writeTenantOverrideAudit } from './audit-log';
 
 const log = createLogger({ route: 'tenant' });
 
@@ -38,7 +39,9 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
 
   if (isHQSuperAdmin(user)) {
     const requestedTenant = c.req.query('tenant_id') || c.req.header('x-tenant-id');
-    if (requestedTenant) {
+    if (requestedTenant && requestedTenant !== user.tenantId) {
+      // Privileged cross-tenant read — leave a durable trail before scoping.
+      writeTenantOverrideAudit(c, user, user.tenantId, requestedTenant);
       c.set('tenantId', requestedTenant);
       return next();
     }
@@ -60,18 +63,20 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
  */
 export function getTenantId(c: {
   get: (_key: string) => unknown;
-  req?: { query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined };
+  env?: Env;
+  req?: { method?: string; path?: string; query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined };
 }): string {
   const explicitTenant = c.get('tenantId') as string | undefined;
   if (explicitTenant) {
     return explicitTenant;
   }
 
-  const user = c.get('user') as { role?: string; tenantId?: string } | undefined;
+  const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenantId?: string } | undefined;
   if (user) {
     if (isHQSuperAdmin(user)) {
       const requestedTenant = c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id');
-      if (requestedTenant) {
+      if (requestedTenant && requestedTenant !== user.tenantId) {
+        writeTenantOverrideAudit(c, user, user.tenantId, requestedTenant);
         return requestedTenant;
       }
     }

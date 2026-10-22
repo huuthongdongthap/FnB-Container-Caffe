@@ -111,12 +111,13 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
         log.error('Signup bonus error (non-fatal):', { message: (e as Error).message });
       }
 
-      if (validated.referral_code) {
+      const referralCode = validated.referral_code;
+      if (referralCode) {
         safeWaitUntil(c,
           (async () => {
             try {
               const { redeemReferral } = await import('@aura/domain-crm');
-              const result = await redeemReferral(db, validated.referral_code, id);
+              const result = await redeemReferral(db, referralCode, id);
               if (!result.success) {
                 log.warn('Referral redeem failed on signup:', { reason: result.reason, customerId: id });
               }

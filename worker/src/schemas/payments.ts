@@ -10,6 +10,7 @@ import {
   MoneySchema,
   PaymentStatusEnum,
   PaymentMethodEnum,
+  SupportedPaymentMethodEnum,
   ReferenceSchema,
   IdempotencyKeySchema,
 } from './common';
@@ -21,7 +22,7 @@ import {
 export const PaymentIntentSchema = z.object({
   orderId: z.string().min(1),
   amount: MoneySchema,
-  method: PaymentMethodEnum,
+  method: SupportedPaymentMethodEnum,
   idempotencyKey: IdempotencyKeySchema,
   returnUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
@@ -39,43 +40,15 @@ export const PaymentIntentResponseSchema = z.object({
 
 export const PayOSWebhookSchema = z.object({
   code: z.string(),
-  id: z.number(),
-  cancel: z.boolean(),
-  status: z.string(),
-  orderCode: z.number(),
-  amount: z.number().int().nonnegative(),
-  description: z.string(),
-  counterAccountBankId: z.string().optional(),
-  counterAccountBankName: z.string().optional(),
-  counterAccountName: z.string().optional(),
-  counterAccountNumber: z.string().optional(),
-  virtualAccountName: z.string().optional(),
-  virtualAccountNumber: z.string().optional(),
-  paymentLinkId: z.string().optional(),
-  transDateTime: z.string(),
-  currency: z.string().default('VND'),
+  desc: z.string(),
+  success: z.boolean(),
+  data: z.object({
+    orderCode: z.number(),
+    amount: z.number().int().nonnegative(),
+    description: z.string(),
+  }).passthrough(),
   signature: z.string(),
 }).openapi('PayOSWebhook');
-
-/**
- * Apple Pay / Google Pay web payment request.
- * payment_token is opaque — structure depends on wallet provider
- * (Apple Pay PKPaymentToken or Google Pay PaymentData).
- */
-export const WebPaymentRequestSchema = z.object({
-  order_id: z.string().min(1),
-  payment_token: z.record(z.string(), z.unknown()),
-  amount: z.number().int().positive(),
-  currency: z.string().length(3).default('VND'),
-}).openapi('WebPaymentRequest');
-
-export const WebPaymentResponseSchema = z.object({
-  transaction_id: z.string(),
-  status: z.enum(['succeeded', 'failed']),
-  payment_method: z.enum(['apple_pay', 'google_pay']),
-  amount: z.number().int().positive(),
-  currency: z.string().length(3),
-}).openapi('WebPaymentResponse');
 
 export const PaymentResponseSchema = z.object({
   id: z.string().min(1),
@@ -138,8 +111,6 @@ export const PaymentSummarySchema = z.object({
 export type PaymentIntent = z.infer<typeof PaymentIntentSchema>;
 export type PaymentIntentResponse = z.infer<typeof PaymentIntentResponseSchema>;
 export type PayOSWebhook = z.infer<typeof PayOSWebhookSchema>;
-export type WebPaymentRequest = z.infer<typeof WebPaymentRequestSchema>;
-export type WebPaymentResponse = z.infer<typeof WebPaymentResponseSchema>;
 export type PaymentResponse = z.infer<typeof PaymentResponseSchema>;
 export type PaymentListResponse = z.infer<typeof PaymentListResponseSchema>;
 export type RefundRequest = z.infer<typeof RefundRequestSchema>;
@@ -218,6 +189,7 @@ export const PaymentRoutes = {
       400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       404: { description: 'Payment not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       409: { description: 'Cannot refund (already refunded/failed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      422: { description: 'Automatic PayOS refund unavailable; verified provider capability required', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   summary: {
@@ -235,23 +207,6 @@ export const PaymentRoutes = {
     },
     responses: {
       200: { description: 'Payment summary', content: { 'application/json': { schema: SuccessResponseSchema(PaymentSummarySchema) } } },
-    },
-  },
-  paymentRequest: {
-    method: 'post',
-    path: '/api/payments/payment-request',
-    summary: 'Process Apple Pay / Google Pay payment token',
-    tags: ['Payments'],
-    security: [{ BearerAuth: [] }],
-    request: { body: { content: { 'application/json': { schema: WebPaymentRequestSchema } } } },
-    responses: {
-      200: { description: 'Payment processed successfully', content: { 'application/json': { schema: SuccessResponseSchema(WebPaymentResponseSchema) } } },
-      400: { description: 'Validation or payment error', content: { 'application/json': { schema: ErrorResponseSchema } } },
-      401: { description: 'Authentication required', content: { 'application/json': { schema: ErrorResponseSchema } } },
-      403: { description: 'Forbidden — order does not belong to user', content: { 'application/json': { schema: ErrorResponseSchema } } },
-      404: { description: 'Order not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
-      409: { description: 'Order already paid', content: { 'application/json': { schema: ErrorResponseSchema } } },
-      422: { description: 'Payment token verification failed (fail-closed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   webhook: {

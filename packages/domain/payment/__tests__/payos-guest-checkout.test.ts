@@ -1,42 +1,24 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { paymentRouter } from '../commands/payos-create-link';
+import { paymentSqliteDB, payosCheckoutResponse } from '../../../../worker/src/__tests__/helpers/payment-sqlite-db';
 
 function createMockEnv(overrides: Record<string, unknown> = {}) {
   const defaultOrder = {
     id: 'ORD_GUEST_01',
     total: 55000,
+    payment_method: 'payos',
     payment_status: 'unpaid',
     customer_id: null,
     is_cod: 0,
   };
 
-  const db = {
-    prepare: (sql: string) => {
-      const stmt = {
-        _sql: sql,
-        _binds: [] as unknown[],
-        bind(...args: unknown[]) {
-          stmt._binds = args;
-          return stmt;
-        },
-        first: async <T = unknown>() => {
-          if (sql.includes('FROM orders WHERE id = ?')) {
-            const orderId = stmt._binds[0];
-            if (overrides._orderNotFound) return null as T;
-            if (overrides._order) return overrides._order as T;
-            return { ...defaultOrder, id: orderId } as T;
-          }
-          if (sql.includes('FROM payments WHERE order_id = ?')) {
-            return (overrides._existingPayment ?? null) as T;
-          }
-          return null as T;
-        },
-        run: async () => ({ success: true, changes: 1 }),
-        all: async () => ({ results: [], success: true }),
-      };
-      return stmt;
-    },
-  };
+  const fixture = paymentSqliteDB();
+  const order = { ...defaultOrder, ...(overrides._order as object || {}) };
+  if (!overrides._orderNotFound) fixture.seed('orders', order);
+  if (overrides._existingPayment) fixture.seed('payments', { order_id: order.id, method: 'payos', amount: order.total,
+    ...overrides._existingPayment as object });
+  const db = fixture.db;
 
   return {
     AURA_DB: db,
@@ -55,16 +37,8 @@ describe('POST /api/payment/create-link - Guest Checkout & Authorization', () =>
 
   it('allows unauthenticated guest to create payment link for guest order', async () => {
     const env = createMockEnv();
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        code: '00',
-        desc: 'Success',
-        data: {
-          checkoutUrl: 'https://pay.payos.vn/web/test-checkout-url',
-          orderCode: 123456789,
-        },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) =>
+      payosCheckoutResponse(JSON.parse(String(init?.body)), 'test-checksum-key-12345678901234567890', 'test-checkout-url'));
 
     const req = new Request('https://test.aura/create-link', {
       method: 'POST',
@@ -129,6 +103,7 @@ describe('POST /api/payment/create-link - Guest Checkout & Authorization', () =>
       _order: {
         id: 'ORD_PAID_01',
         total: 50000,
+        payment_method: 'payos',
         payment_status: 'paid',
         customer_id: null,
         is_cod: 0,
@@ -154,6 +129,7 @@ describe('POST /api/payment/create-link - Guest Checkout & Authorization', () =>
       _order: {
         id: 'ORD_LOW_01',
         total: 500,
+        payment_method: 'payos',
         payment_status: 'unpaid',
         customer_id: null,
         is_cod: 0,

@@ -7,7 +7,7 @@ import {
   listStaffDevices,
 } from '@aura/domain-staff';
 import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
-import { generateJWT } from '../../lib/jwt';
+import { generateJWT, verifyJWT } from '../../lib/jwt';
 import { generateId } from '../../tree/auth/helpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -51,6 +51,7 @@ function buildMockDb(overrides: {
           const val = binds[0];
           if (val === undefined) return null;
           const s = String(val);
+          if (sql.includes('SELECT tenant_id FROM users') && s === 'USR_1') return { tenant_id: 'cafe-a' };
           if (s.startsWith('tok_')) return rowsByToken.has(s) ? rowsByToken.get(s) : null;
           if (s.startsWith('DEV_')) return rowsById.has(s) ? rowsById.get(s) : null;
           return null;
@@ -217,6 +218,8 @@ describe('staffMobileLogin', () => {
     expect(body.success).toBe(true);
     expect(typeof body.token).toBe('string');
     expect(body.token.length).toBeGreaterThan(10);
+    expect((await verifyJWT(body.token, TEST_JWT_SECRET))?.tenantId).toBe('cafe-a');
+    expect(body.user.tenantId).toBe('cafe-a');
   });
 
   it('returns 500 on unexpected error without leaking internal message', async () => {
@@ -301,6 +304,7 @@ describe('staffTokenRefresh', () => {
     expect(body.token).toBeTruthy();
     expect(typeof body.token).toBe('string');
     expect(body.expires_in).toBe(3600);
+    expect((await verifyJWT(body.token, TEST_JWT_SECRET))?.tenantId).toBe('cafe-a');
   });
 
   it('returns 429 when device_token is currently locked out', async () => {

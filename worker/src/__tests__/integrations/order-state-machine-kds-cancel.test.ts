@@ -127,8 +127,9 @@ describe('Order State Machine KDS & Cancellation Contract', () => {
     );
 
     expect(res.status).toBe(200);
-    const cancelUpdate = executedStatements.find(s => s.sql.includes('UPDATE orders SET status = \'cancelled\''));
+    const cancelUpdate = executedStatements.find(s => s.sql.includes('UPDATE orders SET status = ?') && s.binds[0] === 'cancelled');
     expect(cancelUpdate).toBeDefined();
+    expect(cancelUpdate?.sql).toContain('AND status = ?');
   });
 
   it('rejects customer cancellation once order is confirmed/preparing with HTTP 403', async () => {
@@ -169,8 +170,9 @@ describe('Order State Machine KDS & Cancellation Contract', () => {
     );
 
     expect(res.status).toBe(200);
-    const cancelUpdate = executedStatements.find(s => s.sql.includes('UPDATE orders SET status = \'cancelled\''));
+    const cancelUpdate = executedStatements.find(s => s.sql.includes('UPDATE orders SET status = ?') && s.binds[0] === 'cancelled');
     expect(cancelUpdate).toBeDefined();
+    expect(cancelUpdate?.sql).toContain('AND status = ?');
   });
 
   it('rejects cancellation once order is served with HTTP 400 or 409', async () => {

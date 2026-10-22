@@ -11,6 +11,7 @@ import {
   OrderStatusEnum,
   PaymentStatusEnum,
   PaymentMethodEnum,
+  SupportedPaymentMethodEnum,
   ReferenceSchema,
 } from './common';
 
@@ -90,7 +91,7 @@ export const OrderCreateSchema = z.object({
   items: z.array(OrderItemInputSchema).min(1),
   channel: OrderChannelEnum.default('dine_in'),
   notes: z.string().max(1000).optional(),
-  paymentMethod: PaymentMethodEnum.optional(),
+  paymentMethod: SupportedPaymentMethodEnum.optional(),
   idempotencyKey: z.string().min(1).optional(),
   source: z.enum(['pos', 'mobile', 'kiosk', 'admin', 'api']).default('pos'),
 }).openapi('OrderCreate');

@@ -410,7 +410,7 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
           locationId: OWNER_ID,
           items: [{ menuItemId: OWNER_ID, quantity: 1 }],
           source: 'pos',
-          channel: 'dine_in',
+          channel: 'takeaway',
         }),
       }),
       env

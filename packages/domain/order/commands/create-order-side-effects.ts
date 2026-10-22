@@ -41,8 +41,7 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     await db.prepare(`
       INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
       VALUES (?, ?, ?, ?, 0, 0, 'bronze')
-      ON CONFLICT(email) DO UPDATE SET
-        name = excluded.name, phone = excluded.phone, updated_at = CURRENT_TIMESTAMP
+      ON CONFLICT(email) DO NOTHING
     `).bind(generateId('CUST_'), data.customer_email, data.customer_name, data.customer_phone).run();
     const linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(data.customer_email).first<{ id: string }>();
     if (linkedCust) customerIdForCapture = linkedCust.id;
@@ -70,13 +69,8 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     }
   }
 
-  if (!data.customer_id && customerIdForCapture) {
-    await db
-      .prepare('UPDATE orders SET customer_id = ? WHERE id = ?')
-      .bind(customerIdForCapture, orderId)
-      .run()
-      .catch(() => {});
-  }
+  // CRM attribution from public contact fields must never rewrite orders.customer_id.
+  // That column is an authorization owner, assigned only by the canonical ownership policy.
 
   if (customerIdForCapture && ctx?.waitUntil) {
     const captureCustId = customerIdForCapture;
@@ -112,16 +106,9 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_id: undefined, table_id: resolvedTableId,
         items: snapshot.items as unknown as Record<string, unknown>[],
-        total: snapshot.total, payment_method: validatedMethod, notes: data.notes
+        total: snapshot.total, payment_method: validatedMethod, notes: data.notes ?? undefined
       }
     )));
-  }
-
-  if (env.AUTH_KV) {
-    const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const nowIso = new Date().toISOString();
-    await kv.put('latest_order_ts', nowIso);
-    await kv.put('orders:latest_updated_at', nowIso).catch(() => {});
   }
 
   if (validatedMethod === 'cod') {

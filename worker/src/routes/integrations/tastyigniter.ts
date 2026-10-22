@@ -49,7 +49,7 @@ export function createTIRoutes() {
   app.post('/sync/menu', allow, async(c) => {
     try {
       const result = await syncTIToLocalMenu(c.env, c.executionCtx as unknown as ExecutionContext);
-      return c.json({ success: true, ...result });
+      return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ti_sync_menu_error', { error: (err as Error).message });
       return c.json({ success: false, error: 'Failed to sync TastyIgniter menu', mock: false }, 500);
@@ -111,7 +111,7 @@ export function createTIRoutes() {
       }
 
       const result = await processTIWebhook(c.env as Record<string, unknown>, body);
-      return c.json({ success: true, ...result });
+      return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ti_webhook_error', { error: (err as Error).message });
       return c.json({ success: false, error: 'Failed to process TastyIgniter webhook' }, 500);

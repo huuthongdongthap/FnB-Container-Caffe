@@ -760,7 +760,7 @@ GitHub Actions (expected in `.github/workflows/`):
 | **Mautic** | 🟢 Complete | One-way D1→Mautic sync via Workers cron. OAuth2 client credentials. Contact upsert, segment assignment (tier/recency/birthday month), campaign enrollment triggers (winback, birthday, promo). Channels: Resend email + SpeedSMS SMS + existing Zalo ZNS. 73 tests passing | Phase 04 done (2026-06-30). 10 new files. `campaign_enrollments` table added to schema |
 | **Home Assistant** | 🟡 Partial | HVAC/lighting control | Basic webhook triggers |
 | **Frigate** | 🟡 Partial | CCTV heatmap | AI detection not integrated |
-| **VNPay/MoMo/SePay** | ✅ Integrated | Payment processing via PayOS webhook | Production |
+| **PayOS + COD** | ✅ Supported | PayOS webhook settlement and staff-authorized COD collection | Production |
 | **Mixpost** | 🟢 Complete | CF Worker Bridge → Mixpost Docker (VPS:9000) → Facebook/Instagram. 4 API endpoints (posts, generate, accounts, list). 3 cron jobs (daily specials 07:00, new promos 08:00, weekly highlights Mon 09:00). Content templates for promotions + daily specials + best sellers. Bilingual setup guide. 33 tests passing | Phase 04 done (2026-07-01). 4 new files. No new DB tables (reads from products, promotions, categories). See `docs/mixpost-setup-guide.md` |
 | **SMTP** | ✅ Enhanced | Transactional emails via SendGrid (100/day). Marketing emails via Resend (3,000/mo). SMS via SpeedSMS (490 VND/SMS). Campaign-templated winback/birthday/promo | Order confirm, receipt, welcome, e-invoice PDF notice. 73 Mautic tests + 14 SendGrid tests |
 

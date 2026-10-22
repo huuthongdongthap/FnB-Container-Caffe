@@ -16,13 +16,16 @@ import {
 } from '@aura/domain-kitchen';
 import { handleGetKdsOrders } from '../../routes/orders-hono-handlers/kds-handlers';
 
-function makeMockKdsApp(initialOrders: Array<Record<string, unknown>> = []) {
+function makeMockKdsApp(initialOrders: Array<Record<string, unknown>> = [], tenantId = 'tenant-a') {
+  const orderQueries: Array<{ sql: string; binds: unknown[] }> = [];
   const db = {
     prepare: (sql: string) => {
+      const query = { sql, binds: [] as unknown[] };
       const stmt = {
-        bind: () => stmt,
+        bind: (...args: unknown[]) => { query.binds = args; return stmt; },
         all: async <T = unknown>() => {
           if (sql.includes('FROM orders')) {
+            orderQueries.push(query);
             return { results: initialOrders as unknown as T[] };
           }
           return { results: [] as unknown as T[] };
@@ -35,12 +38,13 @@ function makeMockKdsApp(initialOrders: Array<Record<string, unknown>> = []) {
   const app = new Hono<{ Bindings: any }>();
   app.use('*', async (c, next) => {
     c.set('user', { id: 'usr_staff', role: 'staff' });
+    c.set('tenantId', tenantId);
     await next();
   });
   app.get('/api/orders/kds', handleGetKdsOrders);
   app.get('/api/kds/orders', handleGetKdsOrders);
 
-  return { app, env: { AURA_DB: db } };
+  return { app, env: { AURA_DB: db }, orderQueries };
 }
 
 describe('Kitchen / KDS Routing & Snapshot Contract', () => {
@@ -113,5 +117,54 @@ describe('Kitchen / KDS Routing & Snapshot Contract', () => {
     expect(res2.status).toBe(200);
     const data2 = await res2.json() as any;
     expect(data2.data).toHaveLength(1);
+  });
+
+  it('includes every active status and scopes the query to the authenticated tenant', async () => {
+    const statuses = ['pending', 'confirmed', 'preparing', 'ready'];
+    const orders = statuses.map((status) => ({
+      id: `ORD_${status.toUpperCase()}`,
+      status,
+      items: JSON.stringify([{ name: 'Coffee', quantity: 1 }]),
+      created_at: new Date().toISOString(),
+      customer_name: 'Alice',
+    }));
+    const { app, env, orderQueries } = makeMockKdsApp(orders, 'tenant-cafe-a');
+
+    const response = await app.fetch(new Request('https://test.aura/api/kds/orders?status=preparing'), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Array<{ status: string }> };
+    expect(body.data.map((order) => order.status)).toEqual(statuses);
+    expect(orderQueries[0]?.sql).toContain("status IN ('pending', 'confirmed', 'preparing', 'ready')");
+    expect(orderQueries[0]?.sql).toContain('tenant_id = ?');
+    expect(orderQueries[0]?.binds).toEqual(['tenant-cafe-a']);
+  });
+
+  it('returns active PayOS and COD orders with their item snapshots', async () => {
+    const orders = [
+      {
+        id: 'ORD_PAYOS_PREPARING',
+        status: 'preparing',
+        payment_method: 'payos',
+        items: JSON.stringify([{ name: 'Latte', quantity: 2 }]),
+        created_at: new Date().toISOString(),
+        customer_name: 'Alice',
+      },
+      {
+        id: 'ORD_COD_READY',
+        status: 'ready',
+        payment_method: 'cod',
+        items: JSON.stringify([{ name: 'Mocha', quantity: 1 }]),
+        created_at: new Date().toISOString(),
+        customer_name: 'Bob',
+      },
+    ];
+    const { app, env, orderQueries } = makeMockKdsApp(orders, 'tenant-cafe-a');
+
+    const response = await app.fetch(new Request('https://test.aura/api/kds/orders'), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Array<{ id: string; items: Array<{ name: string }> }> };
+    expect(body.data.map(order => order.id)).toEqual(['ORD_PAYOS_PREPARING', 'ORD_COD_READY']);
+    expect(body.data.map(order => order.items[0]?.name)).toEqual(['Latte', 'Mocha']);
+    expect(orderQueries[0]?.binds).toEqual(['tenant-cafe-a']);
   });
 });

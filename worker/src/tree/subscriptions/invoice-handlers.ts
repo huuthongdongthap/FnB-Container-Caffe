@@ -37,7 +37,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
-  const invoiceId = c.req.param('id');
+  const invoiceId = c.req.param('id')!;
   const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const parsed = payInvoiceSchema.safeParse(rawBody);
   if (!parsed.success) {

@@ -21,12 +21,13 @@
 'use client';
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
+import { acknowledgeCheckoutOrder } from './checkout-intent';
 
 /* ---- Types --------------------------------------------------------- */
 
@@ -49,38 +50,21 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   const { currentOrder, loading, error, fetchOrder, subscribeToOrder, unsubscribeFromOrder } =
     useOrderStoreWithOfflineFlush();
 
-  const [pendingOrder, setPendingOrder] = useState<{
-    id?: string;
-    status?: string;
-    total?: number;
-    payment_method?: string;
-    points_earned?: number;
-    cashback_earned?: number;
-  } | null>(null);
+  useEffect(() => {
+    if (orderId && currentOrder?.id === orderId
+      && ['paid', 'completed', 'refunded', 'partially_refunded'].includes(currentOrder.paymentStatus)) {
+      acknowledgeCheckoutOrder(orderId);
+    }
+  }, [orderId, currentOrder?.id, currentOrder?.paymentStatus]);
 
-  // Load cached pending order from localStorage/sessionStorage and clean up state
+  // Remove legacy order caches; confirmation details always come from the order API.
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('pendingOrder') || sessionStorage.getItem('aura_last_order');
-      if (raw) {
-        sessionStorage.setItem('aura_last_order', raw);
-        const parsed = JSON.parse(raw) as Record<string, unknown>;
-        setPendingOrder({
-          id: String(parsed.id ?? ''),
-          status: String(parsed.status ?? ''),
-          total: Number(parsed.total ?? 0),
-          payment_method: String(parsed.payment_method ?? ''),
-          points_earned: Number(parsed.points_earned ?? 0) || undefined,
-          cashback_earned: Number(parsed.cashback_earned ?? 0) || undefined,
-        });
-      }
-    } catch {
-      /* ignore */
-    } finally {
       localStorage.removeItem('pendingOrder');
       localStorage.removeItem('aura_active_booking');
       localStorage.removeItem('aura_checkout_form');
-    }
+      sessionStorage.removeItem('aura_last_order');
+    } catch { /* storage unavailable */ }
     // Ensure cart is cleared after completed order checkout
     useCartStore.getState().clearCart();
   }, []);
@@ -129,6 +113,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   const { showToast } = useToast();
   const handleReorder = useCallback(() => {
     if (!currentOrder?.items?.length) return;
+    acknowledgeCheckoutOrder(currentOrder.id);
     clearCart();
     currentOrder.items.forEach((item) => {
       const rawItem = item as unknown as Record<string, unknown>;
@@ -146,39 +131,40 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     navigate('/menu');
   }, [currentOrder, clearCart, addItem, showToast, navigate]);
 
+  const orderForDisplay = currentOrder?.id === orderId && currentOrder.items.length > 0
+    ? currentOrder
+    : null;
+  const missingOrderItems = Boolean(
+    orderId && currentOrder?.id === orderId && currentOrder.items.length === 0 && !loading
+  );
+  const orderLoadError = error || (missingOrderItems
+    ? 'Không tải được chi tiết món trong đơn. Vui lòng thử lại.'
+    : null);
+
   // Map canonical CustomerOrder to the presentation view model.
   // Money is stored in cents server-side; convert once at this boundary.
   const orderSuccessData: OrderSuccessNewData | null = useMemo(() => {
-    if (currentOrder) {
+    if (orderForDisplay) {
       return {
-        orderId: currentOrder.orderNumber || currentOrder.id || '---',
-        items: currentOrder.items.map((item, index) => ({
-          id: `${currentOrder.id}-${index}`,
+        orderId: orderForDisplay.orderNumber || orderForDisplay.id || '---',
+        items: orderForDisplay.items.map((item, index) => ({
+          id: `${orderForDisplay.id}-${index}`,
           name: item.name,
           quantity: item.quantity,
           price: item.unitPriceCents,
         })),
-        total: currentOrder.totalAmount,
-        estimatedMinutes: 10,
+        total: orderForDisplay.totalAmount,
+        estimatedMinutes: orderForDisplay.estimatedMinutes,
+        status: orderForDisplay.status,
+        paymentStatus: orderForDisplay.paymentStatus,
+        paymentMethod: orderForDisplay.paymentMethod,
         locationName: 'AURA CAFE',
         customerName: '',
-        table: currentOrder.table?.name,
-      };
-    }
-    if (pendingOrder) {
-      return {
-        orderId: pendingOrder.id || '---',
-        items: [],
-        total: pendingOrder.total || 0,
-        estimatedMinutes: 10,
-        locationName: 'AURA CAFE',
-        customerName: '',
-        pointsEarned: pendingOrder.points_earned,
-        cashbackEarned: pendingOrder.cashback_earned,
+        table: orderForDisplay.table?.name,
       };
     }
     return null;
-  }, [currentOrder, pendingOrder]);
+  }, [orderForDisplay]);
 
   return (
     <>
@@ -188,8 +174,8 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
       />
       <StitchOrderSuccessNew
         order={orderSuccessData}
-        isLoading={loading && !currentOrder && !pendingOrder}
-        error={error && !currentOrder && !pendingOrder ? error : null}
+        isLoading={Boolean(orderId) && !orderSuccessData && !orderLoadError}
+        error={orderSuccessData ? null : orderLoadError}
         onBack={handleBack}
         onAccount={handleAccount}
         onTrackOrder={handleTrackOrder}

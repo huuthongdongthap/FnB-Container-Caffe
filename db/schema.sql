@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS cafe_tables (
     capacity     INTEGER NOT NULL,
     zone         TEXT NOT NULL,
     status       TEXT DEFAULT 'Available',
+    tenant_id    TEXT NOT NULL DEFAULT 'default',
     created_at   TEXT DEFAULT (datetime('now'))
 );
 
@@ -129,7 +130,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_phone TEXT NOT NULL,
     customer_email TEXT,
     customer_address TEXT,
-    payment_method TEXT NOT NULL,  -- cod, momo, vnpay, payos
+    payment_method TEXT NOT NULL,  -- new orders: cod, payos; legacy values remain readable
     payment_status TEXT DEFAULT 'unpaid',  -- unpaid, paid, refunded
     shipping_fee INTEGER DEFAULT 0,
     discount INTEGER DEFAULT 0,
@@ -150,6 +151,7 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_by TEXT,
     customer_id TEXT,
     tenant_id TEXT NOT NULL DEFAULT 'default',
+    cod_paid_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -160,6 +162,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_table   ON orders(table_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_phone ON orders(customer_phone);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
+
+CREATE TABLE IF NOT EXISTS order_creation_requests (
+    scope_key TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    order_id TEXT NOT NULL,
+    response_body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS order_items (
     id TEXT PRIMARY KEY,
@@ -178,11 +188,15 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE TABLE IF NOT EXISTS payments (
     id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
-    method TEXT NOT NULL,  -- cod, momo, vnpay, payos
+    method TEXT NOT NULL,  -- new payments: cod, payos; legacy values remain readable
     amount INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',  -- pending, completed, failed, refunded
     transaction_id TEXT,  -- External payment gateway transaction ID
     payment_url TEXT,  -- Payment redirect URL
+    refund_status TEXT,
+    refund_amount INTEGER DEFAULT 0,
+    refund_reason TEXT,
+    refunded_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE

@@ -43,7 +43,7 @@ export interface StitchCheckoutNewProps {
   onClearCart?: () => void;
 }
 
-export type PaymentMethod = 'payos' | 'cod' | 'apple_pay' | 'google_pay';
+export type PaymentMethod = 'payos' | 'cod';
 
 export interface PaymentOption {
   value: PaymentMethod;

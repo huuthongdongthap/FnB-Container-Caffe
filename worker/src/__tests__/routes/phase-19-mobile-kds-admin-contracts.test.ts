@@ -23,6 +23,10 @@ function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = 
           return stmt;
         },
         first: async <T = unknown>(): Promise<T | null> => {
+          if (sql.includes('FROM products WHERE id = ?')) {
+            const products: Record<string, object> = { tea: { id: 'tea', name: 'Trà sen vàng', price: 45000, available: 1 }, bread: { id: 'bread', name: 'Bánh sừng bò', price: 35000, available: 1 } };
+            return (products[String(stmt._binds[0])] || null) as T;
+          }
           if (sql.includes('FROM cafe_tables WHERE id = ?')) {
             const id = String(stmt._binds[0]);
             return (cafeTables.get(id) as T) ?? null;
@@ -49,6 +53,10 @@ function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = 
           return { results: [] as T[], success: true };
         },
         run: async () => {
+          if (sql.includes("UPDATE cafe_tables SET status = 'Occupied'")) {
+            const table = cafeTables.get(String(stmt._binds[0]));
+            if (table) table.status = 'Occupied';
+          }
           if (sql.includes('UPDATE cafe_tables SET status = ?')) {
             const status = stmt._binds[0];
             const id = stmt._binds[stmt._binds.length - 1];
@@ -77,6 +85,7 @@ function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = 
       };
       return stmt;
     },
+    batch: async (statements: { run(): Promise<unknown> }[]) => Promise.all(statements.map(statement => statement.run())),
     cafeTables,
     orders,
     erpnextLogs,
@@ -162,8 +171,8 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
             table_id: 'TBL_1',
             table_number: 1,
             items: [
-              { name: 'Trà sen vàng', quantity: 2, price: 45000 },
-              { name: 'Bánh sừng bò', qty: 1, price: 35000 },
+              { product_id: 'tea', name: 'Trà sen vàng', quantity: 2, price: 45000 },
+              { product_id: 'bread', name: 'Bánh sừng bò', qty: 1, price: 35000 },
             ],
           }),
         },

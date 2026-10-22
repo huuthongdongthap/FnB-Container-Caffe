@@ -33,7 +33,12 @@ export function mapSseEventToOrder(orderData: Record<string, unknown>): Customer
     taxAmount: toNumber(orderData.taxAmount),
     totalAmount: toNumber(orderData.totalAmount),
     status: (orderData.status as CustomerOrder['status']) ?? 'pending',
-    paymentStatus: (orderData.paymentStatus as CustomerOrder['paymentStatus']) ?? 'pending',
+    // A row written before the column gained its default can arrive null;
+    // 'unpaid' is what the column defaults to, whereas 'pending' would claim a
+    // payment attempt is in flight.
+    paymentStatus: (orderData.paymentStatus as CustomerOrder['paymentStatus']) ?? 'unpaid',
+    paymentMethod: firstOrDefault('paymentMethod', orderData, firstOrDefault('payment_method', orderData)) || undefined,
+    estimatedMinutes: typeof orderData.estimatedMinutes === 'number' ? orderData.estimatedMinutes : undefined,
     notes: typeof orderData.notes === 'string' ? orderData.notes : null,
     createdAt: firstOrDefault('createdAt', orderData, new Date().toISOString()),
     updatedAt: firstOrDefault('updatedAt', orderData, new Date().toISOString()),

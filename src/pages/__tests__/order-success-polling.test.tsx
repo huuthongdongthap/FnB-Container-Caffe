@@ -63,6 +63,7 @@ describe('OrderSuccessPage — polling behavior', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     resetStores();
   });
 
@@ -111,6 +112,19 @@ describe('OrderSuccessPage — polling behavior', () => {
     render(<OrderSuccessPage />);
     // Order ID renders — confirms page loaded correctly
     expect(screen.getByText(/ORD_1/)).toBeInTheDocument();
+  });
+
+  it('shows a retry error instead of a cached empty order when details fail to load', () => {
+    mockSearchParams.set('order_id', 'ORD_1');
+    localStorage.setItem('pendingOrder', JSON.stringify({ id: 'ORD_1', total: 50000 }));
+    vi.spyOn(useOrderStore.getState(), 'fetchOrder').mockImplementation(async () => {
+      useOrderStore.setState({ loading: false, error: 'Order details unavailable' });
+    });
+
+    render(<OrderSuccessPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Order details unavailable');
+    expect(screen.queryByText(/ORD_1/)).not.toBeInTheDocument();
   });
 
   it('cleans up polling interval on unmount', () => {

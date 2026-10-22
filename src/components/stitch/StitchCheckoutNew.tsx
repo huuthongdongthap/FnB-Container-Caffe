@@ -79,6 +79,9 @@ function getInitialCheckoutForm(): {
       } : {}),
       ...(savedForm ? savedForm : {}),
     };
+    if (merged.paymentMethod !== 'payos' && merged.paymentMethod !== 'cod') {
+      merged.paymentMethod = 'payos';
+    }
 
     if (booking) {
       const table = booking.tableNumber || '';

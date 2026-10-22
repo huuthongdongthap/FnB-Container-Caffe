@@ -10,7 +10,7 @@ import { claimGuestOrder } from '@aura/domain-customer';
 
 export async function handleClaimOrder(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
-  const id = c.req.param('id');
+  const id = c.req.param('id')!;
   const user = c.get('user');
 
   const result = await claimGuestOrder({

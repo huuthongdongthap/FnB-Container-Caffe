@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 
 export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
@@ -9,6 +10,8 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
 
   let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
+  const tenantId = getTenantId(c);
+  if (tenantId !== '*') { whereClause += ' AND tenant_id = ?'; params.push(tenantId); }
 
   if (locationId) {
     whereClause += ' AND location_id = ?';
@@ -27,7 +30,7 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
     db.prepare(`SELECT COUNT(*) as total FROM orders ${whereClause}`).bind(...params).first(),
     (async () => {
       try {
-        return await db.prepare(`SELECT SUM(total_amount) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first();
+        return await db.prepare(`SELECT SUM(COALESCE(total_amount, total)) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first();
       } catch {
         return await db.prepare(`SELECT SUM(total) as revenue FROM orders ${whereClause} AND status != 'cancelled'`).bind(...params).first();
       }

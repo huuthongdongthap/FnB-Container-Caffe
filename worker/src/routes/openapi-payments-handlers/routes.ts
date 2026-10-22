@@ -4,7 +4,6 @@ import type { Env } from '../../types/env';
 import { registerPaymentReadHandlers } from './read-handlers';
 import { registerPaymentMutationHandlers } from './mutation-handlers';
 import { registerPaymentWebhookHandlers } from './webhook-handlers';
-import { registerWebPaymentHandlers } from './web-payment-handlers';
 
 export const openApiPaymentsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -27,6 +26,5 @@ openApiPaymentsRouter.use('/api/payments/*', authMiddleware);
 registerPaymentReadHandlers(openApiPaymentsRouter);
 registerPaymentMutationHandlers(openApiPaymentsRouter);
 registerPaymentWebhookHandlers(openApiPaymentsRouter);
-registerWebPaymentHandlers(openApiPaymentsRouter);
 
 export default openApiPaymentsRouter;

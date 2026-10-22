@@ -77,11 +77,9 @@ export async function resolveServerOrderOwnership(
     return { customerId: actor.id, stage: 'member_loyalty', isGuest: false, resolvedVia: 'authenticated_user' };
   }
 
-  if (customerPhone && db) {
-    const existing = await findCustomerByIdentifier(db, customerPhone);
-    if (existing) {
-      return { customerId: existing, stage: 'customer_profile', isGuest: false, resolvedVia: 'deterministic_identifier' };
-    }
+  // A public phone number is CRM input, not proof of account ownership.
+  // Keep guest checkout payable without granting access to that phone owner's account.
+  if (customerPhone) {
     return { customerId: null, stage: 'customer_identifier', isGuest: true, resolvedVia: 'anonymous' };
   }
 

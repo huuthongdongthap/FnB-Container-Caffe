@@ -5,6 +5,8 @@
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { executeKdsStatusTransition } from './kds-status-transition';
+import { getTenantId } from 'worker/src/middleware/tenant';
+import { isTerminal } from '../../order/model/order-state-machine';
 import {
   buildIndexFromDbRows,
   filterItemsForStation,
@@ -16,6 +18,9 @@ export const stationTicketsRouter = new Hono<{ Bindings: Env }>();
 stationTicketsRouter.get('/:id/tickets', async (c) => {
   const db = c.env.AURA_DB;
   const stationId = c.req.param('id');
+  const tenantId = getTenantId(c);
+  const tenantClause = tenantId === '*' ? '' : ' AND o.tenant_id = ?';
+  const tenantBinds = tenantId === '*' ? [] : [tenantId];
   const station = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(stationId).first<{ id: string }>();
   if (!station) return c.json({ success: false, error: 'Station not found' }, 404);
 
@@ -25,8 +30,8 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
   const categoryIndex = buildIndexFromDbRows(mappings || []);
 
   const { results: activeOrders } = await db.prepare(
-    'SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?) ORDER BY o.created_at ASC'
-  ).bind('pending', 'confirmed', 'preparing', 'ready').all<Record<string, unknown>>();
+    `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+  ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>();
 
   const { results: assignedItems } = await db.prepare(
     'SELECT order_item_id FROM order_item_stations WHERE station_id = ?'
@@ -63,12 +68,17 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
 stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => {
   const db = c.env.AURA_DB;
   const orderId = c.req.param('orderId');
+  const tenantId = getTenantId(c);
+  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantBinds = tenantId === '*' ? [] : [tenantId];
+  const role = c.get('user')?.role;
   const itemId = c.req.param('itemId');
   const stationId = c.req.query('station_id');
   if (!stationId) return c.json({ success: false, error: 'station_id query param is required' }, 400);
 
-  const order = await db.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; status: string }>();
+  const order = await db.prepare(`SELECT id, status FROM orders WHERE id = ?${tenantClause}`).bind(orderId, ...tenantBinds).first<{ id: string; status: string }>();
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
+  if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
 
   const now = new Date().toISOString();
   const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
@@ -77,7 +87,8 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
   ).bind(compositeItemId, stationId, now).run();
 
   if (order.status === 'confirmed' || order.status === 'pending') {
-    await executeKdsStatusTransition(db, orderId, 'preparing', 'staff', { kv: c.env?.AUTH_KV });
+    const transition = await executeKdsStatusTransition(db, orderId, 'preparing', role, { tenantId, kv: c.env?.AUTH_KV });
+    if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 409) as any);
   }
 
   return c.json({
@@ -90,12 +101,17 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
 stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => {
   const db = c.env.AURA_DB;
   const orderId = c.req.param('orderId');
+  const tenantId = getTenantId(c);
+  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantBinds = tenantId === '*' ? [] : [tenantId];
+  const role = c.get('user')?.role;
   const itemId = c.req.param('itemId');
   const stationId = c.req.query('station_id');
   if (!stationId) return c.json({ success: false, error: 'station_id query param is required' }, 400);
 
-  const order = await db.prepare('SELECT id, status, items FROM orders WHERE id = ?').bind(orderId).first<{ id: string; status: string; items: string }>();
+  const order = await db.prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`).bind(orderId, ...tenantBinds).first<{ id: string; status: string; items: string }>();
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
+  if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
 
   const now = new Date().toISOString();
   const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
@@ -123,10 +139,10 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
   let finalStatus = order.status;
   if (allReady && (order.status === 'preparing' || order.status === 'confirmed')) {
     if (order.status === 'confirmed') {
-      const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', 'staff', { kv: c.env?.AUTH_KV });
+      const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', role, { tenantId, kv: c.env?.AUTH_KV });
       if (prepTrans.success) finalStatus = 'preparing';
     }
-    const trans = await executeKdsStatusTransition(db, orderId, 'ready', 'staff', { kv: c.env?.AUTH_KV });
+    const trans = await executeKdsStatusTransition(db, orderId, 'ready', role, { tenantId, kv: c.env?.AUTH_KV });
     if (trans.success) finalStatus = 'ready';
   }
 

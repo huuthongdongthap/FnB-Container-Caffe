@@ -11,7 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { Check, Sparkles, Wallet } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { OrderSuccessNewItem } from './StitchOrderSuccessNew-types';
-import { PROGRESS_PERCENT, STATUS_STEPS } from './StitchOrderSuccessNew-types';
+import { orderSuccessStatus } from './order-success-status';
+import { STATUS_STEPS } from './StitchOrderSuccessNew-types';
 import { glassPanelClasses } from './stitch-order-success-default';
 
 /* ─── Order Summary Glass Card ───────────────────────────────────────────── */
@@ -20,6 +21,9 @@ interface OrderSummaryCardProps {
   orderId: string;
   items: OrderSuccessNewItem[];
   total: number;
+  status?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
   formatFn: (amount: number) => string;
   pointsEarned?: number;
   cashbackEarned?: number;
@@ -30,10 +34,12 @@ export function OrderSummaryCard({
   items,
   total,
   formatFn,
+  status, paymentStatus, paymentMethod,
   pointsEarned,
   cashbackEarned,
 }: OrderSummaryCardProps) {
   const { t } = useTranslation();
+  const state = orderSuccessStatus(status, paymentStatus, paymentMethod);
 
   return (
     <div
@@ -58,6 +64,8 @@ export function OrderSummaryCard({
           {formatFn(total)}
         </span>
       </div>
+
+      <p data-testid="confirmation-payment-status" className="text-sm text-[var(--aura-chrome-soft)]">{state.paymentLabel}</p>
 
       {/* Items list */}
       <div
@@ -120,19 +128,19 @@ export function OrderSummaryCard({
       {/* Progress tracker (3 steps: Received -> Preparing -> Ready) */}
       <div className="flex flex-col gap-4 pt-2">
         {/* Progress track line */}
-        <div className="relative w-full h-[2px] bg-white/10">
+        <div className="relative w-full h-[2px] bg-white/10" role="progressbar" aria-label="Tiến độ đơn hàng" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>
           {/* Active progress fill */}
           <div
             className="absolute h-full bg-[var(--aura-chrome-bright)] transition-all duration-700"
-            style={{ width: `${PROGRESS_PERCENT}%` }}
+            style={{ width: `${state.progress}%` }}
           />
 
           {/* Step dots */}
           <div className="absolute top-1/2 left-0 -translate-y-1/2 flex justify-between w-full">
             {STATUS_STEPS.map((step, idx) => {
-              const isCompleted = idx === 0;
-              const isActive = idx === 1;
-              const isPending = idx === 2;
+              const isCompleted = idx <= state.activeStep;
+              const isActive = idx === state.activeStep && state.progress < 100;
+              const isPending = idx > state.activeStep;
 
               return (
                 <div

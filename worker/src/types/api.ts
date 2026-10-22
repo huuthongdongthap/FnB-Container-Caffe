@@ -66,6 +66,9 @@ tenantId?: string;
 tier?: string;
 iat?: number;
 exp?: number;
+nbf?: number;
+aud?: string;
+iss?: string;
 }
 
 /**

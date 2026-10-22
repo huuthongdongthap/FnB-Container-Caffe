@@ -211,7 +211,7 @@ openApiApp.doc('/api/json', {
     { name: 'Orders', description: 'Order processing and management' },
     { name: 'Tables', description: 'Table and zone management' },
     { name: 'Auth', description: 'Authentication and authorization' },
-    { name: 'Payments', description: 'Payment processing (PayOS, MoMo, ZaloPay)' },
+    { name: 'Payments', description: 'PayOS and cash-on-delivery payments, refunds, and payment status' },
     { name: 'Staff', description: 'Staff management and shifts' },
     { name: 'Inventory', description: 'Inventory and stock management' },
     { name: 'Loyalty', description: 'Customer loyalty program' },

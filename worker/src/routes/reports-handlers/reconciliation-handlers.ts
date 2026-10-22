@@ -156,9 +156,9 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
       const cashPay = cashPayMap.get(s.shift_date) || 0;
       const cashOut = cashOutMap.get(s.shift_date) || 0;
       const expected = s.opening_float + cashPay - cashOut;
-      const hasDenominations = s.denominations && s.denominations !== '{}';
+      const hasDenominations = Boolean(s.denominations && s.denominations !== '{}');
       const actual = hasDenominations ? s.actual_cash : null;
-      const variance = hasDenominations ? actual - expected : null;
+      const variance = hasDenominations && actual !== null ? actual - expected : null;
       const status = variance === null
         ? 'unreconciled'
         : variance === 0
@@ -183,8 +183,8 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
     // Compute totals
     const totalRevenue = payMethods.reduce((s, p) => s + p.total, 0);
     const totalCashExpected = reconciliationRows.reduce((s, r) => s + r.expected_cash, 0);
-    const totalCashActual = reconciliationRows.reduce((s, r) => s + (r.actual_cash || 0), 0);
-    const totalCashVariance = reconciliationRows.reduce((s, r) => s + (r.variance || 0), 0);
+    const totalCashActual = reconciliationRows.reduce((s, r) => s + (r.actual_cash ?? 0), 0);
+    const totalCashVariance = reconciliationRows.reduce((s, r) => s + (r.variance ?? 0), 0);
     const orderCount = payMethods.reduce((s, p) => s + p.count, 0);
 
     const report: DailyReconciliationReport = {

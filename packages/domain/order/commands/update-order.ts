@@ -6,8 +6,7 @@
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { parseJSON } from '../model/helpers';
-import { canTransition } from '../model/order-state-machine';
-import { canActorTransition, toActorRole } from '../policies/transition-authorization';
+import { transitionOrderStatus, changedRows } from '../policies/order-status-transition';
 import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
 
@@ -17,52 +16,44 @@ export async function updateOrder(
   request: Request,
   env: Record<string, unknown>,
   id: string,
-  actorRole?: string
+  actorRole?: string,
+  tenantId: string = 'default'
 ) {
   try {
     const body = await parseJSON(request);
+    if (body.payment_status !== undefined) {
+      return errorResponse('Payment status can only be changed by a verified PayOS webhook or authorized COD collection', 400);
+    }
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+
+    const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
 
     // Fetch full row — needed for DO broadcast payload below
     const { results } = await db.prepare(
-      'SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?'
-    ).bind(id).all<Record<string, unknown>>();
+      `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?${tenantClause}`
+    ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
 
     if (!results || results.length === 0) {
       return errorResponse('Order not found', 404);
     }
 
     if (body.status !== undefined) {
-      const currentStatus = results[0].status as string;
-      const structural = canTransition(currentStatus, body.status as string);
-      if (!structural.ok) return errorResponse(structural.error!, 400);
-
-      // Role-based authorization gate (Phase 03)
-      const role = toActorRole(actorRole);
-      const authCheck = canActorTransition(role, currentStatus, body.status as string);
-      if (!authCheck.ok) return errorResponse(authCheck.error!, 403);
+      const transition = await transitionOrderStatus(db, id, String(body.status), actorRole, {
+        tenantId,
+        currentOrder: results[0] as { id: string; status: string },
+        fields: { notes: body.notes, delivery_time: body.delivery_time },
+      });
+      if (!transition.success) return errorResponse(transition.error!, transition.statusCode || 400);
+      if (transition.idempotent) return jsonResponse({ success: true, idempotent: true });
+    } else {
+      const fields = ['notes', 'delivery_time'].filter(field => body[field] !== undefined);
+      if (!fields.length) return errorResponse('No valid fields to update', 400);
+      const result = await db.prepare(
+        `UPDATE orders SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?${tenantClause}`,
+      ).bind(...fields.map(field => body[field]), id, results[0].status, ...tenantBinds).run();
+      if (changedRows(result) < 1) return errorResponse('Order changed concurrently; refresh and retry', 409);
     }
-
-    const updatableFields = ['status', 'payment_status', 'notes', 'delivery_time'];
-    const updates: string[] = [];
-    const params: unknown[] = [];
-
-    for (const field of updatableFields) {
-      if (body[field] !== undefined) {
-        updates.push(`${field} = ?`);
-        params.push(body[field]);
-      }
-    }
-
-    updates.push('updated_at = CURRENT_TIMESTAMP');
-
-    if (updates.length === 1) {
-      return errorResponse('No valid fields to update', 400);
-    }
-
-    params.push(id);
-    const query = `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`;
-    await db.prepare(query).bind(...params).run();
 
     // Broadcast order status change via KV for SSE subscribers
     if (body.status !== undefined && env.AUTH_KV) {
@@ -126,20 +117,6 @@ export async function updateOrder(
         } catch (revErr) {
           log.error('Reverse cashback error (non-blocking):', { message: (revErr as Error).message });
         }
-      }
-    }
-
-    if (body.payment_status) {
-      try {
-        await db.prepare(`
-          UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE order_id = ?
-        `).bind(
-          body.payment_status === 'paid' ? 'completed' : body.payment_status,
-          id
-        ).run();
-      } catch {
-        // Non-blocking if legacy payments table is absent
       }
     }
 

@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { PaymentMethodEnum, SupportedPaymentMethodEnum } from '../../schemas/common';
 import {
   paymentMethodSchema,
   createOrderSchema,
@@ -58,6 +59,18 @@ describe('paymentMethodSchema', () => {
     expect(() => paymentMethodSchema.parse('')).toThrow();
     expect(() => paymentMethodSchema.parse('card')).toThrow();
     expect(() => paymentMethodSchema.parse('zalopay')).toThrow();
+    expect(() => paymentMethodSchema.parse('momo')).toThrow();
+    expect(() => paymentMethodSchema.parse('apple_pay')).toThrow();
+    expect(() => paymentMethodSchema.parse('google_pay')).toThrow();
+  });
+});
+
+describe('Payment method API schemas', () => {
+  it('accepts COD in stored payment responses while allowing only COD and PayOS for new writes', () => {
+    expect(PaymentMethodEnum.parse('cod')).toBe('cod');
+    expect(SupportedPaymentMethodEnum.parse('cod')).toBe('cod');
+    expect(SupportedPaymentMethodEnum.parse('payos')).toBe('payos');
+    expect(() => SupportedPaymentMethodEnum.parse('momo')).toThrow();
   });
 });
 
@@ -129,6 +142,9 @@ describe('createOrderSchema', () => {
 
   it('rejects invalid payment method', () => {
     expect(() => createOrderSchema.parse({ ...validOrder, payment_method: 'card' })).toThrow();
+    for (const payment_method of ['momo', 'apple_pay', 'google_pay']) {
+      expect(() => createOrderSchema.parse({ ...validOrder, payment_method })).toThrow();
+    }
   });
 
   it('accepts optional fields', () => {
@@ -540,7 +556,11 @@ describe('updateOrderStatusSchema', () => {
   });
 
   it('rejects unknown status values', () => {
-    expect(() => updateOrderStatusSchema.parse({ status: 'delivered' })).toThrow();
+    expect(() => updateOrderStatusSchema.parse({ status: 'unknown-status' })).toThrow();
+  });
+
+  it.each(['confirmed', 'delivered', 'completed', 'failed', 'expired'])('accepts canonical lifecycle status %s', status => {
+    expect(updateOrderStatusSchema.parse({ status }).status).toBe(status);
   });
 
   it('rejects missing status', () => {
@@ -554,6 +574,16 @@ describe('createOrderInputSchema', () => {
   it('accepts valid order input', () => {
     const data = createOrderInputSchema.parse({ items: validItems });
     expect(data.items).toHaveLength(1);
+    expect(data.payment_method).toBe('cod');
+  });
+
+  it('accepts only PayOS and COD payment methods', () => {
+    for (const payment_method of ['cod', 'payos']) {
+      expect(createOrderInputSchema.safeParse({ items: validItems, payment_method }).success).toBe(true);
+    }
+    for (const payment_method of ['cash', 'momo', 'apple_pay', 'google_pay']) {
+      expect(createOrderInputSchema.safeParse({ items: validItems, payment_method }).success).toBe(false);
+    }
   });
 
   it('accepts order input with optional fields', () => {

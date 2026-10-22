@@ -213,14 +213,19 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
       // Ignore lookup error
     }
 
+    // Resolve store from the account record even when the display profile came from KV.
+    const staffBinding = await c.env.AURA_DB.prepare('SELECT tenant_id FROM users WHERE id = ?')
+      .bind(device.staff_id).first<{ tenant_id?: string | null }>();
+    if (!staffBinding) return errorResponse('Tài khoản nhân viên không còn tồn tại', 403);
+    const tenantId = staffBinding.tenant_id || 'default';
     const token = await generateJWT(
-      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role },
+      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role, tenantId },
       c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
     );
 
     return jsonResponse({
       success: true,
-      user: { id: device.staff_id, email: staffEmail, name: staffName, role: device.role, device_id: device.id },
+      user: { id: device.staff_id, email: staffEmail, name: staffName, role: device.role, tenantId, device_id: device.id },
       token,
       expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
     });
@@ -281,8 +286,12 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
       // Ignore lookup error
     }
 
+    const staffBinding = await c.env.AURA_DB.prepare('SELECT tenant_id FROM users WHERE id = ?')
+      .bind(device.staff_id).first<{ tenant_id?: string | null }>();
+    if (!staffBinding) return errorResponse('Tài khoản nhân viên không còn tồn tại', 403);
+    const tenantId = staffBinding.tenant_id || 'default';
     const newToken = await generateJWT(
-      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role },
+      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role, tenantId },
       c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
     );
 

@@ -10,6 +10,7 @@
 import type * as THREE from 'three';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef } from 'react';
+import { orderSuccessStatus } from './order-success-status';
 
 /* ─── Three.js Ring Animation (matches original ANIMATION_64) ────────────── */
 
@@ -120,10 +121,15 @@ export function ThreeRingOverlay() {
 /* ─── Wait Time Display ──────────────────────────────────────────────────── */
 
 interface WaitTimeDisplayProps {
-  estimatedMinutes: number;
+  estimatedMinutes?: number;
+  status?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
 }
 
-export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
+export function WaitTimeDisplay({ estimatedMinutes, status, paymentStatus, paymentMethod }: WaitTimeDisplayProps) {
+  const state = orderSuccessStatus(status, paymentStatus, paymentMethod);
+  const showEstimate = Boolean(estimatedMinutes && estimatedMinutes > 0 && !state.voided && !state.awaitingPayment && state.progress < 100);
   const { t } = useTranslation();
   return (
     <div className="w-full relative aspect-square flex flex-col items-center justify-center overflow-hidden rounded-[40px]">
@@ -138,7 +144,7 @@ export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
 
       {/* Content */}
       <div className="relative z-10 text-center flex flex-col gap-1">
-        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-mid, #6B9FB8)]">
+        {showEstimate && <><span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-mid, #6B9FB8)]">
           {t('stitch.orderSuccessNewEstimatedWait', {
             defaultValue: 'ESTIMATED WAIT',
           })}
@@ -154,13 +160,12 @@ export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
           </span>
         </div>
 
+        </>}
         {/* Live status badge */}
         <div className="mt-2 px-4 py-1.5 rounded-full border border-[color-mix(in_oklab,var(--aura-chrome-bright)_30%,transparent)] bg-[color-mix(in_oklab,var(--aura-chrome-bright)_10%,transparent)] inline-flex items-center gap-2 self-center">
           <div className="w-2 h-2 rounded-full bg-[var(--aura-chrome-bright)] animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
-            {t('stitch.orderSuccessNewPreparingBrew', {
-              defaultValue: 'PREPARING YOUR BREW',
-            })}
+          <span data-testid="confirmation-status" className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
+            {state.label}
           </span>
         </div>
       </div>

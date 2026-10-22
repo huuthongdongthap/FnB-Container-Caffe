@@ -109,7 +109,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all();
 
-    const staff = rows.results.map(row => ({
+    const staff = rows.results.map((row: Record<string, unknown>) => ({
       ...row,
       role: row.role,
       locale: row.locale,

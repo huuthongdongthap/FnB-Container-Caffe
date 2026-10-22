@@ -1,6 +1,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
-import { publishOrderEvent } from '@aura/domain-order';
+import { getTenantId } from '../middleware/tenant';
+import { createOrderFromAlias } from '../../../packages/domain/order/commands/create-order-alias';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
@@ -48,11 +49,13 @@ export async function getOrdersMobile(
 
     const tableId = context.req.query('table_id');
 
-    let query = 'SELECT * FROM orders';
+    const tenantId = getTenantId(context);
+    let query = 'SELECT * FROM orders WHERE 1=1';
     const params: string[] = [];
+    if (tenantId !== '*') { query += ' AND tenant_id = ?'; params.push(tenantId); }
 
     if (tableId) {
-      query += ' WHERE table_id = ?';
+      query += ' AND table_id = ?';
       params.push(tableId);
     }
 
@@ -88,110 +91,21 @@ export async function createOrderMobile(
       return errorResponse('Không có quyền tạo đơn', 403);
     }
 
-    const body = await context.req.json<{
-      table_id: string;
-      table_number?: string | number;
-      customer_name?: string;
-      customer_phone?: string;
-      payment_method?: string;
-      notes?: string;
-      items: Array<{ name: string; qty?: number; quantity?: number; price?: number; note?: string }>;
-    }>();
-
-    if (!body.table_id) {
-      return errorResponse('Thiếu table_id', 400);
-    }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return errorResponse('Danh sách món trống', 400);
-    }
-
-    const id = `ORD_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const now = new Date().toISOString();
-    const normalizedItems = normalizeOrderItems(body.items);
-    const total = normalizedItems.reduce(
-      (sum, item) => sum + Number(item.qty ?? 1) * Number(item.price ?? 0),
-      0,
-    );
-    const itemsJson = JSON.stringify(normalizedItems);
-    const tableNumber = String(body.table_number ?? body.table_id);
-    const customerName = String(body.customer_name || `Bàn ${tableNumber}`);
-    const customerPhone = String(body.customer_phone || '0000000000');
-    const paymentMethod = String(body.payment_method || 'cash');
-
-    try {
-      await context.env.AURA_DB
-        .prepare(
-          `INSERT INTO orders (
-             id, order_number, table_id, table_number,
-             customer_name, customer_phone, items, total,
-             status, payment_method, payment_status, order_type,
-             notes, created_at, updated_at
-           )
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', 'dine_in', ?, ?, ?)`
-        )
-        .bind(
-          id,
-          id,
-          body.table_id,
-          tableNumber,
-          customerName,
-          customerPhone,
-          itemsJson,
-          total,
-          paymentMethod,
-          body.notes ?? null,
-          now,
-          now,
-        )
-        .run();
-    } catch (insertErr) {
-      const msg = String((insertErr as Error)?.message || '');
-      if (msg.includes('no such column') || msg.includes('has no column')) {
-        await context.env.AURA_DB
-          .prepare(
-            `INSERT INTO orders (
-               id, table_id, customer_name, customer_phone,
-               items, total, status, payment_method, payment_status,
-               order_type, notes, created_at, updated_at
-             )
-             VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 'unpaid', 'dine_in', ?, ?, ?)`
-          )
-          .bind(
-            id,
-            body.table_id,
-            customerName,
-            customerPhone,
-            itemsJson,
-            total,
-            paymentMethod,
-            body.notes ?? null,
-            now,
-            now,
-          )
-          .run();
-      } else {
-        throw insertErr;
-      }
-    }
-
-    try {
-      await context.env.AURA_DB
-        .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
-        .bind('Occupied', body.table_id)
-        .run();
-    } catch {
-      // Non-blocking if cafe_tables is not present in minimal test mock
-    }
-
-    if (context.env?.AUTH_KV) {
-      await Promise.all([
-        context.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
-        context.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
-        publishOrderEvent(context.env.AUTH_KV, id, 'pending').catch(() => {}),
-      ]);
-    }
-
-    return jsonResponse({ success: true, order_id: id, total }, 201);
+    const body = await context.req.json<Record<string, unknown>>();
+    if (!body.table_id) return errorResponse('Thiếu table_id', 400);
+    if (!Array.isArray(body.items) || body.items.length === 0) return errorResponse('Danh sách món trống', 400);
+    let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+    try { ctx = context.executionCtx; } catch { /* unit tests have no execution context */ }
+    const response = await createOrderFromAlias(context.req.raw, context.env, {
+      ...body,
+      customer_name: body.customer_name || `Bàn ${body.table_number || body.table_id}`,
+      customer_phone: body.customer_phone || '0000000000',
+      order_type: 'dine_in',
+      payment_method: String(body.payment_method || 'cod').toLowerCase(),
+    }, ctx, context.get('user'));
+    if (!response.ok) return response;
+    const result = await response.json() as { data: { id: string; total: number } };
+    return jsonResponse({ success: true, order_id: result.data.id, total: result.data.total }, response.status);
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('createOrderMobile error:', { message: errMsg });
@@ -214,9 +128,10 @@ export async function getOrderDetail(
       return errorResponse('Thiếu order id', 400);
     }
 
+    const tenantId = getTenantId(context);
     const row = await context.env.AURA_DB
-      .prepare('SELECT * FROM orders WHERE id = ?')
-      .bind(orderId)
+      .prepare(`SELECT * FROM orders WHERE id = ?${tenantId === '*' ? '' : ' AND tenant_id = ?'}`)
+      .bind(...(tenantId === '*' ? [orderId] : [orderId, tenantId]))
       .first();
 
     if (!row) {

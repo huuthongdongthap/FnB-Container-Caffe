@@ -3,6 +3,7 @@ import { createLogger } from 'worker/src/middleware/logger';
 import type { Env } from 'worker/src/types/env';
 import type { Context } from 'hono';
 import { executeKdsStatusTransition } from './kds-status-transition';
+import { getTenantId } from 'worker/src/middleware/tenant';
 
 const log = createLogger({ route: 'kds-mobile' });
 
@@ -35,6 +36,9 @@ export async function getKdsMobile(
       return errorResponse('Không có quyền', 403);
     }
 
+    const tenantId = getTenantId(context);
+    const tenantClause = tenantId === '*' ? '' : ' AND o.tenant_id = ?';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     let orders: { results: unknown[] };
     try {
       orders = await context.env.AURA_DB
@@ -43,10 +47,10 @@ export async function getKdsMobile(
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
-           WHERE o.status IN ('pending','confirmed','preparing','ready')
+           WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
            ORDER BY o.created_at ASC`
         )
-        .all();
+        .bind(...tenantBinds).all();
     } catch {
       orders = await context.env.AURA_DB
         .prepare(
@@ -54,10 +58,10 @@ export async function getKdsMobile(
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON t.id = o.table_id
-           WHERE o.status IN ('pending','confirmed','preparing','ready')
+           WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
            ORDER BY o.created_at ASC`
         )
-        .all();
+        .bind(...tenantBinds).all();
     }
 
     const rows = orders.results as Array<Record<string, unknown>>;
@@ -115,16 +119,13 @@ export async function updateKdsStatus(
       // Context without Cloudflare executionCtx (e.g. test harness)
     }
 
-    const effectiveRole = body.status === 'served' && ['kitchen', 'barista', 'chef'].includes(role)
-      ? 'staff'
-      : role;
-
     const result = await executeKdsStatusTransition(
       context.env.AURA_DB,
       orderId,
       body.status,
-      effectiveRole,
+      role,
       {
+        tenantId: getTenantId(context),
         kv: context.env.AUTH_KV,
         waitUntil: waitUntilFn,
       }

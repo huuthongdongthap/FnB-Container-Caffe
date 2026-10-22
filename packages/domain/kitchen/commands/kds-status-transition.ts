@@ -3,30 +3,13 @@
  * Single server-authoritative status transition executor for all KDS channels.
  */
 
-import { canTransition, isTerminal, canActorTransition, toActorRole } from '@aura/domain-order';
+import { transitionOrderStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
 
-export interface TransitionKdsResult {
-  success: boolean;
-  error?: string;
-  statusCode?: number;
-  idempotent?: boolean;
-  order?: {
-    id: string;
-    status: string;
-    previous_status: string;
-  };
-}
-
-export interface KdsTransitionDb {
-  prepare(sql: string): {
-    bind(...args: unknown[]): {
-      first<T = unknown>(): Promise<T | null>;
-      run(): Promise<unknown>;
-    };
-  };
-}
+export type TransitionKdsResult = OrderStatusResult;
+export type KdsTransitionDb = OrderStatusDb;
 
 export interface KdsTransitionOptions {
+  tenantId?: string;
   kv?: { put(key: string, val: string, opts?: { expirationTtl?: number }): Promise<void> } | null;
   waitUntil?: (promise: Promise<unknown>) => void;
   env?: Record<string, unknown>;
@@ -48,60 +31,16 @@ export async function executeKdsStatusTransition(
   userRole?: string,
   options?: KdsTransitionOptions,
 ): Promise<TransitionKdsResult> {
-  const order = await db
-    .prepare('SELECT id, status FROM orders WHERE id = ?')
-    .bind(orderId)
-    .first<{ id: string; status: string }>();
-
-  if (!order) {
-    return { success: false, error: 'Order not found', statusCode: 404 };
-  }
-
-  // Idempotent duplicate event
-  if (order.status === targetStatus) {
-    return {
-      success: true,
-      idempotent: true,
-      order: { id: order.id, status: targetStatus, previous_status: order.status },
-    };
-  }
-
-  // Terminal state immutability
-  if (isTerminal(order.status)) {
-    return {
-      success: false,
-      error: `Cannot transition terminal order (${order.status})`,
-      statusCode: 400,
-    };
-  }
-
-  // Structural transition validation
-  const structural = canTransition(order.status, targetStatus);
-  const isKdsDirectStart = order.status === 'pending' && targetStatus === 'preparing';
-  if (!structural.ok && !isKdsDirectStart) {
-    return { success: false, error: structural.error, statusCode: 400 };
-  }
-
-  // Role authorization validation
-  const role = toActorRole(userRole || 'staff');
-  const authCheck = isKdsDirectStart
-    ? canActorTransition(role, 'confirmed', 'preparing')
-    : canActorTransition(role, order.status, targetStatus);
-  if (!authCheck.ok) {
-    return { success: false, error: authCheck.error, statusCode: 403 };
-  }
-
+  const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, { tenantId: options?.tenantId });
+  if (!result.success || result.idempotent) return result;
+  const order = result.order!;
   const now = new Date().toISOString();
-  await db
-    .prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
-    .bind(targetStatus, now, orderId)
-    .run();
 
   if (options?.kv) {
     const eventPayload = JSON.stringify({
       orderId,
       status: targetStatus,
-      previous_status: order.status,
+      previous_status: order.previous_status,
       timestamp: now,
     });
     const putPromise = Promise.all([
@@ -124,18 +63,29 @@ export async function executeKdsStatusTransition(
           get?: (id: unknown) => { fetch: (req: Request) => Promise<unknown> };
         } | undefined;
         if (broadcaster?.idFromName && broadcaster?.get) {
-          const doId = broadcaster.idFromName('global');
+          const tenantId = options?.tenantId ?? 'default';
+          const row = await db.prepare(`SELECT id, items, total, payment_status, customer_name, customer_phone, table_id, created_at
+            FROM orders WHERE id = ?${tenantId === '*' ? '' : ' AND tenant_id = ?'}`)
+            .bind(orderId, ...(tenantId === '*' ? [] : [tenantId])).first<{
+              items: string | unknown[]; total: number; payment_status: string;
+              customer_name: string; customer_phone: string; table_id?: string | null; created_at: string;
+            }>();
+          if (!row) return;
+          const items = Array.isArray(row.items) ? row.items : JSON.parse(row.items);
+          if (!Array.isArray(items)) return;
+          const createdAt = Date.parse(row.created_at.includes('T') ? row.created_at : `${row.created_at.replace(' ', 'T')}Z`);
+          const doId = broadcaster.idFromName(orderId);
           const stub = broadcaster.get(doId);
           await stub.fetch(
             new Request('https://do/broadcast', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                type: 'order_status_updated',
-                order_id: orderId,
+                orderId,
                 status: targetStatus,
-                previous_status: order.status,
-                updated_at: now,
+                payment_status: row.payment_status,
+                items, total: row.total, customer_name: row.customer_name, customer_phone: row.customer_phone,
+                table_id: row.table_id, createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(), updatedAt: Date.now(),
               }),
             })
           );
@@ -154,6 +104,6 @@ export async function executeKdsStatusTransition(
 
   return {
     success: true,
-    order: { id: order.id, status: targetStatus, previous_status: order.status },
+    order: { id: order.id, status: targetStatus, previous_status: order.previous_status },
   };
 }

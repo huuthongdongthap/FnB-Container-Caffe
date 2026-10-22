@@ -47,7 +47,7 @@ Tài liệu này chi tiết hóa 12 pillars (trụ cột) công nghệ nguồn m
 **Vai trò:** AI Object Detection (người/xe), phân tích mật độ khách hàng (Heatmap). Lưu trữ local, tích hợp Home Assistant, bảo mật tuyệt đối, không tốn phí cloud.
 
 ## 12. 💰 Payment Gateways (Cổng thanh toán VN)
-**Công cụ:** VNPay/MoMo SDKs, SePay (VietQR)
+**Thanh toán đang hỗ trợ:** PayOS (VietQR) và COD
 **Vai trò:** Tích hợp trực tiếp thanh toán QR Code tĩnh/động cho mọi điểm chạm: Odoo POS, TastyIgniter, pretix. Đáp ứng tiêu chuẩn Open Banking 2025 tại Việt Nam.
 
 ---

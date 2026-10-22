@@ -59,6 +59,7 @@ export async function calculateOrderSnapshot(
     let categoryId = (rawItem.category_id || rawItem.categoryId || null) as string | null;
     let resolvedItemId = itemId;
 
+    if (db && !itemId) return reject('item_not_found', 'A catalog product ID is required for every item');
     if (db && itemId) {
       const resolved = await resolveServerProductPrice(db, {
         productId: itemId,

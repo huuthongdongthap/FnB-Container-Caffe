@@ -46,3 +46,37 @@ function extractResourceId(c: { req: { method: string; path: string; param: (key
   }
   return undefined;
 }
+
+/**
+ * Records a privileged tenant override.
+ *
+ * Cross-tenant reads are a privilege-escalation path for HQ super-admins, so
+ * every activation must leave a durable trail with from/to/by for SIEM review.
+ * Fire-and-forget: an audit write failure must never block the request it describes.
+ */
+export function writeTenantOverrideAudit(
+  c: { env?: Env; req?: { method?: string; path?: string; header?: (name: string) => string | undefined } },
+  user: { id?: string; name?: string; email?: string; role?: string; tenantId?: string } | undefined,
+  from: string | undefined,
+  to: string
+): void {
+  if (!c.env?.AURA_DB) return;
+  writeCanonicalAuditLog(c.env.AURA_DB, {
+    actor: {
+      id: user?.id || 'unknown',
+      name: user?.name || user?.email || 'unknown',
+      role: user?.role,
+      tenantId: from,
+    },
+    action: 'tenant_override',
+    resourceType: 'tenant',
+    resourceId: to,
+    metadata: {
+      method: c.req?.method,
+      path: c.req?.path,
+      tenant_from: from ?? null,
+      tenant_to: to,
+    },
+    ipAddress: c.req?.header?.('cf-connecting-ip') || null,
+  }, { policy: 'best_effort' }).catch(() => {});
+}

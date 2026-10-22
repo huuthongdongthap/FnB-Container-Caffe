@@ -60,7 +60,8 @@ export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Respons
    const tiers = (results ?? []).map(mapRow);
    return c.json({ ok: true, data: tiers, lang });
  } catch (err) {
-   log.error('pricing DB error', { cause: err.cause, name: err.name, message: err.message });
+   const e = err as { cause?: unknown; name?: string; message?: string };
+   log.error('pricing DB error', { cause: e.cause, name: e.name, message: e.message });
    return c.json({ ok: false, error: 'Failed to load pricing' }, 500);
  }
 }

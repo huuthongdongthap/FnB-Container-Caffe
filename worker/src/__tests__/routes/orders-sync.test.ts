@@ -1,37 +1,18 @@
+// @vitest-environment node
 /**
  * Unit tests for POST /api/orders/sync (Offline Order Sync & Idempotency)
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { ordersCoreRouter } from '../../routes/orders-core';
-import { createMockEnv, createMockDB, createMockKV } from '../test-utils';
+import { createMockEnv, createMockKV } from '../test-utils';
+import { orderCreationFixture } from '../integrations/order-creation-fixture';
+const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
+afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
 
 function syncMockDB() {
-  const db = createMockDB();
-  db.prepare = ((sql: string) => {
-    const stmt: Record<string, unknown> = {
-      _sql: sql,
-      _binds: [] as unknown[],
-      bind(...args: unknown[]) {
-        this._binds = args;
-        return this;
-      },
-      first: async () => {
-        if (sql.includes('FROM cafe_tables WHERE table_number')) {
-          return { id: 'TBL_001' };
-        }
-        if (sql.toLowerCase().includes('from orders where id')) {
-          return null;
-        }
-        return null;
-      },
-      all: async () => ({ results: [], success: true }),
-      run: async () => ({ success: true, changes: 1, lastRowId: 1 }),
-      raw: async () => []
-    };
-    return stmt as any;
-  }) as any;
-  return db;
+  const fixture = orderCreationFixture(); fixtures.push(fixture);
+  return fixture.env.AURA_DB;
 }
 
 describe('POST /sync (Offline Orders Sync)', () => {
@@ -44,7 +25,7 @@ describe('POST /sync (Offline Orders Sync)', () => {
       body: JSON.stringify({
         localId: 'local_test_123',
         orderData: {
-          items: [{ name: 'Ca Phe Muoi', qty: 1, price: 30000 }],
+          items: [{ product_id: 'coffee', name: 'Ca Phe Muoi', qty: 1, price: 30000 }],
           total: 30000,
           customer_name: 'Le Van B',
           customer_phone: '0909123456',
@@ -72,13 +53,13 @@ describe('POST /sync (Offline Orders Sync)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         localId: 'local_flat_456',
-        items: [{ name: 'Bac Xiu', qty: 2, price: 35000 }],
+        items: [{ product_id: 'coffee', name: 'Bac Xiu', qty: 2, price: 35000 }],
         total: 70000,
         customer_name: 'Tran Thi C',
         customer_phone: '0988776655',
         payment_method: 'cod',
         order_type: 'dine_in',
-        table_id: '1',
+        table_id: 'D1',
       }),
     });
 
@@ -95,7 +76,7 @@ describe('POST /sync (Offline Orders Sync)', () => {
     const reqPayload = {
       localId: 'local_idem_789',
       orderData: {
-        items: [{ name: 'Tra Dao', qty: 1, price: 28000 }],
+        items: [{ product_id: 'coffee', name: 'Tra Dao', qty: 1, price: 28000 }],
         total: 28000,
         customer_name: 'Vo Van D',
         customer_phone: '0911223344',
@@ -123,7 +104,7 @@ describe('POST /sync (Offline Orders Sync)', () => {
     expect(res2.status).toBe(200);
     expect(res2.headers.get('X-Cache')).toBe('HIT');
     const data2 = await res2.json() as Record<string, unknown>;
-    expect(data2.cached).toBe(true);
+    expect(data2.success).toBe(true);
     expect(data2.localId).toBe('local_idem_789');
   });
 

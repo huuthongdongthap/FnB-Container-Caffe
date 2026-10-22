@@ -1,216 +1,141 @@
-/**
- * Orders — Create order handler
- * Canonical Order Write Handler
- */
-
+/** Canonical order writer: signed scope, server prices and atomic persistence. */
+import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/workers-types';
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
 import { generateId, parseJSON } from '../model/helpers';
-import { calculateOrderSnapshot } from '../policies/order-snapshot';
+import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
+import { resolveOrderCreationScope, resolveOrderCreationTable, orderCreationIdempotency, OrderCreationError, type OrderCreationActor } from '../policies/order-creation-scope';
 import { runPostOrderSideEffects } from './create-order-side-effects';
-import { verifyJWT, getAuthToken } from 'worker/src/lib/jwt';
+import { publishOrderEvent } from '../policies/customer-order-payload';
 import { resolveServerOrderOwnership } from '../../customer/policies/order-ownership-policy';
 
 const log = createLogger({ route: 'orders' });
+interface SavedCreation { fingerprint: string; response_body: string }
+const replayResponse = (row: SavedCreation, fingerprint: string) => row.fingerprint !== fingerprint
+  ? errorResponse('Idempotency-Key reused with different order data', 409)
+  : new Response(row.response_body, { status: 200, headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' } });
 
-export async function createOrder(request: Request, env: Record<string, unknown>, ctx?: { waitUntil?: (p: Promise<unknown>) => void }) {
-  // ── Idempotency check (Idempotency-Key header → KV cache) ──────
-  const idemKey = request.headers.get('Idempotency-Key');
-  if (idemKey && env.AUTH_KV) {
-    const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const cached = await kv.get(`order:idempotency:${idemKey}`, 'json');
-    if (cached) return new Response(JSON.stringify(cached), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' } });
-  }
-
+export async function createOrder(
+  request: Request, env: Record<string, unknown>,
+  ctx?: { waitUntil?: (p: Promise<unknown>) => void }, trustedActor?: OrderCreationActor,
+) {
   try {
-    const body = await parseJSON(request);
-    const parsed = createOrderSchema.safeParse(body);
+    const parsed = createOrderSchema.safeParse(await parseJSON(request));
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       return errorResponse(`${first.path.join('.')}: ${first.message}`, 400);
     }
     const data = parsed.data;
     const validatedMethod = paymentMethodSchema.parse(data.payment_method);
-
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const { actor, tenantId } = await resolveOrderCreationScope(request, env, trustedActor);
+    const idemKey = request.headers.get('Idempotency-Key');
+    const scopedData = { ...data };
+    delete scopedData.tenant_id;
+    const idem = idemKey ? await orderCreationIdempotency(tenantId, actor?.id, idemKey, scopedData) : null;
+    const db = env.AURA_DB as D1Database;
+    const findReplay = () => db.prepare('SELECT fingerprint, response_body FROM order_creation_requests WHERE scope_key = ?')
+      .bind(idem!.key).first<SavedCreation>();
+    // D1 is authoritative; KV eviction or outage must never duplicate an accepted offline order.
+    if (idem) {
+      const saved = await findReplay();
+      if (saved) return replayResponse(saved, idem.fingerprint);
+    }
     const orderId = generateId('ORD_');
-
-    // ── Server-authoritative price snapshot ──────────────
-    const snapshot = await calculateOrderSnapshot(db, {
-      items: data.items,
-      order_type: data.order_type || 'dine_in',
-      shipping_fee: data.shipping_fee,
-      discount: data.discount,
-      service_fee: data.service_fee,
-      tip_amount: data.tip_amount,
+    const orderType = data.order_type || (data.table_id ? 'dine_in' : 'takeaway');
+    const snapshot = await calculateCheckoutSnapshot(db, {
+      items: data.items, order_type: orderType, shipping_fee: data.shipping_fee,
+      discount: data.discount, service_fee: data.service_fee, tip_amount: data.tip_amount,
     });
-    if (snapshot.rejected) {
-      return errorResponse(snapshot.rejected.message, 400);
-    }
-    const itemsJson = snapshot.itemsJson;
-
-    let resolvedTableId: string | null = null;
-    if (data.table_id) {
-      const tableNum = data.table_id.trim();
-      let tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ?').bind(tableNum).first<{ id: string }>();
-      if (!tableRow && tableNum !== tableNum.toUpperCase()) {
-        tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ?').bind(tableNum.toUpperCase()).first<{ id: string }>();
-      }
-      if (!tableRow) {
-        tableRow = await db.prepare('SELECT id FROM cafe_tables WHERE id = ?').bind(tableNum).first<{ id: string }>();
-      }
-      if (tableRow) {
-        resolvedTableId = tableRow.id;
-        await db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND status = 'Available'").bind(tableRow.id).run();
-      }
-    }
-
-    if (data.order_type === 'dine_in' && !resolvedTableId) {
+    if (snapshot.rejected) return errorResponse(snapshot.rejected.message, 400);
+    const resolvedTableId = await resolveOrderCreationTable(db, data.table_id, tenantId);
+    if (orderType === 'dine_in' && !resolvedTableId) {
       return errorResponse('dine_in orders require a valid table_id (table_number from QR)', 400);
     }
-
-    const now = new Date().toISOString();
-
-    // ── Server-authoritative Customer Ownership Resolution ────────
-    let actor: { id?: string; role?: string } | null = null;
-    const token = getAuthToken(request);
-    if (token && env.JWT_SECRET) {
-      try {
-        const payload = await verifyJWT(token, env.JWT_SECRET as string);
-        if (payload) actor = { id: payload.id || (payload as any).sub, role: payload.role };
-      } catch { /* guest */ }
-    }
     const ownership = await resolveServerOrderOwnership({
-      actor,
-      clientSuppliedCustomerId: data.customer_id || null,
-      customerPhone: data.customer_phone || null,
-      db: db as any,
+      actor, clientSuppliedCustomerId: data.customer_id || null, customerPhone: data.customer_phone || null, db,
     });
     const resolvedCustomerId = ownership.customerId;
-
-    // ── Canonical D1 orders persistence ──────────────────────────
-    try {
-      await db.prepare(`
-        INSERT INTO orders (
-          id, items, total, status, customer_name, customer_phone,
-          customer_email, customer_address, payment_method, payment_status,
-          shipping_fee, discount, notes, delivery_time, table_id,
-          order_type, tip_amount, service_fee, customer_id, tenant_id,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        orderId, itemsJson,
-        snapshot.total, 'pending',
-        data.customer_name, data.customer_phone,
-        data.customer_email || null, data.customer_address || null,
-        validatedMethod, 'unpaid',
-        snapshot.shipping_fee,
-        snapshot.discount,
-        data.notes || null, data.delivery_time || 'now',
-        resolvedTableId,
-        data.order_type || 'dine_in',
-        snapshot.tip_amount,
-        snapshot.service_fee,
-        resolvedCustomerId,
-        data.tenant_id || 'default',
-        now, now
-      ).run();
-    } catch {
-      await db.prepare(`
-        INSERT INTO orders (
-          id, items, total, status, customer_name, customer_phone,
-          customer_email, customer_address, payment_method, payment_status,
-          shipping_fee, discount, notes, delivery_time, table_id,
-          order_type, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        orderId, itemsJson,
-        snapshot.total, 'pending',
-        data.customer_name, data.customer_phone,
-        data.customer_email || null, data.customer_address || null,
-        validatedMethod, 'unpaid',
-        snapshot.shipping_fee,
-        snapshot.discount,
-        data.notes || null, data.delivery_time || 'now',
-        resolvedTableId,
-        data.order_type || 'dine_in',
-        now, now
-      ).run();
-    }
-
-    // ── DO Broadcast (after validation & D1 insert) ──────────────
-    if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
-      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
-      const stub = ns.get(ns.idFromName(orderId));
-      (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
-        orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
-        customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
-        createdAt: Date.now(), updatedAt: Date.now(),
-      }).catch(e => {
-        if (env.AUTH_KV) {
-          (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace).put(
-            `broadcast:fail:${orderId}`,
-            JSON.stringify({ orderId, error: 'DO_BROADCAST_FAILED', message: (e as Error).message, ts: new Date().toISOString() }),
-            { expirationTtl: 86400 }
-          ).catch(() => {});
-        }
-      });
-    }
-
-    // ── Canonical D1 order_items persistence (7 columns) ─────────
-    for (const item of snapshot.items) {
-      const lineItemId = generateId('ITEM_');
-      await db.prepare(`
-        INSERT INTO order_items (
-          id, order_id, product_id, quantity, subtotal, modifiers, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        lineItemId,
-        orderId,
-        item.menuItemId,
-        item.quantity,
-        item.subtotalCents,
-        JSON.stringify(item.modifiers || []),
-        now
-      ).run();
-    }
-
-    // ── Canonical payments record (COD / non-PayOS) ─────────────
-    if (validatedMethod !== 'payos') {
-      const paymentId = generateId('PAY_');
-      await db.prepare(`
-        INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind(paymentId, orderId, validatedMethod, snapshot.total, 'pending', now, now).run();
-    }
-
-    // ── Post-order side effects (non-blocking) ───────────────────
-    await runPostOrderSideEffects({
-      db, env, ctx, orderId, data, snapshot, validatedMethod, resolvedTableId
-    });
-
-    // ── Cache idempotency response ──────────────────────────────
-    const idemBody = {
+    const now = new Date().toISOString();
+    const responseBody = {
       success: true, data: {
-        id: orderId, status: 'pending', payment_status: 'unpaid',
-        items: snapshot.items, total: snapshot.total,
+        id: orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
-        shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
-        notes: data.notes || null, delivery_time: data.delivery_time || 'now',
-        table_id: resolvedTableId, order_type: data.order_type || 'dine_in',
-        created_at: now
+        shipping_fee: snapshot.shipping_fee, discount: snapshot.discount, notes: data.notes || null,
+        delivery_time: data.delivery_time || 'now', table_id: resolvedTableId, order_type: orderType, created_at: now,
       },
-      message: 'Order created successfully'
+      message: 'Order created successfully',
     };
-    if (idemKey && env.AUTH_KV) {
-      const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-      await kv.put(`order:idempotency:${idemKey}`, JSON.stringify(idemBody), { expirationTtl: 86400 });
+    const statements: D1PreparedStatement[] = [];
+    if (idem) {
+      statements.push(db.prepare(`INSERT INTO order_creation_requests
+        (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)`)
+        .bind(idem.key, idem.fingerprint, orderId, JSON.stringify(responseBody), now));
     }
-    return jsonResponse(idemBody, 201);
+    statements.push(db.prepare(`INSERT INTO orders (
+      id, items, total, status, customer_name, customer_phone,
+      customer_email, customer_address, payment_method, payment_status,
+      shipping_fee, discount, notes, delivery_time, table_id,
+      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+        data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+        snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+        orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now));
+    for (const item of snapshot.items) {
+      statements.push(db.prepare(`INSERT INTO order_items
+        (id, order_id, product_id, quantity, subtotal, modifiers, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .bind(generateId('ITEM_'), orderId, item.menuItemId, item.quantity, item.subtotalCents,
+          JSON.stringify(item.modifiers || []), now));
+    }
+    if (validatedMethod === 'cod') {
+      statements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .bind(generateId('PAY_'), orderId, 'cod', snapshot.total, 'pending', now, now));
+    }
+    if (resolvedTableId) {
+      statements.push(db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND tenant_id = ? AND status = 'Available'")
+        .bind(resolvedTableId, tenantId));
+    }
+    try { await db.batch(statements); }
+    catch (error) {
+      // A concurrent same-key request either committed the entire order or nothing.
+      const saved = idem ? await findReplay() : null;
+      if (saved) return replayResponse(saved, idem!.fingerprint);
+      throw error;
+    }
+    await publishOrderEvent(env.AUTH_KV as KVNamespace | undefined, orderId, 'pending');
+    // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
+    try {
+      if (env.ORDER_BROADCASTER) {
+        const ns = env.ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
+        const stub = ns.get(ns.idFromName(orderId));
+        const event = {
+          orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+          customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        const broadcast = stub.fetch('https://do/broadcast', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event),
+        }).then(result => { if (!result.ok) throw new Error(`Broadcast returned ${result.status}`); })
+          .catch(error => log.warn('Order broadcast failed after commit', { orderId, message: (error as Error).message }));
+        if (ctx?.waitUntil) ctx.waitUntil(broadcast); else await broadcast;
+      }
+      await runPostOrderSideEffects({
+        db, env, ctx, orderId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId,
+      });
+    } catch (error) {
+      log.warn('Order side effect failed after persistence', { orderId, message: (error as Error).message });
+    }
+    if (idem && env.AUTH_KV) {
+      await (env.AUTH_KV as KVNamespace).put(idem.key,
+        JSON.stringify({ fingerprint: idem.fingerprint, body: responseBody }), { expirationTtl: 86400 }).catch(() => {});
+    }
+    return jsonResponse(responseBody, 201);
   } catch (error) {
+    if (error instanceof OrderCreationError) return errorResponse(error.message, error.status);
     log.error('CreateOrder error:', { message: (error as Error).message });
     return errorResponse('Failed to create order', 500);
   }

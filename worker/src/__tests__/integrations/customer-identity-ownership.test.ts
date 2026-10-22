@@ -56,14 +56,14 @@ describe('Customer Identity & Order Ownership Contract', () => {
     expect(res.resolvedVia).toBe('staff_override');
   });
 
-  it('4. Repeat Order Identity: Deterministic phone match resolves existing customer profile without duplicate profile', async () => {
+  it('4. Repeat guest phone stays unclaimed until ownership is authenticated', async () => {
     const res = await resolveServerOrderOwnership({
       actor: null, clientSuppliedCustomerId: null, customerPhone: '0901234567', db: mockDbWithCustomer,
     });
-    expect(res.customerId).toBe('cust_repeat_123');
-    expect(res.stage).toBe('customer_profile');
-    expect(res.isGuest).toBe(false);
-    expect(res.resolvedVia).toBe('deterministic_identifier');
+    expect(res.customerId).toBeNull();
+    expect(res.stage).toBe('customer_identifier');
+    expect(res.isGuest).toBe(true);
+    expect(res.resolvedVia).toBe('anonymous');
   });
 
   it('5. Secure IDOR Gate: Anonymous guest cannot access registered customer order', () => {

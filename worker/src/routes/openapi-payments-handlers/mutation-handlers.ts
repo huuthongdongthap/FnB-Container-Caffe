@@ -2,189 +2,37 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PaymentRoutes } from '../../schemas/payments';
 import { getDatabase } from '../../lib/db';
-import { canAccessOrder, publishOrderEvent } from '@aura/domain-order';
+import { canAccessPaymentOrder } from '../../../../packages/domain/payment/policies/payment-access';
+import { handleCreateLink } from '../../../../packages/domain/payment/commands/payos-create-link';
+import { handleRefund } from '../refunds-handlers/mutation-handlers';
 
 export function registerPaymentMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
-  // POST /api/payments - Create payment
   router.openapi(PaymentRoutes.create as any, async (c: any) => {
+    const body = c.req.valid('json' as never) as { orderId: string; method: string; amount?: number };
+    if (body.method === 'payos') return handleCreateLink(c, { order_id: body.orderId, amount: body.amount }, true);
     const db = getDatabase(c);
-    const body = c.req.valid('json' as never) as {
-      orderId: string;
-      method: string;
-      amount: number;
-      provider?: string;
-      providerReference?: string;
-      metadata?: Record<string, unknown>;
-    };
-    const user = c.get('user') as { id?: string; role?: string } | undefined;
-    const now = new Date().toISOString();
-
-    // Verify order exists
-    const order = (await db.prepare('SELECT id, customer_id, total, payment_status FROM orders WHERE id = ?').bind(body.orderId).first()) as {
-      id: string;
-      customer_id?: string | null;
-      total: number;
-      payment_status: string;
-    } | null;
-
-    if (!order) {
-      return c.json({ success: false, error: 'Order not found' }, 404);
-    }
-
-    if (!canAccessOrder(user, order).allowed) {
-      return c.json({ success: false, error: 'Forbidden' }, 403);
-    }
-
-    if (order.payment_status === 'paid') {
-      return c.json({ success: false, error: 'Order already paid' }, 409);
-    }
-
-    // Server-authoritative amount validation
-    const serverTotal = parseInt(String(order.total), 10);
-    if (body.amount !== undefined && body.amount !== serverTotal) {
+    const order = await db.prepare('SELECT id, customer_id, tenant_id, total, payment_status, payment_method FROM orders WHERE id = ?')
+      .bind(body.orderId).first<{ id: string; customer_id: string | null; tenant_id: string | null; total: number; payment_status: string; payment_method: string }>();
+    if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
+    if (!canAccessPaymentOrder(c, order)) return c.json({ success: false, error: 'Forbidden' }, 403);
+    if (body.method !== 'cod' || order.payment_method !== 'cod') return c.json({ success: false, error: 'Payment method does not match the order' }, 409);
+    if (['paid', 'refunded'].includes(order.payment_status)) return c.json({ success: false, error: 'Order already paid' }, 409);
+    const amount = Number(order.total);
+    if (!Number.isSafeInteger(amount) || amount < 0 || (body.amount !== undefined && body.amount !== amount)) {
       return c.json({ success: false, error: 'Tampered amount: does not match order total' }, 400);
     }
-
-    // Idempotency: return existing pending payment if already created
-    const existing = (await db.prepare(
-      'SELECT id, payment_url, status FROM payments WHERE order_id = ? AND method = ? AND status IN (\'pending\', \'completed\') ORDER BY created_at DESC LIMIT 1'
-    ).bind(body.orderId, body.method).first()) as { id: string; payment_url: string | null; status: string } | null;
-
-    if (existing) {
-      if (existing.status === 'completed') {
-        return c.json({ success: false, error: 'Order already paid' }, 409);
-      }
-      return c.json({
-        success: true,
-        data: {
-          paymentId: existing.id,
-          paymentUrl: existing.payment_url,
-          qrCodeUrl: null,
-          deeplink: null,
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-          status: 'pending',
-        },
-      }, 201);
-    }
-
-    const id = crypto.randomUUID();
-    const randBytes = new Uint8Array(4);
-    crypto.getRandomValues(randBytes);
-    const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    const transactionId = `txn_${Date.now()}_${randHex}`;
-
-    // Create payment record in canonical payments table
-    await db.prepare(
-      `INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?)`
-    ).bind(
-      id,
-      body.orderId,
-      body.method,
-      serverTotal,
-      transactionId,
-      now,
-      now
-    ).run();
-
-    // Audit log
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind('payment_create', user?.id || 'system', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_create', 'payment', id, JSON.stringify({ orderId: body.orderId, amount: serverTotal }), now).run().catch(() => {});
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        paymentId: id,
-        paymentUrl: null,
-        qrCodeUrl: null,
-        deeplink: null,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        status: 'pending',
-      },
-    }, 201);
-  });
-
-  // POST /api/payments/refund - Refund payment
-  router.openapi(PaymentRoutes.refund as any, async (c: any) => {
-    const db = getDatabase(c);
-    const body = c.req.valid('json' as never) as { paymentId?: string; amount?: number; reason?: string };
-    const user = c.get('user') as { id?: string; role?: string } | undefined;
     const now = new Date().toISOString();
-    const targetId = body.paymentId || c.req.param?.('id');
-
-    if (user?.role && !['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter'].includes(user.role)) {
-      return c.json({ success: false, error: 'Forbidden' }, 403);
-    }
-
-    if (!targetId) {
-      return c.json({ success: false, error: 'Missing paymentId' }, 400);
-    }
-
-    const payment = (await db.prepare('SELECT id, order_id, amount, status, method FROM payments WHERE id = ?').bind(targetId).first()) as {
-      id: string;
-      order_id: string;
-      amount: number;
-      status: string;
-      method: string;
-    } | null;
-
-    if (!payment) {
-      return c.json({ success: false, error: 'Payment not found' }, 404);
-    }
-
-    if (payment.status !== 'completed' && payment.status !== 'paid') {
-      return c.json({ success: false, error: 'Can only refund completed payments' }, 409);
-    }
-
-    const refundAmount = body.amount || payment.amount;
-
-    // Update canonical payment status
-    await db.prepare('UPDATE payments SET status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, payment.id).run();
-
-    // Update canonical order payment status
-    await db.prepare('UPDATE orders SET payment_status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, payment.order_id).run();
-
-    if (c.env?.AUTH_KV && payment.order_id) {
-      await c.env.AUTH_KV.put('latest_order_ts', now).catch(() => {});
-      await c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {});
-      await publishOrderEvent(c.env.AUTH_KV, payment.order_id, 'refunded').catch(() => {});
-    }
-
-    // Audit log
-    const refundId = crypto.randomUUID();
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind('payment_refund', user?.id || 'system', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user?.id || 'system', 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: payment.id, reason: body.reason }), now).run().catch(() => {});
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        id: refundId,
-        paymentId: payment.id,
-        amount: refundAmount,
-        reason: body.reason || null,
-        status: 'completed',
-        processedAt: now,
-        createdAt: now,
-      },
-    });
+    const id = `cod:${order.id}`;
+    await db.prepare(`INSERT OR IGNORE INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+      SELECT ?, ?, 'cod', ?, 'pending', ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method = 'cod')`)
+      .bind(id, order.id, amount, now, now, order.id).run();
+    const payment = await db.prepare("SELECT id, status FROM payments WHERE order_id = ? AND method = 'cod' ORDER BY created_at ASC LIMIT 1")
+      .bind(order.id).first<{ id: string; status: string }>();
+    if (!payment || payment.status !== 'pending') return c.json({ success: false, error: 'Payment state changed; refresh the order' }, 409);
+    return c.json({ success: true, data: { paymentId: payment.id, paymentUrl: null, qrCodeUrl: null, deeplink: null,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), status: 'pending' } }, 201);
   });
-}
 
+  // No separate database-only refund path: an acknowledgment requires the canonical provider flow.
+  router.openapi(PaymentRoutes.refund as any, (c: any) => handleRefund(c, true));
+}

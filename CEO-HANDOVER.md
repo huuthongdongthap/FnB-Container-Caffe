@@ -476,7 +476,7 @@ Giao diện bán hàng chính:
 
 3. THANH TOÁN
    → Click nút **THANH TOÁN**
-   → Chọn: Tiền mặt / PayOS (QR) / MoMo
+   → Chọn: COD / PayOS (QR)
    → Xác nhận
 
 4. HOÀN TẤT

@@ -140,9 +140,16 @@ export const OrderStatusEnum = z.enum([
   description: 'Order lifecycle status',
 });
 
-// Payment status enum
+// Payment status enum. The first four are the values orders actually carry:
+// `unpaid` is the column default, `cod_pending` and `pending` are accepted by
+// the cash-desk guard, `paid` is what settlement writes. The rest describe a
+// payment attempt's own lifecycle. Keeping them all here means a response that
+// echoes the column doesn't need translation to satisfy its own schema.
 export const PaymentStatusEnum = z.enum([
+  'unpaid',
+  'cod_pending',
   'pending',
+  'paid',
   'processing',
   'completed',
   'failed',
@@ -150,13 +157,14 @@ export const PaymentStatusEnum = z.enum([
   'refunded',
   'partially_refunded',
 ]).openapi({
-  example: 'completed',
+  example: 'paid',
   description: 'Payment status',
 });
 
 // Payment method enum
 export const PaymentMethodEnum = z.enum([
   'cash',
+  'cod',
   'card',
   'payos',
   'momo',
@@ -165,6 +173,12 @@ export const PaymentMethodEnum = z.enum([
 ]).openapi({
   example: 'payos',
   description: 'Payment method',
+});
+
+/** Allowlist for newly created orders and payment intents. */
+export const SupportedPaymentMethodEnum = z.enum(['cod', 'payos']).openapi({
+  example: 'payos',
+  description: 'Supported payment method for new orders: PayOS or cash on delivery',
 });
 
 // Table status enum

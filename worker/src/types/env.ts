@@ -16,6 +16,8 @@ export interface Env {
   JWT_EXPIRY_SECONDS?: string;
   RESET_KEY?: string;
   CORS_ORIGIN?: string;
+  JWT_AUDIENCE?: string;
+  JWT_ISSUER?: string;
 
   // PayOS
   PAYOS_CLIENT_ID?: string;

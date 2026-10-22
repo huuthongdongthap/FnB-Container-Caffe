@@ -14,7 +14,7 @@ import {
 export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm'),
   total: z.number().or(z.string()).refine(
-    (val) => Number(val) >= 1000,
+    (val) => Number.isFinite(Number(val)) && Number(val) >= 1000,
     'Tổng tiền tối thiểu 1,000đ'
   ),
   customer_name: nameSchema,
@@ -34,8 +34,8 @@ export const createOrderSchema = z.object({
   order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
   tip_amount: z.number().nonnegative().optional().default(0),
   service_fee: z.number().nonnegative().optional().default(0),
-  /** Multi-tenant identifier. Defaults to 'default' for single-store / flagship container. */
-  tenant_id: z.string().optional().default('default'),
+  /** Legacy compatibility only. The server never uses this field to choose the store. */
+  tenant_id: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.order_type === 'delivery' && !(data.customer_address ?? '').trim()) {
     ctx.addIssue({
@@ -66,7 +66,7 @@ export const adminOrdersQuerySchema = z.object({
 
 // ── Order status update ──
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled'])
+  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled', 'failed', 'expired'])
 });
 
 // ── Simple order create input ──
@@ -82,7 +82,7 @@ export const createOrderInputSchema = z.object({
   customer_phone: z.string().optional(),
   customer_address: z.string().optional(),
   notes: z.string().optional(),
-  payment_method: z.string().optional()
+  payment_method: paymentMethodSchema.default('cod')
 });
 
 // ══════════════════════════════════════════════

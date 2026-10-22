@@ -206,7 +206,7 @@ status: stable
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | **Cloudflare Free Tier limits** | Service disruption if exceeded | Monitor usage, upgrade to $5 plan proactively |
-| **Payment gateway downtime** | Lost sales | COD always available, have MoMo backup |
+| **PayOS downtime** | Lost sales | Offer COD as the supported fallback |
 | **Staff theft** | Revenue loss | Admin audit logs, shift accountability |
 | **Low customer retention** | Revenue drops | Loyalty program, churn prevention automations |
 | **Competitor price war** | Margin compression | Differentiate via design & experience |

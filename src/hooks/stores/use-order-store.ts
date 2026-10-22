@@ -31,7 +31,7 @@ export type {
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   currentOrder: null, orderHistory: [], loading: false, error: null,
-  pollingId: null, isPolling: false, eventSource: null, abortController: null, queuedOffline: false,
+  pollingId: null, isPolling: false, eventSource: null, abortController: null, queuedOffline: false, flushInProgress: false,
 
   createOrder: async (payload, idempotencyKey) => {
     set({ loading: true, error: null });
@@ -154,33 +154,42 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   },
 
   flushQueuedOrders: async () => {
-    const pending = await offlineDb.getPendingOrders();
-    if (pending.length === 0) { set({ queuedOffline: false }); return null; }
-    let lastOrder: CustomerOrder | null = null;
-    let allSucceeded = true;
-    for (const record of pending) {
-      try {
-        const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(record) });
-        lastOrder = body.data as CustomerOrder;
-        set({ currentOrder: lastOrder, error: null });
-        if (record.localId && typeof offlineDb.removeOrder === 'function') {
-          try { await offlineDb.removeOrder(record.localId); } catch { /* ignore */ }
-        }
-      } catch {
-        allSucceeded = false;
-        set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
-        break;
-      }
-    }
+    // A reconnect can fire the trigger twice, and both calls would walk the same
+    // IndexedDB records and sync each one twice. The second caller sees the
+    // flag and returns; the in-flight run owns the queue until it settles.
+    if (get().flushInProgress) return null;
+    set({ flushInProgress: true });
     try {
-      if (allSucceeded && lastOrder) {
-        await offlineDb.clearOrders();
-        set({ queuedOffline: false, loading: false });
-      } else {
-        set({ loading: false });
+      const pending = await offlineDb.getPendingOrders();
+      if (pending.length === 0) { set({ queuedOffline: false }); return null; }
+      let lastOrder: CustomerOrder | null = null;
+      let allSucceeded = true;
+      for (const record of pending) {
+        try {
+          const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(record) });
+          lastOrder = body.data as CustomerOrder;
+          set({ currentOrder: lastOrder, error: null });
+          if (record.localId && typeof offlineDb.removeOrder === 'function') {
+            try { await offlineDb.removeOrder(record.localId); } catch { /* ignore */ }
+          }
+        } catch {
+          allSucceeded = false;
+          set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
+          break;
+        }
       }
-    } catch { /* retry next reconnect */ }
-    return lastOrder;
+      try {
+        if (allSucceeded && lastOrder) {
+          await offlineDb.clearOrders();
+          set({ queuedOffline: false, loading: false });
+        } else {
+          set({ loading: false });
+        }
+      } catch { /* retry next reconnect */ }
+      return lastOrder;
+    } finally {
+      set({ flushInProgress: false });
+    }
   },
 }));
 

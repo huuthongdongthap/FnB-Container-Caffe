@@ -59,6 +59,7 @@ CREATE TABLE cafe_tables (
     capacity     INTEGER NOT NULL,
     zone         TEXT NOT NULL,
     status       TEXT DEFAULT 'Available',
+    tenant_id    TEXT NOT NULL DEFAULT 'default',
     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -122,7 +123,7 @@ CREATE TABLE orders (
     customer_phone TEXT NOT NULL,
     customer_email TEXT,
     customer_address TEXT,
-    payment_method TEXT NOT NULL,  -- cod, momo, vnpay, payos
+    payment_method TEXT NOT NULL,  -- new orders: cod, payos; legacy values remain readable
     payment_status TEXT DEFAULT 'unpaid',  -- unpaid, paid, refunded
     shipping_fee INTEGER DEFAULT 0,
     discount INTEGER DEFAULT 0,
@@ -143,6 +144,7 @@ CREATE TABLE orders (
     updated_by TEXT,
     customer_id TEXT,
     tenant_id TEXT NOT NULL DEFAULT 'default',
+    cod_paid_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -154,17 +156,30 @@ CREATE INDEX idx_orders_customer_phone ON orders(customer_phone);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
 CREATE INDEX idx_orders_payment_status ON orders(payment_status);
 
+-- Same additive contract as 20261020_01_order_creation_requests.sql.
+CREATE TABLE IF NOT EXISTS order_creation_requests (
+    scope_key TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    order_id TEXT NOT NULL,
+    response_body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 -- =====================================================
 -- PAYMENTS TABLE
 -- =====================================================
 CREATE TABLE payments (
     id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
-    method TEXT NOT NULL,  -- cod, momo, vnpay, payos
+    method TEXT NOT NULL,  -- new payments: cod, payos; legacy values remain readable
     amount INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',  -- pending, completed, failed, refunded
     transaction_id TEXT,  -- External payment gateway transaction ID
     payment_url TEXT,  -- Payment redirect URL
+    refund_status TEXT,
+    refund_amount INTEGER DEFAULT 0,
+    refund_reason TEXT,
+    refunded_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
@@ -174,6 +189,8 @@ CREATE TABLE payments (
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_created_at ON payments(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_txn_unique
+ON payments(transaction_id) WHERE transaction_id != '';
 
 -- =====================================================
 -- RESERVATIONS TABLE
@@ -307,6 +324,7 @@ CREATE TABLE IF NOT EXISTS cashback_transactions (
     amount INTEGER NOT NULL,
     balance_after INTEGER NOT NULL,
     description TEXT,
+    expires_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (wallet_id) REFERENCES cashback_wallets(id)
 );
@@ -693,3 +711,309 @@ CREATE TABLE IF NOT EXISTS product_modifier_groups (
 
 CREATE INDEX IF NOT EXISTS idx_mod_choices_group_avail ON modifier_choices(group_id, is_available);
 CREATE INDEX IF NOT EXISTS idx_pm_groups_prod_grp ON product_modifier_groups(product_id, group_id);
+
+-- Fresh bootstrap parity with additive operational migrations. Existing DBs use their migration ledger.
+-- 20260913_01_customer_identity_consent_events_visits.sql
+-- M1 Customer + Data foundation (v4 pivot): formalize identity, consent,
+-- customer events, and visits on top of the existing zero-based
+-- `customers` table + `customer_phone` order key.
+--
+-- Zero-based policy: these tables are ADDITIVE. No existing behavior
+-- (guest checkout, loyalty signup, order creation) is altered. New
+-- writes are optional enrichment gated by explicit consent.
+--
+-- All tables CREATE TABLE IF NOT EXISTS (re-run safe).
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 1. customer_identities — one row per verified identifier a customer
+--    presents (phone, email, zalo, ...). A customer may hold multiple
+--    identifiers over time; the identifier that created the row is the
+--    canonical one and stays marked is_primary.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS customer_identities (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,            -- FK customers.id
+  identifier_type TEXT NOT NULL,        -- phone | email | zalo | other
+  identifier_value TEXT NOT NULL,       -- normalized value
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  verified_at TEXT,                     -- ISO timestamp of last verification
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_identities_customer
+  ON customer_identities(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_identities_value
+  ON customer_identities(identifier_type, identifier_value);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 2. consents — granular opt-in records. A consent is only valid when
+--    the customer explicitly granted it (source = checkout | signup |
+--    setting). CRM writes (tier promotion, outreach, data export) MUST
+--    check an active consent row before mutating state.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS consents (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,            -- FK customers.id
+  purpose TEXT NOT NULL,                -- crm | marketing | analytics | erpnext_sync
+  granted INTEGER NOT NULL DEFAULT 1,   -- 1 = granted, 0 = revoked
+  source TEXT NOT NULL,                 -- checkout | signup | setting | staff
+  policy_version TEXT NOT NULL DEFAULT 'v1',
+  granted_at TEXT NOT NULL,
+  revoked_at TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_consents_customer
+  ON consents(customer_id, purpose, granted);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 3. customer_events — append-only log of identity-lifecycle events.
+--    The golden-loop spine (v2 §11) reads from here. Never update or
+--    delete a row once written; corrections append a new compensating row.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS customer_events (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,            -- FK customers.id (nullable only for anonymous)
+  event_type TEXT NOT NULL,
+    -- CustomerIdentified | ConsentGiven | ConsentRevoked |
+    -- VisitRecorded | CustomerUpgraded | OrderLinked
+  payload TEXT,                         -- JSON event detail
+  recorded_at TEXT NOT NULL,            -- ISO event time
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_events_customer
+  ON customer_events(customer_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_customer_events_type
+  ON customer_events(event_type, recorded_at);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 4. visits — materialized store visits (order presential, check-in,
+--    reservation completion). Each row is one visit; used by CRM
+--    frequency/value queries (v2 §13 the 6 questions).
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS visits (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,            -- FK customers.id
+  visited_at TEXT NOT NULL,             -- ISO arrival time
+  channel TEXT NOT NULL DEFAULT 'in_store',
+    -- in_store | qr_table | online_pickup | online_delivery
+  order_id TEXT,                        -- nullable (a visit may have no order)
+  spent INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_visits_customer
+  ON visits(customer_id, visited_at);
+CREATE INDEX IF NOT EXISTS idx_visits_date
+  ON visits(visited_at);
+
+-- 20260820_08_client_errors.sql
+-- SPA uncaught-render reports from the per-route ErrorBoundary.
+
+CREATE TABLE IF NOT EXISTS client_errors (
+    id         TEXT PRIMARY KEY,
+    route      TEXT,
+    message    TEXT,
+    stack      TEXT,
+    href       TEXT,
+    user_agent TEXT,
+    ts         TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_errors_route ON client_errors(route);
+CREATE INDEX IF NOT EXISTS idx_client_errors_ts ON client_errors(ts);
+-- 1. Observability: _metrics
+CREATE TABLE IF NOT EXISTS _metrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  value REAL NOT NULL DEFAULT 1,
+  tags TEXT DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_metrics_name_created ON _metrics(name, created_at);
+
+-- 2. Observability: _alerts
+CREATE TABLE IF NOT EXISTS _alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_key TEXT NOT NULL,
+  message TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'warning',
+  dispatched INTEGER NOT NULL DEFAULT 0,
+  dispatched_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_key_created ON _alerts(alert_key, created_at);
+
+
+-- 4. Domain Inventory: inventory_items
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id TEXT PRIMARY KEY,
+  sku TEXT UNIQUE NOT NULL,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  name TEXT NOT NULL,
+  name_en TEXT,
+  category TEXT NOT NULL DEFAULT 'raw_materials',
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  current_stock REAL NOT NULL DEFAULT 0,
+  min_stock REAL NOT NULL DEFAULT 0,
+  max_stock REAL NOT NULL DEFAULT 1000,
+  cost_per_unit REAL DEFAULT 0,
+  supplier TEXT,
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_sku ON inventory_items(sku);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+
+-- 5. Domain Inventory: inventory_transactions
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('in', 'out', 'adjust', 'waste', 'reserve', 'release')),
+  quantity REAL NOT NULL,
+  reference_id TEXT,
+  reference_type TEXT CHECK(reference_type IN ('order', 'purchase', 'adjustment', 'waste_report', 'sync')),
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_item ON inventory_transactions(item_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_created ON inventory_transactions(created_at);
+
+-- 6. Domain Inventory: inventory_snapshots
+CREATE TABLE IF NOT EXISTS inventory_snapshots (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  date TEXT NOT NULL DEFAULT (date('now')),
+  opening_stock REAL NOT NULL,
+  closing_stock REAL NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_snapshots_item_date ON inventory_snapshots(item_id, date);
+
+-- 7. OpenAPI Inventory: ingredients
+CREATE TABLE IF NOT EXISTS ingredients (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  sku TEXT UNIQUE NOT NULL,
+  category TEXT NOT NULL DEFAULT 'raw_materials',
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  cost_per_unit REAL DEFAULT 0,
+  current_stock REAL NOT NULL DEFAULT 0,
+  min_stock REAL NOT NULL DEFAULT 0,
+  max_stock REAL NOT NULL DEFAULT 1000,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ingredients_sku ON ingredients(sku);
+CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
+
+-- 8. OpenAPI Inventory: stock_movements
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id TEXT PRIMARY KEY,
+  ingredient_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  reference_id TEXT,
+  reference_type TEXT,
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_ingredient ON stock_movements(ingredient_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(created_at);
+
+-- 9. OpenAPI Inventory: suppliers
+CREATE TABLE IF NOT EXISTS suppliers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  contact_person TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  tax_id TEXT,
+  payment_terms TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+
+-- 10. OpenAPI Inventory: purchase_orders
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY,
+  po_number TEXT UNIQUE NOT NULL,
+  supplier_id TEXT NOT NULL,
+  order_date TEXT NOT NULL,
+  expected_delivery_date TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  subtotal REAL NOT NULL DEFAULT 0,
+  tax REAL NOT NULL DEFAULT 0,
+  shipping REAL NOT NULL DEFAULT 0,
+  total REAL NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+
+-- 11. OpenAPI Inventory: purchase_order_items
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+  id TEXT PRIMARY KEY,
+  purchase_order_id TEXT NOT NULL,
+  ingredient_id TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  unit_price REAL NOT NULL,
+  total_price REAL NOT NULL,
+  received_quantity REAL DEFAULT 0,
+  FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_order_id);
+
+-- 12. Recipe / BOM & Waste
+CREATE TABLE IF NOT EXISTS recipes (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  name TEXT,
+  instructions TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_recipes_product ON recipes(product_id);
+
+CREATE TABLE IF NOT EXISTS recipe_items (
+  id TEXT PRIMARY KEY,
+  recipe_id TEXT NOT NULL,
+  ingredient_id TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  unit TEXT NOT NULL DEFAULT 'g',
+  FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+
+CREATE TABLE IF NOT EXISTS waste_log (
+  id TEXT PRIMARY KEY,
+  ingredient_id TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  unit TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  recorded_by TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_waste_log_ingredient ON waste_log(ingredient_id);

@@ -112,6 +112,8 @@ export interface OrderState {
   /** Cancels the in-flight poll fetch so its late response is discarded. */
   abortController: AbortController | null;
   queuedOffline: boolean;
+  /** Guards against a second flush stacking on the first; the queue is IndexedDB, so overlap would sync a record twice. */
+  flushInProgress: boolean;
 
   createOrder: (payload: CreateOrderPayload, idempotencyKey?: string) => Promise<CustomerOrder | null>;
   fetchOrder: (id: string) => Promise<void>;

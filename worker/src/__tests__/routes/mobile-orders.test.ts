@@ -7,6 +7,7 @@ import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function buildOrdersMockDb(orders: Array<Record<string, unknown>>): any {
+  orders = orders.map(o => ({ tenant_id: 'default', ...o }));
   const orderMap = new Map(orders.map(o => [o.id as string, o]));
 
   return {
@@ -15,20 +16,22 @@ function buildOrdersMockDb(orders: Array<Record<string, unknown>>): any {
       s.bind = (...args: unknown[]) => { s._binds = args; return s; };
       s.first = async () => {
         const sql = s._sql || '';
-        if (sql.includes('WHERE id = ?')) {
+        if (sql.includes('FROM orders WHERE id = ?')) {
           const id = String(s._binds[0]);
-          return orderMap.get(id) ?? null;
+          const row = orderMap.get(id);
+          return row && (!sql.includes('tenant_id = ?') || row.tenant_id === s._binds[1]) ? row : null;
         }
+        if (sql.includes('FROM products WHERE id = ?') && s._binds[0] === 'coffee') return { id: 'coffee', name: 'Cà phê sữa', price: 25000, available: 1 };
+        if (sql.includes('FROM cafe_tables') && s._binds[0] === 'TBL_1' && s._binds[1] === 'default') return { id: 'TBL_1' };
         return null;
       };
       s.all = async () => {
         const sql = s._sql || '';
         if (sql.includes('FROM orders')) {
-          if (sql.includes('WHERE') && s._binds.length > 0) {
-            const tableId = String(s._binds[0]);
-            return { results: orders.filter(o => o.table_id === tableId), success: true };
-          }
-          return { results: orders, success: true };
+          const tenantIndex = sql.includes('tenant_id = ?') ? 0 : -1;
+          const tableIndex = sql.includes('table_id = ?') ? (tenantIndex === 0 ? 1 : 0) : -1;
+          return { results: orders.filter(o => (tenantIndex < 0 || o.tenant_id === s._binds[tenantIndex])
+            && (tableIndex < 0 || o.table_id === s._binds[tableIndex])), success: true };
         }
         return { results: [], success: true };
       };
@@ -205,7 +208,7 @@ describe('createOrderMobile', () => {
 
   const validOrderBody = {
     table_id: 'TBL_1',
-    items: [{ name: 'Cà phê sữa', qty: 2, price: 25000, note: 'Ít đường' }],
+    items: [{ product_id: 'coffee', name: 'Cà phê sữa', qty: 2, price: 25000, note: 'Ít đường' }],
   };
 
   it('returns 201 for owner creating order', async () => {
@@ -239,6 +242,16 @@ describe('createOrderMobile', () => {
     });
     const res = await createOrderMobile(ctx);
     expect(res.status).toBe(201);
+  });
+
+  it('rejects unsupported payment methods', async () => {
+    const ctx: any = mockOrdersContext({
+      role: 'owner',
+      method: 'POST',
+      body: { ...validOrderBody, payment_method: 'momo' },
+    });
+    const res = await createOrderMobile(ctx);
+    expect(res.status).toBe(400);
   });
 
   it('returns 400 when table_id is missing', async () => {
@@ -305,13 +318,8 @@ describe('createOrderMobile', () => {
   });
 
   it('returns 500 on database error during create', async () => {
-    const badDb: any = {
-      prepare: () => ({
-        bind: () => ({
-          run: async () => { throw new Error('D1 insert failed'); },
-        }),
-      }),
-    };
+    const badDb = buildOrdersMockDb([]);
+    badDb.batch = async () => { throw new Error('D1 insert failed'); };
     const ctx: any = {
       req: {
         raw: new Request('https://test.aura/mobile/orders', {

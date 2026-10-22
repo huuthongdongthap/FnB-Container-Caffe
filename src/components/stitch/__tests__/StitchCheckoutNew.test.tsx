@@ -113,6 +113,16 @@ describe('StitchCheckoutNew', () => {
     expect(screen.getByText('Payment Method')).toBeTruthy();
   });
 
+  it('offers only PayOS and COD', () => {
+    renderWithProviders(
+      <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} />,
+    );
+    expect(screen.getByText('PayOS')).toBeTruthy();
+    expect(screen.getByText('Cash on Delivery')).toBeTruthy();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.queryByText(/MoMo|Apple Pay|Google Pay/i)).toBeNull();
+  });
+
   it('shows processing state when isProcessing is true', () => {
     renderWithProviders(
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} isProcessing />,

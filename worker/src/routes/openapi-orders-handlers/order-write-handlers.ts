@@ -3,144 +3,44 @@ import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
-import { calculateOrderSnapshot, canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
-import { resolveServerOrderOwnership, canAccessOrder } from '@aura/domain-customer';
-import { validateOrderTable } from '@aura/domain-table';
+import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
+import { canAccessOrder } from '@aura/domain-customer';
+import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
 import { getDatabase } from '../../lib/db';
 import { handleCancelOrder } from './order-cancel-handlers';
 
 export { handleCancelOrder };
 
 export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
-  const db = getDatabase(c);
   const body = ((c.req as any).valid ? (c.req as any).valid('json') : null) || (await c.req.json());
-  const user = c.get('user');
-  const now = new Date().toISOString();
-
-  const id = crypto.randomUUID();
-  const orderNumber = `ORD-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-
-  const snapshotInput = {
-    items: (body.items || []).map((item: any) => ({
-      productId: item.productId || item.product_id || item.menuItemId || item.id,
-      quantity: item.quantity ?? item.qty,
-      modifiers: item.modifiers || [],
-      notes: item.notes || null,
-    })),
-    order_type: body.channel,
-    shipping_fee: 0,
-    discount: 0,
-    service_fee: 0,
-    tip_amount: 0,
-    now: new Date(),
-  };
-
-  const snapshot = await calculateOrderSnapshot(db as any, snapshotInput);
-  if (snapshot.rejected) {
-    return c.json({ success: false, error: snapshot.rejected.message, code: snapshot.rejected.code }, 400);
-  }
-
-  if (body.tableId) {
-    const tableCheck = await validateOrderTable(db as any, body.tableId);
-    if (!tableCheck.ok) {
-      return c.json({ success: false, error: 'Table not found', code: 'table_not_found' }, 404);
-    }
-  }
-
-  const ownership = await resolveServerOrderOwnership({
-    actor: user,
-    clientSuppliedCustomerId: body.customer?.id || null,
-    customerPhone: body.customer?.phone || null,
-    db: db as any,
-  });
-  const customerId = ownership.customerId;
-
+  let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+  try { ctx = c.executionCtx; } catch { /* Unit callers may omit execution context. */ }
+  const response = await createOrderFromAlias(c.req.raw, c.env, {
+    items: body.items,
+    total: body.total ?? body.totalAmount ?? 1000,
+    customer_name: body.customer?.name || 'Khách tại quán',
+    customer_phone: body.customer?.phone || '0000000000',
+    customer_email: body.customer?.email || '',
+    customer_address: body.customer?.address || '',
+    customer_id: body.customer?.id,
+    payment_method: body.paymentMethod || 'cod',
+    table_id: body.tableId,
+    order_type: body.channel || (body.tableId ? 'dine_in' : 'takeaway'),
+    notes: body.notes,
+  }, ctx, c.get('user'));
+  if (!response.ok) return response;
+  const accepted = await response.json() as { data: Record<string, any> & { id: string } };
+  const db = getDatabase(c);
+  let created: any = accepted.data;
+  let details: { items: any[]; payments: any[] } = { items: [], payments: [] };
   try {
-    await db.prepare(
-      `INSERT INTO orders (id, order_number, table_id, location_id, customer_id, customer_name, customer_phone, customer_email, customer_loyalty_tier, customer_loyalty_points_earned, customer_locale, items, subtotal, discount_amount, tax_amount, total_amount, status, payment_status, notes, source, channel, happy_hour_applied, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, orderNumber, body.tableId || null, body.locationId, customerId,
-      body.customer?.name || null, body.customer?.phone || null, body.customer?.email || null,
-      body.customer?.loyaltyTier || null, body.customer?.loyaltyPointsEarned || 0,
-      body.customer?.locale || 'vi',
-      snapshot.itemsJson,
-      snapshot.subtotal, snapshot.discount, snapshot.service_fee, snapshot.total,
-      'pending', 'unpaid', body.notes || null, body.source || 'pos', body.channel || 'dine_in',
-      snapshot.items.some(i => i.price !== undefined && i.price < i.unitPriceCents) ? 1 : 0,
-      now, now
-    ).run();
-  } catch {
-    await db.prepare(
-      `INSERT INTO orders (id, customer_id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id,
-      customerId,
-      body.customer?.name || null,
-      body.customer?.phone || null,
-      body.tableId || null,
-      snapshot.itemsJson,
-      snapshot.total,
-      'pending',
-      body.paymentMethod || 'cash',
-      body.channel || 'dine_in',
-      body.notes || null,
-      now,
-      now
-    ).run();
-  }
-
-  for (const item of snapshot.items) {
-    try {
-      await db.prepare(
-        `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        crypto.randomUUID(), id, item.menuItemId, item.quantity, item.subtotalCents,
-        JSON.stringify(item.modifiers || []), now
-      ).run();
-    } catch {
-      // order_items table may be absent when using canonical orders.items JSON schema
-      break;
-    }
-  }
-
-  if (c.env?.AUTH_KV) {
-    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
-    try {
-      if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
-    } catch { /* executionCtx may be absent in testing */ }
-    await publishOrderEvent(c.env.AUTH_KV, id, 'pending', {
-      waitUntil: waitUntilFn,
-    });
-  }
-
-  const actorId = user?.id || 'system';
-  try {
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, actorId, 'order_create', 'order', id, JSON.stringify(body), now).run();
-  } catch {
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(actorId, actorId, 'order_create', 'order', id, JSON.stringify(body), now).run().catch(() => {});
-    } catch {
-      // Ignore audit log error
-    }
-  }
-
-  const created = await db.prepare(
-    `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o
-     LEFT JOIN cafe_tables t ON o.table_id = t.id
-     WHERE o.id = ?`
-  ).bind(id).first();
-
-  const { items: orderItems, payments } = await fetchOrderItemsAndPayments(db, id);
-  return c.json({ success: true, data: formatOrder(created, orderItems, payments) }, 201);
+    created = await db.prepare(`SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+      FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?`)
+      .bind(accepted.data.id).first() || accepted.data;
+    details = await fetchOrderItemsAndPayments(db, accepted.data.id);
+  } catch { /* An optional read projection must not turn a committed order into a retryable failure. */ }
+  return c.json({ success: true, data: formatOrder(created, details.items, details.payments) }, response.status as 200 | 201,
+    response.headers.get('X-Cache') ? { 'X-Cache': 'HIT' } : undefined);
 }
 
 export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {

@@ -58,13 +58,14 @@ export async function getHealth(env: Env, checkDependencies = false): Promise<He
   dependencies.d1_database = d1Probe;
 
   // Probe KV Cache (if bound)
-  if (env.KV_CACHE) {
+  const kvCache = env.KV_CACHE;
+  if (kvCache) {
     const kvProbe = await executeHealthCheckProbe(
       'kv_cache',
       'cache',
       false, // Non-critical
       async () => {
-        await env.KV_CACHE.get('__health_probe__');
+        await kvCache.get('__health_probe__');
       },
       1500
     );

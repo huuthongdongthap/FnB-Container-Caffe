@@ -20,7 +20,10 @@ export interface OrderSuccessNewData {
   orderId: string;
   items: OrderSuccessNewItem[];
   total: number;
-  estimatedMinutes: number;
+  estimatedMinutes?: number;
+  status?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
   locationName: string;
   locationImageUrl?: string;
   customerName?: string;
@@ -48,6 +51,3 @@ export interface StitchOrderSuccessNewProps {
 /* ─── Status Steps ───────────────────────────────────────────────────────── */
 
 export const STATUS_STEPS = ['received', 'preparing', 'ready'] as const;
-
-/** Matches HTML design: Received + Preparing active */
-export const PROGRESS_PERCENT = 50;

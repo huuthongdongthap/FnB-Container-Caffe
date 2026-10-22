@@ -6,6 +6,8 @@ import type { Env } from '../../types/env';
 import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../../middleware/rate-limit';
 import { createLogger } from '../../middleware/logger';
 import { makeOrderId } from './types';
+import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
+import { resolveOrderCreationScope, resolveOrderCreationTable, OrderCreationError } from '../../../../packages/domain/order/policies/order-creation-scope';
 
 const log = createLogger({ route: 'guest-orders' });
 
@@ -18,16 +20,17 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   }
   const data = parsed.data;
 
-  let tableRow = await db.prepare(
-    'SELECT id, table_number FROM cafe_tables WHERE table_number = ?'
-  ).bind(data.table_id).first<{ id: string; table_number?: string | number }>();
-  if (!tableRow) {
-    tableRow = await db.prepare(
-      'SELECT id, table_number FROM cafe_tables WHERE id = ?'
-    ).bind(data.table_id).first<{ id: string; table_number?: string | number }>();
-  }
-  if (!tableRow) {
-    return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
+  let tenantId: string;
+  let tableRow: { id: string; table_number?: string | number };
+  try {
+    const scope = await resolveOrderCreationScope(c.req.raw, c.env);
+    tenantId = scope.tenantId;
+    const id = await resolveOrderCreationTable(db, data.table_id, tenantId);
+    if (!id) return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
+    tableRow = { id, table_number: data.table_id };
+  } catch (error) {
+    if (error instanceof OrderCreationError) return c.json({ success: false, error: error.message }, error.status === 400 ? 404 : error.status);
+    throw error;
   }
 
   const orderId = makeOrderId();
@@ -38,29 +41,29 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   try {
     batchResult = await db.batch([
       db.prepare(
-        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
-      ).bind(tableRow.id),
+        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND status = \'Available\''
+      ).bind(tableRow.id, tenantId),
       db.prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cash', ?, 'dine_in', ?, ?)`
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
       ).bind(
         orderId, data.customer_name, data.customer_phone, tableRow.id,
         JSON.stringify([]), 0,
-        'Khách QR - cho don mon', now, now
+        'Khách QR - cho don mon', tenantId, now, now
       )
     ]);
   } catch {
     batchResult = await db.batch([
       db.prepare(
-        'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND status = \'Available\''
-      ).bind(tableRow.id),
+        'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND tenant_id = ? AND status = \'Available\''
+      ).bind(tableRow.id, tenantId),
       db.prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cash', ?, 'dine_in', ?, ?)`
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
       ).bind(
         orderId, data.customer_name, data.customer_phone, tableRow.id,
         JSON.stringify([]), 0,
-        'Khách QR - cho don mon', now, now
+        'Khách QR - cho don mon', tenantId, now, now
       )
     ]);
   }
@@ -105,143 +108,26 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
 }
 
 export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
-  const db = c.env.AURA_DB;
   try {
-    const body = await c.req.json<{
-      customer_name: string;
-      customer_phone: string;
-      table_id?: string;
-      items: Array<{ name: string; qty: number; price: number; note?: string; product_id?: string }>;
-      fulfillment_type?: string;
-      delivery_address?: string;
-      payment_method?: string;
-    }>();
-
-    const name = (body.customer_name || '').trim();
-    const phone = (body.customer_phone || '').trim();
-    if (!name || !phone) {
-      return c.json({ success: false, error: 'Name and phone required' }, 400);
-    }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return c.json({ success: false, error: 'Items required' }, 400);
-    }
-
-    for (const item of body.items) {
-      const qty = Number(item?.qty ?? 1);
-      const price = Number(item?.price ?? 0);
-      if (!Number.isFinite(qty) || qty <= 0 || qty > 100) {
-        return c.json({ success: false, error: 'Invalid item quantity' }, 400);
-      }
-      if (!Number.isFinite(price) || price < 0) {
-        return c.json({ success: false, error: 'Invalid item price' }, 400);
-      }
-    }
-
-    const fulfillment = (body.fulfillment_type || 'DINE_IN').toUpperCase();
+    const body = await c.req.json<Record<string, unknown>>();
+    const fulfillment = String(body.fulfillment_type || 'DINE_IN').toUpperCase();
     if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(fulfillment)) {
       return c.json({ success: false, error: 'Invalid fulfillment_type' }, 400);
     }
-    if (fulfillment === 'DELIVERY' && !(body.delivery_address || '').trim()) {
-      return c.json({ success: false, error: 'Delivery address required' }, 400);
-    }
-
-    const tableId = body.table_id || null;
-    const orderId = makeOrderId();
-    const now = new Date().toISOString();
-    const payMethod = (body.payment_method || 'cash').toLowerCase();
-
-    // If dine-in with table_id, mark table Occupied
-    if (tableId && fulfillment === 'DINE_IN') {
-      try {
-        await db.prepare(
-          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
-        ).bind(tableId).run();
-      } catch {
-        await db.prepare(
-          'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND status = \'Available\''
-        ).bind(tableId).run();
-      }
-    }
-
-    const resolvedItems = await Promise.all(
-      body.items.map(async (item) => {
-        const lookupId = item.product_id || (item as { item_id?: string; id?: string }).item_id || (item as { id?: string }).id;
-        if (lookupId && !(item.price && item.price > 0)) {
-          try {
-            const prod = await db
-              .prepare('SELECT price FROM products WHERE id = ?')
-              .bind(lookupId)
-              .first<{ price?: number }>();
-            if (prod && typeof prod.price === 'number' && Number.isFinite(prod.price)) {
-              return { ...item, price: prod.price };
-            }
-          } catch {
-            // Fall back to client price in mock/partial environments
-          }
-        }
-        return item;
-      })
-    );
-
-    const total = resolvedItems.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
-
-    // Canonical D1 orders persistence with exact schema columns
-    try {
-      await db.prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, customer_address, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        orderId, name, phone, tableId,
-        JSON.stringify(resolvedItems),
-        total,
-        payMethod, fulfillment.toLowerCase(), body.delivery_address || null,
-        fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
-        now, now
-      ).run();
-    } catch (insertErr) {
-      if (String((insertErr as Error)?.message || '').includes('no such column')) {
-        await db.prepare(
-          `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, order_type, address, notes, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          orderId, name, phone, tableId,
-          JSON.stringify(resolvedItems),
-          total,
-          payMethod, fulfillment.toLowerCase(), body.delivery_address || null,
-          fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
-          now, now
-        ).run();
-      } else {
-        throw insertErr;
-      }
-    }
-
-    // Line item persistence to order_items
-    for (const item of resolvedItems) {
-      const lineItemId = makeOrderId('ITEM');
-      const prodId = item.product_id || item.name;
-      const subtotal = (item.price || 0) * (item.qty || 1);
-      try {
-        await db.prepare(
-          `INSERT INTO order_items (id, order_id, product_id, quantity, subtotal, modifiers, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(lineItemId, orderId, prodId, item.qty || 1, subtotal, '[]', now).run();
-      } catch (itemErr) {
-        if (!String((itemErr as Error)?.message || '').includes('no such table: order_items')) {
-          throw itemErr;
-        }
-      }
-    }
-
-    if (c.env?.AUTH_KV) {
-      await Promise.all([
-        c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
-        c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
-        publishOrderEvent(c.env.AUTH_KV, orderId, 'pending'),
-      ]);
-    }
-
-    return c.json({ success: true, order_id: orderId, total, fulfillment_type: fulfillment }, 201);
+    let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+    try { ctx = c.executionCtx; } catch { /* unit tests have no execution context */ }
+    const response = await createOrderFromAlias(c.req.raw, c.env, {
+      ...body,
+      payment_method: String(body.payment_method || 'cod').toLowerCase(),
+      order_type: fulfillment.toLowerCase(),
+      customer_address: body.delivery_address || body.customer_address,
+      notes: body.notes || (fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest'),
+    }, ctx);
+    if (!response.ok) return response;
+    const result = await response.json() as { data: { id: string; total: number; payment_method: string } };
+    return c.json({ success: true, order_id: result.data.id, total: result.data.total,
+      fulfillment_type: fulfillment, payment_method: result.data.payment_method }, response.status as 200 | 201,
+    response.headers.get('X-Cache') ? { 'X-Cache': 'HIT' } : undefined);
   } catch (err) {
     log.error('Guest checkout error:', { message: (err as Error).message });
     return c.json({ success: false, error: 'Failed to create guest order' }, 500);

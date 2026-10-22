@@ -1,584 +1,154 @@
-/**
- * Unit tests for src/tree/orders/create-order.ts
- * Tests: validation, order creation, table resolution, customer upsert, inventory
- */
-
-import { describe, it, expect, vi } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// Mocks — vitest hoists vi.mock() to the top automatically.
-// ---------------------------------------------------------------------------
-
-vi.mock('../../../../../packages/domain/order/notifications/telegram', () => ({
-  notifyTelegram: vi.fn(async() => {})
-}));
-
-vi.mock('worker/src/tree/push/notifier', () => ({
-  sendPushToStaff: vi.fn(async() => ({ sent: 0, failed: 0 }))
-}));
-
-vi.mock('../../../lib/email', () => ({
-  sendEmail: vi.fn(async() => true)
-}));
-
-vi.mock('../../../templates/order-confirm', () => ({
-  renderOrderConfirm: vi.fn(() => '<html/>')
-}));
-
-vi.mock('../../../middleware/logger', () => ({
-  createLogger: () => ({
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    child: () => ({ debug: () => {}, info: () => {}, warn: () => {}, error: () => {} })
-  })
-}));
-
-vi.mock('../../../lib/metrics-collector', () => ({
-  createMetricsCollector: () => ({
-    recordMetric: async() => {},
-    recordAlert: async() => null,
-    markAlertDispatched: async() => {},
-    pruneOldMetrics: async() => 0
-  })
-}));
-
-// ---------------------------------------------------------------------------
-// Real imports
-// ---------------------------------------------------------------------------
-
-import { jsonResponse, errorResponse } from '../../../middleware/cors';
+// @vitest-environment node
+/** Canonical writer contracts execute real bootstrap SQL and catalog lookups. */
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOrder } from '@aura/domain-order';
-import { createMockEnv, createMockDB, createMockKV } from '../../test-utils';
+import { orderCreationFixture } from '../../integrations/order-creation-fixture';
+import { createMockKV } from '../../test-utils';
 
-// ---------------------------------------------------------------------------
-// Shared test data
-// ---------------------------------------------------------------------------
-
-type OrderBase = {
-  items: Array<{ name: string; quantity?: number; price?: number }>;
-  total: number;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  customer_address: string;
-  payment_method: 'cod' | 'payos';
-  shipping_fee: number;
-  discount: number;
-  notes: string;
-  delivery_time: string;
-  order_type?: 'dine_in' | 'takeaway' | 'delivery';
-  table_id?: string;
+const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
+function fixture() { const f = orderCreationFixture(); fixtures.push(f); return f; }
+afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
+const base = {
+  items: [{ product_id: 'coffee', name: 'Forged name', quantity: 2, price: 25000 }], total: 50000,
+  customer_name: 'Nguyen Van A', customer_phone: '0909123456', customer_email: '', customer_address: '',
+  payment_method: 'cod', shipping_fee: 0, discount: 0, notes: '', delivery_time: 'now', order_type: 'takeaway',
 };
-
-const ORDER_BASE: OrderBase = {
-  items: [{ name: 'Cà phê sữa', quantity: 2, price: 25000 }],
-  total: 50000,
-  customer_name: 'Nguyen Van A',
-  customer_phone: '0909123456',
-  customer_email: '',
-  customer_address: '',
-  payment_method: 'cod',
-  shipping_fee: 0,
-  discount: 0,
-  notes: '',
-  delivery_time: 'now',
-  order_type: 'takeaway',
-};
-
-function makeBody(overrides: Partial<OrderBase> = {}): OrderBase {
-  return { ...ORDER_BASE, ...overrides };
+function request(overrides: Record<string, unknown> = {}, key?: string) {
+  return new Request('https://test.aura/api/orders', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) },
+    body: JSON.stringify({ ...base, ...overrides }),
+  });
 }
-
-// ---------------------------------------------------------------------------
-// DB stub helper
-// Pattern-matches each prepared statement's SQL to return appropriate data.
-// ---------------------------------------------------------------------------
-
-function makeOrderDB(overrides: Record<string, unknown> = {}): ReturnType<typeof createMockDB> {
-  const db = createMockDB();
-
-  db.prepare = ((_sql: string) => {
-    const stmt: Record<string, unknown> = {
-      _sql,
-      _binds: [] as unknown[],
-      bind(this: typeof stmt, ...args: unknown[]) {
-        this._binds = args;
-        return this;
-      },
-      async first<T = unknown>() {
-        const sql = stmt._sql as string;
-        if (sql.includes('FROM cafe_tables WHERE table_number')) {
-          if (overrides._tableNotFound) {
-            return null as T;
-          }
-          return { id: (overrides._tableId ?? 'tbl-uuid-123') as T };
-        }
-        return null as T;
-      },
-      async run() {
-        return { success: true, changes: 1, lastRowId: 1 } as unknown;
-      },
-      all: async() => ({ results: [], success: true } as never),
-      raw: async() => []
-    };
-    return stmt as never;
-  }) as typeof db.prepare;
-
-  return db;
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('createOrder', () => {
-  // Helper: call createOrder and expect 201 Created
-  async function createAndAssert(req: Request, env: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    return res.json() as Promise<Record<string, unknown>>;
-  }
-  it('returns 400 with validation error when items is empty', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ items: [] }))
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(400);
-    const data: unknown = await res.json();
-    expect((data as Record<string, unknown>).success).toBe(false);
+  it('rejects empty items before writing', async () => {
+    const { env, sqlite } = fixture();
+    expect((await createOrder(request({ items: [] }), env)).status).toBe(400);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
   });
-
-  // Test 2: Happy path — 200, success flag, correct structure
-  it('returns 200 with success flag and correct structure on valid order', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ORDER_BASE)
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    expect(data.success).toBe(true);
-    expect(data.message).toBe('Order created successfully');
-    const order = data.data as Record<string, unknown>;
-    expect(order.id).toBeDefined();
-    expect(typeof order.id).toBe('string');
-    expect((order.id as string).startsWith('ORD_')).toBe(true);
-    expect(order.status).toBe('pending');
-    expect(order.payment_status).toBe('unpaid');
+  it('returns 201 with the stable order envelope and server-priced snapshot', async () => {
+    const { env, sqlite } = fixture();
+    const response = await createOrder(request(), env);
+    expect(response.status).toBe(201);
+    const body = await response.json() as any;
+    expect(body).toMatchObject({ success: true, message: 'Order created successfully' });
+    expect(body.data.id).toMatch(/^ORD_/);
+    expect(body.data).toMatchObject({ status: 'pending', payment_status: 'unpaid', total: 40000 });
+    expect(body.data.items[0]).toMatchObject({ name: 'Coffee', price: 20000, quantity: 2 });
+    expect(sqlite.prepare('SELECT total FROM orders').get()).toMatchObject({ total: 40000 });
   });
-
-  // Test 3: Response includes all expected fields
-  it('response includes customer, payment, numeric totals, table_id null', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody())
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    const customer = order.customer as Record<string, unknown>;
-
-    // Customer block
-    expect(customer.full_name).toBe('Nguyen Van A');
-    expect(customer.phone).toBe('0909123456');
-    expect(customer.address).toBeNull();
-
-    // Direct fields
-    expect(order.customer_name).toBe('Nguyen Van A');
-    expect(order.customer_phone).toBe('0909123456');
-    expect(order.customer_address).toBeNull();
-    expect(order.payment_method).toBe('cod');
-    expect(order.table_id).toBeNull();
-
-    // Numeric
-    expect(typeof order.total).toBe('number');
-    expect(typeof order.shipping_fee).toBe('number');
-    expect(typeof order.discount).toBe('number');
-    expect(order.delivery_time).toBe('now');
-
-    // Items
-    const items = order.items as Array<Record<string, unknown>>;
-    expect(items.length).toBe(1);
-    expect(items[0].name).toBe('Cà phê sữa');
-
-    // ISO timestamp
-    expect(order.created_at).toBeDefined();
-    expect(new Date(order.created_at as string).toISOString()).toBe(order.created_at);
+  it('includes customer, payment, numeric totals and null optional fields', async () => {
+    const { env } = fixture();
+    const { data } = await (await createOrder(request(), env)).json() as any;
+    expect(data.customer).toEqual({ full_name: base.customer_name, phone: base.customer_phone, address: null });
+    expect(data).toMatchObject({ customer_name: base.customer_name, customer_phone: base.customer_phone,
+      customer_address: null, payment_method: 'cod', table_id: null, notes: null, delivery_time: 'now', shipping_fee: 0, discount: 0 });
+    expect(new Date(data.created_at).toISOString()).toBe(data.created_at);
   });
-
-  // Test 4: Resolves table_number -> UUID, marks table occupied
-  it('resolves table_id to UUID and marks table occupied', async() => {
-    const TABLE_UUID = 'tbl-uuid-abc';
-    const db = makeOrderDB({ _tableId: TABLE_UUID });
-    const env = createMockEnv({ AURA_DB: db });
-
-    let tableLookupBinds: unknown[] = [];
-    let tableUpdateBinds: unknown[] = [];
-
-    const basePrepare = db.prepare.bind(db);
-    db.prepare = ((sql: string) => {
-      const stmt = basePrepare(sql);
-      const origBind = stmt.bind.bind(stmt);
-      stmt.bind = (...args: unknown[]) => {
-        if (sql.includes('SELECT id FROM cafe_tables')) {
-          tableLookupBinds = args;
-        }
-        if (sql.includes('UPDATE cafe_tables')) {
-          tableUpdateBinds = args;
-        }
-        return origBind(...args);
-      };
-      return stmt;
-    }) as typeof db.prepare;
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ table_id: '5' } as Partial<OrderBase> & { table_id: string }))
-    });
-    const res = await createOrder(req, env);
-
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    expect(order.table_id).toBe(TABLE_UUID);
-    expect(tableLookupBinds.length).toBeGreaterThanOrEqual(1);
-    expect(tableUpdateBinds.length).toBeGreaterThanOrEqual(1);
-    expect(tableLookupBinds[0]).toBe('5');
-    expect(tableUpdateBinds[0]).toBe(TABLE_UUID);
+  it('resolves a store table code and atomically occupies the correct table', async () => {
+    const { env, sqlite } = fixture();
+    const response = await createOrder(request({ table_id: 'D1', order_type: 'dine_in' }), env);
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data.table_id).toBe('table-default');
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id='table-default'").get()).toMatchObject({ status: 'Occupied' });
   });
-
-  // Test 5: table_id not found → resolvedTableId stays null
-  it('ignores table_id when no matching table exists', async() => {
-    const db = makeOrderDB({ _tableNotFound: true });
-    const env = createMockEnv({ AURA_DB: db });
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ table_number: '999' } as Partial<OrderBase> & { table_number: string }))
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    expect((data.data as Record<string, unknown>).table_id).toBeNull();
+  it('rejects an unresolved explicit table instead of creating an unbound order', async () => {
+    const { env, sqlite } = fixture();
+    expect((await createOrder(request({ table_id: '999' }), env)).status).toBe(400);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
   });
-
-  // Test 6: No cafe_tables query when table_id is absent
-  it('does not query cafe_tables when table_id is absent', async() => {
-    const db = createMockDB();
-    const queriedSql: string[] = [];
-    const origPrepare = db.prepare.bind(db);
-    db.prepare = ((sql: string) => {
-      queriedSql.push(sql);
-      return origPrepare(sql);
-    }) as typeof db.prepare;
-
-    const env = createMockEnv({ AURA_DB: db });
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody())
-    });
-    await createOrder(req, env);
-
-    const cafeTableQueries = queriedSql.filter(s => s.includes('cafe_tables'));
-    expect(cafeTableQueries.length).toBe(0);
+  it('does not query cafe_tables for takeaway without a table', async () => {
+    const { env } = fixture();
+    const spy = vi.spyOn(env.AURA_DB, 'prepare');
+    expect((await createOrder(request(), env)).status).toBe(201);
+    expect(spy.mock.calls.some(([sql]) => String(sql).includes('cafe_tables'))).toBe(false);
   });
-
-  // Test 7: Email provided → customer upsert fires
-  it('inserts customer record when customer_email is provided', async() => {
-    const db = makeOrderDB({ _tableNotFound: true });
-    const env = createMockEnv({ AURA_DB: db });
-
-    let customerSqlFound = false;
-    const basePrepare = db.prepare.bind(db);
-    db.prepare = ((sql: string) => {
-      const stmt = basePrepare(sql);
-      const origBind = stmt.bind.bind(stmt);
-      stmt.bind = (...args: unknown[]) => {
-        if (sql.includes('INSERT INTO customers') && sql.includes('ON CONFLICT')) {
-          customerSqlFound = true;
-        }
-        return origBind(...args);
-      };
-      return stmt;
-    }) as typeof db.prepare;
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ customer_email: 'nguyenvana@example.com' }))
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    expect((data.data as Record<string, unknown>).customer).toBeDefined();
-    expect(customerSqlFound).toBe(true);
+  it('accepts an email without assigning unverified CRM account ownership', async () => {
+    const { env, sqlite } = fixture();
+    const response = await createOrder(request({ customer_email: 'guest@test.aura' }), env);
+    expect(response.status).toBe(201);
+    expect(sqlite.prepare('SELECT customer_email,customer_id FROM orders').get())
+      .toMatchObject({ customer_email: 'guest@test.aura', customer_id: null });
   });
-
-  // Test 7b: No customer upsert when email is empty
-  it('skips customer insert when customer_email is empty', async() => {
-    const db = makeOrderDB({ _tableNotFound: true });
-    const env = createMockEnv({ AURA_DB: db });
-
-    let customerSqlFound = false;
-    const basePrepare = db.prepare.bind(db);
-    db.prepare = ((sql: string) => {
-      const stmt = basePrepare(sql);
-      const origBind = stmt.bind.bind(stmt);
-      stmt.bind = (...args: unknown[]) => {
-        if (sql.includes('INSERT INTO customers') && sql.includes('ON CONFLICT')) {
-          customerSqlFound = true;
-        }
-        return origBind(...args);
-      };
-      return stmt;
-    }) as typeof db.prepare;
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ customer_email: '' }))
-    });
-    await createOrder(req, env);
-    expect(customerSqlFound).toBe(false);
+  it('keeps guest CRM attribution separate from account ownership', async () => {
+    const { env, sqlite } = fixture();
+    expect((await createOrder(request(), env)).status).toBe(201);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM customers').get()).toMatchObject({ count: 1 });
+    expect(sqlite.prepare('SELECT customer_id FROM orders').get()).toMatchObject({ customer_id: null });
   });
-
-  // Test 8: DB error → 500
-  it('returns 500 with error message on database error', async() => {
-    const env = createMockEnv();
-    const throwingDB = {
-      prepare: () => {
-        throw new Error('Simulated DB failure');
-      }
-    } as unknown as ReturnType<typeof createMockDB>;
-    env.AURA_DB = throwingDB;
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody())
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(500);
-    const data: Record<string, unknown> = await res.json();
-    expect(data.success).toBe(false);
-    expect(data.error).toBe('Failed to create order');
-    expect((data.error as string).includes('Simulated DB failure')).toBe(false);
+  it('returns a sanitized 500 when persistence fails', async () => {
+    const { env, sqlite } = fixture();
+    sqlite.exec("CREATE TRIGGER fail_order BEFORE INSERT ON orders BEGIN SELECT RAISE(ABORT,'Simulated DB failure'); END");
+    const response = await createOrder(request(), env);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, error: 'Failed to create order' });
   });
-
-  // Test 9: Items preserve fields (qty, price, name)
-  it('preserves order item fields through order creation', async() => {
-    const items = [
-      { name: 'Cà phê sữa đá', quantity: 2, price: 25000 },
-      { name: 'Bánh mì thịt', quantity: 1, price: 15000 }
-    ];
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ items, total: 65000 }))
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    const returnedItems = order.items as Array<Record<string, unknown>>;
-    expect(returnedItems.length).toBe(2);
-
-    expect(returnedItems[0]).toHaveProperty('name');
-    expect(returnedItems[0]).toHaveProperty('price');
+  it('preserves quantity, notes and distinct catalog products', async () => {
+    const { env, sqlite } = fixture();
+    sqlite.exec("INSERT INTO products(id,category_id,name,price) VALUES('bread','coffee','Bread',15000)");
+    const response = await createOrder(request({ items: [base.items[0], { product_id: 'bread', name: 'Bread', quantity: 1, notes: 'Warm' }] }), env);
+    expect(response.status).toBe(201);
+    const { data } = await response.json() as any;
+    expect(data.total).toBe(55000);
+    expect(data.items[1]).toMatchObject({ menuItemId: 'bread', price: 15000, notes: 'Warm' });
   });
-
-  // Test 10: payos payment method accepted
-  it('accepts payos payment method and includes it in response', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ payment_method: 'payos' }))
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    expect(order.payment_method).toBe('payos');
-    expect(order.payment_status).toBe('unpaid');
+  it('accepts PayOS without precreating an unusable pending payment', async () => {
+    const { env, sqlite } = fixture();
+    const response = await createOrder(request({ payment_method: 'payos' }), env);
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data).toMatchObject({ payment_method: 'payos', payment_status: 'unpaid' });
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM payments').get()).toMatchObject({ count: 0 });
   });
-
-  // Test 11: Invalid payment method → 400
-  it('returns 400 for invalid payment_method', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ payment_method: 'visa' } as unknown as Partial<OrderBase>))
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(400);
+  it('rejects unsupported payment methods', async () => {
+    const { env } = fixture();
+    expect((await createOrder(request({ payment_method: 'visa' }), env)).status).toBe(400);
   });
-
-  // Test 12: Total with discount/shipping
-  it('includes shipping_fee and discount in response', async() => {
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({ total: 70000, shipping_fee: 5000, discount: 2000 }))
-    });
-    const env = createMockEnv();
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    expect(order.shipping_fee).toBe(5000);
-    expect(order.discount).toBe(2000);
+  it('ignores untrusted shipping and discount values', async () => {
+    const { env } = fixture();
+    const response = await createOrder(request({ shipping_fee: 5000, discount: 39000 }), env);
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data).toMatchObject({ shipping_fee: 0, discount: 0, total: 40000 });
   });
-
-  // Test 13: Mobile composite cart ID (e.g. bt001-Size Tiêu Chuẩn (M)_...) resolves base product bt001 in D1
-  it('resolves composite mobile cart item ID to base product ID in D1', async() => {
-    const db = createMockDB();
-    db.prepare = ((_sql: string) => {
-      const stmt: Record<string, unknown> = {
-        _sql,
-        _binds: [] as unknown[],
-        bind(this: typeof stmt, ...args: unknown[]) {
-          this._binds = args;
-          return this;
-        },
-        async first<T = unknown>() {
-          const sql = stmt._sql as string;
-          const arg0 = stmt._binds[0];
-          if (sql.includes('FROM products WHERE id = ?') && arg0 === 'bt001') {
-            return { id: 'bt001', name: 'Nước suối', price: 10000, available: 1 } as T;
-          }
-          return null as T;
-        },
-        async run() {
-          return { success: true, changes: 1, lastRowId: 1 } as unknown;
-        },
-        all: async() => ({ results: [], success: true } as never),
-        raw: async() => []
-      };
-      return stmt as never;
-    }) as typeof db.prepare;
-
-    const env = createMockEnv({ AURA_DB: db });
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody({
-        items: [{
-          id: 'bt001-Size Tiêu Chuẩn (M)_100% đường (chuẩn)_Đá đầy đủ (chuẩn)',
-          name: 'Nước suối',
-          quantity: 1,
-          price: 10000,
-        } as unknown as OrderBase['items'][0]],
-        total: 25000,
-        shipping_fee: 15000,
-      }))
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    const order = data.data as Record<string, unknown>;
-    expect(order.total).toBe(25000);
-    const items = order.items as Array<Record<string, unknown>>;
-    expect(items[0].menuItemId).toBe('bt001');
+  it('rejects unknown composite IDs without prefix or name fallback', async () => {
+    const { env } = fixture();
+    const response = await createOrder(request({ items: [{ id: 'coffee-Size M', name: 'Coffee', quantity: 1, price: 1000 }] }), env);
+    expect(response.status).toBe(400);
   });
 });
 
-// ── Idempotency (Idempotency-Key header → KV cache) ─────────────
 describe('Idempotency', () => {
-  it('returns 200 from KV cache on duplicate Idempotency-Key', async() => {
-    const cached = {
-      success: true,
-      data: { id: 'ORD_CACHED', status: 'pending', payment_status: 'unpaid', items: [], total: 50000, customer_name: 'Nguyen Van A' },
-      message: 'Order created successfully'
-    };
-    const kv = createMockKV({ 'order:idempotency:idem-dup': JSON.stringify(cached) });
-    const env = createMockEnv({ AUTH_KV: kv });
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-dup' },
-      body: JSON.stringify(makeBody())
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(200);
-    const data: Record<string, unknown> = await res.json();
-    expect((data.data as Record<string, unknown>).id).toBe('ORD_CACHED');
+  it('returns the original durable response on a duplicate scoped key', async () => {
+    const { env, sqlite } = fixture();
+    const first = await createOrder(request({}, 'repeat'), env);
+    const replay = await createOrder(request({}, 'repeat'), env);
+    expect(first.status).toBe(201); expect(replay.status).toBe(200);
+    expect(replay.headers.get('X-Cache')).toBe('HIT');
+    expect(await replay.json()).toEqual(await first.json());
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 1 });
   });
-
-  it('creates order AND caches response on first request with Idempotency-Key', async() => {
-    const kv = createMockKV();
-    const env = createMockEnv({ AUTH_KV: kv });
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-first' },
-      body: JSON.stringify(makeBody())
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
-    const data: Record<string, unknown> = await res.json();
-    expect((data.data as Record<string, unknown>).id).toMatch(/^ORD_/);
-
-    // Verify KV cached the response
-    const cachedRaw = await kv.get('order:idempotency:idem-first');
-    expect(cachedRaw).toBeTruthy();
-    const cached = JSON.parse(cachedRaw as string);
-    expect(cached.success).toBe(true);
-    expect(cached.message).toBe('Order created successfully');
+  it('ignores a legacy global KV entry and caches the accepted scoped response', async () => {
+    const { env, sqlite } = fixture();
+    env.AUTH_KV = createMockKV({ 'order:idempotency:legacy': JSON.stringify({ data: { id: 'FOREIGN_ORDER' } }) });
+    expect((await createOrder(request({}, 'legacy'), env)).status).toBe(201);
+    const row = sqlite.prepare('SELECT scope_key,response_body FROM order_creation_requests').get() as any;
+    expect(row.scope_key).toMatch(/^order:idempotency:v2:/);
+    expect(JSON.parse(row.response_body).data.id).not.toBe('FOREIGN_ORDER');
+    expect(await env.AUTH_KV.get(row.scope_key)).toBeTruthy();
   });
-
-  it('skips idempotency when header absent', async() => {
-    const env = createMockEnv();
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makeBody())
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
+  it('creates independently when no idempotency key is given', async () => {
+    const { env, sqlite } = fixture();
+    expect((await createOrder(request(), env)).status).toBe(201);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM order_creation_requests').get()).toMatchObject({ count: 0 });
   });
-
-  it('skips idempotency when AUTH_KV binding missing', async() => {
-    const env = createMockEnv({ AUTH_KV: undefined });
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-nokv' },
-      body: JSON.stringify(makeBody())
-    });
-    const res = await createOrder(req, env);
-    expect(res.status).toBe(201);
+  it('retains replay safety when AUTH_KV is missing', async () => {
+    const { env } = fixture(); env.AUTH_KV = undefined;
+    expect((await createOrder(request({}, 'no-kv'), env)).status).toBe(201);
+    expect((await createOrder(request({}, 'no-kv'), env)).status).toBe(200);
   });
-
-  it('cache TTL is 24 hours (86400s)', async() => {
-    const captured: { key?: string; ttl?: number } = {};
-    const kv = {
-      get: async() => null,
-      put: async(key: string, _val: string, opts?: { expirationTtl?: number }) => { captured.key = key; captured.ttl = opts?.expirationTtl; },
-      delete: async() => {},
-      list: async() => ({ keys: [], list_complete: true, cursor: '' }),
-      getWithMetadata: async() => ({ value: null, metadata: null })
-    } as unknown as ReturnType<typeof createMockKV>;
-    const env = createMockEnv({ AUTH_KV: kv });
-
-    const req = new Request('https://test.aura/api/orders', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-ttl' },
-      body: JSON.stringify(makeBody())
-    });
-    await createOrder(req, env);
-
-    expect(captured.key).toBe('order:idempotency:idem-ttl');
-    expect(captured.ttl).toBe(86400);
+  it('sets a 24-hour KV cache TTL without relying on it for durable correctness', async () => {
+    const { env } = fixture();
+    const put = vi.spyOn(env.AUTH_KV, 'put');
+    expect((await createOrder(request({}, 'ttl'), env)).status).toBe(201);
+    expect(put.mock.calls.some(([key, , options]) => String(key).startsWith('order:idempotency:v2:') && options?.expirationTtl === 86400)).toBe(true);
   });
 });

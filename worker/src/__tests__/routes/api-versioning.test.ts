@@ -16,6 +16,8 @@ function env() {
   } as any;
 }
 
+const REQUEST_CTX = { waitUntil: () => {} } as any;
+
 describe('API versioning', () => {
   it('serves /api/version', async() => {
     const res = await app.fetch(new Request('https://test.aura/api/version'), env() as any, { waitUntil: () => {} } as any);
@@ -64,9 +66,36 @@ describe('API versioning', () => {
         }),
       },
     };
-    const res = await app.fetch(new Request('https://test.aura/api/health?ready=1'), passingEnv as any, { waitUntil: () => {} } as any);
+    const res = await app.fetch(new Request('https://test.aura/api/health?ready=1'), passingEnv as any, REQUEST_CTX);
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.readiness).toBe(true);
+  });
+
+  // The /api/v1 prefix is a rewrite onto the canonical surface, so guards
+  // registered against literal /api/... paths must still run for a v1 request.
+  // If the alias ever stops re-entering the root app, a cookie-only write would
+  // slip past the KDS auth and the cookie-auth guard both.
+  it('still applies the KDS auth guard to a /api/v1 request', async() => {
+    const res = await app.fetch(
+      new Request('https://test.aura/api/v1/kds/orders', { method: 'POST' }),
+      env(),
+      REQUEST_CTX
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('still rejects a cookie-authenticated write on /api/v1', async() => {
+    const res = await app.fetch(
+      new Request('https://test.aura/api/v1/orders/ORD_1/cancel', {
+        method: 'POST',
+        headers: { Cookie: 'access_token=not-a-real-token' },
+      }),
+      env(),
+      REQUEST_CTX
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json() as Record<string, unknown>;
+    expect(String(body.error)).toContain('xác thực bằng token');
   });
 });

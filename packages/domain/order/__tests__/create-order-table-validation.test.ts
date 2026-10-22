@@ -19,6 +19,7 @@ function createMockEnv(tableRow: { id: string; table_number: string } | null = n
             }
             return null as T;
           }
+          if (sql.includes('FROM products WHERE id = ?')) return { id: 'coffee', name: 'Coffee', price: 25000, available: 1 } as T;
           if (sql.includes('SELECT')) return null as T;
           return null as T;
         },
@@ -41,7 +42,7 @@ function createMockEnv(tableRow: { id: string; table_number: string } | null = n
 
 describe('createOrder - Dine-In Table Validation', () => {
   const baseOrder = {
-    items: [{ name: 'Cà phê đen đá', qty: 1, price: 25000 }],
+    items: [{ product_id: 'coffee', name: 'Cà phê đen đá', qty: 1, price: 25000 }],
     total: 25000,
     customer_name: 'Nguyen Van A',
     customer_phone: '0901234567',

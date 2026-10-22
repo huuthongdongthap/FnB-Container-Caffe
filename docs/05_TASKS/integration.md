@@ -259,7 +259,7 @@ priority: P2
 
 ## Pillar 11: Payment Gateways (Already Done)
 
-**Status:** ✅ Completed — PayOS integrated, VNPay/MoMo available as fallback options.
+**Status:** ✅ Completed — PayOS and COD are the supported checkout methods.
 
 ---
 

@@ -110,56 +110,6 @@ export async function resolveServerProductPrice(
     try {
       dbItem = await findById(productId);
 
-      // If composite item ID (e.g. "bt001-Size Tiêu Chuẩn (M)..."), extract base ID
-      if (!dbItem && productId.includes('-')) {
-        const baseId = productId.split('-')[0]?.trim();
-        if (baseId && baseId !== productId) {
-          dbItem = await findById(baseId);
-        }
-      }
-
-      // Fallback matching by name if ID was modified or composite
-      if (!dbItem && fallbackName && fallbackName.trim()) {
-        const cleanName = fallbackName.trim();
-        try {
-          dbItem = await db
-            .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE name = ?')
-            .bind(cleanName)
-            .first<DbCatalogRow>();
-        } catch {
-          dbItem = null;
-        }
-        if (!dbItem) {
-          try {
-            dbItem = await db
-              .prepare('SELECT id, name, price, is_available as available FROM products WHERE name = ?')
-              .bind(cleanName)
-              .first<DbCatalogRow>();
-          } catch {
-            dbItem = null;
-          }
-        }
-        if (!dbItem) {
-          try {
-            dbItem = await db
-              .prepare('SELECT id, name, price, available, category FROM menu_items WHERE name = ?')
-              .bind(cleanName)
-              .first<DbCatalogRow>();
-          } catch {
-            dbItem = null;
-          }
-        }
-        if (!dbItem) {
-          try {
-            dbItem = await db
-              .prepare('SELECT id, name, price, available FROM menu_items WHERE name = ?')
-              .bind(cleanName)
-              .first<DbCatalogRow>();
-          } catch {
-            dbItem = null;
-          }
-        }
-      }
     } catch {
       dbItem = null;
     }

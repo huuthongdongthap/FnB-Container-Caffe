@@ -1,311 +1,62 @@
-/**
- * Unit tests for src/tree/orders/split-orders.ts
- * Tests: splitOrders — validation, table resolution, order creation, payment records
- */
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-/* ── mock logger ── */
-
-vi.mock('../../../middleware/logger', () => ({
-  createLogger: () => ({
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn()
-  })
-}));
-
-/* ── mock telegram / push / email (used by create-order via splitOrders import chain) ── */
-vi.mock('../../../../../packages/domain/order/notifications/telegram', () => ({
-  notifyTelegram: vi.fn(async() => {})
-}));
-
-vi.mock('worker/src/tree/push/notifier', () => ({
-  sendPushToStaff: vi.fn(async() => ({ sent: 0, failed: 0 }))
-}));
-
-vi.mock('../../../lib/email', () => ({
-  sendEmail: vi.fn(async() => true)
-}));
-
-/* ── DB helpers ── */
-function makeChain(
-  firstResult: unknown = null,
-  allResults: unknown[] = [],
-  runResult: { success: boolean; changes: number } = { success: true, changes: 1 }
-) {
-  const chain: Record<string, unknown> = {};
-  chain.bind = vi.fn(() => {
-    return chain;
-  });
-  chain.first = vi.fn(async() => firstResult);
-  chain.all = vi.fn(async() => ({ results: allResults }));
-  chain.run = vi.fn(async() => runResult);
-  return chain as never;
-}
-
-function makeTableChain(status = 'Available') {
-  return makeChain(
-    { id: 'tbl_42', status },
-    undefined,
-    { success: true, changes: status === 'Available' ? 1 : 0 }
-  );
-}
-
-function makeDB(chains: Record<string, unknown>[] = [makeChain()]) {
-  const queue = [...chains];
-  return {
-    prepare: vi.fn((_sql: string) => {
-      const chain = queue.shift() ?? makeChain();
-      return chain as never;
-    }),
-    batch: vi.fn(async() => [])
-  } as unknown as import('@cloudflare/workers-types').D1Database;
-}
-
-function makeEnv(db: import('@cloudflare/workers-types').D1Database) {
-  return { AURA_DB: db };
-}
-
-/* ── imports under test ── */
+// @vitest-environment node
+/** Split bill validation and persistence contract against actual SQLite. */
+import { afterEach, describe, expect, it } from 'vitest';
 import { splitOrders } from '@aura/domain-order';
+import { orderCreationFixture } from '../../integrations/order-creation-fixture';
 
-describe('split-orders', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
+function fixture() { const f = orderCreationFixture(); fixtures.push(f); return f; }
+afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
+const entry = { items: [{ id: 'coffee', name: 'Coffee', price: 1000, quantity: 2 }], total: 1000,
+  customer_name: 'Split customer', customer_phone: '0909123456', payment_method: 'cod' };
+const payload = { table_id: 'D1', orders: [entry, { ...entry, payment_method: 'payos' }] };
+const request = (body: unknown) => new Request('https://test.aura/api/orders/split', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+});
+
+describe('splitOrders', () => {
+  it('creates independent bills with stable response shape and correct catalog prices', async () => {
+    const { env, sqlite } = fixture();
+    const response = await splitOrders(request(payload), env);
+    expect(response.status).toBe(201);
+    const body = await response.json() as any;
+    expect(body.success).toBe(true); expect(body.data).toHaveLength(2);
+    expect(body.data[0]).toMatchObject({ total: 40000, status: 'pending', payment_status: 'unpaid', table_id: 'table-default' });
+    expect(body.data[0].id).not.toBe(body.data[1].id);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM order_items').get()).toMatchObject({ count: 2 });
+    expect(sqlite.prepare('SELECT method,amount FROM payments').all()).toEqual([{ method: 'cod', amount: 40000 }]);
   });
-
-  describe('splitOrders', () => {
-    const validPayload = {
-      orders: [
-        {
-          items: [{ id: 'i1', name: 'Pho Bo', price: 50000, quantity: 2 }],
-          total: 100000,
-          customer_name: 'Nguyen Van A',
-          customer_phone: '0909123456',
-          customer_email: 'nguyen@test.com',
-          customer_address: '123 Main St',
-          payment_method: 'cod',
-          notes: 'No onions',
-          delivery_time: '2026-07-08T12:00:00.000Z',
-          shipping_fee: 0,
-          discount: 0
-        },
-        {
-          items: [{ id: 'i2', name: 'Banh Mi', price: 30000, quantity: 1 }],
-          total: 30000,
-          customer_name: 'Tran Thi B',
-          customer_phone: '0909765432',
-          customer_email: '',
-          payment_method: 'cash'
-        }
-      ],
-      table_id: 'table-01'
-    };
-
-    function makeReq(body: unknown): Request {
-      return new Request('https://test.aura/api/orders/split', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    function makeDBForSplit() {
-      // table lookup -> INSERT order 1 -> INSERT payment 1 -> INSERT order 2 -> INSERT payment 2
-      return makeDB([
-        makeTableChain(), // table lookup
-        makeChain(undefined, undefined, { success: true, changes: 1 }), // UPDATE cafe_tables
-        makeChain(undefined, undefined, { success: true, changes: 1 }), // INSERT order 1
-        makeChain(undefined, undefined, { success: true, changes: 1 }), // INSERT payment 1
-        makeChain(undefined, undefined, { success: true, changes: 1 }), // INSERT order 2
-        makeChain(undefined, undefined, { success: true, changes: 1 }) // INSERT payment 2
-      ]);
-    }
-
-    it('creates split orders and returns 201', async() => {
-      const db = makeDBForSplit();
-      const env = makeEnv(db);
-
-      const result = await splitOrders(makeReq(validPayload), env);
-
-      expect(result.status).toBe(201);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { success: boolean }).success).toBe(true);
-      expect((body as Record<string, unknown> & { data: unknown[] }).data).toHaveLength(2);
-      expect((body as Record<string, unknown> & { data: { status: string }[] }).data[0].status).toBe('pending');
-      expect((body as Record<string, unknown> & { data: { status: string; payment_status: string }[] }).data[0].payment_status).toBe('unpaid');
-      expect((body as Record<string, unknown> & { data: { status: string }[] }).data[1].status).toBe('pending');
-    });
-
-    it('resolves table_number to table UUID and occupies it', async() => {
-      const db = makeDB([
-        makeTableChain(),
-        makeChain(undefined, undefined, { success: true, changes: 1 }), // UPDATE cafe_tables
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 })
-      ]);
-      const env = makeEnv(db);
-
-      await splitOrders(makeReq(validPayload), env);
-
-      const calls = (db.prepare as unknown as { mock: { calls: [unknown, string][] } }).mock.calls as unknown[][];
-      // First call resolves either table_number or id
-      expect((calls[0][0] as string)).toContain('WHERE table_number = ? OR id = ?');
-      // Second call: UPDATE cafe_tables SET status = 'Occupied'
-      expect((calls[1][0] as string)).toContain('cafe_tables');
-      expect((calls[1][0] as string)).toContain('Occupied');
-    });
-
-    it('handles non-existent table gracefully (no table_id in orders)', async() => {
-      const payload = {
-        ...validPayload,
-        orders: validPayload.orders.map(o => ({ ...o, table_id: undefined }))
-      };
-
-      const db = makeDB([
-        makeChain(null), // table lookup returns null
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 })
-      ]);
-      const env = makeEnv(db);
-
-      const result = await splitOrders(makeReq(payload), env);
-      expect(result.status).toBe(201);
-    });
-
-    it('returns 400 when fewer than 2 orders provided', async() => {
-      const payload = {
-        orders: [validPayload.orders[0]], // only 1 order
-        table_id: 'table-01'
-      };
-
-      const env = makeEnv(makeDB([]));
-      const result = await splitOrders(makeReq(payload), env);
-
-      expect(result.status).toBe(400);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { error: string }).error).toContain('2');
-    });
-
-    it('returns 400 when more than 4 orders provided', async() => {
-      const payload = {
-        orders: Array.from({ length: 5 }, (_, i) => ({
-          items: [{ id: `i${i}`, name: `Item ${i}`, price: 10000, quantity: 1 }],
-          total: 10000,
-          customer_name: `Customer ${i}`,
-          customer_phone: '0909123456'
-        })),
-        table_id: 'table-01'
-      };
-
-      const env = makeEnv(makeDB([]));
-      const result = await splitOrders(makeReq(payload), env);
-
-      expect(result.status).toBe(400);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { error: string }).error).toContain('4');
-    });
-
-    it('returns 400 when table_id is missing', async() => {
-      const payload = {
-        orders: validPayload.orders
-      };
-
-      const env = makeEnv(makeDB([]));
-      const result = await splitOrders(makeReq(payload), env);
-
-      expect(result.status).toBe(400);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { error: string }).error).toContain('table');
-    });
-
-    it('returns 400 when order total is below minimum 1000d', async() => {
-      const payload = {
-        orders: [
-          {
-            items: [{ id: 'i1', name: 'Tea', price: 500, quantity: 1 }],
-            total: 500, // below 1000 min
-            customer_name: 'Test',
-            customer_phone: '0909123456'
-          },
-          {
-            items: [{ id: 'i2', name: 'Coffee', price: 500, quantity: 1 }],
-            total: 500,
-            customer_name: 'Test2',
-            customer_phone: '0909765432'
-          }
-        ],
-        table_id: 'table-01'
-      };
-
-      const env = makeEnv(makeDB([]));
-      const result = await splitOrders(makeReq(payload), env);
-
-      expect(result.status).toBe(400);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { error: string }).error).toContain('1,000');
-    });
-
-    it('defaults payment_method to cash and delivery_time to now', async() => {
-      const payload = {
-        orders: [
-          {
-            items: [{ id: 'i1', name: 'Nuoc', price: 10000, quantity: 1 }],
-            total: 10000,
-            customer_name: 'Test',
-            customer_phone: '0909123456'
-            // no payment_method, no delivery_time
-          },
-          {
-            items: [{ id: 'i2', name: 'Com', price: 20000, quantity: 1 }],
-            total: 20000,
-            customer_name: 'Test2',
-            customer_phone: '0909765432'
-          }
-        ],
-        table_id: 'table-01'
-      };
-
-      const db = makeDB([
-        makeTableChain(),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 }),
-        makeChain(undefined, undefined, { success: true, changes: 1 })
-      ]);
-      const env = makeEnv(db);
-
-      const result = await splitOrders(makeReq(payload), env);
-      expect(result.status).toBe(201);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { data: { payment_method: string }[] }).data[0].payment_method).toBe('cash');
-      // delivery_time is not included in response object
-    });
-
-    it('returns 500 on database error', async() => {
-      const env = makeEnv(makeDB([]));
-      env.AURA_DB = makeDB([]);
-      (env.AURA_DB as unknown as { prepare: unknown }).prepare = vi.fn(() => {
-        throw new Error('D1 error');
-      }) as never;
-
-      const result = await splitOrders(makeReq(validPayload), env);
-      expect(result.status).toBe(500);
-      const bodyRaw = await result.json();
-      const body = (bodyRaw as Record<string, unknown>);
-      expect((body as Record<string, unknown> & { success: boolean }).success).toBe(false);
-    });
+  it('defaults to COD when a payment method is omitted', async () => {
+    const { env } = fixture();
+    const { payment_method: _method, ...withoutMethod } = entry;
+    const response = await splitOrders(request({ table_id: 'D1', orders: [withoutMethod, withoutMethod] }), env);
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data.every((o: any) => o.payment_method === 'cod')).toBe(true);
+  });
+  it.each([[], [entry], Array(5).fill(entry)])('rejects invalid number of sub-orders', async orders => {
+    const { env, sqlite } = fixture();
+    expect((await splitOrders(request({ table_id: 'D1', orders }), env)).status).toBe(400);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
+  });
+  it('rejects missing table information', async () => {
+    const { env } = fixture();
+    expect((await splitOrders(request({ orders: [entry, entry] }), env)).status).toBe(400);
+  });
+  it('rejects unresolved tables without a table-less fallback', async () => {
+    const { env } = fixture();
+    expect((await splitOrders(request({ ...payload, table_id: 'missing-table' }), env)).status).toBe(400);
+  });
+  it.each(['momo', 'apple_pay', 'google_pay'])('rejects unsupported method %s before writing', async method => {
+    const { env, sqlite } = fixture();
+    const response = await splitOrders(request({ ...payload, orders: [entry, { ...entry, payment_method: method }] }), env);
+    expect(response.status).toBe(400);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
+  });
+  it('returns a sanitized failure on database errors', async () => {
+    const { env } = fixture();
+    env.AURA_DB.prepare = () => { throw new Error('D1 error'); };
+    const response = await splitOrders(request(payload), env);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, error: 'Failed to create split orders' });
   });
 });

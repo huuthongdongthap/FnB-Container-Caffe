@@ -154,7 +154,7 @@ export function createHARouter() {
         parsed.data.event as DiningPresenceEvent,
         parsed.data.payload ?? {}
       );
-      return c.json({ success: true, ...result });
+      return c.json({ ...result, success: true });
     } catch (err) {
       log.error('dispatch_presence_error', { error: (err as Error).message });
       return c.json({ success: false, error: 'Failed to dispatch presence event' }, 500);
@@ -184,7 +184,7 @@ export function createHARouter() {
       }
 
       const result = await handleHAWebhook(c.env as Record<string, unknown>, body);
-      return c.json({ success: true, ...result });
+      return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ha_webhook_error', { error: (err as Error).message });
       return c.json({ success: false, error: 'Failed to process Home Assistant webhook' }, 500);

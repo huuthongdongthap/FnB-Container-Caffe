@@ -59,8 +59,8 @@ Chose **PayOS** as primary gateway.
 
 ## Future Considerations
 
-- Add MoMo as secondary gateway (capture MoMo-only customers)
-- Implement smart routing based on customer's bank (if detectable)
+- Supported checkout methods are PayOS and COD. No secondary gateway is planned.
+- Historical payment methods remain readable for existing records; they are not available for new orders.
 
 ## Implementation
 

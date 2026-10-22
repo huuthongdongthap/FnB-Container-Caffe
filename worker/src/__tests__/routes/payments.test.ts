@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for payment routes via paymentRouter Hono router.
  * Phase 1 TDD baseline — tests current behavior before hardening.
@@ -7,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TEST_JWT_SECRET, createMockKV, createMockDB } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
+import { paymentSqliteDB, payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 
 async function createTestRouter() {
   const mod = await import('@aura/domain-payment');
@@ -37,54 +39,21 @@ function paymentMockDB(config: {
   orderExists?: boolean;
   orderTotal?: number;
   orderPaymentStatus?: string;
+  orderPaymentMethod?: string;
   orderCustomerId?: string;
   existingPayment?: { status: string; payment_url?: string; checkout_url?: string; transaction_id: string } | null;
 }) {
-  const db = createMockDB();
-  const {
-    orderExists = true,
-    orderTotal = 50000,
-    orderPaymentStatus = 'unpaid',
-    orderCustomerId = 'USR_1',
-    existingPayment = null
-  } = config;
-
-  db.prepare = ((sql: string) => {
-    const stmt: Record<string, unknown> = {
-      _sql: sql,
-      _binds: [] as unknown[],
-      bind(...args: unknown[]) {
-        this._binds = args; return this;
-      },
-      first: async() => {
-        if (sql.includes('FROM orders WHERE id = ?')) {
-          if (!orderExists) {
-            return null;
-          }
-          return { id: 'ORD_1', total: orderTotal, payment_status: orderPaymentStatus, customer_id: orderCustomerId };
-        }
-        if (sql.includes('FROM payments WHERE order_id')) {
-          return existingPayment;
-        }
-        return null;
-      },
-      all: async() => ({ results: [], success: true }),
-      run: async() => ({ success: true, changes: 1, lastRowId: 0, meta: { last_row_id: 0 } }),
-      raw: async() => []
-    };
-    return stmt as any;
-  }) as any;
-  return db;
+  const fixture = paymentSqliteDB();
+  const { orderExists = true, orderTotal = 50000, orderPaymentStatus = 'unpaid',
+    orderPaymentMethod = 'payos', orderCustomerId = 'USR_1', existingPayment = null } = config;
+  if (orderExists) fixture.seed('orders', { id: 'ORD_1', total: orderTotal,
+    payment_status: orderPaymentStatus, payment_method: orderPaymentMethod, customer_id: orderCustomerId || null });
+  if (existingPayment) fixture.seed('payments', { id: 'PAY_1', order_id: 'ORD_1', method: 'payos',
+    amount: orderTotal, created_at: '2020-01-01T00:00:00Z', updated_at: '2020-01-01T00:00:00Z', ...existingPayment });
+  Object.defineProperty(fixture.db, 'executedSql', { get: () => fixture.executedStatements.map((statement) => statement.sql) });
+  return fixture.db;
 }
 
-/** Mock PayOS API success response */
-function mockPayOSSuccess() {
-  return {
-    code: '00',
-    desc: 'success',
-    data: { checkoutUrl: 'https://pay.payos.vn/pay/test123', paymentLinkId: 'LINK_001' }
-  };
-}
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -109,9 +78,7 @@ describe('PayOS create-link auth', () => {
 
   it('allows guest to pay an order with no customer_id (guest order)', async() => {
     const app = await createTestRouter();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 })
-    ));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url, init) => payosCheckoutResponse(JSON.parse(String(init.body)), 'test-checksum')));
     const env = makeEnv({ AURA_DB: paymentMockDB({ orderCustomerId: '' }) });
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
@@ -182,7 +149,7 @@ describe('PayOS create-link idempotency', () => {
     });
     // Mock PayOS API — should NOT be called (idempotency returns cached)
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    fetchSpy.mockResolvedValue(new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 }));
+    fetchSpy.mockImplementation(async (_url, init) => payosCheckoutResponse(JSON.parse(String(init?.body)), 'test-checksum'));
 
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
@@ -211,9 +178,7 @@ describe('PayOS create-link idempotency', () => {
         }
       })
     });
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 })
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => init?.method === 'POST' ? payosCheckoutResponse(JSON.parse(String(init.body)), 'test-checksum') : new Response(JSON.stringify({ code: 'not-found' }), { status: 404 }));
 
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
@@ -224,9 +189,10 @@ describe('PayOS create-link idempotency', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(body.cached).toBeUndefined();
-    expect(body.checkoutUrl).toBe('https://pay.payos.vn/pay/test123');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(body.orderCode).toBe(12345);
+    expect(body.cached).toBe(true);
+    expect(body.checkoutUrl).toBe('https://pay.payos.vn/web/test123');
   });
 
   it('returns 409 when order is already paid', async() => {
@@ -243,6 +209,25 @@ describe('PayOS create-link idempotency', () => {
   });
 });
 
+describe('PayOS create-link payment method guard', () => {
+  it('does not create a PayOS link or mark a COD order paid', async() => {
+    const app = await createTestRouter();
+    const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
+    const db = paymentMockDB({ orderPaymentMethod: 'cod', orderPaymentStatus: 'cod_pending' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await app.fetch(new Request('https://test.aura/api/payment/create-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ order_id: 'ORD_1' }),
+    }), makeEnv({ AURA_DB: db }));
+
+    expect(res.status).toBe(409);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((db as any).executedSql.filter((sql: string) => /UPDATE orders|INSERT INTO payments/i.test(sql))).toHaveLength(0);
+  });
+});
+
 // ── Return URL Tests ──────────────────────────────────────────────────
 
 describe('PayOS create-link return URL', () => {
@@ -256,7 +241,7 @@ describe('PayOS create-link return URL', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     fetchSpy.mockImplementation(async(url, init) => {
       capturedPayload = JSON.parse((init as RequestInit).body as string);
-      return new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 });
+      return payosCheckoutResponse(JSON.parse(String(init?.body)), 'test-checksum');
     });
 
     const req = new Request('https://test.aura/api/payment/create-link', {
@@ -283,9 +268,7 @@ describe('PayOS create-link success path', () => {
     const env = makeEnv({ AURA_DB: paymentMockDB({}) });
 
     // Mock PayOS API success
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 })
-    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => payosCheckoutResponse(JSON.parse(String(init?.body)), 'test-checksum'));
 
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
@@ -296,7 +279,7 @@ describe('PayOS create-link success path', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(true);
-    expect(body.checkoutUrl).toBe('https://pay.payos.vn/pay/test123');
+    expect(body.checkoutUrl).toBe('https://pay.payos.vn/web/test123');
   });
 
   it('handles PayOS API error gracefully', async() => {
@@ -317,69 +300,21 @@ describe('PayOS create-link success path', () => {
     expect(res.status).toBe(502);
   });
 
-  it('persists the exact retried orderCode registered with PayOS when initial INSERT hits UNIQUE collision', async() => {
-    const { persistPaymentWithRetries } = await import('../../../../packages/domain/payment/commands/payos-helpers');
-    const insertedCodes: string[] = [];
-    const registeredPayOSCodes: number[] = [];
-
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async(_url, init) => {
-      const payload = JSON.parse((init as RequestInit).body as string) as { orderCode: number };
-      registeredPayOSCodes.push(payload.orderCode);
-      return new Response(
-        JSON.stringify({
-          code: '00',
-          desc: 'success',
-          data: { checkoutUrl: 'https://pay.payos.vn/pay/retry-link' }
-        }),
-        { status: 200 }
-      );
+  it('resolves transaction-code collision before contacting PayOS and persists only the registered code', async () => {
+    const helpers = await import('../../../../packages/domain/payment/commands/payos-helpers');
+    const { getOrCreatePayOSAttempt } = await import('../../../../packages/domain/payment/commands/payos-attempt');
+    const fixture = paymentSqliteDB(); fixture.order('OTHER'); fixture.payment('OTHER', 'pending', '111111'); fixture.order('ORD_RETRY_1');
+    vi.spyOn(helpers, 'generateOrderCode').mockReturnValueOnce(111111).mockReturnValueOnce(222222);
+    const registeredCodes: number[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body)); registeredCodes.push(body.orderCode);
+      expect(fixture.sqlite.prepare("SELECT transaction_id FROM payments WHERE order_id = 'ORD_RETRY_1'").get()?.transaction_id).toBe(String(body.orderCode));
+      return payosCheckoutResponse(body, 'local');
     });
-
-    let insertAttempt = 0;
-    const db = createMockDB();
-    db.prepare = ((sql: string) => {
-      const stmt: Record<string, unknown> = {
-        _sql: sql,
-        _binds: [] as unknown[],
-        bind(...args: unknown[]) {
-          this._binds = args;
-          return this;
-        },
-        run: async function(this: { _binds: unknown[] }) {
-          if (sql.includes('INSERT INTO payments')) {
-            insertAttempt++;
-            if (insertAttempt === 1) {
-              throw new Error('UNIQUE constraint failed: payments.transaction_id');
-            }
-            insertedCodes.push(String(this._binds[3]));
-          }
-          return { success: true, changes: 1, lastRowId: 0, meta: { last_row_id: 0 } };
-        }
-      };
-      return stmt as any;
-    }) as any;
-
-    const result = await persistPaymentWithRetries({
-      db: db as any,
-      orderId: 'ORD_RETRY_1',
-      amount: 50000,
-      initialOrderCode: 111111,
-      checkoutUrl: 'https://pay.payos.vn/pay/initial',
-      payosPayload: { orderCode: 111111, amount: 50000 },
-      checksumKey: 'test-checksum',
-      clientId: 'test-client',
-      apiKey: 'test-api-key',
-      cancelUrl: 'https://test.aura/cancel',
-      description: 'Order #ORD_RETRY_1',
-      returnUrl: 'https://test.aura/return'
-    });
-
-    expect(result.ok).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(registeredPayOSCodes).toHaveLength(1);
-    expect(insertedCodes).toEqual([String(registeredPayOSCodes[0])]);
-    expect(result.finalOrderCode).toBe(registeredPayOSCodes[0]);
-    expect(result.checkoutUrl).toBe('https://pay.payos.vn/pay/retry-link');
+    const result = await getOrCreatePayOSAttempt({ db: fixture.db, orderId: 'ORD_RETRY_1', amount: 20000,
+      clientId: 'local', apiKey: 'local', checksumKey: 'local', description: 'Order', returnUrl: 'https://test.aura/success', cancelUrl: 'https://test.aura/cancel' });
+    expect(result).toMatchObject({ ok: true, payment: { transaction_id: '222222' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(1); expect(registeredCodes).toEqual([222222]);
   });
 });
 

@@ -23,12 +23,14 @@ i18n.use(initReactI18next).init({
 });
 
 // jsdom polyfill: HTMLDialogElement not implemented in jsdom
-HTMLDialogElement.prototype.showModal = function () {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function () {
-  this.open = false;
-};
+if (typeof HTMLDialogElement !== 'undefined') {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+  };
+}
 
 // jsdom polyfill: EventSource (not available in jsdom)
 if (typeof globalThis.EventSource === 'undefined') {

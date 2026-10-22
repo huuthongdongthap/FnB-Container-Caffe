@@ -45,6 +45,7 @@ function makeTamperTestEnv() {
     return stmt as any;
   };
 
+  db.batch = async statements => Promise.all(statements.map(statement => statement.run()));
   const store = new Map<string, string>();
   return {
     env: {
@@ -145,14 +146,14 @@ describe('Order Persistence Tamper & Schema Validation', () => {
     expect(res.status).toBe(201);
     const data = await res.json() as any;
     expect(data.success).toBe(true);
-    expect(data.total).toBe(60000);
+    expect(data.total).toBe(80000);
 
     // Verify order insert uses order_type and customer_address (not fulfillment_type)
     const orderInsert = insertLogs.find(l => l.sql.includes('INSERT INTO orders'));
     expect(orderInsert).toBeDefined();
-    expect(orderInsert?.sql).toContain('order_type, customer_address');
-    expect(orderInsert?.binds[7]).toBe('delivery');
-    expect(orderInsert?.binds[8]).toBe('123 Đường Hoa, Sa Đéc');
+    expect(orderInsert?.sql).toContain('customer_email, customer_address');
+    expect(orderInsert?.binds[15]).toBe('delivery');
+    expect(orderInsert?.binds[7]).toBe('123 Đường Hoa, Sa Đéc');
 
     // Verify order_items insert matches canonical 7 columns
     const itemInsert = insertLogs.find(l => l.sql.includes('INSERT INTO order_items'));
@@ -160,7 +161,7 @@ describe('Order Persistence Tamper & Schema Validation', () => {
     expect(itemInsert?.sql).toContain('id, order_id, product_id, quantity, subtotal, modifiers, created_at');
     expect(itemInsert?.binds[2]).toBe('P_VALID');
     expect(itemInsert?.binds[3]).toBe(2);
-    expect(itemInsert?.binds[4]).toBe(60000);
+    expect(itemInsert?.binds[4]).toBe(80000);
   });
 
   it('validates canonical schema DDL compatibility for orders and order_items', () => {
@@ -171,9 +172,11 @@ describe('Order Persistence Tamper & Schema Validation', () => {
       // Check order_items has exact 7 canonical columns and references products(id)
       expect(schema).toMatch(/CREATE TABLE (IF NOT EXISTS )?order_items/);
       expect(schema).toContain('FOREIGN KEY (product_id) REFERENCES products(id)');
-      expect(schema).not.toContain('variant_id');
-      expect(schema).not.toContain('unit_price');
-      expect(schema).not.toContain('total_price');
+      const orderItemsDdl = schema.match(/CREATE TABLE (?:IF NOT EXISTS )?order_items\s*\([\s\S]*?\n\);/)?.[0];
+      expect(orderItemsDdl).toBeTruthy();
+      expect(orderItemsDdl).not.toContain('variant_id');
+      expect(orderItemsDdl).not.toContain('unit_price');
+      expect(orderItemsDdl).not.toContain('total_price');
 
       // Check orders has cafe_tables foreign key and canonical columns
       expect(schema).toContain('FOREIGN KEY (table_id) REFERENCES cafe_tables(id)');
