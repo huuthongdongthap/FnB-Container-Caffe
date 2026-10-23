@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { cn } from '@/lib/cn';
+import { ManageMenuTabBar } from './manage-menu-tab-bar';
 import type { Tab } from './types';
 import { useProductManager } from './use-product-manager';
 import { useCategoryManager } from './use-category-manager';
@@ -10,6 +10,10 @@ import { CategoryList } from './category-list';
 import { ProductModal } from './product-modal';
 import { CategoryModal } from './category-modal';
 import { ConfirmDeleteModal } from './confirm-delete-modal';
+import { useModifierManager } from './use-modifier-manager';
+import { ModifierGroupList } from './modifier-group-list';
+import { ModifierGroupModal } from './modifier-group-modal';
+import { ModifierChoiceModal } from './modifier-choice-modal';
 
 export default function ManageMenuPage() {
   const { t } = useTranslation();
@@ -17,6 +21,7 @@ export default function ManageMenuPage() {
 
   const product = useProductManager();
   const category = useCategoryManager();
+  const modifiers = useModifierManager();
 
   const products = product.query.data?.data ?? [];
   const categories = category.query.data?.data ?? [];
@@ -35,30 +40,7 @@ export default function ManageMenuPage() {
           </div>
 
           {/* Tabs */}
-          <div className="mb-6 flex gap-1 border-b border-border">
-            <button
-              onClick={() => setActiveTab('products')}
-              className={cn(
-                'px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
-                activeTab === 'products'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-foreground',
-              )}
-            >
-              {t('adminMenu.tabProducts')}
-            </button>
-            <button
-              onClick={() => setActiveTab('categories')}
-              className={cn(
-                'px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
-                activeTab === 'categories'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-foreground',
-              )}
-            >
-              {t('adminMenu.tabCategories')}
-            </button>
-          </div>
+          <ManageMenuTabBar activeTab={activeTab} onChange={setActiveTab} />
 
           {activeTab === 'products' && (
             <ProductList
@@ -85,6 +67,18 @@ export default function ManageMenuPage() {
               onEdit={category.openEditModal}
               onDelete={(id) => category.setDeleteId(id)}
               onAdd={category.openAddModal}
+            />
+          )}
+
+          {activeTab === 'modifiers' && (
+            <ModifierGroupList
+              groups={modifiers.groupsQuery.data?.data ?? []}
+              isLoading={modifiers.groupsQuery.isLoading}
+              isError={modifiers.groupsQuery.isError}
+              onRefetch={() => modifiers.groupsQuery.refetch()}
+              onAdd={modifiers.openAddGroupModal}
+              onManageChoices={modifiers.openChoiceModal}
+              onDelete={modifiers.setConfirmDeleteGroup}
             />
           )}
         </div>
@@ -132,6 +126,54 @@ export default function ManageMenuPage() {
           }}
           onClose={() => category.setDeleteId(null)}
           loading={category.deleteMutation.isPending}
+        />
+
+        <ConfirmDeleteModal
+          open={modifiers.confirmDeleteGroup !== null}
+          title="Xác nhận xoá"
+          message="Xoá nhóm tùy chọn cũng xoá các lựa chọn bên trong nó. Các món đã gán nhóm này sẽ không còn hiện tùy chọn. Hành động này không thể hoàn tác."
+          onConfirm={() => {
+            if (modifiers.confirmDeleteGroup) {
+              modifiers.deleteGroupMutation.mutate(modifiers.confirmDeleteGroup.id);
+            }
+          }}
+          onClose={() => modifiers.setConfirmDeleteGroup(null)}
+          loading={modifiers.deleteGroupMutation.isPending}
+        />
+
+        <ModifierGroupModal
+          open={modifiers.groupModalOpen}
+          form={modifiers.groupForm}
+          errors={modifiers.errors}
+          onChange={modifiers.handleGroupFormChange}
+          onSave={() => {
+            if (modifiers.validateGroupForm()) {
+              modifiers.createGroupMutation.mutate(modifiers.groupForm);
+            }
+          }}
+          onClose={modifiers.closeGroupModal}
+          saving={modifiers.createGroupMutation.isPending}
+        />
+
+        <ModifierChoiceModal
+          open={modifiers.choiceGroupId !== null}
+          groupName={
+            modifiers.groupsQuery.data?.data?.find((g) => g.id === modifiers.choiceGroupId)?.name ?? ''
+          }
+          choices={modifiers.choicesQuery.data?.data ?? []}
+          form={modifiers.choiceForm}
+          errors={modifiers.errors}
+          onChange={modifiers.handleChoiceFormChange}
+          onSave={() => {
+            if (modifiers.validateChoiceForm() && modifiers.choiceGroupId) {
+              modifiers.createChoiceMutation.mutate({
+                groupId: modifiers.choiceGroupId,
+                formData: modifiers.choiceForm,
+              });
+            }
+          }}
+          onClose={modifiers.closeChoiceModal}
+          saving={modifiers.createChoiceMutation.isPending}
         />
       </div>
     </>

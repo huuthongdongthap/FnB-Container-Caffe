@@ -101,11 +101,34 @@ priority: P1
 
 ## Future Tasks (Backlog)
 
-### Task: Product variants (size, add-ons)
+### Task: Priced product variants (size, add-ons)
 
-**Description:** Support product variations (e.g., size S/M/L, extra toppings) with price modifiers.
+**Description:** Support product variations with price modifiers (e.g., size S/M/L, thêm topping).
 
-**Effort:** 16h  
+Đã thử và gỡ bỏ: modal từng hiện size L (+5.000₫) và topping (+5.000đ/+8.000đ), nhưng
+server-authoritative pricing (`resolveServerProductPrice`) bỏ qua giá client khi product row
+đã tồn tại trong DB — khách thấy 34.000₫, server thu 29.000₫; gửi modifier id không có trong
+`modifier_choices` thì bị HTTP 400, không có fallback mềm. Nên lần này đã bỏ hoàn toàn size
+và topping khỏi modal để giá hiển thị = giá thu.
+
+Nếu làm lại, cần đồng bộ cả 3: (1) seed `modifier_groups` + `modifier_choices` cho từng món,
+(2) checkout gửi `modifiers: string[]` thay vì nhúng chuỗi vào `notes`, (3) pricing-resolver
+đọc được modifier đã chọn. Rule layer (`src/lib/menu-option-rules.ts`) đã tách sẵn nên chỉ
+cần thêm nhóm option mới.
+
+**Progress (2026-10-23):**
+- (3) pricing-resolver đã đọc được modifier từ trước — `pricing-resolver.ts` tính
+  `modifierDelta` và `order-snapshot.ts` lưu snapshot. Phần này không cần làm lại.
+- (1) Đã có UI admin để tạo dữ liệu (tab "Tùy chọn" trong `/admin/menu`) thay vì seed SQL:
+  CRUD API `/api/menu-modifiers` đã có và được `staffAuth` bảo vệ, nên seeding bằng SQL sẽ
+  tạo thêm một đường ghi không qua phân quyền. **Chưa seed** — cần quyết định thương mại
+  (món nào có size, phụ thí hay đổi giá gốc, giá topping, size và topping có cộng dồn được
+  không). Còn một lỗ hổng: chưa có sẵn PATCH/DELETE cho `modifier_choices`, nên sửa sai giá
+  hiện phải ghi trực tiếp DB.
+- (2) Chưa làm. Lưu ý bẫy id: `menu.tsx` nối suffix vào product id và `use-cart-store.ts`
+  đọc ngược lại, nên nếu modifier đổi sang object phải bỏ cơ chế suffix đó chứ không patch.
+
+**Remaining effort:** ~12h (link editor + checkout gửi modifiers + test end-to-end)
 **Priority:** P2
 
 ---

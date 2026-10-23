@@ -4,7 +4,38 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
-### Staff, Admin & KDS Backend/Frontend Data-Flow Contract Fixes (2026-10-17)
+### 🥤 Beverage Customizer Simplification — Per-Category Options (2026-10-23)
+- **feat(menu-options)** — Added `src/lib/menu-option-rules.ts`: maps menu category + serving tags to which customization groups an item can actually take (sweetness levels, ice levels, bar note). Keyed on `category` + `tags` rather than item id, because ids are not stable between the API rows and the offline fallback data (the yogurt group diverges: DB `yg001-yg004` vs fallback `yo001-yo004`). Unknown category falls back to the permissive plan so a new menu group degrades instead of silently stripping adjustable options.
+- **fix(menu-customization)** — Added `yg004` (Yaourt hủ) to the ready-to-serve bypass list in `src/lib/menu-customization.ts`. The live catalog id was missing while the offline-only `yo004` was present, so the real yogurt cup was being asked for sugar and ice.
+- **refactor(menu-modal)** — `DrinkCustomizerModal` now renders only the option groups the rule layer enabled for the item, reading its option lists from the rule layer, and numbers its sections consecutively from the groups that survive (no more "3. Mức đá" under "1. Độ ngọt" with a missing 2). Split into `DrinkOptionGroup.tsx`, `DrinkNotesSection.tsx`, and `DrinkModalHeader.tsx` to stay under the 200-line rule.
+- **feat(menu-types)** — `MenuItemData` carries optional `tags?: string[]`, and `transformToStitchItem` forwards them; previously the tags were fetched and dropped.
+- **fix(billing)** — Removed size and topping options from the customizer. Both promised surcharges the server never collected: server-authoritative pricing (`resolveServerProductPrice`) discards the client price whenever the product row exists in the DB, and an unrecognized modifier id hard-rejects the order with HTTP 400. The customer saw 34.000₫ and was charged 29.000₫. The modal price is now the menu price and is the price charged.
+- **test(menu)** — Added `src/lib/__tests__/menu-option-rules.test.ts` (37 tests: the category matrix as an executable spec, bypass list, tag vetoes, graceful fallbacks) and `src/components/menu/__tests__/DrinkCustomizerModal.test.tsx` (18 tests: bypass, per-category groups, gapless numbering, flat pricing, payload shape — the confirm handler receives structured modifiers rather than a flattened string — and state reset when switching items).
+
+### 🛠️ Modifier Admin UI — Catalog Management for Priced Variants (2026-10-23)
+
+- **feat(admin-menu)** — Added a third tab, "Tùy chọn", to the menu admin page for managing
+  `modifier_groups` and `modifier_choices`. The `/api/menu-modifiers` CRUD API had existed and
+  been `staffAuth`-guarded since the original build with no front end at all, so priced
+  variants could only be created by writing SQL against D1 directly — a second write path
+  that bypassed staff authorization. The tab exposes group create/list/delete, choice create
+  with an integer VND delta, and availability toggling.
+- **refactor(admin-menu)** — Split the tab strip out of `ManageMenu.tsx` into
+  `manage-menu-tab-bar.tsx` and the modifier state into `use-modifier-manager.ts` (mirrors
+  the existing `use-category-manager.ts`: `apiFetch` + react-query), keeping both files under
+  the 200-line budget.
+- **feat(i18n)** — Added 18 `adminMenu.modifier*` keys to `src/locales/{vi,en}.json`.
+  Note `public/locales/` is a stale byte-identical copy of the live pair that nothing loads
+  (`src/lib/i18n.ts` imports `src/locales/` only) — the new keys went to the live pair.
+
+**Deliberately out of scope:** choice edit/delete (the API exposes only GET and POST on
+`/groups/:groupId/choices`, so a mis-priced choice still needs a direct DB write) and the
+product↔group link editor (`POST`/`DELETE .../products/:pid/groups` exist but no surface
+renders them). Linking is the blocker for actually charging a modifier — a modifier is
+rejected unless its group is linked to the product (`modifier-validation.ts`) — so it is the
+next piece of work, not an omission.
+
+
 - **fix(staff-auth)** — Enforced PIN lockout (`pin_lockout:${deviceToken}`) on `POST /mobile/refresh` in `packages/domain/staff/commands/staff-auth.ts` (returning `429` when locked) and added `user:${payload.id}` + D1 `users` table fallback on `GET /mobile/me` in `worker/src/tree/auth/current-user.ts`.
 - **fix(shifts)** — Added cross-midnight open-shift fallback (`WHERE staff_id = ? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1`) with 24h cap on `POST /api/shifts/clock-out` in `packages/domain/shift/commands/shifts.ts`, mounted `reconciliationRoutes` (`/api/shifts/:id/reconcile`, `/api/shifts/:id/reconciliation`) in `worker/src/routes/features-router.ts`, and added `400` payload validation for `opening_float` and `denominations` in `packages/domain/shift/src/routes/reconciliation.ts`.
 - **fix(kds)** — Normalized station ticket `order_item_id` to composite key `${orderId}:${itemId}` in `packages/domain/kitchen/commands/kitchen-station-tickets.ts` to prevent cross-order item readiness bleed; scoped `['kitchen', 'barista', 'chef']` RBAC strictly to `/api/admin/orders*` in `worker/src/routes/features-router.ts` while unifying KDS RBAC across `worker/src/index.ts`, `worker/src/routes/orders-unified.ts`, `worker/src/routes/staff-mobile.ts`, `packages/domain/kitchen/commands/kitchen-stations.ts`, and `packages/domain/kitchen/commands/kds-mobile.ts`; validated canonical statuses and updated `latest_order_ts` + `orders:latest_updated_at` in `AUTH_KV` on admin status mutations; and normalized `item.name` / `item.modifiers` in `src/hooks/use-kds.ts` SSE stream mapping.

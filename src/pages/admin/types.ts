@@ -35,7 +35,41 @@ export interface CategoryFormData {
   sort_order: string;
 }
 
-export type Tab = 'products' | 'categories';
+export type Tab = 'products' | 'categories' | 'modifiers';
+
+/** An option group (e.g. "Kích cỡ") the customer picks from. */
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  /** `single` allows one pick, `multiple` several — enforced server-side. */
+  type: 'single' | 'multiple';
+  required: number;
+  sort_order: number;
+  is_active: number;
+}
+
+/** One selectable option inside a group, priced as a delta over the base price. */
+export interface ModifierChoice {
+  id: string;
+  group_id: string;
+  name: string;
+  /** Integer VND, signed; validation rejects non-integers. */
+  price_delta: number;
+  sort_order: number;
+  is_available: number;
+}
+
+export interface ModifierGroupFormData {
+  name: string;
+  type: 'single' | 'multiple';
+  required: boolean;
+  sort_order: string;
+}
+
+export interface ModifierChoiceFormData {
+  name: string;
+  price_delta: string;
+}
 
 export const EMPTY_PRODUCT: ProductFormData = {
   name: '',
@@ -53,6 +87,18 @@ export const EMPTY_CATEGORY: CategoryFormData = {
   name: '',
   slug: '',
   sort_order: '0',
+};
+
+export const EMPTY_MODIFIER_GROUP: ModifierGroupFormData = {
+  name: '',
+  type: 'single',
+  required: false,
+  sort_order: '0',
+};
+
+export const EMPTY_MODIFIER_CHOICE: ModifierChoiceFormData = {
+  name: '',
+  price_delta: '0',
 };
 
 // ── Promotions ───────────────────────────────────────────────────────
