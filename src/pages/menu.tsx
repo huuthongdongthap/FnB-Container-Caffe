@@ -26,6 +26,8 @@ function transformToStitchItem(item: CustomerMenuItem): MenuItemData {
     imageAlt: item.name,
     category: item.category,
     badge: item.tags?.includes('featured') ? 'NỔI BẬT' : undefined,
+    // Preserved so the customizer can decide which options apply to this drink.
+    tags: item.tags,
   };
 }
 
@@ -92,7 +94,7 @@ export function MenuPage() {
       return;
     }
 
-    // Craft drinks: Open customization modal so customer can choose sweetness, ice, size, toppings
+    // Craft drinks: Open customization modal so customer can choose sweetness and ice
     setCustomizingItem(stitchItem);
   };
 

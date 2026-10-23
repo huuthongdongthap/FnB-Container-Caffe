@@ -1,8 +1,8 @@
 /**
  * Menu Customization Rules
- * Determines which items are craft drinks (requiring sweetness, ice, size, toppings)
+ * Determines which items are craft drinks (requiring sweetness and ice levels)
  * versus ready-to-serve / packaged products (bottled water, canned sodas, yogurt cups, whole coconuts)
- * that should NEVER prompt for sugar, ice, or toppings.
+ * that should NEVER prompt for sugar or ice.
  */
 
 // Category keys that represent pre-packaged, non-craft goods
@@ -15,7 +15,9 @@ export const READY_TO_SERVE_CATEGORIES = new Set([
 
 // Explicit item IDs that are pre-made or served whole without barista formulation
 export const READY_TO_SERVE_ITEM_IDS = new Set([
-  'yo004', // Yaourt hũ (sữa chua hũ nguyên chất)
+  // Yaourt hũ: 'yo004' is the offline fallback id, 'yg004' the catalog id — both must bypass.
+  'yo004',
+  'yg004',
   'jc004', // Dừa trái (nguyên quả tươi)
   'od002', // Bình trà bắc (bình mộc nóng ngồi lâu)
   'bt001', // Nước suối đóng chai
@@ -26,7 +28,7 @@ export const READY_TO_SERVE_ITEM_IDS = new Set([
 /**
  * Check if a menu item is a ready-to-serve / packaged product.
  * Returns true if the item should bypass the drink customization modal
- * (no sweetness, ice levels, toppings, or size upgrades).
+ * (no sweetness or ice levels — the drink is served as it is packaged).
  */
 export function isReadyToServeItem(item?: {
   id?: string;

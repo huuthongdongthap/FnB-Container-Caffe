@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useId } from 'react';
-import { X, Plus, Minus, Sparkles, Check } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew-types';
-import { isReadyToServeItem } from '@/lib/menu-customization';
+import { buildDrinkOptions } from '@/lib/menu-option-rules';
+import { DrinkModalHeader } from './DrinkModalHeader';
+import { DrinkOptionGroup } from './DrinkOptionGroup';
+import { DrinkNotesSection } from './DrinkNotesSection';
 
 interface DrinkCustomizerModalProps {
   item: MenuItemData | null;
@@ -18,18 +21,23 @@ interface DrinkCustomizerModalProps {
   }) => void;
 }
 
-const SWEETNESS_OPTIONS = ['100% đường (chuẩn)', '70% ít ngọt', '50% ngọt thanh', 'Không đường'];
-const ICE_OPTIONS = ['Đá đầy đủ (chuẩn)', 'Ít đá', 'Đá riêng', 'Uống nóng'];
-const SIZE_OPTIONS = [
-  { label: 'Size Tiêu Chuẩn (M)', extra: 0 },
-  { label: 'Size Lớn (L)', extra: 5000 },
-];
-const TOPPINGS = [
-  { id: 't_cream', name: 'Kem cheese béo mặn', price: 8000 },
-  { id: 't_pearl', name: 'Trân châu trắng', price: 5000 },
-  { id: 't_jelly', name: 'Thạch cà phê giòn', price: 5000 },
-];
+/**
+ * One adjustable axis the rule layer enabled for this item.
+ * `label` drives the heading; `selected` is the customer's pick.
+ */
+interface OptionSection {
+  label: string;
+  options: readonly string[];
+  selected: string;
+  onChange: (value: string) => void;
+}
 
+/**
+ * A drink is served exactly as the menu prices it: sweetness, ice and a note to
+ * the bar are the only adjustable axes, and never all three at once. Sections are
+ * numbered from the groups that survived the rule layer so a customer never reads
+ * "3. Mức đá" straight under "1. Độ ngọt" with a missing 2.
+ */
 export function DrinkCustomizerModal({
   item,
   isOpen,
@@ -38,18 +46,18 @@ export function DrinkCustomizerModal({
 }: DrinkCustomizerModalProps) {
   // ── All hooks MUST be called unconditionally (Rules of Hooks) ──
   const noteInputId = useId();
-  const [sweetness, setSweetness] = useState<string>(SWEETNESS_OPTIONS[0] ?? '100% đường (chuẩn)');
-  const [ice, setIce] = useState<string>(ICE_OPTIONS[0] ?? 'Đá đầy đủ (chuẩn)');
-  const [size, setSize] = useState(SIZE_OPTIONS[0] ?? { label: 'Size Tiêu Chuẩn (M)', extra: 0 });
-  const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
+  const [sweetness, setSweetness] = useState('');
+  const [ice, setIce] = useState('');
   const [notes, setNotes] = useState('');
   const [quantity, setQuantity] = useState(1);
 
+  const plan = item ? buildDrinkOptions(item) : null;
+
   useEffect(() => {
-    setSweetness(SWEETNESS_OPTIONS[0] ?? '100% đường (chuẩn)');
-    setIce(ICE_OPTIONS[0] ?? 'Đá đầy đủ (chuẩn)');
-    setSize(SIZE_OPTIONS[0] ?? { label: 'Size Tiêu Chuẩn (M)', extra: 0 });
-    setSelectedToppings([]);
+    if (!item) return;
+    const next = buildDrinkOptions(item);
+    setSweetness(next.sweetnessOptions[0] ?? '');
+    setIce(next.iceOptions[0] ?? '');
     setNotes('');
     setQuantity(1);
   }, [item?.id, isOpen]);
@@ -65,42 +73,48 @@ export function DrinkCustomizerModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Guard: render nothing when modal is closed, no item selected, or item is packaged/ready-to-serve
-  if (!isOpen || !item || isReadyToServeItem(item)) return null;
+  // Guard: render nothing when closed, no item selected, or the item is served as-is.
+  if (!isOpen || !item || !plan || plan.bypass) return null;
 
   const basePrice = parseInt(item.price.replace(/\D/g, ''), 10) || 25000;
+  const totalPrice = basePrice * quantity;
 
-  const toppingsPrice = selectedToppings.reduce((sum, tid) => {
-    const t = TOPPINGS.find((top) => top.id === tid);
-    return sum + (t?.price ?? 0);
-  }, 0);
-
-  const unitPrice = basePrice + size.extra + toppingsPrice;
-  const totalPrice = unitPrice * quantity;
-
-  const toggleTopping = (id: string) => {
-    setSelectedToppings((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
-    );
-  };
+  // State resets in an effect, so the very first paint would briefly show nothing
+  // selected; fall back to the plan's own default until the effect commits.
+  const pickedSweetness = sweetness || plan.sweetnessOptions[0] || '';
+  const pickedIce = ice || plan.iceOptions[0] || '';
 
   const handleConfirm = () => {
-    const modifierList: string[] = [
-      size.label,
-      sweetness,
-      ice,
-      ...selectedToppings.map((tid) => TOPPINGS.find((t) => t.id === tid)?.name).filter(Boolean) as string[],
-    ];
-
+    const modifierList = [pickedSweetness, pickedIce, notes.trim()].filter(Boolean);
     onConfirm({
       item,
       quantity,
-      finalPrice: unitPrice,
+      finalPrice: basePrice,
       modifiers: modifierList,
       notes: notes.trim(),
     });
     onClose();
   };
+
+  const sections: OptionSection[] = [];
+  if (plan.showSweetness) {
+    sections.push({
+      label: 'Độ ngọt (Đường)',
+      options: plan.sweetnessOptions,
+      selected: pickedSweetness,
+      onChange: setSweetness,
+    });
+  }
+  if (plan.showIce) {
+    sections.push({
+      label: 'Mức đá',
+      options: plan.iceOptions,
+      selected: pickedIce,
+      onChange: setIce,
+    });
+  }
+
+  const sectionsVisible = sections.length + (plan.showNotes ? 1 : 0);
 
   return (
     <div
@@ -113,182 +127,35 @@ export function DrinkCustomizerModal({
         className="w-full max-w-lg bg-[#0A1A2E] border border-white/10 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
         style={{ fontFamily: 'var(--aura-font-body)' }}
       >
-        {/* Header with image & item info */}
-        <div className="relative p-5 border-b border-white/10 flex items-start gap-4 bg-white/[0.02]">
-          {item.imageSrc && (
-            <img
-              src={item.imageSrc}
-              alt={item.name}
-              className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0"
+        <DrinkModalHeader
+          imageSrc={item.imageSrc}
+          name={item.name}
+          category={item.category}
+          price={`${basePrice.toLocaleString('vi-VN')}₫`}
+          onClose={onClose}
+        />
+
+        {/* Scrollable modifiers list — numbered off the sections that actually render */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          {sections.map((section, index) => (
+            <DrinkOptionGroup
+              key={section.label}
+              index={index + 1}
+              label={section.label}
+              options={section.options}
+              selected={section.selected}
+              onChange={section.onChange}
+            />
+          ))}
+
+          {plan.showNotes && (
+            <DrinkNotesSection
+              index={sectionsVisible}
+              inputId={noteInputId}
+              value={notes}
+              onChange={setNotes}
             />
           )}
-          <div className="flex-1 min-w-0 pr-8">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-[#4A7C59] block mb-1">
-              {item.category} • Tùy chỉnh vị
-            </span>
-            <h3
-              id="drink-customizer-title"
-              className="text-lg font-bold text-white truncate"
-              style={{ fontFamily: 'var(--aura-font-display)' }}
-            >
-              {item.name}
-            </h3>
-            <p className="text-sm font-semibold text-[var(--aura-chrome-bright)] mt-0.5">
-              {basePrice.toLocaleString('vi-VN')}₫
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng bảng tùy chọn"
-            className="absolute top-4 right-4 min-h-[44px] min-w-[44px] p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Scrollable modifiers list */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Size */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-soft)] mb-2.5">
-              1. Chọn kích cỡ (Size)
-            </h4>
-            <div className="grid grid-cols-2 gap-2.5">
-              {SIZE_OPTIONS.map((opt) => {
-                const isSelected = size.label === opt.label;
-                return (
-                  <button
-                    key={opt.label}
-                    type="button"
-                    onClick={() => setSize(opt)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-medium text-left flex items-center justify-between transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[var(--aura-chrome-bright)] bg-[var(--aura-chrome-bright)]/10 text-white'
-                        : 'border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20'
-                    }`}
-                  >
-                    <span>{opt.label}</span>
-                    {opt.extra > 0 && (
-                      <span className="text-[11px] font-semibold text-[#6B9FB8]">
-                        +{opt.extra.toLocaleString('vi-VN')}₫
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Sweetness */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-soft)] mb-2.5">
-              2. Độ ngọt (Đường)
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              {SWEETNESS_OPTIONS.map((opt) => {
-                const isSelected = sweetness === opt;
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setSweetness(opt)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[var(--aura-chrome-bright)] bg-[var(--aura-chrome-bright)]/10 text-white font-semibold'
-                        : 'border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Ice */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-soft)] mb-2.5">
-              3. Mức đá
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              {ICE_OPTIONS.map((opt) => {
-                const isSelected = ice === opt;
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setIce(opt)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[var(--aura-chrome-bright)] bg-[var(--aura-chrome-bright)]/10 text-white font-semibold'
-                        : 'border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Toppings */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-soft)] mb-2.5">
-              4. Topping thêm (tùy chọn)
-            </h4>
-            <div className="space-y-2">
-              {TOPPINGS.map((top) => {
-                const isSelected = selectedToppings.includes(top.id);
-                return (
-                  <button
-                    key={top.id}
-                    type="button"
-                    onClick={() => toggleTopping(top.id)}
-                    className={`w-full py-2.5 px-3 rounded-xl border text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[var(--aura-chrome-bright)] bg-[var(--aura-chrome-bright)]/10 text-white'
-                        : 'border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-4 h-4 rounded flex items-center justify-center border ${
-                          isSelected
-                            ? 'bg-[var(--aura-chrome-bright)] border-[var(--aura-chrome-bright)] text-[#0A1A2E]'
-                            : 'border-white/30'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                      <span>{top.name}</span>
-                    </div>
-                    <span className="font-semibold text-[#6B9FB8]">
-                      +{top.price.toLocaleString('vi-VN')}₫
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Special instructions */}
-          <div>
-            <label
-              htmlFor={noteInputId}
-              className="block text-xs font-bold uppercase tracking-wider text-[var(--aura-chrome-soft)] mb-2"
-            >
-              5. Ghi chú thêm cho quầy bar
-            </label>
-            <input
-              id={noteInputId}
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ví dụ: cho nhiều sữa, mang ly giữ nhiệt riêng..."
-              className="w-full px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[var(--aura-chrome-bright)] transition-colors"
-            />
-          </div>
         </div>
 
         {/* Footer: quantity counter + confirm button */}

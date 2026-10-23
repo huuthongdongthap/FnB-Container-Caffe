@@ -8,6 +8,12 @@ export interface MenuItemData {
   category: string;
   badge?: string;
   prepTime?: number; // estimated prep time in minutes
+  /**
+   * Catalog tags describing how the drink is served (Iced, Hot, Blended, ...).
+   * Drives which customization options the customer is offered; see
+   * src/lib/menu-option-rules.ts.
+   */
+  tags?: string[];
 }
 
 export interface StitchMenuNewProps {
