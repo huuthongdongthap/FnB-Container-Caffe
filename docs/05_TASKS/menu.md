@@ -75,14 +75,42 @@ priority: P1
 ### Story 5: Menu image optimization
 
 **Acceptance Criteria:**
-- [ ] Images served in WebP format with JPEG fallback
-- [ ] Responsive images: srcset for different screen sizes
-- [ ] Lazy loading (loading="lazy") for offscreen images
-- [ ] Cloudflare Images optimization enabled
-- [ ] Average image size < 50KB
+- [x] Images served in AVIF with WebP fallback
+- [x] Responsive images: srcset for different screen sizes
+- [x] Lazy loading (loading="lazy") for offscreen images
+- [x] Immutable cache headers on the image directory
+- [ ] Cloudflare Images optimization enabled — off by choice, `_headers` + git instead
 
-**Priority:** P2  
+**Priority:** P2
 **Status:** ✅ Completed
+
+**Budget (2026-10-24):**
+
+Chuẩn per-file "< 50KB" được viết trước khi có ảnh thật và không nêu width, nên
+không thể pass/fail được. Thay bằng chuẩn theo đúng width mà card dùng:
+
+| Width | Mục đích | Budget | Đo thực tế (max) |
+|---|---|---|---|
+| 400 px | card 1x | 40 KB | 25 KB |
+| 800 px | card retina 2x | 90 KB | 73 KB |
+| 1200 px | ceiling cho viewport lớn | 160 KB | 147 KB |
+
+Card ≈ 293 px (`grid-cols-4` trong `max-w-7xl px-6`), nên width 1200 không bao giờ
+được request ở breakpoint nào — nó chỉ tồn tại làm trần.
+
+Metric quan trọng nhất là **tổng payload toàn trang**, không phải per-file: một
+file 140 KB ở 1200 px vô hại nếu browser không tải nó; 49 file 25 KB mới là cái
+người dùng chịu. Toàn bộ menu trong first paint (~49 ảnh ở width 400, AVIF) =
+**0.52 MiB**, so với 6.10 MiB nếu vẫn dùng ảnh gốc 1200 px.
+
+Guard: `src/lib/__tests__/menu-image-budget.test.ts` walk directory thật và fail
+nếu bất kỳ file nào vượt ngưỡng theo width đọc ra từ tên file.
+
+Debt đang mở (biết, có chủ đích): `pepsi.webp` (191 px) và `red-bull.webp`
+(260 px) là ảnh nguồn nhỏ hơn variant 400 px, nên card sẽ hơi mờ dù nén tốt —
+cần ảnh gốc lớn hơn, không phải nén lại. Test
+`keeps every master at least as wide as the variant it feeds` đang đỏ vì đúng
+2 file này.
 
 ---
 

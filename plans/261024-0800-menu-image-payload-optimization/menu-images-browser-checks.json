@@ -1,0 +1,88 @@
+{
+  "checks": [
+    {
+      "name": "mobile",
+      "fixture": "canonical 49-item catalog with empty API image URLs",
+      "formats": [
+        "avif 400w=58"
+      ],
+      "shiftedCards": 0,
+      "overflow": false,
+      "soft": [
+        {
+          "alt": "Red Bull lon vàng — ảnh sản phẩm từ TCP",
+          "naturalWidth": 260,
+          "needed": 292
+        }
+      ],
+      "packshotRatio": {
+        "src": "/menu/aura-drinks/dasani.webp",
+        "bitmapRatio": 0.418,
+        "boxRatio": 1.521,
+        "objectFit": "contain"
+      }
+    },
+    {
+      "name": "tablet",
+      "fixture": "canonical 49-item catalog with empty API image URLs",
+      "formats": [
+        "avif 400w=46"
+      ],
+      "shiftedCards": 0,
+      "overflow": false,
+      "soft": [
+        {
+          "alt": "Red Bull lon vàng — ảnh sản phẩm từ TCP",
+          "naturalWidth": 260,
+          "needed": 294
+        }
+      ],
+      "packshotRatio": {
+        "src": "/menu/aura-drinks/dasani.webp",
+        "bitmapRatio": 0.418,
+        "boxRatio": 1.531,
+        "objectFit": "contain"
+      }
+    },
+    {
+      "name": "desktop",
+      "fixture": "canonical 49-item catalog with empty API image URLs",
+      "formats": [
+        "avif 400w=46"
+      ],
+      "shiftedCards": 0,
+      "overflow": false,
+      "soft": [],
+      "packshotRatio": {
+        "src": "/menu/aura-drinks/dasani.webp",
+        "bitmapRatio": 0.418,
+        "boxRatio": 1.219,
+        "objectFit": "contain"
+      }
+    }
+  ],
+  "failures": [
+    {
+      "name": "mobile",
+      "why": "1 image(s) rendered soft",
+      "detail": [
+        {
+          "alt": "Red Bull lon vàng — ảnh sản phẩm từ TCP",
+          "naturalWidth": 260,
+          "needed": 292
+        }
+      ]
+    },
+    {
+      "name": "tablet",
+      "why": "1 image(s) rendered soft",
+      "detail": [
+        {
+          "alt": "Red Bull lon vàng — ảnh sản phẩm từ TCP",
+          "naturalWidth": 260,
+          "needed": 294
+        }
+      ]
+    }
+  ]
+}

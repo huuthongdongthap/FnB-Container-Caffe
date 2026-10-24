@@ -4,6 +4,32 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### ⚡ Menu Image Payload Optimization — AVIF + Width Variants (2026-10-24)
+
+- **perf(menu-images)** — The 49 menu photographs shipped as 1200×900 masters totalling
+  6.10 MiB, served to a card that renders ≈ 293 px wide (`xl:grid-cols-4` inside
+  `max-w-7xl px-6`), so every card downloaded more than twice the pixels it displays.
+  `scripts/build-menu-image-variants.mjs` now emits AVIF (quality 50) and WebP (quality 80)
+  derivatives at 400/800/1200 px, and `StitchMenuNewMenuPhoto` picks one via
+  `<picture>` with a `sizes` attribute mirroring the grid. Full menu first paint is
+  **0.52 MiB, −91%**. AVIF is listed first because at equal perceptual quality it is
+  roughly half the bytes of WebP, with the WebP derivative as the fallback.
+- **fix(menu-images)** — Only the original masters are re-encoded. The 4 brand packshots
+  were stored losslessly (WebP `VP8L`), so downsizing them is a first lossy generation and
+  keeps their framing intact; the 49 illustrations already carry a lossy generation, so a
+  second pass at the same size would only compound the loss. `scripts/optimize-brand-packshots.mjs`
+  therefore matches on the `VP8L` header signature rather than a filename list.
+- **feat(cache)** — `_headers` now gives `/menu/aura-drinks/*`
+  `Cache-Control: public, max-age=31536000, immutable`. Without it the generated variants
+  would have been re-validated on every visit, throwing away most of the saving. `immutable`
+  is safe because the filenames carry the width and format, so republishing produces a new URL.
+  No CSP change was needed: `img-src` governs sources, not image formats.
+- **test(menu-images)** — Added `src/lib/__tests__/menu-image-budget.test.ts`, which walks the
+  real directory and reads each variant's width out of its filename to enforce a per-width
+  budget (40/90/160 KB), asserts a derivative exists for every master, and caps a full first
+  paint at 768 KB. Rewrote `docs/05_TASKS/menu.md:82` — the old "average image size < 50KB"
+  standard predates the photographs and names no width, so it could never be evaluated.
+
 ### 🥤 Beverage Customizer Simplification — Per-Category Options (2026-10-23)
 - **feat(menu-options)** — Added `src/lib/menu-option-rules.ts`: maps menu category + serving tags to which customization groups an item can actually take (sweetness levels, ice levels, bar note). Keyed on `category` + `tags` rather than item id, because ids are not stable between the API rows and the offline fallback data (the yogurt group diverges: DB `yg001-yg004` vs fallback `yo001-yo004`). Unknown category falls back to the permissive plan so a new menu group degrades instead of silently stripping adjustable options.
 - **fix(menu-customization)** — Added `yg004` (Yaourt hủ) to the ready-to-serve bypass list in `src/lib/menu-customization.ts`. The live catalog id was missing while the offline-only `yo004` was present, so the real yogurt cup was being asked for sugar and ice.
