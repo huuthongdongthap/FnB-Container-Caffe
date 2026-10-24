@@ -102,3 +102,45 @@ export function resolveMenuDrinkPackshots(id: string, imageUrl?: string | null) 
     ? MENU_DRINK_PACKSHOTS[id]
     : undefined;
 }
+
+/**
+ * Widths offered for each photograph, in CSS pixels.
+ *
+ * The menu grid is xl:grid-cols-4 inside max-w-7xl, so an image cell is about
+ * 293px: 400 covers 1x, 800 covers retina, and 1200 is a ceiling for unusually
+ * large viewports. Wider variants were measured and rejected - they were never
+ * requested by any breakpoint and the payload grew accordingly.
+ */
+export const MENU_IMAGE_WIDTHS = [400, 800, 1200] as const;
+
+function atWidth(path: string, width: number, extension: string): string {
+  return path.replace(/\.(webp|avif)$/, `-${width}.${extension}`);
+}
+
+/** Formats emitted for every width; AVIF first because it is roughly half the bytes. */
+const MENU_IMAGE_FORMATS = ['avif', 'webp'] as const;
+
+export interface MenuImageVariant {
+  width: number;
+  format: (typeof MENU_IMAGE_FORMATS)[number];
+  src: string;
+}
+
+/**
+ * Variants for one photograph, largest first so a browser picks the best match.
+ *
+ * Only paths produced by the generator get variants. An administrator-uploaded
+ * image keeps whatever the catalog stored, because those files live outside
+ * public/menu/aura-drinks and have no derivatives.
+ */
+export function menuImageVariants(path: string): MenuImageVariant[] {
+  if (!path.startsWith('/menu/aura-drinks/')) return [];
+
+  const variants: MenuImageVariant[] = [];
+  for (const width of [...MENU_IMAGE_WIDTHS].reverse()) {
+    for (const format of MENU_IMAGE_FORMATS) {
+      variants.push({ width, format, src: atWidth(path, width, format) });
+    }
+  }
+  return variants;
+}

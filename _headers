@@ -16,6 +16,12 @@
 /public/images/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Menu drink photographs. Safe to cache immutably because the generated
+# variants encode their width and format in the filename (latte-800.avif), so
+# republishing an image changes its URL instead of leaving a stale copy served.
+/menu/aura-drinks/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /*.min.css
   Cache-Control: public, max-age=31536000, immutable
 
