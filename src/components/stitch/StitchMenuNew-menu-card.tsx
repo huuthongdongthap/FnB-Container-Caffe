@@ -2,6 +2,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { Check, Heart } from 'lucide-react';
+import { StitchMenuNewMenuPhoto } from './StitchMenuNew-menu-photo';
 import type { MenuItemData } from './StitchMenuNew-types';
 
 /* ── Category placeholder maps ─────────────────────────────────── */
@@ -81,40 +82,25 @@ export function StitchMenuNewMenuCard({
     >
       {/* ── Image / Placeholder ─────────────────────────── */}
       <div className="relative h-64 overflow-hidden">
-        {item.imageSrc ? (
-          <img
-            src={item.imageSrc}
-            alt={item.imageAlt}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            loading="lazy"
-            onError={(e) => {
-              // Hide broken image → show placeholder
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-              const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null;
-              if (placeholder) placeholder.style.display = 'flex';
+        <StitchMenuNewMenuPhoto item={item}>
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-3"
+            style={{
+              background: CATEGORY_GRADIENT[item.category] ?? CATEGORY_GRADIENT['default'],
             }}
-          />
-        ) : null}
-
-        {/* Placeholder shown when no imageSrc or image fails */}
-        <div
-          className="h-full w-full flex-col items-center justify-center gap-3"
-          style={{
-            display: item.imageSrc ? 'none' : 'flex',
-            background: CATEGORY_GRADIENT[item.category] ?? CATEGORY_GRADIENT['default'],
-          }}
-          aria-hidden="true"
-        >
-          <span className="text-5xl select-none" role="img" aria-hidden="true">
-            {CATEGORY_ICON[item.category] ?? CATEGORY_ICON['default']}
-          </span>
-          <span
-            className="text-[10px] uppercase tracking-[0.2em] font-semibold opacity-60"
-            style={{ color: 'var(--aura-chrome-bright)' }}
+            aria-hidden="true"
           >
-            {CATEGORY_LABEL[item.category] ?? 'Đồ uống'}
-          </span>
-        </div>
+            <span className="text-5xl select-none" role="img" aria-hidden="true">
+              {CATEGORY_ICON[item.category] ?? CATEGORY_ICON['default']}
+            </span>
+            <span
+              className="text-[10px] uppercase tracking-[0.2em] font-semibold opacity-60"
+              style={{ color: 'var(--aura-chrome-bright)' }}
+            >
+              {CATEGORY_LABEL[item.category] ?? 'Đồ uống'}
+            </span>
+          </div>
+        </StitchMenuNewMenuPhoto>
 
         {item.badge && (
           <div

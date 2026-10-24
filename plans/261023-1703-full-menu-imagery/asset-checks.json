@@ -1,0 +1,429 @@
+{
+  "count": 49,
+  "distinct": 49,
+  "totalBytes": 5893892,
+  "items": [
+    {
+      "id": "tc001",
+      "name": "Cà phê máy/ phin",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/ca-phe-den.webp",
+      "bytes": 143742,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc002",
+      "name": "Cà phê sữa máy/ phin",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/ca-phe-sua.webp",
+      "bytes": 129866,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc003",
+      "name": "Cà phê/ Matcha muối",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/ca-phe-muoi.webp",
+      "bytes": 85486,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc004",
+      "name": "Bạc xỉu đá/ nóng",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/bac-xiu.webp",
+      "bytes": 117218,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc005",
+      "name": "Ca cao đá/ nóng",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/ca-cao.webp",
+      "bytes": 141276,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc006",
+      "name": "Ca cao sữa đá/ nóng",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/ca-cao-sua.webp",
+      "bytes": 137324,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "tc007",
+      "name": "Matcha latte đá",
+      "category": "traditional-coffee",
+      "image": "/menu/aura-drinks/matcha-latte-da.webp",
+      "bytes": 125924,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc001",
+      "name": "Cà phê kiểu Ý",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/espresso.webp",
+      "bytes": 110694,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc002",
+      "name": "Cà phê kiểu Mỹ",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/americano.webp",
+      "bytes": 95816,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc003",
+      "name": "Cà phê bọt sữa",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/cappuccino.webp",
+      "bytes": 106870,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc004",
+      "name": "Cà phê và Socola",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/mocha.webp",
+      "bytes": 113672,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc005",
+      "name": "Cà phê sữa nóng kiểu Ý",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/latte.webp",
+      "bytes": 108374,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "hc006",
+      "name": "Trà xanh sữa nóng",
+      "category": "hot-coffee",
+      "image": "/menu/aura-drinks/matcha-latte-nong.webp",
+      "bytes": 126824,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp001",
+      "name": "Cà phê đá xay",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/coffee-frappuccino.webp",
+      "bytes": 126434,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp002",
+      "name": "Cà phê bánh xay",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/cookie-frappuccino.webp",
+      "bytes": 138946,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp003",
+      "name": "Cà phê Socola đá xay",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/mocha-frappuccino.webp",
+      "bytes": 140298,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp004",
+      "name": "Cà phê Dừa Việt quốc",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/coconut-blueberry-coffee.webp",
+      "bytes": 138662,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp005",
+      "name": "Sữa chua Việt quốc bánh xay",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/blueberry-yogurt-frappuccino.webp",
+      "bytes": 130308,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "fp006",
+      "name": "Trà xanh đá xay",
+      "category": "frappuccino",
+      "image": "/menu/aura-drinks/matcha-frappuccino.webp",
+      "bytes": 128734,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sd001",
+      "name": "Sapphire",
+      "category": "soda",
+      "image": "/menu/aura-drinks/soda-sapphire.webp",
+      "bytes": 150718,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sd002",
+      "name": "Emerald",
+      "category": "soda",
+      "image": "/menu/aura-drinks/soda-emerald.webp",
+      "bytes": 157770,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te001",
+      "name": "Lipton chanh đá/nóng",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-lipton-chanh.webp",
+      "bytes": 133272,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te002",
+      "name": "Lipton sữa đá/ nóng",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-lipton-sua.webp",
+      "bytes": 118732,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te003",
+      "name": "Lipton cam đá/ nóng",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-lipton-cam.webp",
+      "bytes": 146644,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te004",
+      "name": "Trà cúc thảo mộc đá/ nóng",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-cuc.webp",
+      "bytes": 132382,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te005",
+      "name": "Trà mãng cầu",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-mang-cau.webp",
+      "bytes": 140060,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "te006",
+      "name": "Trà đào",
+      "category": "tea",
+      "image": "/menu/aura-drinks/tra-dao.webp",
+      "bytes": 138630,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sm001",
+      "name": "Sinh tố Dâu",
+      "category": "smoothies",
+      "image": "/menu/aura-drinks/sinh-to-dau.webp",
+      "bytes": 118592,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sm002",
+      "name": "Sinh tố Bơ",
+      "category": "smoothies",
+      "image": "/menu/aura-drinks/sinh-to-bo.webp",
+      "bytes": 103276,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sm003",
+      "name": "Sinh tố Mãng cầu",
+      "category": "smoothies",
+      "image": "/menu/aura-drinks/sinh-to-mang-cau.webp",
+      "bytes": 119696,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "sm004",
+      "name": "Sinh tố Sapo",
+      "category": "smoothies",
+      "image": "/menu/aura-drinks/sinh-to-sapo.webp",
+      "bytes": 125210,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "yg001",
+      "name": "Yaourt đá",
+      "category": "yogurt",
+      "image": "/menu/aura-drinks/yaourt-da.webp",
+      "bytes": 103120,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "yg002",
+      "name": "Yaourt cà phê",
+      "category": "yogurt",
+      "image": "/menu/aura-drinks/yaourt-ca-phe.webp",
+      "bytes": 119816,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "yg003",
+      "name": "Yaourt Việt Quốc",
+      "category": "yogurt",
+      "image": "/menu/aura-drinks/yaourt-viet-quoc.webp",
+      "bytes": 135416,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "yg004",
+      "name": "Yaourt hủ",
+      "category": "yogurt",
+      "image": "/menu/aura-drinks/yaourt-hu.webp",
+      "bytes": 97752,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc001",
+      "name": "Đá chanh",
+      "category": "juice",
+      "image": "/menu/aura-drinks/da-chanh.webp",
+      "bytes": 119008,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc002",
+      "name": "Rau má",
+      "category": "juice",
+      "image": "/menu/aura-drinks/rau-ma.webp",
+      "bytes": 138816,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc003",
+      "name": "Rau má dừa/sữa",
+      "category": "juice",
+      "image": "/menu/aura-drinks/rau-ma-dua-sua.webp",
+      "bytes": 118930,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc004",
+      "name": "Dừa trái",
+      "category": "juice",
+      "image": "/menu/aura-drinks/dua-trai.webp",
+      "bytes": 135450,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc005",
+      "name": "Dừa đá",
+      "category": "juice",
+      "image": "/menu/aura-drinks/dua-da.webp",
+      "bytes": 120048,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "jc006",
+      "name": "Cam vắt",
+      "category": "juice",
+      "image": "/menu/aura-drinks/cam-vat.webp",
+      "bytes": 130690,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "od001",
+      "name": "Trà đường",
+      "category": "other-drinks",
+      "image": "/menu/aura-drinks/tra-duong.webp",
+      "bytes": 146112,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "od002",
+      "name": "Bình trà bắc",
+      "category": "other-drinks",
+      "image": "/menu/aura-drinks/binh-tra-bac.webp",
+      "bytes": 119968,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "od003",
+      "name": "Đá me",
+      "category": "other-drinks",
+      "image": "/menu/aura-drinks/da-me.webp",
+      "bytes": 159992,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "od004",
+      "name": "Chanh muối",
+      "category": "other-drinks",
+      "image": "/menu/aura-drinks/chanh-muoi.webp",
+      "bytes": 123996,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "od005",
+      "name": "Sữa tươi",
+      "category": "other-drinks",
+      "image": "/menu/aura-drinks/sua-tuoi.webp",
+      "bytes": 94468,
+      "source": "ai-illustration"
+    },
+    {
+      "id": "bt001",
+      "name": "Nước suối",
+      "category": "bottled",
+      "image": "/menu/aura-drinks/dasani.webp",
+      "bytes": 46260,
+      "packshots": [
+        {
+          "src": "/menu/aura-drinks/dasani.webp",
+          "alt": "Nước đóng chai Dasani 510 ml — ảnh sản phẩm từ Coca-Cola Việt Nam",
+          "width": 502,
+          "height": 1200
+        }
+      ],
+      "source": "official-brand-packshot"
+    },
+    {
+      "id": "bt002",
+      "name": "Sting/ Coca/ Pepsi/ 7 UP/ Ô long",
+      "category": "bottled",
+      "image": "/menu/aura-drinks/coca-cola.webp",
+      "bytes": 36952,
+      "packshots": [
+        {
+          "src": "/menu/aura-drinks/coca-cola.webp",
+          "alt": "Coca-Cola vị nguyên bản — ảnh sản phẩm từ Coca-Cola Việt Nam",
+          "width": 1100,
+          "height": 1100
+        },
+        {
+          "src": "/menu/aura-drinks/pepsi.webp",
+          "alt": "Pepsi Cola — ảnh sản phẩm từ Suntory PepsiCo Việt Nam",
+          "width": 191,
+          "height": 635
+        }
+      ],
+      "source": "official-brand-packshot"
+    },
+    {
+      "id": "bt003",
+      "name": "Redbull",
+      "category": "bottled",
+      "image": "/menu/aura-drinks/red-bull.webp",
+      "bytes": 15648,
+      "packshots": [
+        {
+          "src": "/menu/aura-drinks/red-bull.webp",
+          "alt": "Red Bull lon vàng — ảnh sản phẩm từ TCP",
+          "width": 260,
+          "height": 413
+        }
+      ],
+      "source": "official-brand-packshot"
+    }
+  ]
+}

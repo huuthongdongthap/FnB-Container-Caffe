@@ -1,0 +1,42 @@
+{
+  "mode": "built-in image_gen",
+  "sharedPrompt": "One landscape 4:3 photorealistic menu photograph. Warm natural window light, pale travertine or wood, subtle foliage bokeh. Entire vessel centered within central 60%, crop-safe breathing room. No lettering, logos, stars, circular emblems, Viva Star, or watermarks, including on vessels.",
+  "entries": [
+    {
+      "slug": "ca-phe-den",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-75608102-2c9c-4b22-b8fb-c487ff3b28e3.png",
+      "reference": "tranh treo tuong 40x40cm-01.png",
+      "subject": "Vietnamese black iced coffee, dark espresso brown in a clear unbranded straight glass with transparent ice cubes and condensation, small metal Vietnamese phin beside the glass, warm wood."
+    },
+    {
+      "slug": "ca-phe-sua",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-27bcd742-481e-44af-abfe-41661a3c84a0.png",
+      "reference": "tranh treo tuong 40x40cm-01.png",
+      "subject": "Vietnamese iced milk coffee, clear short unbranded glass showing condensed milk at bottom and rich brown coffee above, some gentle marbling and ice, small phin to the side."
+    },
+    {
+      "slug": "ca-phe-muoi",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-d8b7b98b-45c8-47e5-b0d5-16e76a1790d4.png",
+      "reference": "tranh w49xh68-01.png",
+      "subject": "Vietnamese salted cream coffee: short rounded clear unbranded glass, espresso brown coffee lower layer and a thick smooth ivory salted cream cap. No lotus seeds, petals, fruit or garnish. Tiny bowl with a pinch of salt at side."
+    },
+    {
+      "slug": "matcha-latte-nong",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-82a6a2af-43da-4435-879e-55c4a1e4c415.png",
+      "reference": "tranh treo tuong 40x40cm-02.png",
+      "subject": "Hot matcha latte in a plain white ceramic cup and saucer, vivid green matcha with delicate white heart latte art, bamboo whisk and a small bowl of matcha powder to the side. Remove all branding on the cup and corner. Full cup, saucer and handle visible."
+    },
+    {
+      "slug": "sinh-to-dau",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-c122da7e-e637-48a1-8021-2f05187a325d.png",
+      "reference": "tranh w49xh68-02.png",
+      "subject": "Strawberry smoothie, opaque thick naturally pink blended strawberries and milk, tall clear plain glass with smooth blended texture, garnish one strawberry at rim, ripe fresh strawberries at side. No orange, pandan, cream cap or red syrup layers."
+    },
+    {
+      "slug": "sinh-to-bo",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-126a6425-6696-4135-b624-898d65fbdbb8.png",
+      "reference": "tranh w49xh68-03.png",
+      "subject": "Vietnamese avocado smoothie, thick uniform naturally pale avocado green blended texture in a tall clear plain glass, fresh halved avocado with brown stone at side. No pandan, rice, jelly, matcha, cereal or cream topping."
+    }
+  ]
+}

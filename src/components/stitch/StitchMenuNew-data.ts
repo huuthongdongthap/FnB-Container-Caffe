@@ -1,11 +1,12 @@
 import type { MenuItemData } from './StitchMenuNew-types';
+import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
 
 /**
  * Toàn bộ thực đơn AURA CAFE — Sa Đéc, Đồng Tháp
  * Nguồn: menu thực tế của quán (bảng giá tháng 9/2026)
  * Ảnh sản phẩm: AI Generated chuyên nghiệp chuẩn Concept Cafe Container AURA
  */
-export const DEFAULT_ITEMS: MenuItemData[] = [
+const MENU_ITEMS: MenuItemData[] = [
 
   /* ─── CÀ PHÊ TRUYỀN THỐNG ────────────────────────────────── */
   {
@@ -13,7 +14,7 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     name: 'Cà phê máy / phin truyền thống',
     description: 'Cà phê đen nguyên chất pha máy espresso hoặc phin truyền thống, phục vụ đá hoặc nóng.',
     price: '20.000₫',
-    imageSrc: '/menu/ca-phe-den.jpg',
+    imageSrc: '/menu/aura-drinks/ca-phe-den.webp',
     imageAlt: 'Cà phê đen nguyên chất pha phin / máy',
     category: 'traditional-coffee',
     badge: 'TRUYỀN THỐNG',
@@ -23,7 +24,7 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     name: 'Cà phê sữa máy / phin',
     description: 'Cà phê đậm đà kết hợp sữa đặc béo ngậy, pha máy hoặc phin. Phục vụ đá hoặc nóng.',
     price: '25.000₫',
-    imageSrc: '/menu/ca-phe-sua.jpg',
+    imageSrc: '/menu/aura-drinks/ca-phe-sua.webp',
     imageAlt: 'Cà phê sữa đá / nóng pha phin chuẩn gu Việt',
     category: 'traditional-coffee',
     badge: 'BÁN CHẠY',
@@ -33,7 +34,7 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     name: 'Cà phê / Matcha muối',
     description: 'Lớp kem muối béo mịn phủ lên cà phê hoặc matcha thơm lừng — đặc sản được yêu thích nhất.',
     price: '28.000₫',
-    imageSrc: '/menu/ca-phe-muoi.jpg',
+    imageSrc: '/menu/aura-drinks/ca-phe-muoi.webp',
     imageAlt: 'Cà phê muối / Matcha muối AURA CAFE',
     category: 'traditional-coffee',
     badge: 'ĐẶC SẢN',
@@ -127,7 +128,7 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     name: 'Greentea Latte nóng',
     description: 'Trà xanh sữa nóng — matcha hòa tan trong sữa tươi nóng, thanh mát và nhẹ nhàng.',
     price: '35.000₫',
-    imageSrc: '/menu/matcha-latte.jpg',
+    imageSrc: '/menu/aura-drinks/matcha-latte-nong.webp',
     imageAlt: 'Trà xanh sữa nóng Greentea Latte',
     category: 'hot-coffee',
   },
@@ -274,7 +275,7 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     name: 'Sinh tố Dâu / Bơ / Mãng cầu / Sapo',
     description: 'Sinh tố trái cây tươi chọn lọc — dâu tây, bơ sáp dẻo, mãng cầu hoặc sapodilla. Xay mịn béo ngậy.',
     price: '35.000₫',
-    imageSrc: '/menu/sinh-to-bo.jpg',
+    imageSrc: '/menu/aura-drinks/sinh-to-bo.webp',
     imageAlt: 'Sinh tố bơ sáp tươi sánh mịn',
     category: 'smoothies',
     badge: 'BÁN CHẠY',
@@ -453,3 +454,8 @@ export const DEFAULT_ITEMS: MenuItemData[] = [
     category: 'bottled',
   },
 ];
+
+export const DEFAULT_ITEMS: MenuItemData[] = MENU_ITEMS.map((item) => ({
+  ...item,
+  imageSrc: resolveMenuDrinkImage(item.id === 'sm001' ? 'sm002' : item.id, item.imageSrc),
+}));

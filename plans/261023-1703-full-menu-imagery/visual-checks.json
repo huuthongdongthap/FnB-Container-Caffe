@@ -1,0 +1,18 @@
+[
+  {
+    "name": "desktop",
+    "cards": 49,
+    "decoded": true,
+    "overflow": false,
+    "categoryFilters": 10,
+    "search": true
+  },
+  {
+    "name": "mobile",
+    "cards": 49,
+    "decoded": true,
+    "overflow": false,
+    "categoryFilters": 10,
+    "search": true
+  }
+]

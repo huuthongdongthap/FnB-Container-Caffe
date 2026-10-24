@@ -1,0 +1,16 @@
+[
+  {
+    "name": "desktop",
+    "fixture": "canonical 49-item catalog with empty API image URLs",
+    "count": 49,
+    "distinct": 49,
+    "overflow": false
+  },
+  {
+    "name": "mobile",
+    "fixture": "canonical 49-item catalog with empty API image URLs",
+    "count": 49,
+    "distinct": 49,
+    "overflow": false
+  }
+]

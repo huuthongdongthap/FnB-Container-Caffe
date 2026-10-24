@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import StitchMenuNew from '../StitchMenuNew';
 import type { MenuItemData } from '../StitchMenuNew';
+import { MENU_DRINK_IMAGES } from '@/lib/menu-drink-images';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -72,6 +73,49 @@ const CUSTOM_ITEMS: MenuItemData[] = [
 ];
 
 describe('StitchMenuNew', () => {
+  const bottledItem: MenuItemData = {
+    id: 'bt002', name: 'Nước ngọt', description: '', price: '15.000₫',
+    imageSrc: MENU_DRINK_IMAGES.bt002!, imageAlt: 'Nước ngọt', category: 'bottled',
+  };
+
+  it('shows Coca-Cola and Pepsi together without cropping their labels', () => {
+    renderWithProviders(<StitchMenuNew items={[bottledItem]} />);
+    for (const brand of [/Coca-Cola vị nguyên bản/, /Pepsi Cola/]) {
+      expect(screen.getByRole('img', { name: brand })).toHaveClass('object-contain');
+    }
+  });
+
+  it('uses the real gold Red Bull packshot', () => {
+    renderWithProviders(<StitchMenuNew items={[{ ...bottledItem, id: 'bt003', imageSrc: MENU_DRINK_IMAGES.bt003! }]} />);
+    expect(screen.getByRole('img', { name: /Red Bull lon vàng/ })).toHaveAttribute('src', '/menu/aura-drinks/red-bull.webp');
+  });
+
+  it('shows Coca-Cola Dasani bottled water without cropping or changing its price', () => {
+    renderWithProviders(<StitchMenuNew items={[{
+      ...bottledItem, id: 'bt001', name: 'Nước suối', price: '10.000₫', imageSrc: MENU_DRINK_IMAGES.bt001!,
+    }]} />);
+    const image = screen.getByRole('img', { name: /Nước đóng chai Dasani 510 ml/ });
+    expect(image).toHaveAttribute('src', '/menu/aura-drinks/dasani.webp');
+    expect(image).toHaveClass('object-contain');
+    expect(screen.getByText('10.000₫')).toBeInTheDocument();
+  });
+
+  it('preserves custom bottled imagery', () => {
+    renderWithProviders(<StitchMenuNew items={[{ ...bottledItem, imageSrc: '/uploads/soft-drinks.webp' }]} />);
+    expect(screen.getByRole('img', { name: 'Nước ngọt' })).toHaveAttribute('src', '/uploads/soft-drinks.webp');
+    expect(screen.queryByRole('img', { name: /Pepsi Cola/ })).toBeNull();
+  });
+
+  it('keeps the other brand visible when one packshot fails', () => {
+    renderWithProviders(<StitchMenuNew items={[bottledItem]} />);
+    fireEvent.error(screen.getByRole('img', { name: /Coca-Cola vị nguyên bản/ }));
+    expect(screen.queryByRole('img', { name: /Coca-Cola vị nguyên bản/ })).toBeNull();
+    expect(screen.getByRole('img', { name: /Pepsi Cola/ })).toBeInTheDocument();
+    fireEvent.error(screen.getByRole('img', { name: /Pepsi Cola/ }));
+    expect(screen.queryByRole('img', { name: /Pepsi Cola/ })).toBeNull();
+    expect(screen.getByText('Đóng chai')).toBeInTheDocument();
+  });
+
   it('renders with default items', () => {
     renderWithProviders(<StitchMenuNew />);
     expect(screen.getByText('Cà phê máy / phin truyền thống')).toBeTruthy();

@@ -1,0 +1,308 @@
+{
+  "mode": "built-in image_gen",
+  "styleReference": "assets/menu/aura-drinks/ca-phe-sua.png",
+  "sharedPrompt": "Use case: product-mockup. Create ONE landscape 4:3 photorealistic premium Vietnamese cafe menu photograph. Supplied image is STYLE REFERENCE ONLY: match its warm natural window light, wood/pale travertine tabletop, soft green foliage bokeh, gentle sun shadows, natural tactile materials. Replace subject with requested beverage, maintain same family of photographic styling. One centered product fully visible within middle 60% frame, ample room around rim/base for menu card cropping; believable drink texture and proportions; props only from ingredients. No text, logos, Viva Star, stars, watermarks, corner emblems, prices or typography anywhere, including vessels and background. Not a collage. Subject: ",
+  "jobs": [
+    {
+      "id": "tc004",
+      "slug": "bac-xiu",
+      "subject": "Vietnamese iced white coffee (bac xiu), short clear glass, mostly ivory condensed milk and fresh milk with only a thin dark coffee layer at top and ice, creamy pale color; no whipped cream.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-32ecaa56-36db-4ac5-a7ff-44edc0fe58b8.png",
+      "status": "completed"
+    },
+    {
+      "id": "tc005",
+      "slug": "ca-cao",
+      "subject": "Iced cocoa: clear tumbler with rich dark chocolate brown cocoa and ice, small bowl of cocoa powder beside. No coffee beans or coffee phin.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-f9ce153f-2832-4d0c-9aee-b691452ddc43.png",
+      "status": "completed"
+    },
+    {
+      "id": "tc006",
+      "slug": "ca-cao-sua",
+      "subject": "Iced milk cocoa: clear tumbler, light creamy chocolate brown milk cocoa with ice, small plain milk pitcher and cocoa powder beside. No coffee.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-204c374b-8d8e-4d8b-b041-9164b787b1c2.png",
+      "status": "completed"
+    },
+    {
+      "id": "tc007",
+      "slug": "matcha-latte-da",
+      "subject": "Iced matcha latte in tall clear straight glass: ivory milk at bottom, vivid green matcha on top with slight swirls, clear ice and condensation. Small matcha powder bowl. No latte art.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-f0b80e92-0dc0-4df7-b573-f3f2065fddf0.png",
+      "status": "completed"
+    },
+    {
+      "id": "hc001",
+      "slug": "espresso",
+      "subject": "Hot espresso in a tiny plain white demitasse cup and saucer: small concentrated dark shot with golden crema, no milk or ice. A few roasted beans beside. Elevated camera angle shows crema; full cup and handle.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-3c1f3ea4-28a9-4588-bd59-7a401bed79cc.png",
+      "status": "completed"
+    },
+    {
+      "id": "hc002",
+      "slug": "americano",
+      "subject": "Hot Americano, full plain white ceramic cup and saucer of black coffee, subtle steam, thin golden brown surface, no milk or foam and no ice. A few beans beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-f8cef4c7-cea2-4219-8865-485d7620a915.png",
+      "status": "completed"
+    },
+    {
+      "id": "hc003",
+      "slug": "cappuccino",
+      "subject": "Hot cappuccino in plain white rounded ceramic cup and saucer, dark espresso under thick ivory microfoam with a delicate small rosetta and fine cocoa dusting, subtle steam. Full handle visible.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-8b51ab59-4227-4a61-89be-8dfc4891336b.png",
+      "status": "completed"
+    },
+    {
+      "id": "hc004",
+      "slug": "mocha",
+      "subject": "Hot mocha coffee in plain white ceramic cup and saucer, warm chocolate brown coffee with fine milk foam and a restrained dark chocolate drizzle on top. Small pieces of dark chocolate beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-5c699868-4211-4f2a-a532-d2c3a04196e8.png",
+      "status": "completed"
+    },
+    {
+      "id": "hc005",
+      "slug": "latte",
+      "subject": "Hot cafe latte in plain white ceramic cup and saucer, light caramel espresso with silky microfoam and white leaf latte art. No matcha or chocolate. Small milk pitcher beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-5bf08c02-c11e-4dbf-ba20-0111f027e649.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp001",
+      "slug": "coffee-frappuccino",
+      "subject": "Coffee frappuccino: tall clear plain glass of thick light coffee brown blended ice with a modest ivory whipped cream swirl, crushed ice texture. Small scattering coffee beans beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-6ebc2b51-8c3a-4d48-9c8a-46880715c9a4.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp002",
+      "slug": "cookie-frappuccino",
+      "subject": "Cookie coffee frappuccino: tall clear plain glass, creamy pale coffee blended ice visibly flecked with crushed dark sandwich cookie crumbs, small whipped cream swirl topped with cookie crumbs; unbranded dark cookie beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-021b2fd6-c70c-4443-99de-1c69e0a77560.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp003",
+      "slug": "mocha-frappuccino",
+      "subject": "Mocha frappuccino: tall clear glass of dark chocolate coffee blended ice, modest whipped cream and chocolate drizzle, small pieces dark chocolate and a few coffee beans beside.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-4930dbae-fe5e-49e2-a359-4704f9257bb1.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp004",
+      "slug": "coconut-blueberry-coffee",
+      "subject": "Coconut blueberry coffee ice: tall clear glass with deep purple blueberry puree bottom, ivory coconut blended ice middle and thin espresso brown swirls upper layer, lightly topped with coconut shavings. Fresh blueberries and coconut slice beside. No pink strawberry.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-a514b0f3-139f-45d0-918a-120b0964370b.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp005",
+      "slug": "blueberry-yogurt-frappuccino",
+      "subject": "Blueberry yogurt frappuccino: tall clear glass of thick blended icy lavender yogurt with purple blueberry swirls and a small yogurt cream peak, blueberries beside. No coffee or chocolate.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-e2e2bf1a-30c1-416e-bf68-a98299471cbe.png",
+      "status": "completed"
+    },
+    {
+      "id": "fp006",
+      "slug": "matcha-frappuccino",
+      "subject": "Matcha frappuccino: tall clear glass of thick uniform matcha green blended ice, small whipped cream swirl lightly dusted matcha, powder bowl beside. Not layered milk latte; no ice cubes.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-25ce557a-7a5d-41d4-b458-855b1818d059.png",
+      "status": "completed"
+    },
+    {
+      "id": "sd001",
+      "slug": "soda-sapphire",
+      "subject": "Blue curacao soda, tall clear unbranded highball of sapphire blue sparkling soda and clear ice, vivid blue base becoming clear pale blue at top, bubbles, thin lemon wheel on rim. No alcohol bottle.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-c943653f-e78a-41f3-be9c-e336a9f9da2d.png",
+      "status": "completed"
+    },
+    {
+      "id": "sd002",
+      "slug": "soda-emerald",
+      "subject": "Mint soda, tall clear highball of emerald green sparkling soda with transparent ice, bubbles, mint leaves and thin lime wheel. Mint sprig and lime beside. No alcohol.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-6679f3c4-8d98-4bec-9e7d-7c4768d42090.png",
+      "status": "completed"
+    },
+    {
+      "id": "te001",
+      "slug": "tra-lipton-chanh",
+      "subject": "Iced lemon black tea: tall clear glass of transparent amber brewed black tea with ice and a thin yellow lemon wheel, lemon half beside. No milk or peach, no branded tea bag.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-e69dc442-0631-4a4e-8cdd-f57f926efbb8.png",
+      "status": "completed"
+    },
+    {
+      "id": "te002",
+      "slug": "tra-lipton-sua",
+      "subject": "Iced milk black tea: tall clear glass of creamy caramel tan brewed black tea and milk, ice, small plain milk pitcher beside. No pearls, fruit, whipped cream or coffee beans.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-d74fd96b-0c2c-4c5d-95e7-095453a63f2f.png",
+      "status": "completed"
+    },
+    {
+      "id": "te003",
+      "slug": "tra-lipton-cam",
+      "subject": "Iced orange black tea: tall clear glass of translucent orange amber black tea with ice and fresh orange slices, half orange beside. Clearly translucent tea, not opaque orange juice.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-0e2dd750-4de2-4595-aec7-acbc47d327a1.png",
+      "status": "completed"
+    },
+    {
+      "id": "te004",
+      "slug": "tra-cuc",
+      "subject": "Chamomile herbal tea: clear glass cup and saucer of pale golden infusion with a few chamomile flowers beside, subtle steam, no milk, no fruit and no ice. Full glass handle visible.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-3c2c32c5-be57-4086-aefb-c4c15d299c4f.png",
+      "status": "completed"
+    },
+    {
+      "id": "te005",
+      "slug": "tra-mang-cau",
+      "subject": "Soursop iced tea: tall clear glass of translucent amber tea with ice and soft white soursop flesh pieces, a cut green spiky soursop fruit with white flesh beside. Never lychee, custard apple scales, lime or peach.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-211d70bf-567e-4f57-bc7e-8063ff14c86a.png",
+      "status": "completed"
+    },
+    {
+      "id": "te006",
+      "slug": "tra-dao",
+      "subject": "Peach iced tea: tall clear glass of amber tea with clear ice and curved golden peach wedges, cut ripe peach beside, small mint sprig. Translucent tea, no milk or smoothie texture.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-963d13f7-4e8c-4ccc-9430-a34f8eef2c7e.png",
+      "status": "completed"
+    },
+    {
+      "id": "sm003",
+      "slug": "sinh-to-mang-cau",
+      "subject": "Vietnamese soursop smoothie, tall clear glass of thick creamy ivory blended soursop, tiny dark natural fruit flecks, cut green spiky soursop with white flesh at side. No ice cubes or whipped cream.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-2d08076d-dab2-4fc0-bbd2-851ff3e76f93.png",
+      "status": "completed"
+    },
+    {
+      "id": "sm004",
+      "slug": "sinh-to-sapo",
+      "subject": "Vietnamese sapodilla smoothie, tall clear glass of thick pale caramel beige blended sapodilla, halved brown sapodilla with sandy tan flesh and glossy black seeds beside. No coffee beans or chocolate.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-e088fae5-d0ea-4a2c-a87f-8adef833eb36.png",
+      "status": "completed"
+    },
+    {
+      "id": "yg001",
+      "slug": "yaourt-da",
+      "subject": "Vietnamese iced yogurt: short clear glass filled with thick ivory white yogurt and a few clear ice pieces, small spoon beside, no fruit, coffee or colored syrup.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-20ab5e88-f45d-4628-a8a2-867a2fb0baa8.png",
+      "status": "completed"
+    },
+    {
+      "id": "yg002",
+      "slug": "yaourt-ca-phe",
+      "subject": "Vietnamese coffee yogurt: short clear glass with thick white yogurt bottom, dark brown coffee swirls top with a few ice pieces, small spoon beside. Distinct yogurt layers, no foam cap.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-135e01c0-90d1-403e-8869-95e0df002a30.png",
+      "status": "completed"
+    },
+    {
+      "id": "yg003",
+      "slug": "yaourt-viet-quoc",
+      "subject": "Vietnamese blueberry yogurt: short clear glass showing thick white yogurt with deep purple blueberry preserve swirls, a few ice pieces, fresh blueberries beside, small spoon. No whipped cream.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-cbfc1433-f3d9-45c2-9f01-462145133123.png",
+      "status": "completed"
+    },
+    {
+      "id": "yg004",
+      "slug": "yaourt-hu",
+      "subject": "Traditional Vietnamese yogurt in a small unbranded open transparent glass jar of smooth white set yogurt, plain lid beside and a teaspoon. No ice or fruit, no text.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-6425459b-e5cc-4b56-89be-400ce160918c.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc001",
+      "slug": "da-chanh",
+      "subject": "Fresh iced lemonade: tall clear glass of cloudy very pale yellow lime lemonade with transparent ice, lime wheel, freshly halved green limes beside. No herbs or colored syrup.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-50e79a9b-8714-4304-bcb7-cb3b674992d1.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc002",
+      "slug": "rau-ma",
+      "subject": "Vietnamese centella juice: clear glass of opaque deep natural leafy green pennywort juice with ice, small handful of round fan shaped centella asiatica leaves beside. No matcha or milk.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-c0436a03-eb39-4e37-a704-eafee9fcf277.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc003",
+      "slug": "rau-ma-dua-sua",
+      "subject": "Vietnamese pennywort coconut milk drink: clear tall glass showing opaque deep green centella lower layer and ivory coconut milk upper layer with mild swirls and ice. A small coconut wedge and round centella leaves beside. No pandan.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-92aeb7c7-485c-4d09-9d69-425317d07545.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc004",
+      "slug": "dua-trai",
+      "subject": "Fresh drinking coconut: one young green coconut with top neatly cut open showing white husk and coconut water opening, simple unbranded pale reusable straw. Natural whole coconut as vessel, no glass, no branding.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-5d9daa24-1525-4ded-89f6-5009c710c32e.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc005",
+      "slug": "dua-da",
+      "subject": "Iced coconut water: clear tumbler of transparent slightly cloudy coconut water, clear ice and thin soft white coconut flesh ribbons, small cut young coconut behind. Not coconut milk.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-a7710793-c545-443b-b87c-51ae262a8ac3.png",
+      "status": "completed"
+    },
+    {
+      "id": "jc006",
+      "slug": "cam-vat",
+      "subject": "Fresh squeezed orange juice: clear short glass of opaque vibrant natural orange juice with subtle pulp, a few ice pieces and halved ripe orange beside. No tea, milk or syrup.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-baa87450-82fb-42ab-ba93-ca0f04c72b81.png",
+      "status": "completed"
+    },
+    {
+      "id": "od001",
+      "slug": "tra-duong",
+      "subject": "Vietnamese sweetened iced tea: plain clear glass of simple transparent light amber tea with ice, tiny bowl of white sugar beside. No lemon, fruit, mint or milk.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-77cee2b6-3f08-41bc-9d9e-3d7a6d26e22c.png",
+      "status": "completed"
+    },
+    {
+      "id": "od002",
+      "slug": "binh-tra-bac",
+      "subject": "Northern Vietnamese green tea set: one simple cream ceramic teapot and two matching tiny tea cups on a small wood tray, pale golden green brewed tea visible in cups and dry tea leaves in small bowl. Subtle steam, no fruit.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-af9281b0-71d0-4e34-b0da-17f62ee27499.png",
+      "status": "completed"
+    },
+    {
+      "id": "od003",
+      "slug": "da-me",
+      "subject": "Vietnamese iced tamarind drink: clear tall glass of translucent deep amber brown tamarind juice with ice, small bits tamarind pulp and toasted peanuts on top, tamarind pods and a tiny bowl peanuts beside. No coffee or chocolate.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-e6f66ba9-494c-40cf-9fa7-6b490a76c505.png",
+      "status": "completed"
+    },
+    {
+      "id": "od004",
+      "slug": "chanh-muoi",
+      "subject": "Vietnamese salted preserved lime lemonade: clear short glass of cloudy pale straw colored drink with ice and one wrinkled preserved yellow lime, small bowl of preserved limes and salt beside. Not fresh green lime juice.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-8704fdc7-73c2-484e-8136-e3b02401c615.png",
+      "status": "completed"
+    },
+    {
+      "id": "od005",
+      "slug": "sua-tuoi",
+      "subject": "Cold fresh milk: clear plain tall glass of pure white fresh milk with subtle condensation, small plain white ceramic milk pitcher beside. No ice, coffee or fruit.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-15835383-dc93-40d6-8bed-fb8c7ffa9385.png",
+      "status": "completed"
+    },
+    {
+      "id": "bt001",
+      "slug": "nuoc-suoi",
+      "subject": "Packaged mineral water illustration: one plain transparent sealed water bottle with a simple white cap and no printed label, crystal clear water, beside one small glass of water. Full bottle including cap and base; no text or logos.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-e237d125-8a84-482f-a637-5705be087a36.png",
+      "status": "completed"
+    },
+    {
+      "id": "bt002",
+      "slug": "nuoc-ngot",
+      "subject": "Soft drink assortment illustration: three plain sealed unbranded aluminum soda cans in solid red, deep blue and green, beside one clear short glass of dark cola with ice and bubbles. No lettering, graphics, stars, logos or fake labels on cans. A grouped assortment represents choices in one menu entry.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-22448066-3749-4ef3-ba57-35e4ec52e273.png",
+      "status": "completed"
+    },
+    {
+      "id": "bt003",
+      "slug": "nuoc-tang-luc",
+      "subject": "Energy drink illustration: one plain sealed slim aluminum energy drink can in brushed silver and deep blue, entirely unbranded with no text, figures or symbols, next to a short clear glass of pale golden sparkling energy drink over ice. Full can visible.",
+      "source": "/Users/mac/.codex/generated_images/01a1666b-5a40-7be0-ac14-68f68cb2cca2/exec-6c0e5ed3-07fb-4099-a8e4-3805a5ff738b.png",
+      "status": "completed"
+    }
+  ]
+}
