@@ -237,7 +237,10 @@ export async function syncModifierChoiceToMenuProjection(
         available = excluded.available,
         updated_at = CURRENT_TIMESTAMP
     `).bind(proj.id, proj.group_id, proj.option_name, proj.price_delta, proj.available).run();
-  } catch {
-    // Graceful fallback if menu_modifiers table does not exist
+  } catch (err) {
+    // The table is expected to exist after the menu_modifiers migration; swallow
+    // only to keep a pre-migration environment alive, but leave a trace so a
+    // stale projection is diagnosable instead of silently serving old prices.
+    console.error('[menu-projection] modifier sync failed', choice.id, err);
   }
 }

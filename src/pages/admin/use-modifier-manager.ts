@@ -30,6 +30,8 @@ export function useModifierManager() {
 
   const [choiceGroupId, setChoiceGroupId] = useState<string | null>(null);
   const [choiceForm, setChoiceForm] = useState<ModifierChoiceFormData>(EMPTY_MODIFIER_CHOICE);
+  /** Non-null when the modal is editing an existing choice rather than creating one. */
+  const [editingChoice, setEditingChoice] = useState<ModifierChoice | null>(null);
 
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<ModifierGroup | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -46,8 +48,7 @@ export function useModifierManager() {
     enabled: choiceGroupId !== null,
   });
 
-  function invalidateAll() {
-    queryClient.invalidateQueries({ queryKey: GROUPS_KEY });
+  function invalidateAll() {    queryClient.invalidateQueries({ queryKey: GROUPS_KEY });
     queryClient.invalidateQueries({ queryKey: ['admin-modifier-choices'] });
     queryClient.invalidateQueries({ queryKey: ['admin-product-groups'] });
   }
@@ -96,13 +97,37 @@ export function useModifierManager() {
     onError: (err: Error) => setErrors({ _form: err.message }),
   });
 
-  // The router exposes create-only for choices (no PATCH/DELETE on
-  // /groups/:groupId/choices/:id), so the UI offers creation only. Retiring a
-  // mis-priced choice is a direct-DB operation until that endpoint exists.
+  const updateChoiceMutation = useMutation({
+    mutationFn: (vars: { groupId: string; choiceId: string; formData: ModifierChoiceFormData }) =>
+      apiFetch(`/api/menu-modifiers/groups/${vars.groupId}/choices/${vars.choiceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: vars.formData.name,
+          price_delta: Number(vars.formData.price_delta),
+        }),
+      }),
+    onSuccess: () => {
+      invalidateAll();
+      closeChoiceModal();
+    },
+    onError: (err: Error) => setErrors({ _form: err.message }),
+  });
 
-  // Product↔group linking (POST/DELETE /api/menu-modifiers/products/:id/groups)
-  // is intentionally not wired yet — no surface renders it. Add it alongside a
-  // product-link editor rather than shipping unreachable mutations.
+  const deleteChoiceMutation = useMutation({
+    mutationFn: (vars: { groupId: string; choiceId: string }) =>
+      apiFetch(`/api/menu-modifiers/groups/${vars.groupId}/choices/${vars.choiceId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      invalidateAll();
+      closeChoiceModal();
+    },
+    onError: (err: Error) => setErrors({ _form: err.message }),
+  });
+
+  // Product↔group linking lives outside this hook — that surface is anchored on
+  // a product rather than a group, so it carries its own queries and mutation
+  // pair. Exposing them here would leave two owners for the same endpoint.
 
   function openAddGroupModal() {
     setEditingGroup(null);
@@ -120,15 +145,37 @@ export function useModifierManager() {
 
   function openChoiceModal(group: ModifierGroup) {
     setChoiceGroupId(group.id);
+    setEditingChoice(null);
     setChoiceForm(EMPTY_MODIFIER_CHOICE);
+    setErrors({});
+  }
+
+  function openEditChoiceModal(group: ModifierGroup, choice: ModifierChoice) {
+    setChoiceGroupId(group.id);
+    setEditingChoice(choice);
+    setChoiceForm({ name: choice.name, price_delta: String(choice.price_delta) });
     setErrors({});
   }
 
   function closeChoiceModal() {
     setChoiceGroupId(null);
+    setEditingChoice(null);
     setChoiceForm(EMPTY_MODIFIER_CHOICE);
     setErrors({});
   }
+
+  /** Creates or updates depending on whether a choice is being edited. */
+  function saveChoice() {
+    if (!choiceGroupId) return;
+    if (editingChoice) {
+      updateChoiceMutation.mutate({ groupId: choiceGroupId, choiceId: editingChoice.id, formData: choiceForm });
+      return;
+    }
+    createChoiceMutation.mutate({ groupId: choiceGroupId, formData: choiceForm });
+  }
+
+  /** Both choice paths drive the same button, so the spinner tracks either. */
+  const savingChoice = createChoiceMutation.isPending || updateChoiceMutation.isPending;
 
   function handleGroupFormChange(field: keyof ModifierGroupFormData, value: string | boolean) {
     setGroupForm((prev) => ({ ...prev, [field]: value }) as ModifierGroupFormData);
@@ -177,16 +224,22 @@ export function useModifierManager() {
     groupForm,
     choiceGroupId,
     choiceForm,
+    editingChoice,
+    savingChoice,
     confirmDeleteGroup,
     setConfirmDeleteGroup,
     errors,
     createGroupMutation,
     deleteGroupMutation,
     createChoiceMutation,
+    updateChoiceMutation,
+    deleteChoiceMutation,
     openAddGroupModal,
     closeGroupModal,
     openChoiceModal,
+    openEditChoiceModal,
     closeChoiceModal,
+    saveChoice,
     handleGroupFormChange,
     handleChoiceFormChange,
     validateGroupForm,

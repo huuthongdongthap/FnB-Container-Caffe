@@ -17,6 +17,13 @@ import type { HappyHourWindow } from '../model/catalog-types';
 
 const log = createLogger({ route: 'customer.menu' });
 
+export interface CustomerMenuItemModifier {
+  id: string;
+  group_id: string;
+  option_name: string;
+  price_delta: number;
+}
+
 export interface CustomerMenuItem {
   id: string;
   name: string;
@@ -26,6 +33,7 @@ export interface CustomerMenuItem {
   imageUrl: string | null;
   tags: string[];
   available: boolean;
+  modifierChoices: CustomerMenuItemModifier[];
 }
 
 export interface CustomerMenuCategory {
@@ -66,6 +74,50 @@ function parseTags(tags: string | string[] | null | undefined): string[] {
     return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Fill `modifierChoices` for a set of items from the menu_modifiers projection.
+ *
+ * Single batched query bucketed by product — a per-item query would turn a
+ * 49-item menu into 49 round trips. Only available options are returned, so a
+ * retired choice disappears from the customer view without a second read.
+ */
+async function attachProductModifiers(
+  db: D1Database,
+  items: CustomerMenuItem[],
+): Promise<void> {
+  const productIds = items.map((item) => item.id);
+  if (productIds.length === 0) return;
+
+  const placeholders = productIds.map(() => '?').join(',');
+  try {
+    const modRes = await db.prepare(
+      `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta
+         FROM product_modifier_groups pm
+         JOIN menu_modifiers mm ON mm.group_id = pm.group_id
+        WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
+        ORDER BY mm.option_name`
+    ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+
+    const byProduct = new Map<string, CustomerMenuItemModifier[]>();
+    for (const row of (modRes.results ?? modRes ?? []) as Array<{ product_id: string } & CustomerMenuItemModifier>) {
+      const list = byProduct.get(row.product_id) ?? [];
+      list.push({
+        id: row.id,
+        group_id: row.group_id,
+        option_name: row.option_name,
+        price_delta: row.price_delta,
+      });
+      byProduct.set(row.product_id, list);
+    }
+    for (const item of items) {
+      item.modifierChoices = byProduct.get(item.id) ?? [];
+    }
+  } catch {
+    // Pre-migration database: no menu_modifiers table, so no modifiers to show.
+    for (const item of items) item.modifierChoices = [];
   }
 }
 
@@ -153,8 +205,11 @@ export async function getCustomerMenu(
         imageUrl: item.image_url,
         tags: parseTags(item.tags),
         available: toAvailabilityFlag(item.available),
+        modifierChoices: [],
       };
     });
+
+    await attachProductModifiers(db, items);
 
     const categoryMap = new Map<string, CustomerMenuItem[]>();
     for (const item of items) {
@@ -235,7 +290,7 @@ export async function getCustomerMenuItem(
         })
       : basePrice;
 
-    return {
+    const item: CustomerMenuItem = {
       id: raw.id,
       name: raw.name,
       description: raw.description,
@@ -244,7 +299,10 @@ export async function getCustomerMenuItem(
       imageUrl: raw.image_url,
       tags: parseTags(raw.tags),
       available: toAvailabilityFlag(raw.available),
+      modifierChoices: [],
     };
+    await attachProductModifiers(db, [item]);
+    return item;
   } catch (err) {
     log.error('customer_menu_item_read_failed', { id, error: String(err) });
     return null;

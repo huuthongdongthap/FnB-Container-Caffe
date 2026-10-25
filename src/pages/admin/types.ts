@@ -71,6 +71,15 @@ export interface ModifierChoiceFormData {
   price_delta: string;
 }
 
+/** A modifier group attached to a product, as returned by the link endpoint. */
+export interface ProductModifierLink {
+  group_id: string;
+  name: string;
+  type: 'single' | 'multiple';
+  required: number;
+  sort_order: number;
+}
+
 export const EMPTY_PRODUCT: ProductFormData = {
   name: '',
   slug: '',

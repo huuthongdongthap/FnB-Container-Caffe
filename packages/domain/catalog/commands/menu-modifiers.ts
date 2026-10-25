@@ -60,6 +60,11 @@ menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT id FROM modifier_groups WHERE id = ?').bind(id).first<{ id: string }>();
   if (!existing) return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  // product_modifier_groups has no FK to products, so the cascade on
+  // modifier_choices leaves these links behind and the product silently
+  // loses modifiers it still advertises.
+  await db.prepare('DELETE FROM product_modifier_groups WHERE group_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM menu_modifiers WHERE group_id = ?').bind(id).run();
   await db.prepare('DELETE FROM modifier_groups WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
@@ -117,6 +122,65 @@ menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
   });
   const choice = await db.prepare('SELECT * FROM modifier_choices WHERE id = ?').bind(id).first<ModifierChoice>();
   return c.json({ success: true, data: choice }, 201);
+});
+
+menuModifiersRouter.patch('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
+  const db = c.env.AURA_DB;
+  const { groupId, choiceId } = c.req.param();
+  const existing = await db.prepare(
+    'SELECT id FROM modifier_choices WHERE id = ? AND group_id = ?'
+  ).bind(choiceId, groupId).first<{ id: string }>();
+  if (!existing) return c.json({ success: false, error: 'Modifier choice not found' }, 404);
+
+  const body = (await c.req.json()) as Record<string, unknown>;
+  const name = String(body.name ?? '').trim();
+  if (!name) return c.json({ success: false, error: 'name is required' }, 400);
+  const priceDelta = Number(body.price_delta);
+  if (!Number.isInteger(priceDelta)) {
+    return c.json({ success: false, error: 'price_delta must be an integer in VND' }, 400);
+  }
+  const isAvailable = body.is_available !== undefined ? (body.is_available ? 1 : 0) : 1;
+
+  try {
+    await db.prepare(
+      `UPDATE modifier_choices
+       SET name = ?, price_delta = ?, is_available = ?
+       WHERE id = ? AND group_id = ?`
+    ).bind(name, priceDelta, isAvailable, choiceId, groupId).run();
+  } catch {
+    // Older databases predate the is_available column.
+    await db.prepare(
+      'UPDATE modifier_choices SET name = ?, price_delta = ? WHERE id = ? AND group_id = ?'
+    ).bind(name, priceDelta, choiceId, groupId).run();
+  }
+
+  // The projection is the customer-facing copy of this price; leaving it stale
+  // makes the customer see one number while the server charges another.
+  await syncModifierChoiceToMenuProjection(db, {
+    id: choiceId,
+    group_id: groupId,
+    name,
+    price_delta: priceDelta,
+    is_available: isAvailable,
+  });
+
+  const choice = await db.prepare('SELECT * FROM modifier_choices WHERE id = ?').bind(choiceId).first<ModifierChoice>();
+  return c.json({ success: true, data: choice });
+});
+
+menuModifiersRouter.delete('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
+  const db = c.env.AURA_DB;
+  const { groupId, choiceId } = c.req.param();
+  const existing = await db.prepare(
+    'SELECT id FROM modifier_choices WHERE id = ? AND group_id = ?'
+  ).bind(choiceId, groupId).first<{ id: string }>();
+  if (!existing) return c.json({ success: false, error: 'Modifier choice not found' }, 404);
+
+  await db.prepare('DELETE FROM modifier_choices WHERE id = ? AND group_id = ?')
+    .bind(choiceId, groupId).run();
+  // Retiring a choice must retire it on the customer side too.
+  await db.prepare('DELETE FROM menu_modifiers WHERE id = ?').bind(choiceId).run();
+  return c.json({ success: true });
 });
 
 // ── Product ↔ Modifier Group mapping ───────────────────────────────

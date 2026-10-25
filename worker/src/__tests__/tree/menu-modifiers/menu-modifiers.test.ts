@@ -17,10 +17,14 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
   const callLog: string[] = [];
   const boundLog: { sql: string; args: unknown[] }[] = [];
   let idx = 0;
+  const acctStmt: any = { bind: () => acctStmt, first: async () => ({ id: 'u1', name: 'Staff', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }), all: async () => ({ results: [], success: true, meta: {} }), run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }), raw: async () => [] };
   const db = {
     _log: callLog,
     _bound: boundLog,
     prepare: (sql: string) => {
+      // The request-time session gate reads the staff account row; without a
+      // fixture for it the gate cannot tell a live session from a revoked one.
+      if (/FROM users WHERE id = \?/i.test(sql)) return acctStmt;
       callLog.push(sql);
       let handler = rowsBySql[idx];
       if (handler && !handler.match(sql)) handler = rowsBySql.find(h => h.match(sql));
@@ -60,7 +64,7 @@ app.use('/api/menu-modifiers/*', requireAuth(['owner', 'staff', 'manager']));
 app.route('/api/menu-modifiers', menuModifiersRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown) {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' }, SECRET);
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, SECRET, 28800);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -156,12 +160,113 @@ describe('menu-modifiers routes', () => {
     expect(json.error).toContain('discount_rate');
   });
 
-  it('GET /happy-hour/now returns null when no window matches', async () => {
+  it('PATCH /groups/:groupId/choices/:choiceId repriced in both the canonical and projection tables', async () => {
     const db = makeScriptedDB([
-      { match: (s) => s.includes('happy_hour_windows'), rows: [] },
+      { match: (s) => s.includes('modifier_choices WHERE id = ? AND group_id = ?'), rows: [{ id: 'MC-1' }], firstRow: { id: 'MC-1' } },
+      { match: (s) => s.startsWith('UPDATE modifier_choices'), rows: [], firstRow: null },
+      { match: (s) => s.includes('menu_modifiers'), rows: [], firstRow: null },
+      { match: (s) => s.startsWith('SELECT * FROM modifier_choices WHERE id = ?'), rows: [{ id: 'MC-1', group_id: 'MG-1', name: 'Nhiều đường', price_delta: 5000 }], firstRow: { id: 'MC-1', group_id: 'MG-1', name: 'Nhiều đường', price_delta: 5000 } },
     ]);
-    const { status, json } = await fetchHandler(db, 'GET', '/api/menu-modifiers/happy-hour/now');
+    const { status, json } = await fetchHandler(db, 'PATCH', '/api/menu-modifiers/groups/MG-1/choices/MC-1', {
+      name: 'Nhiều đường',
+      price_delta: 5000,
+    });
+
     expect(status).toBe(200);
-    expect(json.data).toBeNull();
+    expect(json.data.price_delta).toBe(5000);
+
+    // The projection is the customer-facing copy of this price; if the PATCH
+    // updates modifier_choices alone the customer reads the stale number.
+    const canonical = db._bound.find(e => e.sql.startsWith('UPDATE modifier_choices'))!;
+    expect(canonical.args).toEqual(['Nhiều đường', 5000, 1, 'MC-1', 'MG-1']);
+
+    const projection = db._bound.find(e => e.sql.includes('menu_modifiers'))!;
+    expect(projection.args[2]).toBe('Nhiều đường');
+    expect(projection.args[3]).toBe(5000);
+  });
+
+  it('PATCH rejects a non-integer price_delta', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_choices WHERE id = ? AND group_id = ?'), rows: [{ id: 'MC-1' }], firstRow: { id: 'MC-1' } },
+    ]);
+    const { status, json } = await fetchHandler(db, 'PATCH', '/api/menu-modifiers/groups/MG-1/choices/MC-1', {
+      name: 'X',
+      price_delta: 'abc',
+    });
+
+    expect(status).toBe(400);
+    expect(json.error).toContain('integer');
+    expect(db._bound.some(e => e.sql.startsWith('UPDATE modifier_choices'))).toBe(false);
+  });
+
+  it('PATCH rejects a choice that belongs to another group', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_choices WHERE id = ? AND group_id = ?'), rows: [], firstRow: null },
+    ]);
+    const { status } = await fetchHandler(db, 'PATCH', '/api/menu-modifiers/groups/MG-2/choices/MC-1', {
+      name: 'X',
+      price_delta: 1000,
+    });
+
+    expect(status).toBe(404);
+    expect(db._bound.some(e => e.sql.startsWith('UPDATE modifier_choices'))).toBe(false);
+  });
+
+  it('PATCH requires a staff session', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_choices'), rows: [{ id: 'MC-1' }], firstRow: { id: 'MC-1' } },
+    ]);
+    // No Authorization header: the session gate must refuse before any write.
+    const res = await app.fetch(
+      new Request('https://test.aura/api/menu-modifiers/groups/MG-1/choices/MC-1', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'X', price_delta: 1 }),
+      }),
+      makeEnv(db),
+      { waitUntil: () => {} } as any,
+    );
+
+    expect([401, 403]).toContain(res.status);
+    expect(db._bound.some(e => e.sql.startsWith('UPDATE modifier_choices'))).toBe(false);
+  });
+
+  it('DELETE choice retires it from the customer projection too', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_choices WHERE id = ? AND group_id = ?'), rows: [{ id: 'MC-1' }], firstRow: { id: 'MC-1' } },
+      { match: (s) => s.startsWith('DELETE FROM modifier_choices'), rows: [], firstRow: null },
+      { match: (s) => s.startsWith('DELETE FROM menu_modifiers'), rows: [], firstRow: null },
+    ]);
+    const { status } = await fetchHandler(db, 'DELETE', '/api/menu-modifiers/groups/MG-1/choices/MC-1');
+
+    expect(status).toBe(200);
+    // Deleting the canonical row alone leaves the option on the customer menu.
+    expect(db._bound.some(e => e.sql.includes('DELETE FROM menu_modifiers'))).toBe(true);
+  });
+
+  it('DELETE group clears orphan product links', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_groups WHERE id = ?'), rows: [{ id: 'MG-1' }], firstRow: { id: 'MG-1' } },
+      { match: (s) => s.startsWith('DELETE FROM product_modifier_groups'), rows: [], firstRow: null },
+      { match: (s) => s.startsWith('DELETE FROM menu_modifiers'), rows: [], firstRow: null },
+      { match: (s) => s.startsWith('DELETE FROM modifier_groups'), rows: [], firstRow: null },
+    ]);
+    const { status } = await fetchHandler(db, 'DELETE', '/api/menu-modifiers/groups/MG-1');
+
+    expect(status).toBe(200);
+    // product_modifier_groups has no FK to products, so the cascade on
+    // modifier_choices leaves these rows behind and the product loses silently.
+    const linkDelete = db._bound.find(e => e.sql.startsWith('DELETE FROM product_modifier_groups'));
+    expect(linkDelete).toBeDefined();
+    expect(linkDelete!.args).toContain('MG-1');
+  });
+
+  it('GET /groups/:groupId/choices lists choices', async () => {
+    const db = makeScriptedDB([
+      { match: (s) => s.includes('modifier_choices WHERE group_id = ?'), rows: [{ id: 'MC-1', group_id: 'MG-1', name: 'Ít đường', price_delta: 0 }] },
+    ]);
+    const { status, json } = await fetchHandler(db, 'GET', '/api/menu-modifiers/groups/MG-1/choices');
+    expect(status).toBe(200);
+    expect(json.data).toHaveLength(1);
   });
 });

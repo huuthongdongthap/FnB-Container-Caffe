@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { ManageMenuTabBar } from './manage-menu-tab-bar';
-import type { Tab } from './types';
+import type { Tab, ModifierChoice } from './types';
 import { useProductManager } from './use-product-manager';
 import { useCategoryManager } from './use-category-manager';
 import { ProductList } from './product-list';
@@ -11,7 +11,9 @@ import { ProductModal } from './product-modal';
 import { CategoryModal } from './category-modal';
 import { ConfirmDeleteModal } from './confirm-delete-modal';
 import { useModifierManager } from './use-modifier-manager';
+import { useModifierLinkEditor } from './use-modifier-link-editor';
 import { ModifierGroupList } from './modifier-group-list';
+import { ModifierLinkEditor } from './modifier-link-editor';
 import { ModifierGroupModal } from './modifier-group-modal';
 import { ModifierChoiceModal } from './modifier-choice-modal';
 
@@ -22,10 +24,14 @@ export default function ManageMenuPage() {
   const product = useProductManager();
   const category = useCategoryManager();
   const modifiers = useModifierManager();
+  const linkEditor = useModifierLinkEditor();
 
   const products = product.query.data?.data ?? [];
   const categories = category.query.data?.data ?? [];
   const categoriesById = new Map(categories.map((c) => [c.id, c]));
+
+  const [confirmDeleteChoice, setConfirmDeleteChoice] = useState<ModifierChoice | null>(null);
+  const choiceGroup = modifiers.groupsQuery.data?.data?.find((g) => g.id === modifiers.choiceGroupId);
 
   return (
     <>
@@ -71,15 +77,34 @@ export default function ManageMenuPage() {
           )}
 
           {activeTab === 'modifiers' && (
-            <ModifierGroupList
-              groups={modifiers.groupsQuery.data?.data ?? []}
-              isLoading={modifiers.groupsQuery.isLoading}
-              isError={modifiers.groupsQuery.isError}
-              onRefetch={() => modifiers.groupsQuery.refetch()}
-              onAdd={modifiers.openAddGroupModal}
-              onManageChoices={modifiers.openChoiceModal}
-              onDelete={modifiers.setConfirmDeleteGroup}
-            />
+            <>
+              <ModifierLinkEditor
+                groups={modifiers.groupsQuery.data?.data ?? []}
+                products={products}
+                productId={linkEditor.productId}
+                onProductChange={linkEditor.setProductId}
+                links={linkEditor.productGroupsQuery.data?.data ?? []}
+                isLoadingLinks={linkEditor.productGroupsQuery.isLoading}
+                onToggle={linkEditor.toggleLink}
+                pendingGroupId={
+                  linkEditor.linkMutation.isPending || linkEditor.unlinkMutation.isPending
+                    ? (linkEditor.linkMutation.variables?.groupId ??
+                       linkEditor.unlinkMutation.variables?.groupId ??
+                       null)
+                    : null
+                }
+                error={linkEditor.errors._form}
+              />
+              <ModifierGroupList
+                groups={modifiers.groupsQuery.data?.data ?? []}
+                isLoading={modifiers.groupsQuery.isLoading}
+                isError={modifiers.groupsQuery.isError}
+                onRefetch={() => modifiers.groupsQuery.refetch()}
+                onAdd={modifiers.openAddGroupModal}
+                onManageChoices={modifiers.openChoiceModal}
+                onDelete={modifiers.setConfirmDeleteGroup}
+              />
+            </>
           )}
         </div>
 
@@ -157,23 +182,38 @@ export default function ManageMenuPage() {
 
         <ModifierChoiceModal
           open={modifiers.choiceGroupId !== null}
-          groupName={
-            modifiers.groupsQuery.data?.data?.find((g) => g.id === modifiers.choiceGroupId)?.name ?? ''
-          }
+          groupName={choiceGroup?.name ?? ''}
           choices={modifiers.choicesQuery.data?.data ?? []}
+          editingChoice={modifiers.editingChoice}
           form={modifiers.choiceForm}
           errors={modifiers.errors}
           onChange={modifiers.handleChoiceFormChange}
           onSave={() => {
-            if (modifiers.validateChoiceForm() && modifiers.choiceGroupId) {
-              modifiers.createChoiceMutation.mutate({
+            if (modifiers.validateChoiceForm()) modifiers.saveChoice();
+          }}
+          onEdit={(choice) => {
+            if (choiceGroup) modifiers.openEditChoiceModal(choiceGroup, choice);
+          }}
+          onDelete={setConfirmDeleteChoice}
+          onClose={modifiers.closeChoiceModal}
+          saving={modifiers.savingChoice}
+        />
+
+        <ConfirmDeleteModal
+          open={confirmDeleteChoice !== null}
+          title="Xác nhận xoá lựa chọn"
+          message={t('adminMenu.deleteChoiceConfirm')}
+          onConfirm={() => {
+            if (confirmDeleteChoice && modifiers.choiceGroupId) {
+              modifiers.deleteChoiceMutation.mutate({
                 groupId: modifiers.choiceGroupId,
-                formData: modifiers.choiceForm,
+                choiceId: confirmDeleteChoice.id,
               });
             }
+            setConfirmDeleteChoice(null);
           }}
-          onClose={modifiers.closeChoiceModal}
-          saving={modifiers.createChoiceMutation.isPending}
+          onClose={() => setConfirmDeleteChoice(null)}
+          loading={modifiers.deleteChoiceMutation.isPending}
         />
       </div>
     </>
