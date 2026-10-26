@@ -116,14 +116,20 @@ describe('Supported payment methods', () => {
 });
 
 describe('Priority 2: Staging Gate Accuracy (Stale Build, Public Asset Freshness, Target Selection & Rollback Capabilities)', () => {
+  // Pages rollback goes through the Cloudflare REST API: there is no
+  // `wrangler pages rollback` subcommand, and the runbook records that a CLI
+  // rollback probe must never be mistaken for real rollback capability.
+  const PAGES_ROLLBACK_CALL = `curl --fail --silent --request POST \\
+  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/$PROJECT_NAME/deployments/$1/rollback"`;
+
   const FULL_ROLLBACK_SCRIPT = `#!/bin/bash
-npx wrangler pages rollback "$1" --project-name aura-cafe
+${PAGES_ROLLBACK_CALL}
 npx wrangler rollback "$1"
 npx wrangler d1 execute fnb-caffe-db --file="worker/db/migrations/20261001_01_table_01.down.sql" --remote
 `;
 
   const PAGES_ONLY_ROLLBACK_SCRIPT = `#!/bin/bash
-npx wrangler pages rollback "$1" --project-name aura-cafe
+${PAGES_ROLLBACK_CALL}
 `;
 
   function setupTempRepoFixture(options: {
@@ -487,10 +493,15 @@ npx wrangler d1 time-travel restore fnb-caffe-db --timestamp="2026-10-01T00:00:0
         variableAndWrapperScript,
         `#!/bin/bash
 WRANGLER_CMD="\${WRANGLER_BIN:-npx wrangler}"
-DOWN_FILE="worker/db/migrations/20261001_01_init.down.sql"
+ACCOUNT_ID="\${ACCOUNT_ID:-account}"
+PROJECT_NAME="\${PROJECT_NAME:-project}"
 
 run_wrangler() {
   $WRANGLER_CMD --config worker/wrangler.toml "$@"
+}
+
+rollback_pages() {
+  curl --fail --silent --request POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/$PROJECT_NAME/deployments/$1/rollback"
 }
 
 if [ -z "$1" ]; then
@@ -498,9 +509,9 @@ if [ -z "$1" ]; then
   exit 0
 fi
 
-run_wrangler pages rollback "$1" --project-name aura-cafe
-run_wrangler deployments rollback "$1"
-run_wrangler d1 execute fnb-caffe-db --remote --file="$DOWN_FILE"
+rollback_pages "$1"
+run_wrangler rollback "$1"
+run_wrangler d1 time-travel restore fnb-caffe-db --bookmark "$1" --config worker/wrangler.toml
 `
       );
 
@@ -559,22 +570,28 @@ exit 0
         'curl',
         `#!/bin/sh
 echo "curl $*" >> "$MOCK_ROLLBACK_LOG"
-echo "HTTP/2 200"
-exit 0
-`
-      );
-      writeMock(
-        'sleep',
-        `#!/bin/sh
-echo "sleep $*" >> "$MOCK_ROLLBACK_LOG"
+out=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--output" ]; then out="$arg"; fi
+  prev="$arg"
+done
+if [ -n "$out" ]; then
+  printf '{"success":true,"result":{"id":"%s"}}' "$MOCK_ROLLBACK_ID" > "$out"
+fi
 exit 0
 `
       );
 
+      const accountId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const deploymentId = '12345678-1234-4321-abcd-123456789abc';
       const env = {
         ...process.env,
         PATH: `${mockBinDir}:${process.env.PATH}`,
         MOCK_ROLLBACK_LOG: logFile,
+        MOCK_ROLLBACK_ID: deploymentId,
+        CLOUDFLARE_ACCOUNT_ID: accountId,
+        CLOUDFLARE_API_TOKEN: 'mock-token-for-gate-test',
       };
 
       // 1. Without argument: lists Pages deployments and exits 0 without rolling back
@@ -583,23 +600,23 @@ exit 0
       const noArgCalls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
       expect(noArgCalls).toEqual(['wrangler pages deployment list --project-name fnb-caffe-container']);
 
-      // 2. With deployment ID argument: executes Pages rollback only (no Worker rollback, no D1 rollback)
+      // 2. With a deployment UUID: Pages rollback goes through the REST API and the
+      //    confirmed response is parsed, so a single curl call must carry the bearer
+      //    credentials and nothing else is invoked for the pages target.
       writeFileSync(logFile, '');
-      execFileSync('bash', [rollbackCopy, 'deploy-test-id-123'], {
+      execFileSync('bash', [rollbackCopy, deploymentId], {
         cwd: tempDir,
         env,
         stdio: 'pipe',
       });
       const argCalls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
-      expect(argCalls).toEqual([
-        'wrangler pages rollback deploy-test-id-123 --project-name fnb-caffe-container',
-        'sleep 3',
-        'curl -s https://auraspace.cafe',
-      ]);
-      expect(argCalls.some((line) => /^wrangler (?:deployments )?rollback\b/.test(line))).toBe(
-        false
+      expect(argCalls).toHaveLength(1);
+      expect(argCalls[0]).toContain('--request POST');
+      expect(argCalls[0]).toContain(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/fnb-caffe-container/deployments/${deploymentId}/rollback`
       );
-      expect(argCalls.some((line) => /^wrangler d1\b/.test(line))).toBe(false);
+      expect(argCalls[0]).toContain('Authorization: Bearer mock-token-for-gate-test');
+      expect(argCalls.some((line) => /^wrangler (?:rollback|d1)\b/.test(line))).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -684,9 +701,9 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 37,
+        forwardCount: 38,
         downCount: 7,
-        missingDownCount: 30,
+        missingDownCount: 31,
         safeReversibleCount: 0,
         unsafeDownCount: 7,
         fileCoverageComplete: false,
@@ -740,7 +757,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 7/37 .down.sql files present (30 missing), 0/37 safely reversible without data-loss/schema-drift hazards (7 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 7/38 .down.sql files present (31 missing), 0/38 safely reversible without data-loss/schema-drift hazards (7 existing .down.sql flagged'
     );
   });
 });
@@ -758,9 +775,9 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(37);
+    expect(canonicalDir.forwardCount).toBe(38);
     expect(canonicalDir.downCount).toBe(7);
-    expect(canonicalDir.missingDownCount).toBe(30);
+    expect(canonicalDir.missingDownCount).toBe(31);
   });
 
   it('enforces fail-closed migration execution in deploy-cloudflare.sh, worker/scripts/apply-migrations.sh, and scripts/deploy-branded.sh (default deploy runs zero D1 commands; migration runner requires explicit forward migration selection)', () => {

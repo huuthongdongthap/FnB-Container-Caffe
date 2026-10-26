@@ -122,7 +122,7 @@ function stripInlineShellComment(line) {
       escaped = true;
       continue;
     }
-    if (ch === "'" && !inDouble) {
+    if (ch === '\'' && !inDouble) {
       inSingle = !inSingle;
       continue;
     }
@@ -163,7 +163,7 @@ function preprocessShellLines(rawContent) {
 
     let fullLine = `${accumulator}${uncommented}`.trim();
     accumulator = '';
-    if (!fullLine) continue;
+    if (!fullLine) {continue;}
 
     const heredocMatch = fullLine.match(/<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/);
     if (heredocMatch) {
@@ -205,7 +205,7 @@ function splitShellClauses(logicalLines) {
         escaped = true;
         continue;
       }
-      if (ch === "'" && !inDouble) {
+      if (ch === '\'' && !inDouble) {
         inSingle = !inSingle;
         continue;
       }
@@ -216,7 +216,7 @@ function splitShellClauses(logicalLines) {
       if (!inSingle && !inDouble) {
         if (ch === ';') {
           const text = line.slice(start, i).trim();
-          if (text) clauses.push({ text, prevOp });
+          if (text) {clauses.push({ text, prevOp });}
           prevOp = ';';
           start = i + 1;
         } else if (
@@ -225,7 +225,7 @@ function splitShellClauses(logicalLines) {
         ) {
           const op = `${ch}${line[i + 1]}`;
           const text = line.slice(start, i).trim();
-          if (text) clauses.push({ text, prevOp });
+          if (text) {clauses.push({ text, prevOp });}
           prevOp = op;
           i++;
           start = i + 1;
@@ -261,7 +261,7 @@ function tokenizeShellWords(clauseText) {
       escaped = true;
       continue;
     }
-    if (ch === "'" && !inDouble) {
+    if (ch === '\'' && !inDouble) {
       inSingle = !inSingle;
       continue;
     }
@@ -303,19 +303,19 @@ function expandShellVariables(text, vars, positionalArgs = []) {
 
 function evaluateStaticShellCondition(condText, vars) {
   const expanded = expandShellVariables(condText.trim(), vars);
-  if (/^\(\(\s*0\s*\)\)$/.test(expanded)) return 'false';
-  if (/^\(\(\s*[1-9]\d*\s*\)\)$/.test(expanded)) return 'true';
+  if (/^\(\(\s*0\s*\)\)$/.test(expanded)) {return 'false';}
+  if (/^\(\(\s*[1-9]\d*\s*\)\)$/.test(expanded)) {return 'true';}
 
   const words = tokenizeShellWords(expanded);
-  if (words.length === 0) return 'unknown';
+  if (words.length === 0) {return 'unknown';}
 
   if (words.length === 1) {
-    if (words[0] === 'false') return 'false';
-    if (words[0] === 'true' || words[0] === ':') return 'true';
+    if (words[0] === 'false') {return 'false';}
+    if (words[0] === 'true' || words[0] === ':') {return 'true';}
   }
   if (words.length === 2 && words[0] === '!') {
-    if (words[1] === 'true') return 'false';
-    if (words[1] === 'false') return 'true';
+    if (words[1] === 'true') {return 'false';}
+    if (words[1] === 'false') {return 'true';}
   }
 
   let testWords = null;
@@ -336,15 +336,15 @@ function evaluateStaticShellCondition(condText, vars) {
       return testWords[0].length > 0 ? 'true' : 'false';
     }
     if (testWords.length === 2) {
-      if (testWords[0] === '-z') return testWords[1].length === 0 ? 'true' : 'false';
-      if (testWords[0] === '-n') return testWords[1].length > 0 ? 'true' : 'false';
+      if (testWords[0] === '-z') {return testWords[1].length === 0 ? 'true' : 'false';}
+      if (testWords[0] === '-n') {return testWords[1].length > 0 ? 'true' : 'false';}
     }
     if (testWords.length === 3) {
       const [left, op, right] = testWords;
-      if (op === '=' || op === '==') return left === right ? 'true' : 'false';
-      if (op === '!=') return left !== right ? 'true' : 'false';
-      if (op === '-eq') return Number(left) === Number(right) ? 'true' : 'false';
-      if (op === '-ne') return Number(left) !== Number(right) ? 'true' : 'false';
+      if (op === '=' || op === '==') {return left === right ? 'true' : 'false';}
+      if (op === '!=') {return left !== right ? 'true' : 'false';}
+      if (op === '-eq') {return Number(left) === Number(right) ? 'true' : 'false';}
+      if (op === '-ne') {return Number(left) !== Number(right) ? 'true' : 'false';}
     }
   }
 
@@ -368,9 +368,16 @@ function classifyWranglerCommandWords(words) {
     }
   }
 
-  if (idx >= words.length) return null;
+  if (idx >= words.length) {return null;}
   const cmd = words[idx];
-  if (NON_ROLLBACK_COMMANDS.has(cmd)) return null;
+  if (cmd === 'curl') {
+    const args = words.slice(idx + 1);
+    const methodIndex = args.findIndex((arg) => arg === '-X' || arg === '--request');
+    const method = methodIndex >= 0 ? args[methodIndex + 1] : undefined;
+    const pagesRollbackUrl = args.some((arg) => /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/[^/]+\/pages\/projects\/[^/]+\/deployments\/[^/]+\/rollback$/.test(arg));
+    return method === 'POST' && pagesRollbackUrl ? 'pages' : null;
+  }
+  if (NON_ROLLBACK_COMMANDS.has(cmd)) {return null;}
 
   // Strip package runner wrappers (npx, bunx, pnpm dlx/exec, yarn dlx, npm exec)
   if (cmd === 'npx' || cmd === 'bunx') {
@@ -386,10 +393,10 @@ function classifyWranglerCommandWords(words) {
     idx += 2;
   } else if (cmd === 'npm' && words[idx + 1] === 'exec') {
     idx += 2;
-    if (words[idx] === '--') idx++;
+    if (words[idx] === '--') {idx++;}
   }
 
-  if (idx >= words.length) return null;
+  if (idx >= words.length) {return null;}
   const targetBin = words[idx];
   if (targetBin !== 'wrangler' && !targetBin.endsWith('/wrangler')) {
     return null;
@@ -410,13 +417,7 @@ function classifyWranglerCommandWords(words) {
     subcommands.push(token);
   }
 
-  if (subcommands[0] === 'pages' && subcommands[1] === 'rollback') {
-    return 'pages';
-  }
-  if (
-    subcommands[0] === 'rollback' ||
-    (subcommands[0] === 'deployments' && subcommands[1] === 'rollback')
-  ) {
+  if (subcommands[0] === 'rollback') {
     return 'worker';
   }
   if (
@@ -465,7 +466,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
   };
 
   function evaluateClauses(clauseList, positionalArgs = [], callDepth = 0) {
-    if (callDepth > 6) return;
+    if (callDepth > 6) {return;}
     const stack = [];
     let topTerminated = false;
     let collectingFnName = null;
@@ -473,9 +474,9 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
     let collectingFnBody = [];
 
     function isCurrentlyReachable() {
-      if (topTerminated) return false;
+      if (topTerminated) {return false;}
       for (const frame of stack) {
-        if (!frame.branchReachable || frame.branchTerminated) return false;
+        if (!frame.branchReachable || frame.branchTerminated) {return false;}
       }
       return true;
     }
@@ -490,7 +491,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
 
     function processSimpleClause(text, prevOp) {
       const trimmed = text.trim();
-      if (!trimmed) return;
+      if (!trimmed) {return;}
 
       if (trimmed.startsWith('if ')) {
         const cond = trimmed.slice(3).trim();
@@ -514,7 +515,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
           top.branchTerminated = false;
         }
         const rest = trimmed.slice(4).trim();
-        if (rest) processSimpleClause(rest, 'none');
+        if (rest) {processSimpleClause(rest, 'none');}
         return;
       }
 
@@ -527,7 +528,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
           const cond = trimmed.slice(5).trim();
           const rawStatus = evaluateStaticShellCondition(cond, vars);
           const condStatus = top.anyBranchStaticallyTrue ? 'false' : rawStatus;
-          if (condStatus === 'true') top.anyBranchStaticallyTrue = true;
+          if (condStatus === 'true') {top.anyBranchStaticallyTrue = true;}
           top.condStatus = condStatus;
           top.branchReachable = false;
           top.branchTerminated = false;
@@ -546,7 +547,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
           top.branchTerminated = false;
         }
         const rest = trimmed.slice(4).trim();
-        if (rest) processSimpleClause(rest, 'none');
+        if (rest) {processSimpleClause(rest, 'none');}
         return;
       }
 
@@ -594,7 +595,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
           top.branchTerminated = false;
         }
         const rest = trimmed.slice(2).trim();
-        if (rest) processSimpleClause(rest, 'none');
+        if (rest) {processSimpleClause(rest, 'none');}
         return;
       }
 
@@ -628,7 +629,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
 
       const expanded = expandShellVariables(trimmed, vars, positionalArgs);
       const words = tokenizeShellWords(expanded);
-      if (words.length === 0) return;
+      if (words.length === 0) {return;}
 
       if (functions.has(words[0])) {
         const fnBody = functions.get(words[0]);
@@ -644,7 +645,7 @@ export function inspectRollbackCapabilities(rollbackScriptPath) {
 
     for (const clause of clauseList) {
       const trimmed = clause.text.trim();
-      if (!trimmed) continue;
+      if (!trimmed) {continue;}
 
       if (collectingFnName) {
         const opens = (trimmed.match(/\{/g) || []).length;
@@ -721,7 +722,7 @@ export const BUILD_INPUT_PATHS = [
 ];
 
 function getLatestMtimeMs(targetPath) {
-  if (!existsSync(targetPath)) return 0;
+  if (!existsSync(targetPath)) {return 0;}
   const stat = statSync(targetPath);
   if (!stat.isDirectory()) {
     return stat.mtimeMs;
@@ -739,10 +740,10 @@ function getLatestMtimeMs(targetPath) {
     const childPath = resolve(targetPath, entry.name);
     if (entry.isDirectory()) {
       const childLatest = getLatestMtimeMs(childPath);
-      if (childLatest > latest) latest = childLatest;
+      if (childLatest > latest) {latest = childLatest;}
     } else if (entry.isFile()) {
       const childMtime = statSync(childPath).mtimeMs;
-      if (childMtime > latest) latest = childMtime;
+      if (childMtime > latest) {latest = childMtime;}
     }
   }
   return latest;
