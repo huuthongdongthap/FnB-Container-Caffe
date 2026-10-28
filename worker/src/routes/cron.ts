@@ -5,6 +5,7 @@
  * - order-checks.ts: checkOverdueOrders
  * - cashback-warnings.ts: sendCashbackExpiryWarnings
  * - campaigns.ts: runCampaignTriggers
+ * - sop-reminders.ts: runSopReminders
  * - index.ts: Barrel export
  */
 
@@ -16,5 +17,6 @@ export {
   runCampaignTriggers,
   syncMauticContacts,
   detectWinbackCandidates,
-  detectBirthdayCandidates
+  detectBirthdayCandidates,
+  runSopReminders
 } from './cron-handlers';

@@ -13,6 +13,7 @@ import {
   detectWinbackCandidates,
   detectBirthdayCandidates,
   runCampaignTriggers,
+  runSopReminders,
 } from './routes/cron';
 import {
   autoPostDailySpecials,
@@ -49,6 +50,7 @@ export async function handleScheduled(
   safeWait(autoPostNewPromotions(env as unknown as Record<string, unknown>));
   safeWait(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
   safeWait(runCampaignTriggers(env as unknown as Record<string, unknown>));
+  safeWait(runSopReminders(env as unknown as Record<string, unknown>));
   safeWait(sendShiftReminders(env as unknown as Record<string, unknown>));
   safeWait(dispatchAlerts(env));
 }
