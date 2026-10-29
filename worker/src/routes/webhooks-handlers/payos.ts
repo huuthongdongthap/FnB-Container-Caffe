@@ -80,6 +80,28 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
           if (details) await sendOrderPaidNotifications(c, { ...details, total: details.total ?? details.total_amount }, now);
         } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
       }
+      const orderRecord = order as Record<string, unknown>;
+      if (orderRecord.customer_id || orderRecord.customer_phone || orderRecord.customer_email) {
+        try {
+          const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
+          await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, payment.order_id);
+        } catch (err) { log.warn('PayOS loyalty credit error (non-blocking)', { message: (err as Error).message }); }
+        try {
+          let refCustomerId = (orderRecord.customer_id as string | undefined) || null;
+          if (!refCustomerId && (orderRecord.customer_phone || orderRecord.customer_email)) {
+            const normalizedPhone = String(orderRecord.customer_phone || '').replace(/\D/g, '');
+            const cust = await db.prepare(
+              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+            ).bind(orderRecord.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+            refCustomerId = cust?.id ?? null;
+          }
+          if (refCustomerId && orderAmount >= 20000) {
+            const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+            const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
+            await rewardReferralOnFirstOrder(db, refCustomerId, payment.order_id, orderAmount, refPolicy);
+          }
+        } catch (err) { log.warn('PayOS referral reward error (non-blocking)', { message: (err as Error).message }); }
+      }
     }
     return ack(settled.paymentChanged ? 'Webhook processed' : 'Already processed');
   } catch (err) {

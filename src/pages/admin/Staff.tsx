@@ -1,3 +1,5 @@
+import { useSubmissionSession } from '@/lib/server-confirmed-submission';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -14,6 +16,12 @@ export { formatTime, formatDate, formatHours } from './staff-utils';
 import type { StaffTab } from './staff-types';
 
 export default function StaffPage() {
+  const session = useSubmissionSession();
+  return <StaffSession key={session} />;
+}
+
+function StaffSession() {
+  const canRecruit = useAuthStore(state => ['owner', 'manager'].includes(state.user?.role || ''));
   const { t } = useTranslation();
   const [tab, setTab] = useState<StaffTab>('list');
 
@@ -42,7 +50,7 @@ export default function StaffPage() {
         >
           {t('adminStaff.shifts')}
         </button>
-        <button
+        {canRecruit && <button
           onClick={() => setTab('recruitment')}
           className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
             tab === 'recruitment'
@@ -51,12 +59,12 @@ export default function StaffPage() {
           }`}
         >
           {t('adminStaff.recruitment', 'Tuyển dụng')}
-        </button>
+        </button>}
       </div>
 
       {tab === 'list' && <StaffListTab />}
       {tab === 'shifts' && <ShiftsTab />}
-      {tab === 'recruitment' && <RecruitmentTab />}
+      {canRecruit && tab === 'recruitment' && <RecruitmentTab />}
     </div>
   );
 }

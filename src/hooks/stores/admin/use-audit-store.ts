@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createPrivateStore as create } from '@/lib/create-private-store';
 import { apiFetch } from '@/lib/api-client';
 
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiFetch } from '@/lib/api-client';
+import { readClientSession, subscribeClientSession } from '@/lib/client-session';
 
 /* ═══════════════════════════════════════════════════════════════════
    Referral store — Zustand with manual localStorage persistence.
@@ -31,6 +32,7 @@ interface ReferralState {
   fetchReferralData: () => Promise<void>;
   applyReferralCode: (code: string) => Promise<void>;
   copyReferralLink: () => string;
+  reset: () => void;
   clearError: () => void;
 }
 
@@ -69,9 +71,11 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
   error: null,
 
   fetchReferralData: async () => {
+    const sessionToken = readClientSession().token;
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ data: Record<string, unknown> }>('/api/loyalty/referral/stats');
+      if (readClientSession().token !== sessionToken) return;
 
       const data = body.data || body;
 
@@ -150,5 +154,23 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
     return `${window.location.origin}/referral?ref=${referralCode}`;
   },
 
+  reset: () => set({
+    referralCode: null,
+    referralCount: 0,
+    cashbackEarned: 0,
+    codeUsage: 0,
+    recentReferrals: [],
+    loading: false,
+    error: null,
+  }),
+
   clearError: () => set({ error: null }),
 }));
+
+if (typeof window !== 'undefined') {
+  subscribeClientSession((session) => {
+    if (!session.token) {
+      useReferralStore.getState().reset();
+    }
+  });
+}

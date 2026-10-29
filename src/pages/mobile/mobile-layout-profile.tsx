@@ -1,11 +1,13 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import type { MobileUser } from './mobile-layout-types';
 import { NOTIF_CARD, PROFILE_AVATAR, PROFILE_NAME, PROFILE_ROLE, PROFILE_ID } from './mobile-layout-styles';
 
 export default function ProfileScreen({ user, onLogout }: { user: MobileUser; onLogout: () => void }) {
   const { t } = useTranslation();
+  const { forgetDevice } = useMobileAuth();
   return (
     <div style={{ padding: '16px 16px 24px' }}>
       <div style={{ ...NOTIF_CARD, textAlign: 'center', boxShadow: 'var(--md-sys-elevation-level1)' }}>
@@ -20,6 +22,9 @@ export default function ProfileScreen({ user, onLogout }: { user: MobileUser; on
         style={{ width: '100%', marginTop: 16, padding: '14px 0', fontSize: 15, fontWeight: 600, border: '1.5px solid var(--md-sys-color-error)', borderRadius: 12, background: 'var(--aura-noir-mid)', color: 'var(--md-sys-color-error)', cursor: 'pointer', fontFamily: 'var(--aura-font-body)' }}
       >
         {t('auth.logout', 'Đăng xuất / Logout')}
+      </button>
+      <button type="button" onClick={forgetDevice} style={{ width: '100%', marginTop: 12, padding: 12 }}>
+        {t('auth.forgetDevice', 'Quên thiết bị này')}
       </button>
     </div>
   );

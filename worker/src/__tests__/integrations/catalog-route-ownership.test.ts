@@ -11,11 +11,18 @@
 import { describe, it, expect } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockDB, createMockKV } from '../test-utils';
+import { createMockEnv, createMockDB, createMockKV, isStaffAccountLookup, STAFF_ACCOUNT_ROW } from '../test-utils';
 
 const TEST_SECRET = 'test-jwt-secret-at-least-16-chars';
 const TEST_CAT_ID = 'cat-123';
 const TEST_PROD_ID = 'prod-456';
+
+/**
+ * Account row the staff-session gate resolves for the token minted in this
+ * file. The role must match the token's role claim, otherwise the gate
+ * revokes the session on the ("Quyền đã thay đổi") authority change path.
+ */
+const STAFF_ROW = { ...STAFF_ACCOUNT_ROW, id: 'staff-1', role: 'staff' };
 
 function createOwnershipTestEnv(initialState: {
   categories?: Map<string, any>;
@@ -67,6 +74,10 @@ function createOwnershipTestEnv(initialState: {
         return { success: true, changes: 1, lastRowId: 1 };
       },
       first: async () => {
+        // Staff mutations are gated by the request-time session check, which
+        // resolves the `users` row behind the token; answer it with the account
+        // the issued staff token claims to come from.
+        if (isStaffAccountLookup(_sql)) return STAFF_ROW;
         if (_sql.includes('SELECT COUNT(*) as count FROM products WHERE category_id = ?')) {
           const catId = boundParams[0];
           let count = 0;
@@ -132,7 +143,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
       ['cat-2', { id: 'cat-2', name: 'Trà', slug: 'tra', sort_order: 2 }],
     ]);
     const env = createOwnershipTestEnv({ categories: cats });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     // 1. GET /api/categories/tree -> must NOT hit /:id with id="tree" (which would 404)
     const treeRes = await app.fetch(new Request('https://test.aura/api/categories/tree'), env);
@@ -182,7 +193,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
     const cats = new Map<string, any>([[TEST_CAT_ID, { id: TEST_CAT_ID, name: 'Cà phê' }]]);
     const prods = new Map<string, any>([[TEST_PROD_ID, { id: TEST_PROD_ID, category_id: TEST_CAT_ID, name: 'Espresso' }]]);
     const env = createOwnershipTestEnv({ categories: cats, products: prods });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     const delRes = await app.fetch(
       new Request(`https://test.aura/api/categories/${TEST_CAT_ID}`, {
@@ -201,7 +212,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
   it('supports PATCH and PUT for category updates', async () => {
     const cats = new Map<string, any>([[TEST_CAT_ID, { id: TEST_CAT_ID, name: 'Old Name', slug: 'old-name' }]]);
     const env = createOwnershipTestEnv({ categories: cats });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     // PATCH update
     const patchRes = await app.fetch(

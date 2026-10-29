@@ -23,6 +23,9 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
   }
 
   const db = c.env.AURA_DB;
+  const staff = c.get('staff' as any) as { tenantId?: string } | undefined;
+  const user = c.get('user' as any) as { tenantId?: string } | undefined;
+  const tenantId = staff?.tenantId || user?.tenantId || (typeof c.env.PILOT_TENANT_ID === 'string' && c.env.PILOT_TENANT_ID.trim() ? c.env.PILOT_TENANT_ID.trim() : 'default');
 
   // Query customer + cashback wallet
   type PosCustomerRow = {
@@ -38,6 +41,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
     total_earned: number;
     total_spent: number;
     visit_count: number;
+    tenant_id?: string | null;
   };
   let row: PosCustomerRow | null = null;
   try {
@@ -72,6 +76,9 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
       `)
       .bind(normalizedPhone)
       .first<PosCustomerRow>();
+  }
+  if (row && row.tenant_id && row.tenant_id !== tenantId) {
+    row = null;
   }
 
   if (!row) {

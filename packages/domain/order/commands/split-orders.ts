@@ -89,7 +89,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     }
     return jsonResponse({ success: true, data: createdOrders, message: `Đã tạo ${createdOrders.length} đơn hàng` }, 201);
   } catch (error) {
-    if (error instanceof OrderCreationError) return errorResponse(error.message, error.status);
+    if (error instanceof OrderCreationError) return Response.json({ success: false, error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
     log.error('SplitOrders error:', { message: (error as Error).message });
     return errorResponse('Failed to create split orders', 500);
   }

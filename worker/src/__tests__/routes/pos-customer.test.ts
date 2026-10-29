@@ -16,10 +16,26 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
   const callLog: string[] = [];
   const boundLog: { sql: string; args: unknown[] }[] = [];
   let idx = 0;
+  // Holds the role the next request should be answered with: the session gate
+  // compares the token role against the account row, so a request that plays
+  // another role needs a row carrying that same role or the session reads as
+  // revoked mid-request.
+  const accountState: { role: string } = { role: 'staff' };
+  const acctStmt: any = {
+    bind: () => acctStmt,
+    first: async () => ({ id: 'u1', name: 'A', phone: null, role: accountState.role, tenant_id: 'default', is_active: 1, auth_version: 1 }),
+    all: async () => ({ results: [] as ScriptedRow[], success: true, meta: {} }),
+    run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }),
+    raw: async () => [],
+  };
   const db = {
     _log: callLog,
     _bound: boundLog,
+    _accountState: accountState,
     prepare: (sql: string) => {
+      // The request-time session gate reads the staff account row; without a
+      // fixture for it the gate cannot tell a live session from a revoked one.
+      if (/FROM users WHERE id = \?/i.test(sql)) return acctStmt;
       callLog.push(sql);
       let handler = rowsBySql[idx];
       if (handler && !handler.match(sql)) handler = rowsBySql.find(h => h.match(sql));
@@ -62,7 +78,12 @@ const testApp = new Hono<{ Bindings: any }>();
 testApp.route('/api/pos/customer', posCustomerRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown, role: string = 'staff') {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role }, TEST_JWT_SECRET);
+  // The session gate compares the token role against the account row, so a
+  // request that plays another role has to be answered by a row with that same
+  // role — otherwise the role would read as changed mid-session and be revoked.
+  const dbi = db as unknown as { _accountState: { role: string } };
+  dbi._accountState.role = role;
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role, ...(role === 'customer' ? {} : { authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }) }, TEST_JWT_SECRET, 28800);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -104,7 +125,7 @@ describe('pos-customer routes', () => {
   it('returns 403 when customer role tries to access', async () => {
     const { status, json } = await fetchHandler(db, 'GET', '/api/pos/customer?phone=0912345678', null, 'customer');
     expect(status).toBe(403);
-    expect(json.error).toContain('Không có quyền');
+    expect(json.error).toContain('quyền');
   });
 
   it('returns found=false when customer not found', async () => {

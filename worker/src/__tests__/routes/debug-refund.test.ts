@@ -4,9 +4,18 @@ import { createMockEnv, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 
 async function ownerHeaders() {
-  const t = await generateJWT({ id: 'U1', email: 'e@t.com', name: 'O', role: 'owner' }, TEST_JWT_SECRET, '3600');
+  const t = await generateJWT({ id: 'U1', email: 'e@t.com', name: 'O', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, '3600');
   return { Authorization: `Bearer ${t}` };
 }
+
+/** The account row the session gate reads for the owner token above. */
+const U1_ACCOUNT: any = {
+  bind: () => U1_ACCOUNT,
+  first: async () => ({ id: 'U1', name: 'O', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }),
+  all: async () => ({ results: [] }),
+  run: async () => ({ success: true, changes: 0 }),
+  raw: async () => [],
+};
 
 describe('debug', () => {
   it('raw response inspection', async () => {
@@ -15,6 +24,9 @@ describe('debug', () => {
     const db: any = {
       prepare: (sql: string) => {
         prepCount++;
+        // The request-time session gate reads the account row behind the owner
+        // token; without it every request reads as a revoked session.
+        if (/FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(sql)) return U1_ACCOUNT;
         const s = sql.replace(/\s+/g, ' ').trim();
         const n = s.toLowerCase();
         let target: any = null;

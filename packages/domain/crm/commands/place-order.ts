@@ -4,10 +4,6 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { applyAccrual } from './accrual';
-import { loadPolicy } from './loyalty-policy';
-import { rewardReferralOnFirstOrder } from './referral';
-import { resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } from './referral-policy';
 
 export type FulfillmentChannel = 'pickup' | 'delivery';
 
@@ -193,28 +189,10 @@ export async function placeOrder(
     }
   }
 
-  // ── Loyalty accrual (non-blocking) — failures swallowed ──
-  if (input.customerId) {
-    const policy = await loadPolicy(db).catch(() => null);
-    if (policy) {
-      await applyAccrual(db, policy, {
-        orderId,
-        customerId: input.customerId,
-        orderTotalVnd: totalCents,
-      }).catch(() => null);
-    }
-
-    // ── Referral reward (non-blocking) — failures swallowed ──
-    const resolvedKv =
-      kv ??
-      input.kv ??
-      ((db as unknown as { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace })?.AUTH_KV ??
-        (typeof (db as unknown as { get?: unknown })?.get === 'function'
-          ? (db as unknown as import('@cloudflare/workers-types').KVNamespace)
-          : undefined));
-    const refPolicy = await resolveReferralPolicy(resolvedKv).catch(() => DEFAULT_REFERRAL_POLICY);
-    await rewardReferralOnFirstOrder(db, input.customerId, orderId, totalCents, refPolicy).catch(() => null);
-  }
+  // Loyalty accrual and first-order referral rewards are deferred until payment
+  // settles (payment_status = 'paid') or the order completes, preventing unpaid
+  // pending orders from minting spendable cashback or referral payouts.
+  void kv;
 
   return {
     ok: true,

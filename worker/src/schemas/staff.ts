@@ -4,7 +4,6 @@ import {
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
-  IdParamsSchema,
   LocaleEnum,
   DateTimeSchema,
   StaffRoleEnum,
@@ -65,68 +64,59 @@ export const StaffListResponseSchema = z.object({
   meta: PaginationMetaSchema,
 }).openapi('StaffListResponse');
 
+const ShiftIdSchema = z.string().regex(/^[1-9]\d*$/);
+const ShiftIdParamsSchema = z.object({ id: ShiftIdSchema });
+const ScheduleTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/);
 export const ShiftSchema = z.object({
-  id: z.string().min(1),
+  id: ShiftIdSchema,
   staffId: z.string().min(1),
-  staff: ReferenceSchema.nullable().optional(),
+  staff_id: z.string().min(1),
+  staff_name: z.string(),
   locationId: z.string().min(1),
   date: z.string().date(),
-  startTime: z.string().time(),
-  endTime: z.string().time(),
-  breakMinutes: z.number().int().nonnegative().default(0),
-  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).default('scheduled'),
-  notes: z.string().max(500).optional(),
-  createdAt: DateTimeSchema,
-  updatedAt: DateTimeSchema,
+  startTime: ScheduleTimeSchema.nullable(),
+  endTime: ScheduleTimeSchema.nullable(),
+  clock_in: z.string().nullable(),
+  clock_out: z.string().nullable(),
+  hours_worked: z.number().nullable(),
+  attendance_state: z.enum(['scheduled', 'active', 'completed', 'cancelled']).nullable(),
+  breakMinutes: z.literal(0),
+  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 }).openapi('Shift');
-
 export const ShiftCreateSchema = z.object({
   staffId: z.string().min(1),
-  locationId: z.string().min(1),
+  locationId: z.string().min(1).optional(),
   date: z.string().date(),
-  startTime: z.string().time(),
-  endTime: z.string().time(),
-  breakMinutes: z.number().int().nonnegative().default(0),
+  startTime: ScheduleTimeSchema,
+  endTime: ScheduleTimeSchema,
+  breakMinutes: z.literal(0).optional(),
   notes: z.string().max(500).optional(),
 }).openapi('ShiftCreate');
-
-export const ShiftUpdateSchema = z.object({
-  staffId: z.string().min(1).optional(),
-  date: z.string().date().optional(),
-  startTime: z.string().time().optional(),
-  endTime: z.string().time().optional(),
-  breakMinutes: z.number().int().nonnegative().optional(),
-  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
-  notes: z.string().max(500).optional(),
+export const ShiftUpdateSchema = ShiftCreateSchema.partial().extend({
+  status: z.enum(['scheduled', 'cancelled']).optional(),
 }).openapi('ShiftUpdate');
-
-export const ShiftListResponseSchema = z.object({
-  shifts: z.array(ShiftSchema),
-  meta: PaginationMetaSchema,
-}).openapi('ShiftListResponse');
-
-export const AttendanceSchema = z.object({
-  id: z.string().min(1),
-  staffId: z.string().min(1),
-  shiftId: z.string().min(1).nullable(),
-  checkIn: DateTimeSchema,
-  checkOut: DateTimeSchema.nullable(),
-  breakStart: DateTimeSchema.nullable(),
-  breakEnd: DateTimeSchema.nullable(),
-  locationId: z.string().min(1),
-  deviceFingerprint: z.string().nullable(),
-  notes: z.string().max(500).optional(),
+export const ShiftListResponseSchema = z.object({ shifts: z.array(ShiftSchema), meta: PaginationMetaSchema }).openapi('ShiftListResponse');
+export const AttendanceSchema = ShiftSchema.extend({
+  shiftId: ShiftIdSchema,
+  checkIn: z.string(),
+  checkOut: z.string().nullable(),
+  breakStart: z.null(),
+  breakEnd: z.null(),
+  deviceFingerprint: z.null(),
 }).openapi('Attendance');
-
 export const AttendanceCheckInSchema = z.object({
-  shiftId: z.string().min(1).optional(),
-  locationId: z.string().min(1),
-  deviceFingerprint: z.string().optional(),
+  staffId: z.string().min(1).optional(),
+  shiftId: ShiftIdSchema.optional(),
+  locationId: z.string().min(1).optional(),
+  notes: z.string().max(500).optional(),
 }).openapi('AttendanceCheckIn');
-
 export const AttendanceCheckOutSchema = z.object({
-  attendanceId: z.string().min(1),
-  deviceFingerprint: z.string().optional(),
+  staffId: z.string().min(1).optional(),
+  attendanceId: ShiftIdSchema.optional(),
+  notes: z.string().max(500).optional(),
 }).openapi('AttendanceCheckOut');
 
 // Export types
@@ -238,7 +228,7 @@ export const StaffRoutes = {
       summary: 'Get shift by ID',
       tags: ['Staff'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema },
+      request: { params: ShiftIdParamsSchema },
       responses: {
         200: { description: 'Shift details', content: { 'application/json': { schema: SuccessResponseSchema(ShiftSchema) } } },
         404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -263,7 +253,7 @@ export const StaffRoutes = {
       summary: 'Update shift',
       tags: ['Staff'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: ShiftUpdateSchema } } } },
+      request: { params: ShiftIdParamsSchema, body: { content: { 'application/json': { schema: ShiftUpdateSchema } } } },
       responses: {
         200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(ShiftSchema) } } },
         404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -275,7 +265,7 @@ export const StaffRoutes = {
       summary: 'Cancel shift',
       tags: ['Staff'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema },
+      request: { params: ShiftIdParamsSchema },
       responses: {
         200: { description: 'Cancelled', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
         404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -298,7 +288,7 @@ export const StaffRoutes = {
         }),
       },
       responses: {
-        200: { description: 'Attendance list', content: { 'application/json': { schema: SuccessResponseSchema(z.array(AttendanceSchema)) } } },
+        200: { description: 'Attendance list', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ attendance: z.array(AttendanceSchema), meta: PaginationMetaSchema })) } } },
       },
     },
     checkIn: {

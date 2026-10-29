@@ -171,9 +171,19 @@ describe('useLoyaltyStore', () => {
     await useLoyaltyStore.getState().phoneAuth('0901234567');
 
     expect(requestBody).toContain('0901234567');
+    expect(localStorage.getItem('aura_auth_token')).toBe('phone-jwt');
     const s = useLoyaltyStore.getState();
     expect(s.loading).toBe(false);
     expect(s.error).toBeNull();
+  });
+
+  it('reset(): clears in-memory loyalty state back to defaults', () => {
+    useLoyaltyStore.setState({ tier: 'platinum', points: 900, cashbackRate: 10 });
+    useLoyaltyStore.getState().reset();
+    const s = useLoyaltyStore.getState();
+    expect(s.tier).toBe('bronze');
+    expect(s.points).toBe(0);
+    expect(s.cashbackRate).toBe(3);
   });
 
   it('phoneAuth(): sets error on failure', async () => {

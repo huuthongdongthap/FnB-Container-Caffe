@@ -1,9 +1,12 @@
-import { getAuthToken, verifyJWT } from 'worker/src/lib/jwt';
+import { getAuthToken } from 'worker/src/lib/jwt';
+import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
+import { StaffSessionError } from 'worker/src/lib/staff-session';
+import type { Env } from 'worker/src/types/env';
 import type { D1Like } from './order-snapshot-types';
 
 export interface OrderCreationActor { id?: string; role?: string; tenantId?: string }
 export class OrderCreationError extends Error {
-  constructor(message: string, readonly status: 400 | 401 | 403 | 404 | 409) { super(message); }
+  constructor(message: string, readonly status: 400 | 401 | 403 | 404 | 409 | 503, readonly code?: string) { super(message); }
 }
 
 const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef']);
@@ -18,10 +21,16 @@ export async function resolveOrderCreationScope(
   const token = getAuthToken(request);
   if (!actor && token) {
     if (typeof env.JWT_SECRET !== 'string') throw new OrderCreationError('Authentication unavailable', 401);
-    const payload = await verifyJWT(token, env.JWT_SECRET);
-    const kv = env.AUTH_KV as { get(key: string): Promise<unknown> } | undefined;
-    if (!payload || await kv?.get(`revoked:${token}`)) throw new OrderCreationError('Invalid or expired session', 401);
-    actor = { id: payload.id || (payload as { sub?: string }).sub, role: payload.role, tenantId: payload.tenantId };
+    try {
+      const session = await authenticateRequest(request, env as unknown as Env);
+      if (!session) throw new OrderCreationError('Invalid or expired session', 401);
+      if ('blocked' in session) throw new OrderCreationError(session.blocked, 403);
+      const payload = session.payload;
+      actor = { id: payload.id, role: payload.role, tenantId: payload.tenantId };
+    } catch (error) {
+      if (error instanceof StaffSessionError) throw new OrderCreationError(error.message, error.status, error.code);
+      throw error;
+    }
   }
   const tenantId = actor?.role && STAFF_ROLES.has(actor.role) ? (actor.tenantId || 'default') : 'default';
   if (!tenantId.trim() || tenantId === '*' || tenantId.length > 200) throw new OrderCreationError('Invalid store binding', 403);

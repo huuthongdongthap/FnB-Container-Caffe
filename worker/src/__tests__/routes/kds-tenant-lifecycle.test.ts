@@ -13,6 +13,13 @@ function fixtures(tenant = 'cafe-a', status = 'preparing', beforeWrite?: (row: R
     const stmt = {
       bind(...values: unknown[]) { binds = values; return stmt; },
       async first() {
+        // The session gate reads the staff account row behind a token, so a
+        // lookup by id has to answer that account or the session reads as
+        // revoked before the route under test runs.
+        if (/FROM users WHERE id = \?/i.test(sql)) {
+          const accounts = ['staff','cashier','waiter','kitchen'].map(role => ({ id: `actor-${role}`, name: role, role, tenant_id: 'cafe-a', is_active: 1, auth_version: 1 }));
+          return accounts.find(row => row.id === binds[0]) || null;
+        }
         if (!sql.includes('FROM orders WHERE id = ?')) return null;
         if (binds[0] !== row.id || (sql.includes('tenant_id = ?') && binds.at(-1) !== row.tenant_id)) return null;
         return { ...row };
@@ -40,7 +47,8 @@ function fixtures(tenant = 'cafe-a', status = 'preparing', beforeWrite?: (row: R
   return { row, db, env, writes };
 }
 async function request(path: string, method = 'PATCH', role = 'staff', status = 'ready') {
-  const token = await generateJWT({ id: 'staff-a', sub: 'staff-a', role, tenantId: 'cafe-a', email: 'a@test.aura' } as any, TEST_JWT_SECRET);
+  const token = await generateJWT({ id: `actor-${role}`, sub: `actor-${role}`, role, tenantId: 'cafe-a', email: 'a@test.aura',
+    authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800);
   return new Request(`https://test.aura${path}`, {
     method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     ...(method === 'PATCH' && !path.includes('mark-cod-paid') ? { body: JSON.stringify({ status }) } : {}),

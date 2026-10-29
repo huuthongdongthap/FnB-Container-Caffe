@@ -1,67 +1,34 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMockDB, createMockEnv, createMockKV } from '../test-utils';
-import { submitContact, contactRouter } from '../../routes/contact';
-
-describe('contact smoke', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+// @vitest-environment node
+import { afterEach, describe, expect, it } from 'vitest';
+import { privacyFixture } from '../helpers/privacy-sqlite-fixture';
+const fixtures: ReturnType<typeof privacyFixture>[] = [];
+const fixture = () => { const value = privacyFixture(); fixtures.push(value); return value; };
+afterEach(() => { for (const f of fixtures.splice(0)) f.sqlite.close(); });
+const contact = { name: 'Test User', phone: '0909123456', content: 'Support question' };
+describe('Contact privacy persistence', () => {
+  it('persists a real ID with server ownership and classification', async () => {
+    const f = fixture();
+    const response = await f.request('/api/contact', 'other', 'POST',
+      { ...contact, tenant_id: 'cafe-b', classification: 'recruitment', category: 'service' }, { 'X-Tenant-Id': 'cafe-b' });
+    expect(response.status).toBe(201);
+    const { id } = await response.json();
+    expect(id).toMatch(/^MSG_/);
+    expect(f.sqlite.prepare('SELECT tenant_id,classification,category FROM contact_messages WHERE id=?').get(id))
+      .toMatchObject({ tenant_id: 'cafe-a', classification: 'contact', category: 'service' });
   });
-
-  function makeEnv() {
-    return { ...createMockEnv(), AURA_DB: createMockDB(), AUTH_KV: createMockKV() };
-  }
-
-  it('POST /api/contact — missing required fields returns 400', async() => {
-    const req = new Request('https://test.aura/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-
-    const res = await contactRouter.fetch(req, makeEnv());
-    expect(res.status).toBe(400);
+  it('body category cannot create a recruitment copy, validation remains visible', async () => {
+    const f = fixture();
+    expect((await f.request('/api/contact', undefined, 'POST', {})).status).toBe(400);
+    expect((await f.request('/api/contact', undefined, 'POST', { ...contact, category: 'recruitment' })).status).toBe(400);
+    expect(f.sqlite.prepare('SELECT COUNT(*) count FROM contact_messages').get()?.count).toBe(0);
   });
-
-  it('POST /api/contact — valid body returns 201', async() => {
-    const req = new Request('https://test.aura/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Test User',
-        phone: '0909123456',
-        email: 'test@example.com',
-        content: 'Hello this is a test message'
-      })
-    });
-
-    const res = await contactRouter.fetch(req, makeEnv());
-    expect(res.status).toBe(201);
-    const data = await res.json() as Record<string, unknown>;
-    expect(data.success).toBe(true);
-  });
-
-  it('POST /api/contact — sanitizes internal D1 errors on HTTP 500 without leaking SQLite details', async() => {
-    const env = makeEnv();
-    env.AURA_DB.prepare = vi.fn().mockReturnValue({
-      bind: () => ({
-        run: () => Promise.reject(new Error('SQLITE_ERROR: table contact_messages has no column named internal_col'))
-      })
-    });
-
-    const req = new Request('https://test.aura/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Test User',
-        phone: '0909123456',
-        content: 'Hello this is a test message'
-      })
-    });
-
-    const res = await contactRouter.fetch(req, env);
-    expect(res.status).toBe(500);
-    const bodyText = await res.text();
-    expect(bodyText).not.toContain('SQLITE_ERROR');
-    expect(bodyText).not.toContain('internal_col');
+  it('missing production configuration and unknown topology fail closed', async () => {
+    const f = fixture(); delete f.env.PILOT_TENANT_ID;
+    expect((await f.request('/api/contact', undefined, 'POST', contact)).status).toBe(503);
+    f.env.PILOT_TENANT_ID = 'cafe-a';
+    f.sqlite.exec('ALTER TABLE contact_messages RENAME COLUMN classification TO unverified_classification');
+    const failed = await f.request('/api/contact', undefined, 'POST', contact);
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).not.toContain('classification');
   });
 });

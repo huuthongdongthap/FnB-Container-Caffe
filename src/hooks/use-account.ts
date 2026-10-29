@@ -46,12 +46,19 @@ export function useAccount() {
   const [updateLoading, setUpdateLoading] = useState(false);
 
   const fetchProfile = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
+    if (!user) {
+      setProfile(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     try {
       const profileData = await apiFetch<{ success: boolean; data: CustomerProfile; error?: string; message?: string }>('/api/customers/me');
+      if (useAuthStore.getState().user?.id !== user.id) return;
       if (profileData.success) setProfile(profileData.data);
       else setError(profileData.error || profileData.message || 'Không thể tải thông tin');
     } catch {
+      if (useAuthStore.getState().user?.id !== user.id) return;
       setError('Lỗi kết nối');
     } finally {
       setLoading(false);
@@ -59,10 +66,16 @@ export function useAccount() {
   }, [user]);
 
   const fetchOrders = useCallback(async () => {
-    if (!user) { setOrdersLoading(false); return; }
+    if (!user) {
+      setOrders([]);
+      setOrdersError(null);
+      setOrdersLoading(false);
+      return;
+    }
     setOrdersError(null);
     try {
       const ordersData = await apiFetch<OrdersListResponse>('/api/orders?limit=50&sort=created_at&order=desc');
+      if (useAuthStore.getState().user?.id !== user.id) return;
       const resolvedOrders = Array.isArray(ordersData.data?.orders)
         ? ordersData.data.orders
         : Array.isArray(ordersData.orders)
@@ -74,6 +87,7 @@ export function useAccount() {
         setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
       }
     } catch {
+      if (useAuthStore.getState().user?.id !== user.id) return;
       setOrdersError('Lỗi kết nối mạng');
     } finally {
       setOrdersLoading(false);

@@ -101,7 +101,9 @@ export function CheckoutPage() {
     const effectiveShippingFee = effectiveOrderType === 'delivery'
       ? (totalItems >= 2 ? 0 : 15_000)
       : 0;
-    const effectiveTotal = subtotal + effectiveShippingFee;
+    const appliedDiscount = Math.max(0, Number(formData.discount || 0));
+    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount);
+    const normalizedPromoCode = formData.promoCode?.trim().toUpperCase() || undefined;
 
     const payload = {
       items: items.map((i) => {
@@ -133,7 +135,8 @@ export function CheckoutPage() {
       delivery_time: 'now',
       shipping_fee: effectiveShippingFee,
       service_fee: 0,
-      discount: 0,
+      discount: appliedDiscount,
+      ...(normalizedPromoCode ? { promo_code: normalizedPromoCode } : {}),
       tip: 0,
     };
 

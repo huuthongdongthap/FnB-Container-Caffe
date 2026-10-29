@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTierLadder } from '../loyalty-store-helpers';
+import { parseTierLadder, parseLoyaltySummary } from '../loyalty-store-helpers';
 import type { LoyaltyTierLadderItem } from '../loyalty-store-types';
 
 describe('parseTierLadder', () => {
@@ -42,5 +42,18 @@ describe('parseTierLadder', () => {
   it('returns empty array for empty input', () => {
     const result = parseTierLadder([], 'bronze');
     expect(result).toEqual([]);
+  });
+
+  it('normalizes decimal cashback_rate from tier_config to integer percentage', () => {
+    expect(parseLoyaltySummary({ tier: 'bronze', total_points: 10, tier_config: { cashback_rate: 0.03 } })).toEqual({
+      tier: 'bronze',
+      points: 10,
+      cashbackRate: 3,
+    });
+    expect(parseLoyaltySummary({ tier: 'gold', total_points: 220, tier_config: { cashback_rate: 0.07 } })).toEqual({
+      tier: 'gold',
+      points: 220,
+      cashbackRate: 7,
+    });
   });
 });

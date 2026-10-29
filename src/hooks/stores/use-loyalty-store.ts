@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
+import { readClientSession, saveClientSession, subscribeClientSession, type ClientSessionUser } from '@/lib/client-session';
 import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary, parseTierLadder } from './loyalty-store-helpers';
 
 import type { Reward, PointsHistoryEntry, LoyaltyTierLadderItem } from './loyalty-store-types';
@@ -25,6 +26,7 @@ interface LoyaltyState {
   redeemReward: (rewardId: string) => Promise<void>;
   calculateCashback: (amount: number) => number;
   phoneAuth: (phone: string) => Promise<void>;
+  reset: () => void;
   clearError: () => void;
 }
 
@@ -41,6 +43,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   error: null,
 
   fetchLoyalty: async () => {
+    const sessionToken = readClientSession().token;
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/summary');
@@ -70,6 +73,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         tierLadder = parseTierLadder(rawTiers, parseLoyaltySummary(data).tier);
       } catch { /* tier ladder is optional */ }
 
+      if (readClientSession().token !== sessionToken) return;
       const { tier: tierVal, points: pointsVal, cashbackRate: cashbackRateVal } = parseLoyaltySummary(data);
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
       set({
@@ -130,8 +134,11 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({ phone }),
       });
-      const token = res?.token || res?.data?.token;
-      if (token && typeof window !== 'undefined') {
+      const token = res?.customerToken || res?.token || res?.data?.customerToken || res?.data?.token;
+      const user = (res?.user || res?.data?.user) as ClientSessionUser | undefined;
+      if (token && user) {
+        saveClientSession(token, user);
+      } else if (token && typeof window !== 'undefined') {
         window.localStorage.setItem('aura_auth_token', token);
       }
       set({ loading: false, error: null });
@@ -144,5 +151,24 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
     }
   },
 
+  reset: () => set({
+    tier: 'bronze',
+    points: 0,
+    cashbackRate: 3,
+    tierLadder: [],
+    rewards: [],
+    history: [],
+    loading: false,
+    error: null,
+  }),
+
   clearError: () => set({ error: null }),
 }));
+
+if (typeof window !== 'undefined') {
+  subscribeClientSession((session) => {
+    if (!session.token) {
+      useLoyaltyStore.getState().reset();
+    }
+  });
+}

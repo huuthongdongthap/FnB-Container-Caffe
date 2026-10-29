@@ -7,6 +7,10 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { contactSchema } from '../lib/validators';
+import { contactMessageRepository, ContactSchemaUnavailable } from '../lib/contact-message-repository';
+import { resolvePilotStore } from '../lib/pilot-store';
+import { privacyError } from '../lib/pilot-privacy-access';
+import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'contact' });
 
@@ -47,18 +51,23 @@ export async function submitContact(request: Request, env: Record<string, unknow
 
     const { name, phone, email, category, content } = parsed.data;
 
+    const tenantId = resolvePilotStore(env as unknown as Env);
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const result = await db.prepare(
-      'INSERT INTO contact_messages (name, phone, email, category, content, status) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(name.trim().slice(0, 100), phone.trim(), email?.trim().slice(0, 100) || null, category || 'other', content.trim().slice(0, 2000), 'unread').run();
+    const messages = await contactMessageRepository(db);
+    const id = await messages.insert({ tenantId, classification: 'contact',
+      name: name.trim(), phone: phone.trim(), email: email?.trim(), category: category || 'other',
+      content: content.trim(), direction: 'customer' });
 
     return jsonResponse({
       success: true,
       message: 'Tin nhắn đã được gửi. Chúng tôi sẽ phản hồi trong 24h.',
-      id: (result as unknown as { lastRowId?: number }).lastRowId
+      id
     }, 201);
   } catch (error) {
-    log.error('Contact submit error:', { message: (error as Error).message });
+    const expected = privacyError(error);
+    if (expected) return expected;
+    if (error instanceof ContactSchemaUnavailable) return errorResponse('Contact unavailable', 503);
+    log.error('Contact submit error');
     return errorResponse('Failed to submit contact message', 500);
   }
 }

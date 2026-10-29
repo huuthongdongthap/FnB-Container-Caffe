@@ -1,249 +1,87 @@
-/**
- * Chat Routes
- * Live chat support widget API.
- * POST /api/chat/messages — save message from customer
- * GET  /api/chat/conversations — list unique conversations (auth required)
- * GET  /api/chat/messages/:phone — get message history for a phone (auth required)
- */
-
+/** Support chat reads only explicitly classified rows owned by the pilot store. */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { jsonResponse, errorResponse } from '../middleware/cors';
-import { createLogger } from '../middleware/logger';
 import { requireAuth } from '../middleware/auth';
-import { getAuthToken, verifyJWT } from '../lib/jwt';
+import { authenticateRequest } from '../lib/staff-session-auth';
+import { staffSessionErrorResponse } from '../lib/staff-session';
+import { contactMessageRepository, ContactSchemaUnavailable } from '../lib/contact-message-repository';
+import { privacyError, privacyStore } from '../lib/pilot-privacy-access';
+import { resolvePilotStore } from '../lib/pilot-store';
 import type { Env } from '../types/env';
 
-const log = createLogger({ route: 'chat' });
-
-// ── Zod schemas ──
-
+const roles = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'];
 const sendMessageSchema = z.object({
-  name: z.string().min(1, 'Ten khong duoc de trong').max(100),
-  phone: z.string().min(8, 'So dien thoai khong hop le').max(15),
-  message: z.string().min(1, 'Tin nhan khong duoc de trong').max(2000),
+  name: z.string().trim().min(1, 'Ten khong duoc de trong').max(100),
+  phone: z.string().trim().min(8, 'So dien thoai khong hop le').max(15),
+  message: z.string().trim().min(1, 'Tin nhan khong duoc de trong').max(2000),
   direction: z.enum(['customer', 'admin']).optional(),
 });
-
-// ── Rate limit helper ──
-
-async function checkRateLimit(env: Env, key: string, max: number, windowSec: number): Promise<boolean> {
-  if (!env?.AUTH_KV) return true;
+async function checkRateLimit(env: Env, key: string, max: number): Promise<boolean> {
+  if (!env.AUTH_KV) return true;
   try {
     const fullKey = `rl:chat:${key}`;
-    const cur = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
-    if (cur >= max) {
-      return false;
-    }
-    await env.AUTH_KV.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
+    const count = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
+    if (count >= max) return false;
+    await env.AUTH_KV.put(fullKey, String(count + 1), { expirationTtl: 60 });
     return true;
-  } catch {
-    return true;
-  }
+  } catch { return true; }
 }
-
-// ── Handlers ──
-
+function chatError(error: unknown, message: string) {
+  return privacyError(error) || staffSessionErrorResponse(error)
+    || errorResponse(error instanceof ContactSchemaUnavailable ? 'Chat unavailable' : message,
+      error instanceof ContactSchemaUnavailable ? 503 : 500);
+}
 async function sendMessage(c: Context<{ Bindings: Env }>) {
   try {
-    const body = await c.req.json() as Record<string, unknown>;
-    const parsed = sendMessageSchema.safeParse(body);
-
+    const parsed = sendMessageSchema.safeParse(await c.req.json());
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       return errorResponse(`${first.path.join('.')}: ${first.message}`, 400);
     }
-
     const { name, phone, message } = parsed.data;
-    const clientIp =
-      c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
-      'unknown';
-
-    if (clientIp !== 'unknown') {
-      const ipOk = await checkRateLimit(c.env, `ip:${clientIp}`, 20, 60);
-      if (!ipOk) {
-        return errorResponse('Qua nhieu tin nhan, vui long thu lai sau', 429);
-      }
-    }
-
-    const ok = await checkRateLimit(c.env, `msg:${phone}`, 10, 60);
-    if (!ok) {
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
+    if ((ip && !(await checkRateLimit(c.env, `ip:${ip}`, 20)))
+      || !(await checkRateLimit(c.env, `msg:${phone}`, 10)))
       return errorResponse('Qua nhieu tin nhan, vui long thu lai sau', 429);
-    }
-
-    const db = c.env.AURA_DB;
-    const now = new Date().toISOString();
-    let resolvedDirection: 'customer' | 'admin' = 'customer';
+    const tenantId = resolvePilotStore(c.env);
+    let direction: 'customer' | 'admin' = 'customer';
     if (parsed.data.direction === 'admin') {
-      const token = getAuthToken(c.req.raw);
-      if (token && c.env.JWT_SECRET) {
-        let isRevoked = false;
-        if (c.env.AUTH_KV) {
-          try {
-            isRevoked = Boolean(await c.env.AUTH_KV.get(`revoked:${token}`));
-          } catch {
-            isRevoked = false;
-          }
-        }
-        if (!isRevoked) {
-          const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
-          if (payload && ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'].includes(String(payload.role || ''))) {
-            resolvedDirection = 'admin';
-          }
-        }
-      }
+      const session = await authenticateRequest(c.req.raw, c.env);
+      if (!session) return errorResponse('Unauthorized', 401);
+      if ('blocked' in session) return errorResponse(session.blocked, 403);
+      // Authority comes from the verified D1 account, never an incidental JWT claim.
+      if (!session.account || !roles.includes(session.account.role) || session.account.tenant_id !== tenantId)
+        return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+      direction = 'admin';
     }
-    let lastRowId: unknown = undefined;
-    try {
-      const result = await db.prepare(
-        'INSERT INTO contact_messages (name, phone, message, direction, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(name.trim(), phone.trim(), message.trim(), resolvedDirection, now).run();
-      lastRowId = result.meta?.last_row_id;
-    } catch {
-      const msgId = `MSG_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const category = resolvedDirection === 'admin' ? 'chat_admin' : 'chat';
-      await db.prepare(
-        'INSERT INTO contact_messages (id, name, phone, email, category, content, status, created_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)'
-      ).bind(msgId, name.trim(), phone.trim(), category, message.trim(), resolvedDirection === 'admin' ? 'read' : 'unread', now).run();
-      lastRowId = msgId;
-    }
-
-    return jsonResponse({
-      success: true,
-      message: 'Tin nhan da duoc gui',
-      id: lastRowId
-    }, 201);
-  } catch (error) {
-    log.error('Chat send message error:', { message: (error as Error).message });
-    return errorResponse('Failed to send message', 500);
-  }
+    const repository = await contactMessageRepository(c.env.AURA_DB);
+    const id = await repository.insert({ tenantId, classification: 'chat', name, phone, content: message,
+      direction, category: direction === 'admin' ? 'chat_admin' : 'chat' });
+    return jsonResponse({ success: true, message: 'Tin nhan da duoc gui', id }, 201);
+  } catch (error) { return chatError(error, 'Failed to send message'); }
 }
-
 async function getConversations(c: Context<{ Bindings: Env }>) {
   try {
-    const db = c.env.AURA_DB;
-    let results: unknown[] = [];
-    try {
-      const res = await db.prepare(
-        `SELECT
-          cm.phone,
-          cm.name,
-          cm.message AS last_message,
-          cm.direction AS last_direction,
-          cm.created_at AS last_message_at,
-          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone) AS message_count,
-          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone AND direction = 'customer' AND read_at IS NULL) AS unread_count
-        FROM contact_messages cm
-        WHERE cm.id IN (
-          SELECT MAX(id) FROM contact_messages GROUP BY phone
-        )
-        ORDER BY cm.created_at DESC`
-      ).all();
-      results = res.results || [];
-    } catch {
-      const res = await db.prepare(
-        `SELECT
-          cm.phone,
-          cm.name,
-          cm.content AS last_message,
-          CASE WHEN cm.category = 'chat_admin' THEN 'admin' ELSE 'customer' END AS last_direction,
-          cm.created_at AS last_message_at,
-          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone) AS message_count,
-          (SELECT COUNT(*) FROM contact_messages WHERE phone = cm.phone AND status = 'unread') AS unread_count
-        FROM contact_messages cm
-        WHERE cm.rowid IN (
-          SELECT MAX(rowid) FROM contact_messages GROUP BY phone
-        )
-        ORDER BY cm.created_at DESC`
-      ).all();
-      results = res.results || [];
-    }
-
-    const conversations = (results as Array<Record<string, unknown>>).map((row) => ({
-      phone: row.phone,
-      name: row.name,
-      last_message: row.last_message,
-      last_direction: row.last_direction,
-      last_message_at: row.last_message_at,
-      message_count: row.message_count,
-      unread_count: row.unread_count
-    }));
-
-    return jsonResponse({ success: true, data: conversations });
-  } catch (error) {
-    log.error('Chat get conversations error:', { message: (error as Error).message });
-    return errorResponse('Failed to get conversations', 500);
-  }
+    const tenantId = privacyStore(c, roles);
+    if (tenantId instanceof Response) return tenantId;
+    const repository = await contactMessageRepository(c.env.AURA_DB);
+    return jsonResponse({ success: true, data: await repository.conversations(tenantId) });
+  } catch (error) { return chatError(error, 'Failed to get conversations'); }
 }
-
 async function getMessageHistory(c: Context<{ Bindings: Env }>) {
   try {
+    const tenantId = privacyStore(c, roles);
+    if (tenantId instanceof Response) return tenantId;
     const phone = c.req.param('phone') || c.req.param('id');
-    if (!phone || phone.length < 8) {
-      return errorResponse('So dien thoai khong hop le', 400);
-    }
-
-    const db = c.env.AURA_DB;
-    const now = new Date().toISOString();
-
-    // Mark customer messages as read when staff views the conversation
-    try {
-      await db.prepare(
-        "UPDATE contact_messages SET read_at = ? WHERE phone = ? AND direction = 'customer' AND read_at IS NULL"
-      ).bind(now, phone).run();
-    } catch {
-      try {
-        await db.prepare(
-          "UPDATE contact_messages SET status = 'read' WHERE phone = ? AND status = 'unread'"
-        ).bind(phone).run();
-      } catch {
-        // Non-blocking if table or column varies
-      }
-    }
-    try {
-      await db.prepare(
-        "UPDATE chat_messages SET read_at = ? WHERE (conversation_id = ? OR phone = ?) AND sender_type = 'customer' AND read_at IS NULL"
-      ).bind(now, phone, phone).run();
-    } catch {
-      // Non-blocking
-    }
-
-    let results: unknown[] = [];
-    try {
-      const res = await db.prepare(
-        'SELECT id, name, phone, message, direction, created_at, read_at FROM contact_messages WHERE phone = ? ORDER BY created_at ASC'
-      ).bind(phone).all();
-      results = res.results || [];
-    } catch {
-      const res = await db.prepare(
-        `SELECT id, name, phone, content AS message,
-                CASE WHEN category = 'chat_admin' THEN 'admin' ELSE 'customer' END AS direction,
-                created_at,
-                CASE WHEN status = 'read' THEN created_at ELSE NULL END AS read_at
-           FROM contact_messages WHERE phone = ? ORDER BY created_at ASC`
-      ).bind(phone).all();
-      results = res.results || [];
-    }
-
-    return jsonResponse({ success: true, data: results });
-  } catch (error) {
-    log.error('Chat get message history error:', { message: (error as Error).message });
-    return errorResponse('Failed to get message history', 500);
-  }
+    if (!phone || phone.length < 8) return errorResponse('So dien thoai khong hop le', 400);
+    const repository = await contactMessageRepository(c.env.AURA_DB);
+    return jsonResponse({ success: true, data: await repository.history(tenantId, phone) });
+  } catch (error) { return chatError(error, 'Failed to get message history'); }
 }
-
-// ── Router ──
-
 export const chatRouter = new Hono<{ Bindings: Env }>();
-
-// Public: customer sends a message
-chatRouter.post('/messages', (c) => sendMessage(c));
-
-// Protected: get all conversations
-chatRouter.get('/conversations', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getConversations(c));
-
-// Protected: get message history for a phone or conversation ID
-chatRouter.get('/conversations/:id/messages', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getMessageHistory(c));
-chatRouter.get('/messages/:phone', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), (c) => getMessageHistory(c));
+chatRouter.post('/messages', sendMessage);
+chatRouter.get('/conversations', requireAuth(roles), getConversations);
+chatRouter.get('/conversations/:id/messages', requireAuth(roles), getMessageHistory);
+chatRouter.get('/messages/:phone', requireAuth(roles), getMessageHistory);

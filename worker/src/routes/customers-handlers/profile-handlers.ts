@@ -1,48 +1,52 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
-import { verifyJWT } from '../auth.js';
+import { requireAuth } from '../../middleware/auth';
+import { resolvePilotStore } from '../../lib/pilot-store';
 import { updateCustomerProfileSchema, zodErrorResponse } from '../../lib/validators';
 import { type CustomerRecord, PROFILE_SQL } from './types';
 
+function resolveCustomerTenant(c: { get: (k: string) => unknown; env: Env }): string {
+  const user = c.get('user') as { tenantId?: string } | undefined;
+  if (user?.tenantId) {
+    return user.tenantId;
+  }
+  try {
+    return resolvePilotStore(c.env);
+  } catch {
+    return 'default';
+  }
+}
+
 export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
-  // GET /api/customers/me — get current customer by JWT
-  router.get('/me', async (c) => {
+  // GET /api/customers/me — get current customer by JWT (customer role only)
+  router.get('/me', requireAuth(['customer']), async (c) => {
     const db = c.env.AURA_DB;
-    const authHeader = c.req.header('Authorization');
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; role?: string } | undefined;
+    if (!user || user.role !== 'customer') {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
-    const token = authHeader.substring(7);
-    if (c.env.AUTH_KV) {
-      try {
-        if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
-          return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
-        }
-      } catch {
-        // ignore KV error
-      }
-    }
-    const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
-    if (!payload) {
-      return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
-    }
-
-    const customerId = payload.customerId || payload.sub || payload.id;
+    const customerId = user.customerId || user.id || user.sub;
     if (!customerId) {
       return c.json({ success: false, error: 'No customer ID in token' }, 400);
     }
+    const tenantId = resolveCustomerTenant(c as unknown as { get: (k: string) => unknown; env: Env });
 
     let customer: CustomerRecord | null = null;
     try {
       customer = await db.prepare(
-        `${PROFILE_SQL}WHERE c.id = ?`
-      ).bind(customerId).first<CustomerRecord>();
+        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?`
+      ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
-      customer = await db.prepare(
-        'SELECT c.* FROM customers c WHERE c.id = ?'
-      ).bind(customerId).first<CustomerRecord>();
+      try {
+        customer = await db.prepare(
+          `${PROFILE_SQL}WHERE c.id = ?`
+        ).bind(customerId).first<CustomerRecord>();
+      } catch {
+        customer = await db.prepare(
+          'SELECT c.* FROM customers c WHERE c.id = ?'
+        ).bind(customerId).first<CustomerRecord>();
+      }
     }
 
     if (!customer) {
@@ -52,34 +56,19 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
     return c.json({ success: true, data: customer });
   });
 
-  // PATCH /api/customers/me — update current customer profile
-  router.patch('/me', async (c) => {
+  // PATCH /api/customers/me — update current customer profile (customer role only)
+  router.patch('/me', requireAuth(['customer']), async (c) => {
     const db = c.env.AURA_DB;
-    const authHeader = c.req.header('Authorization');
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; role?: string } | undefined;
+    if (!user || user.role !== 'customer') {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
-    const token = authHeader.substring(7);
-    if (c.env.AUTH_KV) {
-      try {
-        if (await c.env.AUTH_KV.get(`revoked:${token}`)) {
-          return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
-        }
-      } catch {
-        // ignore KV error
-      }
-    }
-    const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
-    if (!payload) {
-      return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
-    }
-
-    const customerId = payload.customerId || payload.sub || payload.id;
+    const customerId = user.customerId || user.id || user.sub;
     if (!customerId) {
       return c.json({ success: false, error: 'No customer ID in token' }, 400);
     }
+    const tenantId = resolveCustomerTenant(c as unknown as { get: (k: string) => unknown; env: Env });
 
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = updateCustomerProfileSchema.safeParse(body);
@@ -103,26 +92,37 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const baseUpdates = [...updates];
     updates.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(customerId);
     try {
       await db.prepare(
-        `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
-      ).bind(...params).run();
+        `UPDATE customers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
+      ).bind(...params, customerId, tenantId).run();
     } catch {
-      await db.prepare(
-        `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
-      ).bind(...params).run();
+      try {
+        await db.prepare(
+          `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
+        ).bind(...params, customerId).run();
+      } catch {
+        await db.prepare(
+          `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
+        ).bind(...params, customerId).run();
+      }
     }
 
     let customer: CustomerRecord | null = null;
     try {
       customer = await db.prepare(
-        `${PROFILE_SQL}WHERE c.id = ?`
-      ).bind(customerId).first<CustomerRecord>();
+        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?`
+      ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
-      customer = await db.prepare(
-        'SELECT c.* FROM customers c WHERE c.id = ?'
-      ).bind(customerId).first<CustomerRecord>();
+      try {
+        customer = await db.prepare(
+          `${PROFILE_SQL}WHERE c.id = ?`
+        ).bind(customerId).first<CustomerRecord>();
+      } catch {
+        customer = await db.prepare(
+          'SELECT c.* FROM customers c WHERE c.id = ?'
+        ).bind(customerId).first<CustomerRecord>();
+      }
     }
 
     return c.json({ success: true, data: customer });

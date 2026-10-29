@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMockDB, createMockEnv } from '../test-utils';
+import { createMockDB, createMockEnv, staffSessionClaims } from '../test-utils';
 import { Hono } from 'hono';
 import { customersRouter } from '../../routes/customers';
 import {
@@ -10,7 +10,7 @@ import {
 } from '../../routes/admin-handlers';
 
 function makeDB(): ReturnType<typeof createMockDB> {
-  return createMockDB();
+  return createMockDB([{ id: 'm1', name: 'Manager', role: 'manager', tenant_id: 'default', is_active: 1, auth_version: 1 }, { id: 'a1', name: 'Admin', role: 'admin', tenant_id: 'default', is_active: 1, auth_version: 1 }]);
 }
 
 describe('customers smoke', () => {
@@ -18,16 +18,27 @@ describe('customers smoke', () => {
     vi.clearAllMocks();
   });
 
-  it('GET / — returns 200 with empty list', async() => {
+  it('GET / — returns 200 with empty list for authenticated staff and 401 when unauthenticated', async() => {
     const app = new Hono();
     app.route('/api/customers', customersRouter);
 
-    const req = new Request('https://test.aura/api/customers', {
+    const secret = 'test-jwt-secret-at-least-16-chars';
+    const env = { ...createMockEnv(), AURA_DB: makeDB(), JWT_SECRET: secret };
+
+    const unauthReq = new Request('https://test.aura/api/customers', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     });
+    const unauthRes = await app.fetch(unauthReq, env);
+    expect(unauthRes.status).toBe(401);
 
-    const env = { ...createMockEnv(), AURA_DB: makeDB(), JWT_SECRET: 'test-jwt-secret-at-least-16-chars' };
+    const { generateJWT } = await import('../../lib/jwt');
+    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, secret, 28800);
+    const req = new Request('https://test.aura/api/customers', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${managerToken}` }
+    });
+
     const res = await app.fetch(req, env);
     expect(res.status).toBe(200);
     const data = await res.json() as Record<string, unknown>;
@@ -72,7 +83,7 @@ describe('customers smoke', () => {
     const customerRes = await app.fetch(customerReq, prodEnv);
     expect(customerRes.status).toBe(403);
 
-    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura' } as any, prodEnv.JWT_SECRET);
+    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, prodEnv.JWT_SECRET, 28800);
     const managerReq = new Request('https://test.aura/api/customers', {
       method: 'GET',
       headers: { Authorization: `Bearer ${managerToken}` }
@@ -85,14 +96,15 @@ describe('customers smoke', () => {
     const app = new Hono();
     app.route('/api/customers', customersRouter);
     const db = makeDB();
-    db.prepare = vi.fn().mockReturnValue({
+    const original = db.prepare.bind(db);
+    db.prepare = vi.fn((sql: string) => /FROM users WHERE id/i.test(sql) ? original(sql) : ({
       bind: () => ({ first: () => Promise.reject(new Error('SQLITE_ERROR: no such column secret_col')) }),
       first: () => Promise.reject(new Error('SQLITE_ERROR: no such column secret_col'))
-    });
+    } as any));
 
     const { generateJWT } = await import('../../lib/jwt');
     const secret = 'test-jwt-secret-at-least-16-chars';
-    const token = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura' } as any, secret);
+    const token = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, secret, 28800);
     const req = new Request('https://test.aura/api/customers/segments', {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` }
@@ -112,7 +124,7 @@ describe('customers smoke', () => {
     const prepareSpy = vi.spyOn(db, 'prepare');
     const { generateJWT } = await import('../../lib/jwt');
     const secret = 'test-jwt-secret-at-least-16-chars';
-    const adminToken = await generateJWT({ id: 'a1', role: 'admin', email: 'a@test.aura' } as any, secret);
+    const adminToken = await generateJWT({ id: 'a1', role: 'admin', email: 'a@test.aura', ...staffSessionClaims() } as any, secret, 28800);
 
     const req = new Request('https://test.aura/api/customers?tier=gold&search=090', {
       method: 'GET',

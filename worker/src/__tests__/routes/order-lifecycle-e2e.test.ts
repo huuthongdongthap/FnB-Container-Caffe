@@ -14,9 +14,21 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
+import { isStaffAccountLookup } from '../test-utils';
 import type { D1Database } from '@cloudflare/workers-types';
 
 interface ScriptedRow { [key: string]: unknown }
+
+/** Account row the staff-session gate reads behind the owner token. */
+const OWNER_ACCOUNT_ROW: ScriptedRow = {
+  id: 'usr-owner',
+  name: 'Owner',
+  phone: null,
+  role: 'owner',
+  tenant_id: 'default',
+  is_active: 1,
+  auth_version: 1,
+};
 
 function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows: ScriptedRow[]; firstRow?: ScriptedRow | null }>): D1Database {
   const callLog: string[] = [];
@@ -27,6 +39,27 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
     _bound: boundLog,
     prepare: (sql: string) => {
       callLog.push(sql);
+      // The staff-session gate reads the account row behind every staff token;
+      // answer its lookup with the row the token's claims describe.
+      if (isStaffAccountLookup(sql)) {
+        const accountStmt = {
+          bind: (...args: unknown[]) => {
+            const id = String(args[0] ?? '');
+            return {
+              bind: () => accountStmt,
+              first: async () => (id === String(OWNER_ACCOUNT_ROW.id) ? { ...OWNER_ACCOUNT_ROW } : null),
+              all: async () => ({ results: [OWNER_ACCOUNT_ROW], success: true, meta: {} }),
+              run: async () => ({ success: true, changes: 1, meta: {} }),
+              raw: async () => [],
+            };
+          },
+          first: async () => ({ ...OWNER_ACCOUNT_ROW }),
+          all: async () => ({ results: [OWNER_ACCOUNT_ROW], success: true, meta: {} }),
+          run: async () => ({ success: true, changes: 1, meta: {} }),
+          raw: async () => [],
+        };
+        return accountStmt as unknown as import('@cloudflare/workers-types').D1PreparedStatement;
+      }
       let handler = rowsBySql[idx];
       if (handler && !handler.match(sql)) handler = rowsBySql.find(h => h.match(sql));
       if (handler) idx = rowsBySql.indexOf(handler) + 1;
@@ -84,7 +117,7 @@ describe('Order lifecycle E2E', () => {
   let token: string;
 
   beforeEach(async() => {
-    token = await generateJWT({ sub: 'usr-owner', role: 'owner', name: 'Owner' }, TEST_JWT_SECRET);
+    token = await generateJWT({ sub: 'usr-owner', role: 'owner', name: 'Owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
   });
 
   it('creates an order, retrieves it, and transitions through the state machine', async() => {

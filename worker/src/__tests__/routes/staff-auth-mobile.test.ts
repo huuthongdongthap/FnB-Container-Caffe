@@ -12,12 +12,43 @@ import { generateId } from '../../tree/auth/helpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Mint the live staff-mobile session a refresh must present.
+ *
+ * Refresh no longer accepts a device identifier alone, so the caller has to
+ * present a session bound to the same device and staff account it is renewing.
+ */
+async function mobileSessionBearer(staffId = 'USR_1', deviceId = 'DEV_1'): Promise<string> {
+  const token = await generateJWT({
+    id: staffId,
+    email: 'owner@auraspace.cafe',
+    name: 'Owner',
+    role: 'owner',
+    tenantId: 'cafe-a',
+    authVersion: 1,
+    authTime: Math.floor(Date.now() / 1000),
+    sessionType: 'staff-mobile',
+    deviceId,
+  } as Record<string, unknown>, TEST_JWT_SECRET, 28800);
+  return `Bearer ${token}`;
+}
+
+/**
+ * The account row the refresh's session gate reads, shaped as D1 returns it.
+ */
+const STAFF_ACCOUNT: Record<string, unknown> = {
+  id: 'USR_1', name: 'Owner', phone: null, role: 'owner',
+  tenant_id: 'cafe-a', is_active: 1, auth_version: 1,
+};
+
 function buildMockDb(overrides: {
   deviceByToken?: Record<string, unknown> | null;
   deviceById?: Record<string, unknown> | null;
   allDevices?: Record<string, unknown>[];
   ownDevices?: Record<string, unknown>[];
   deleteOk?: boolean;
+  /** Session bearer to present; mobile refresh requires a live session JWT. */
+  sessionBearer?: string;
 } = {}): any {
   const rowsByToken = new Map<string, Record<string, unknown> | null>();
   const rowsById = new Map<string, Record<string, unknown> | null>();
@@ -52,6 +83,14 @@ function buildMockDb(overrides: {
           if (val === undefined) return null;
           const s = String(val);
           if (sql.includes('SELECT tenant_id FROM users') && s === 'USR_1') return { tenant_id: 'cafe-a' };
+          // The session gate reads the staff account row to decide whether a
+          // presented session is still authorised.
+          if (/FROM users WHERE id = \?/i.test(sql)) {
+            if (s === STAFF_ACCOUNT.id) return { ...STAFF_ACCOUNT };
+            if (s === 'USR_2') return { ...STAFF_ACCOUNT, id: s, role: 'staff' };
+            if (s === 'USR_3') return { ...STAFF_ACCOUNT, id: s, role: 'owner' };
+            return null;
+          }
           if (s.startsWith('tok_')) return rowsByToken.has(s) ? rowsByToken.get(s) : null;
           if (s.startsWith('DEV_')) return rowsById.has(s) ? rowsById.get(s) : null;
           return null;
@@ -61,6 +100,7 @@ function buildMockDb(overrides: {
           const deleteIdx = sql.indexOf('DELETE');
           const isDelete = deleteIdx >= 0 && deleteIdx < (sql.indexOf('FROM') >>> 0);
           if (isStaffDevicesSql && !isDelete) {
+            if (sql.includes('JOIN users u')) return { results: sql.includes('AND d.staff_id = ?') ? overrides.ownDevices ?? [] : overrides.allDevices ?? [], success: true };
             if (!sql.includes('WHERE')) return { results: overrides.allDevices ?? [], success: true };
             if (sql.includes('staff_id = ?')) return { results: overrides.ownDevices ?? [], success: true };
             if (sql.includes('WHERE role IN')) return { results: overrides.allDevices ?? [], success: true };
@@ -68,11 +108,11 @@ function buildMockDb(overrides: {
           if (isDelete) return { success: true, changes: overrides.deleteOk ? 1 : 0 };
           return { results: [], success: true };
         },
-        async run() { return { success: true, changes: 1 }; },
+        async run() { return { success: true, changes: 1, meta: { changes: 1 } }; },
       };
       return stmt;
     },
-    batch: async () => [],
+    batch: async (statements: Array<{ run(): Promise<unknown> }>) => Promise.all(statements.map(statement => statement.run())),
     exec: async () => ({ count: 0, duration: 0 }),
     dump: async () => new Uint8Array(),
   };
@@ -90,6 +130,8 @@ function mockContext(opts: {
   allDevices?: Record<string, unknown>[];
   ownDevices?: Record<string, unknown>[];
   deleteOk?: boolean;
+  /** Session bearer to present; mobile refresh requires a live session JWT. */
+  sessionBearer?: string;
 } = {}): any {
   const user = opts.user ?? { id: 'USR_1', role: 'owner' };
   const db = buildMockDb({
@@ -103,6 +145,7 @@ function mockContext(opts: {
 
   const rawHeaders: Record<string, string> = {};
   if (opts.body !== undefined) rawHeaders['Content-Type'] = 'application/json';
+  if (opts.sessionBearer) rawHeaders['Authorization'] = opts.sessionBearer;
 
   const req: any = {
     raw: new Request('https://test.aura/mobile/test', {
@@ -128,7 +171,7 @@ function mockContext(opts: {
       __D1_BLOB__: undefined,
       __D1_META__: undefined,
     },
-    get: (key: string) => key === 'user' ? user : undefined,
+    get: (key: string) => key === 'user' ? { ...user, tenantId: 'cafe-a' } : undefined,
     set: (_k: string, v: unknown) => { if (typeof v !== 'function') throw new Error('set called with non-function'); },
     json: (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }),
   };
@@ -222,7 +265,7 @@ describe('staffMobileLogin', () => {
     expect(body.user.tenantId).toBe('cafe-a');
   });
 
-  it('returns 500 on unexpected error without leaking internal message', async () => {
+  it('returns 503 on unavailable auth state without leaking internal message', async () => {
     const badDb: any = {
       prepare: () => ({ bind: () => ({ first: async () => { throw new Error('DB_INTERNAL_SECRET_DOWN'); } }), first: async () => { throw new Error('DB_INTERNAL_SECRET_DOWN'); } }),
     };
@@ -244,7 +287,7 @@ describe('staffMobileLogin', () => {
       json: (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }),
     };
     const res = await staffMobileLogin(ctx);
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     const body = await res.json();
     expect(String(body.error)).not.toContain('DB_INTERNAL_SECRET_DOWN');
   });
@@ -276,7 +319,7 @@ describe('staffTokenRefresh', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns 400 when device_token is missing', async () => {
-    const ctx: any = mockContext({ body: {} });
+    const ctx: any = mockContext({ body: {}, sessionBearer: await mobileSessionBearer() });
     const res = await staffTokenRefresh(ctx);
     expect(res.status).toBe(400);
   });
@@ -285,17 +328,32 @@ describe('staffTokenRefresh', () => {
     const ctx: any = mockContext({
       body: { device_token: 'tok_nonexistent' },
       deviceByToken: null,
+      sessionBearer: await mobileSessionBearer(),
     });
     const res = await staffTokenRefresh(ctx);
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toContain('không hợp lệ');
+    expect(body.code).toBe('DEVICE_REVOKED');
+  });
+
+  it('returns 401 when no session is presented', async () => {
+    // A device identifier alone is no longer a credential: refresh requires the
+    // live session it is renewing.
+    const ctx: any = mockContext({
+      body: { device_token: 'tok_known' },
+      deviceByToken: deviceWithPin(''),
+    });
+    const res = await staffTokenRefresh(ctx);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe('SESSION_EXPIRED');
   });
 
   it('returns 200 with new token for valid device', async () => {
     const ctx: any = mockContext({
       body: { device_token: 'tok_known' },
       deviceByToken: deviceWithPin(''),
+      sessionBearer: await mobileSessionBearer(),
     });
     const res = await staffTokenRefresh(ctx);
     expect(res.status).toBe(200);
@@ -303,7 +361,10 @@ describe('staffTokenRefresh', () => {
     expect(body.success).toBe(true);
     expect(body.token).toBeTruthy();
     expect(typeof body.token).toBe('string');
-    expect(body.expires_in).toBe(3600);
+    // Staff sessions are capped at the absolute staff TTL, not the generic
+    // JWT expiry, so a device left unlocked cannot carry authority into the
+    // next shift.
+    expect(body.expires_in).toBe(28800);
     expect((await verifyJWT(body.token, TEST_JWT_SECRET))?.tenantId).toBe('cafe-a');
   });
 
@@ -314,6 +375,7 @@ describe('staffTokenRefresh', () => {
       body: { device_token: 'tok_known' },
       deviceByToken: deviceWithPin(''),
       kv: lockedKv,
+      sessionBearer: await mobileSessionBearer(),
     });
     const res = await staffTokenRefresh(ctx);
     expect(res.status).toBe(429);

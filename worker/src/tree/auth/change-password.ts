@@ -3,7 +3,11 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { createMetricsCollector } from '../../lib/metrics-collector';
-import { getAuthToken, verifyJWT, verifyPassword, hashPassword } from '../../lib/jwt';
+import { verifyPassword, hashPassword } from '../../lib/jwt';
+import { authenticateRequest } from '../../lib/staff-session-auth';
+import { staffSessionErrorResponse } from '../../lib/staff-session';
+import { verifyStaffPassword, changeStaffPassword } from '../../lib/staff-password';
+import type { Env } from '../../types/env';
 import { changePasswordSchema } from '../../lib/validators';
 import { parseJSON } from './helpers';
 
@@ -19,29 +23,20 @@ export async function changePassword(request: Request, env: Record<string, unkno
     }
     const { currentPassword, newPassword } = parsed.data;
 
-    const token = getAuthToken(request);
-    if (!token) {
-      return errorResponse('Unauthorized', 401);
-    }
-
-    const payload = await verifyJWT(token, env.JWT_SECRET as string);
-    if (!payload) {
-      return errorResponse('Token không hợp lệ', 401);
-    }
-
+    const session = await authenticateRequest(request, env as unknown as Env);
+    if (!session) return errorResponse('Unauthorized', 401);
+    if ('blocked' in session) return errorResponse(session.blocked, 403);
+    const { payload, account } = session;
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const revoked = await authKV.get(`revoked:${token}`);
-    if (revoked) {
-      return errorResponse('Token đã bị thu hồi (logout)', 401);
-    }
-
-    const userStr = await authKV.get(`user:${payload.email}`);
-    if (!userStr) {
+    const userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
+    if (!userStr && !account) {
       return errorResponse('User không tồn tại', 404);
     }
 
-    const user = JSON.parse(userStr);
-    const ok = await verifyPassword(currentPassword, user.password);
+    const user = userStr ? JSON.parse(userStr) : { id: account!.id, name: account!.name, role: account!.role, password: '' };
+    const ok = account
+      ? await verifyStaffPassword((env as unknown as Env).AURA_DB, account, currentPassword, user.password)
+      : await verifyPassword(currentPassword, user.password);
     if (!ok) {
       const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
       const mc = createMetricsCollector(db);
@@ -51,13 +46,18 @@ export async function changePassword(request: Request, env: Record<string, unkno
 
     user.password = await hashPassword(newPassword);
     user.updated_at = new Date().toISOString();
-    await authKV.put(`user:${payload.email}`, JSON.stringify(user));
+    if (account) {
+      await changeStaffPassword((env as unknown as Env).AURA_DB, account, user.password);
+      if (payload.email) await authKV.put(`user:${payload.email}`, JSON.stringify(user)).catch(() => {});
+    } else await authKV.put(`user:${payload.email}`, JSON.stringify(user));
 
     return jsonResponse({
       success: true,
       message: 'Mật khẩu đã được thay đổi'
     });
   } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
     log.error('ChangePassword error:', { message: (error as Error).message });
     return errorResponse('Đổi mật khẩu thất bại', 500);
   }

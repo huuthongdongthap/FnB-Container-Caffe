@@ -55,7 +55,8 @@ function base64UrlDecode(s: string): string {
 export async function generateJWT(
   payload: JwtPayload,
   secret: string,
-  ttlSeconds?: string | number
+  ttlSeconds?: string | number,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
 ): Promise<string> {
   validateJWTSecret(secret);
   const encoder = new TextEncoder();
@@ -68,8 +69,8 @@ export async function generateJWT(
   const payloadBase64 = base64UrlEncode(
     JSON.stringify({
       ...payload,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + ttl
+      iat: nowSeconds,
+      exp: nowSeconds + ttl
     })
   );
 
@@ -165,13 +166,21 @@ function getExplicitToken(request: Request): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
-  try {
-    const url = new URL(request.url);
-    const tokenParam = url.searchParams.get('token');
-    if (tokenParam) {
-      return tokenParam;
-    }
-  } catch {}
+  if (request.method === 'GET') {
+    try {
+      const url = new URL(request.url);
+      if (
+        url.pathname.endsWith('/stream') ||
+        url.pathname.endsWith('/events') ||
+        url.pathname.endsWith('/ws')
+      ) {
+        const tokenParam = url.searchParams.get('token');
+        if (tokenParam) {
+          return tokenParam;
+        }
+      }
+    } catch {}
+  }
   return null;
 }
 

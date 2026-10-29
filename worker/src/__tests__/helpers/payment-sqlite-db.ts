@@ -3,19 +3,29 @@ import { createHmac } from 'node:crypto';
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 
 /** Executes real SQL and transactional batches; no pattern-matching D1 responses. */
-export function paymentSqliteDB() {
+export function paymentSqliteDB(options: { canonicalStaff?: boolean; authVersion?: boolean } = {}) {
   const sqlite = new DatabaseSync(':memory:');
   const executedStatements: Array<{ sql: string; binds: unknown[] }> = [];
   const runStatement = new WeakMap<object, () => any>();
-  sqlite.exec(`CREATE TABLE orders (id TEXT PRIMARY KEY, tenant_id TEXT DEFAULT 'default', customer_id TEXT,
+  sqlite.exec(`CREATE TABLE orders (id TEXT PRIMARY KEY, tenant_id TEXT DEFAULT 'default', customer_id TEXT, table_id TEXT,
     total INTEGER, payment_status TEXT DEFAULT 'unpaid', payment_method TEXT DEFAULT 'payos', status TEXT DEFAULT 'pending',
     items TEXT DEFAULT '[]', customer_name TEXT, customer_phone TEXT, customer_email TEXT, customer_address TEXT,
     notes TEXT, is_cod INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT);
     CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, method TEXT, amount INTEGER, status TEXT,
     transaction_id TEXT UNIQUE, payment_url TEXT, created_at TEXT, updated_at TEXT,
     refund_status TEXT, refund_amount INTEGER, refund_reason TEXT);
-    CREATE TABLE audit_logs (id TEXT, user_id TEXT, action TEXT, entity_type TEXT, entity_id TEXT, metadata TEXT, created_at TEXT);
-    CREATE TABLE _metrics (name TEXT, value REAL, tags TEXT, created_at TEXT);`);
+    -- Mirrors 005_audit_logs.sql: the canonical audit writer tries the wide
+    -- schema first and this older shape last, so a narrower table here would
+    -- make every audit assertion fail for a reason that exists only in the test.
+    CREATE TABLE audit_logs (id TEXT, actor_id TEXT, actor_name TEXT, action TEXT,
+      resource_type TEXT, resource_id TEXT, details TEXT, ip_address TEXT, created_at TEXT);
+    CREATE TABLE _metrics (name TEXT, value REAL, tags TEXT, created_at TEXT);
+    CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, phone TEXT, role TEXT,
+      tenant_id TEXT DEFAULT 'default', is_active INTEGER DEFAULT 1,
+      ${options.authVersion === false ? '' : 'auth_version INTEGER DEFAULT 1,'}
+      ${options.canonicalStaff ? '' : 'email TEXT, pin_hash TEXT,'}
+      password_hash TEXT, created_at TEXT, updated_at TEXT);
+    CREATE TABLE staff_login_identities (email TEXT PRIMARY KEY, staff_id TEXT NOT NULL UNIQUE REFERENCES users(id));`);
   function prepare(sql: string) {
     let args: any[] = [];
     const run = () => {
@@ -55,13 +65,20 @@ export function paymentSqliteDB() {
     sqlite.prepare(`INSERT INTO payments (id, order_id, method, amount, status, transaction_id, created_at, updated_at)
       VALUES (?, ?, 'payos', 20000, ?, ?, ?, ?)`).run(`pay_${orderId}`, orderId, status, code, new Date().toISOString(), new Date().toISOString());
   }
-  function seed(table: 'orders' | 'payments', row: Record<string, any>) {
+  // `users` is included because the request-time staff-session gate reads the
+  // account row behind every staff token; a missing row reads as revoked.
+  function seed(table: 'orders' | 'payments' | 'users', row: Record<string, any>) {
     const names = new Set(sqlite.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name));
+    if (names.size === 0) throw new Error(`Unknown table ${table}`);
     const values = Object.entries(row).filter(([key, value]) => names.has(key) && value !== undefined);
     sqlite.prepare(`INSERT INTO ${table} (${values.map(([key]) => key).join(',')}) VALUES (${values.map(() => '?').join(',')})`)
       .run(...values.map(([, value]) => value));
   }
-  return { db, sqlite, order, payment, seed, executedStatements };
+  /** Staff account row satisfying the request-time session gate for `id`/`role`. */
+  function staffAccount(id: string, role: string, tenantId = 'cafe-a') {
+    seed('users', { id, name: `User ${role}`, role, tenant_id: tenantId, is_active: 1, auth_version: 1 });
+  }
+  return { db, sqlite, order, payment, seed, staffAccount, executedStatements };
 }
 
 /** Independent signing fixture following the provider's documented payment-requests sample. */

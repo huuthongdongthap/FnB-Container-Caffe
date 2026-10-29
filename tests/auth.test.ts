@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Auth Routes — Tests for registerUser, loginUser, logoutUser,
  * getCurrentUser, registerStaff, listStaff, bootstrapOwner,
@@ -8,14 +9,17 @@
  * a mock Request and env.
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { paymentSqliteDB } from '../worker/src/__tests__/helpers/payment-sqlite-db';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mock JWT library ────────────────────────────────────────────
-vi.mock('../worker/src/lib/jwt.ts', () => ({
+vi.mock('../worker/src/lib/jwt.ts', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../worker/src/lib/jwt.ts')>(),
   generateJWT: vi.fn(async () => 'mock-jwt-token'),
   verifyJWT: vi.fn(async (token: string) => {
+    if (token === 'owner-token') return { id: 'USR_003', email: 'owner@test.com', name: 'Owner', role: 'owner', exp: Math.floor(Date.now() / 1000) + 3600, authTime: Math.floor(Date.now() / 1000), authVersion: 1, sessionType: 'staff-web' };
     if (token === 'valid-token') {
-      return { email: 'test@test.com', sub: 'user1', id: 'USR_001', name: 'Test User', role: 'staff', exp: Math.floor(Date.now() / 1000) + 3600 };
+      return { email: 'test@test.com', sub: 'user1', id: 'USR_001', name: 'Test User', role: 'customer', exp: Math.floor(Date.now() / 1000) + 3600 };
     }
     return null;
   }),
@@ -78,15 +82,13 @@ function createKvStore(entries: Record<string, unknown> = {}) {
   };
 }
 
-function createMockD1() {
-  return {
-    prepare: vi.fn(() => ({
-      bind: vi.fn().mockReturnThis(),
-      run: vi.fn(async () => ({ success: true })),
-      first: vi.fn(async () => null),
-      all: vi.fn(async () => ({ results: [] })),
-    })),
-  };
+const databases: ReturnType<typeof paymentSqliteDB>[] = [];
+afterEach(() => { for (const value of databases.splice(0)) value.sqlite.close(); });
+function createMockD1(users: Record<string, any>[] = [{ id: 'USR_003', name: 'Owner', role: 'owner' }]) {
+  const value = paymentSqliteDB({ canonicalStaff: true }); databases.push(value);
+  for (const user of users) value.seed('users', { ...user, is_active: user.active === false ? 0 : 1,
+    auth_version: 1, password_hash: user.password || null });
+  return value.db;
 }
 
 function createPostRequest(body: Record<string, unknown>): Request {
@@ -110,6 +112,7 @@ function createAuthRequest(token: string, body?: Record<string, unknown>): Reque
 }
 
 const BASE_ENV = {
+  AURA_DB: createMockD1(),
   JWT_SECRET: 'test-secret-16chars',
   JWT_EXPIRY_SECONDS: '3600',
 };
@@ -150,6 +153,8 @@ const OWNER_USER = {
 };
 
 // ── Suite ───────────────────────────────────────────────────────
+beforeEach(() => { BASE_ENV.AURA_DB = createMockD1(); });
+
 describe('Auth Handlers', () => {
   // ── registerUser ────────────────────────────────────────────
   describe('registerUser', () => {
@@ -285,7 +290,7 @@ describe('Auth Handlers', () => {
       const res = await getCurrentUser(req, env);
       expect(res.status).toBe(401);
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/Authorization/);
+      expect(body.code).toBe('SESSION_EXPIRED');
     });
 
     test('returns 401 with invalid token', async () => {
@@ -295,7 +300,7 @@ describe('Auth Handlers', () => {
       const res = await getCurrentUser(req, env);
       expect(res.status).toBe(401);
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/Token verify/);
+      expect((body as any).code).toBe('SESSION_EXPIRED');
     });
 
     test('returns 404 when user not found in KV', async () => {
@@ -326,7 +331,7 @@ describe('Auth Handlers', () => {
     test('registers staff account successfully', async () => {
       const kv = createKvStore();
       const env = { ...BASE_ENV, AUTH_KV: kv };
-      const req = createPostRequest({ email: 'newstaff@test.com', password: 'staffpass123', name: 'New Staff', phone: '0909123999' });
+      const req = createAuthRequest('owner-token', { email: 'newstaff@test.com', password: 'staffpass123', name: 'New Staff', phone: '0909123999' });
 
       const res = await registerStaff(req, env);
       expect(res.status).toBe(201);
@@ -339,7 +344,7 @@ describe('Auth Handlers', () => {
     test('returns 409 on duplicate email', async () => {
       const kv = createKvStore({ 'user:staff@test.com': STAFF_USER });
       const env = { ...BASE_ENV, AUTH_KV: kv };
-      const req = createPostRequest({ email: 'staff@test.com', password: 'staffpass123' });
+      const req = createAuthRequest('owner-token', { email: 'staff@test.com', password: 'staffpass123' });
 
       const res = await registerStaff(req, env);
       expect(res.status).toBe(409);
@@ -352,13 +357,15 @@ describe('Auth Handlers', () => {
   describe('listStaff', () => {
     test('returns staff and owner users', async () => {
       const kv = createKvStore({
+        'user:USR_002': STAFF_USER,
         'user:staff@test.com': STAFF_USER,
+        'user:USR_003': OWNER_USER,
         'user:owner@test.com': OWNER_USER,
         'user:customer@test.com': DEFAULT_USER,
       });
-      const env = { ...BASE_ENV, AUTH_KV: kv };
+      const env = { ...BASE_ENV, AUTH_KV: kv, AURA_DB: createMockD1([OWNER_USER, STAFF_USER]) };
 
-      const res = await listStaff(new Request('http://localhost/api/auth/staff'), env);
+      const res = await listStaff(createAuthRequest('owner-token'), env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; users: any[] };
       expect(body.success).toBe(true);
@@ -367,14 +374,14 @@ describe('Auth Handlers', () => {
       expect(emails).toEqual(['owner@test.com', 'staff@test.com']);
     });
 
-    test('returns empty list when no staff or owners exist', async () => {
+    test('returns the canonical owner even if KV only has customer metadata', async () => {
       const kv = createKvStore({ 'user:customer@test.com': DEFAULT_USER });
       const env = { ...BASE_ENV, AUTH_KV: kv };
 
-      const res = await listStaff(new Request('http://localhost/api/auth/staff'), env);
+      const res = await listStaff(createAuthRequest('owner-token'), env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; users: any[] };
-      expect(body.users).toHaveLength(0);
+      expect(body.users).toHaveLength(1);
     });
   });
 
@@ -382,7 +389,7 @@ describe('Auth Handlers', () => {
   describe('bootstrapOwner', () => {
     test('creates owner when no owner exists', async () => {
       const kv = createKvStore();
-      const env = { ...BASE_ENV, AUTH_KV: kv, AURA_DB: createMockD1() };
+      const env = { ...BASE_ENV, AUTH_KV: kv, AURA_DB: createMockD1([]) };
       const req = createPostRequest({ email: 'owner@test.com', password: 'ownerpass123', name: 'New Owner' });
 
       const res = await bootstrapOwner(req, env);
@@ -493,7 +500,7 @@ describe('Auth Handlers', () => {
       const res = await changePassword(req, env);
       expect(res.status).toBe(401);
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/Token/);
+      expect((body as any).code).toBe('SESSION_EXPIRED');
     });
 
     test('returns 400 when current password is wrong', async () => {
@@ -522,9 +529,9 @@ describe('Auth Handlers', () => {
         createAuthRequest('valid-token', { currentPassword: 'password123', newPassword: 'newpass456' }),
         { ...BASE_ENV, AUTH_KV: brokenKv }
       );
-      expect(errRes.status).toBe(500);
+      expect(errRes.status).toBe(503);
       const errBody = await errRes.json() as { error: string };
-      expect(errBody.error).toBe('Đổi mật khẩu thất bại');
+      expect((errBody as any).code).toBe('AUTH_STATE_UNAVAILABLE');
       expect(errBody.error).not.toContain('KV_INTERNAL_AUTH_SECRET');
     });
   });

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { createSubmissionKey, submissionSession } from '@/lib/server-confirmed-submission';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -15,17 +16,21 @@ interface ModalProps {
     shifts: string[];
     experience: string;
     note?: string;
-  }) => Promise<void>;
+  }, requestKey?: string) => Promise<boolean>;
 }
 
 export function AddCandidateModal({ open, onClose, onSubmit }: ModalProps) {
   const { t } = useTranslation();
+  const requestKey = useRef(createSubmissionKey());
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     birthYear: '',
     position: 'barista' as 'barista' | 'service',
-    shifts: ['morning'] as string[],
+    shifts: ['ca1'] as string[],
     experience: 'none',
     note: '',
   });
@@ -43,29 +48,35 @@ export function AddCandidateModal({ open, onClose, onSubmit }: ModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
+    const session = submissionSession();
+    const current = () => mounted.current && session === submissionSession();
     if (!formData.fullName.trim() || !formData.phone.trim()) {
       setError('Vui lòng nhập tên và số điện thoại');
       return;
     }
 
+    inFlight.current = true;
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(formData);
+      const ok = await onSubmit(formData, requestKey.current.forPayload(formData));
+      if (!current()) return;
+      if (!ok) { setError('Chưa xác nhận đã lưu hồ sơ. Vui lòng thử lại.'); return; }
       onClose();
       setFormData({
         fullName: '',
         phone: '',
         birthYear: '',
         position: 'barista',
-        shifts: ['morning'],
+        shifts: ['ca1'],
         experience: 'none',
         note: '',
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lỗi thêm hồ sơ');
+      if (current()) setError(err instanceof Error ? err.message : 'Chưa xác nhận đã lưu hồ sơ.');
     } finally {
-      setLoading(false);
+      if (current()) { inFlight.current = false; setLoading(false); }
     }
   };
 

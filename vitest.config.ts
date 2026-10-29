@@ -28,6 +28,7 @@ export default defineConfig({
       '@aura/domain-kitchen': fileURLToPath(new URL('./packages/domain/kitchen/index.ts', import.meta.url)),
       '@aura/domain-staff': fileURLToPath(new URL('./packages/domain/staff/index.ts', import.meta.url)),
       '@aura/domain-shift': fileURLToPath(new URL('./packages/domain/shift/index.ts', import.meta.url)),
+      '@aura/domain-sop': fileURLToPath(new URL('./packages/domain/sop/index.ts', import.meta.url)),
       '@aura/domain-inventory': fileURLToPath(new URL('./packages/domain/inventory/index.ts', import.meta.url)),
       '@aura/domain-reservation': fileURLToPath(new URL('./packages/domain/reservation/index.ts', import.meta.url)),
       'packages/domain/crm/commands/loyalty-policy': fileURLToPath(new URL('./packages/domain/crm/commands/loyalty-policy.ts', import.meta.url)),

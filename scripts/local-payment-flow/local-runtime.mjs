@@ -7,6 +7,13 @@ import { pbkdf2Sync, createHmac } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 export const ROOT = path.resolve(import.meta.dirname, '../..');
+// Each verification plan needs its own evidence directory so two plans running
+// the same harness never overwrite each other's results. Override with
+// LOCAL_FLOW_VERIFICATION_DIR (absolute or repo-relative) when a new plan reuses
+// this harness; the default keeps the original payment/KDS plan's location.
+export const verificationDir = () => process.env.LOCAL_FLOW_VERIFICATION_DIR
+  ? path.resolve(ROOT, process.env.LOCAL_FLOW_VERIFICATION_DIR)
+  : path.join(ROOT, 'plans/261020-1225-payment-kds-remediation/verification');
 // Reuse an installed stable runtime; never install dependencies or select an alpha implicitly.
 const runtimeCandidates = [path.join(ROOT, 'node_modules/miniflare')];
 for (const parent of [ROOT, path.dirname(ROOT)]) {

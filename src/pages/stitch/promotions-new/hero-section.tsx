@@ -52,8 +52,8 @@ export function HeroSection({ offer, timer, formatTime }: HeroSectionProps) {
                 color: 'var(--aura-chrome-bright, #E8EEF3)',
               }}
             >
-              <Clock className="w-3.5 h-3.5 text-[var(--aura-bronze-shimmer,#C9A96E)] animate-spin-slow" aria-hidden="true" />
-              <span>Thời gian còn lại: <strong className="text-[var(--aura-bronze-shimmer,#C9A96E)]">{formatTime(timer)}</strong></span>
+              <Clock className="w-3.5 h-3.5 text-[var(--aura-bronze-shimmer,#C9A96E)]" aria-hidden="true" />
+              <span>Chính sách: <strong className="text-[var(--aura-bronze-shimmer,#C9A96E)]">Luôn áp dụng cho khách mới</strong></span>
             </div>
           </div>
 
@@ -76,7 +76,14 @@ export function HeroSection({ offer, timer, formatTime }: HeroSectionProps) {
 
           <div className="flex flex-wrap items-center gap-4">
             <a
-              href="/menu"
+              href="/menu?promo=WELCOME"
+              onClick={() => {
+                try {
+                  localStorage.setItem('aura_selected_promo_code', 'WELCOME');
+                } catch {
+                  // ignore storage errors
+                }
+              }}
               className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-xs font-bold uppercase tracking-[0.18em] transition-all active:scale-95 hover:brightness-110 shadow-lg group/btn cursor-pointer"
               style={{
                 background: 'linear-gradient(135deg, #C9A96E 0%, #E2D4B7 50%, #C9A96E 100%)',

@@ -16,6 +16,8 @@ export interface CheckoutNewSummary {
   taxLabel?: string;
   deliveryFee: number;
   deliveryLabel?: string;
+  discount?: number;
+  promoCode?: string;
   total: number;
 }
 
@@ -29,6 +31,8 @@ export interface CheckoutNewFormData {
   paymentMethod: PaymentMethod;
   orderType?: OrderType;
   tableNumber?: string;
+  promoCode?: string;
+  discount?: number;
 }
 
 export interface StitchCheckoutNewProps {

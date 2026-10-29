@@ -43,11 +43,12 @@ export function parseLoyaltySummary(data: Record<string, unknown>): { tier: stri
   const tier = (data.tier as string) || 'bronze';
   const points = Number(data.total_points ?? data.points ?? 0);
   const tierConfig = data.tier_config as Record<string, unknown> | undefined;
-  const cashbackRate = Number(
+  const rawRate = Number(
     (data.cashbackRate as number) ??
     (tierConfig?.cashback_rate as number) ??
     3
   );
+  const cashbackRate = rawRate > 0 && rawRate < 1 ? Math.round(rawRate * 100) : rawRate;
   return { tier, points, cashbackRate };
 }
 

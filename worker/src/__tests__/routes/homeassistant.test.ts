@@ -16,10 +16,9 @@ import { generateJWT } from '../../lib/jwt';
 let authHeader: string;
 
 beforeAll(async() => {
-  const token = await generateJWT(
-    { id: 'test-user', email: 'test@aura.cafe', name: 'Test User', role: 'owner' },
+  const token = await generateJWT({ id: 'test-user', email: 'test@aura.cafe', name: 'Test User', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'},
     TEST_JWT_SECRET,
-    '1h'
+    3600
   );
   authHeader = `Bearer ${token}`;
 });
@@ -77,8 +76,20 @@ function stubDB(
     }
   });
 
+  // The request-time session gate reads the staff account row; without a fixture
+  // for it the gate cannot tell a live session from a revoked one. Every other
+  // statement keeps the scripted route answers above.
+  const accountStmt = () => ({
+    bind: () => accountStmt(),
+    first: async() => ({ id: 'test-user', name: 'Test User', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }),
+    all: async() => ({ results: [] as Record<string, unknown>[], success: true }),
+    run: async() => ({ success: true, changes: 1, lastRowId: 1 }),
+    raw: async() => [],
+  });
+
   // Override prepare on the db mock
-  (db as unknown as Record<string, unknown>).prepare = () => stmt() as any;
+  (db as unknown as Record<string, unknown>).prepare = (sql: string) =>
+    (/FROM users WHERE id = \?/i.test(sql) ? accountStmt() : stmt()) as any;
   return db;
 }
 
@@ -264,7 +275,7 @@ describe('createHARouter', () => {
       const customerToken = await generateJWT(
         { id: 'cust-1', email: 'cust@aura.cafe', name: 'Customer', role: 'customer' },
         TEST_JWT_SECRET,
-        '1h'
+        3600
       );
       const res = await router.fetch(
         new Request('https://test.aura/devices', {

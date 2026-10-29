@@ -100,7 +100,7 @@ export async function identifyCustomer(
       'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(
       id, customerId, classified.type, classified.value, isPrimary,
-      input.verifiedAt || nowIso(), nowIso()
+      input.verifiedAt ?? null, nowIso()
     ).run();
 
     const identity: IdentifiedIdentity = {

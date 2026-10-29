@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { customerRoutes } from '../../routes/erpnext/customers';
-import { createMockEnv, createMockDB, createMockKV, TEST_JWT_SECRET } from '../test-utils';
+import { createMockEnv, createMockDB, createMockKV, TEST_JWT_SECRET, STAFF_ACCOUNT_ROW, isStaffAccountLookup } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 
 function makeStmt(overrides: Record<string, unknown> = {}) {
@@ -15,8 +15,19 @@ function makeStmt(overrides: Record<string, unknown> = {}) {
   return stmt as any;
 }
 
+/**
+ * Answer the session gate's account lookup from `STAFF_ACCOUNT_ROW` while
+ * leaving every other statement (and the `prepare` spy tests assert on)
+ * to the caller's overrides.
+ */
 function makeMockDb(overrides: Record<string, unknown> = {}): ReturnType<typeof createMockDB> {
-  const prepareSpy = vi.fn().mockReturnValue(makeStmt(overrides));
+  const routeStmt = makeStmt(overrides);
+  const accountStmt = makeStmt({
+    first: vi.fn().mockImplementation(() => ({ ...STAFF_ACCOUNT_ROW, id: 'USR_1', role: 'owner' })),
+  });
+  const prepareSpy = vi.fn().mockImplementation((sql: string) =>
+    isStaffAccountLookup(sql) ? accountStmt : routeStmt
+  );
   const db = createMockDB();
   (db as any).prepare = prepareSpy;
   (db as any).batch = vi.fn().mockResolvedValue([{ success: true, changes: 1 }]);
@@ -35,7 +46,7 @@ async function fetchCustomers(
   };
   const app = new Hono<{ Bindings: Record<string, unknown> }>();
   customerRoutes(app as any);
-  const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'owner' }, TEST_JWT_SECRET);
+  const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
   const reqInit: RequestInit = {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     method: opts.method || 'GET'

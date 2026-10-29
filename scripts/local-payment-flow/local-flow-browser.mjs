@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { createServer } from 'vite';
-import { ROOT, REVIEW_PASSWORD } from './local-runtime.mjs';
+import { ROOT, REVIEW_PASSWORD, verificationDir } from './local-runtime.mjs';
 import { http, sign } from './local-flow-api.mjs';
 
 const require = createRequire(import.meta.url);
@@ -79,7 +79,7 @@ export async function runBrowserFlow(runtime, context, check) {
         check(`browser-submit:${method}`, response.status() === 201 && navigation,
           method === 'cod' ? 'order201 -> confirmation' : 'order201 -> local PayOS fixture redirect',
           { status: response.status(), url: new URL(page.url()).pathname, error: payload.error, persisted: Boolean(row) });
-        await page.screenshot({ path: path.join(ROOT, `plans/261020-1225-payment-kds-remediation/verification/browser-checkout-${method}.png`), fullPage: true });
+        await page.screenshot({ path: path.join(verificationDir(), `browser-checkout-${method}.png`), fullPage: true });
         const orderId = payload.data?.id || row?.id;
         if (orderId) {
           if (method === 'payos') {
@@ -100,7 +100,7 @@ export async function runBrowserFlow(runtime, context, check) {
           let visible = false;
           try { await page.getByText(itemName, { exact: true }).first().waitFor({ state: 'visible', timeout: 12000 }); visible = true; } catch {}
           check(`browser-confirmation:${method}`, visible, 'actual item displayed from API', { visible, orderId });
-          await page.screenshot({ path: path.join(ROOT, `plans/261020-1225-payment-kds-remediation/verification/browser-confirmation-${method}.png`), fullPage: true });
+          await page.screenshot({ path: path.join(verificationDir(), `browser-confirmation-${method}.png`), fullPage: true });
         }
       } catch (error) { check(`browser-checkout:${method}`, false, 'flow executes', { error: String(error) }); }
       finally { await session.close(); }
@@ -138,7 +138,7 @@ export async function runBrowserFlow(runtime, context, check) {
       }, { timeout: 15000 });
       const ghostVisible = await page.getByText('GHOST KDS LOCAL', { exact: true }).isVisible();
       check('browser-removes-completed-ticket', !ghostVisible, 'ticket removed after two authoritative refreshes', { ghostVisible });
-      await page.screenshot({ path: path.join(ROOT, 'plans/261020-1225-payment-kds-remediation/verification/browser-kds.png'), fullPage: true });
+      await page.screenshot({ path: path.join(verificationDir(), 'browser-kds.png'), fullPage: true });
       await runtime.db.prepare('INSERT INTO orders (id,items,total,status,customer_name,customer_phone,payment_method,tenant_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
         .bind('ORD_REVIEW_PRIVATE_DEFAULT', JSON.stringify([{ name: 'PRIVATE DEFAULT TICKET', quantity: 1, price: 20000 }]), 20000, 'ready', 'Private tenant fixture', '0900000010', 'cod', 'default', new Date().toISOString()).run();
       await page.getByText('PRIVATE DEFAULT TICKET', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
@@ -158,7 +158,7 @@ export async function runBrowserFlow(runtime, context, check) {
       await tenantResponse;
       const previousTenantVisible = await page.getByText('PRIVATE DEFAULT TICKET', { exact: true }).isVisible();
       check('browser-session-tenant-isolation', switched === 'cafe-a' && !previousTenantVisible, 'tenant A session cannot retain default-tenant ticket', { tenant: switched, previousTenantVisible });
-      await page.screenshot({ path: path.join(ROOT, 'plans/261020-1225-payment-kds-remediation/verification/browser-kds-tenant-switch.png'), fullPage: true });
+      await page.screenshot({ path: path.join(verificationDir(), 'browser-kds-tenant-switch.png'), fullPage: true });
     } catch (error) { check('browser-kds-flow', false, 'flow executes', { error: String(error) }); }
     finally { await session.close(); }
     return { apiResponses, blockedExternalRequests: blocked, pageErrors: errors };

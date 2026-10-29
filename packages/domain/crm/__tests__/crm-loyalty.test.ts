@@ -4,6 +4,8 @@ import { loadPolicy, tierByName } from '../commands/loyalty-policy';
 import { computeTier } from '../commands/compute-tier';
 import { applyAccrual, MIN_ORDER_TO_EARN } from '../commands/accrual';
 import { reverseAccrual } from '../commands/refund-reversal';
+import { placeOrder } from '../commands/place-order';
+import { rewardReferralOnFirstOrder, reverseReferralCashback } from '../commands/referral';
 import type { LoyaltyPolicy, LoyaltyTierPolicy } from '../commands/loyalty-policy';
 
 type Row = Record<string, unknown>;
@@ -368,5 +370,100 @@ describe('tierByName', () => {
   it('falls back to default for unknown name', () => {
     const t = tierByName(BASE_POLICY, 'nonexistent');
     expect(t.tierName).toBe('bronze');
+  });
+});
+
+describe('placeOrder & referral post-payment ledger invariants', () => {
+  it('placeOrder creates pending order without premature loyalty accrual or referral payout', async () => {
+    const batchCalls: BatchCall[] = [];
+    const db = createMockDB(
+      {
+        [sqlMatch('FROM menu_items WHERE id')]: [{ id: 'm1', name: 'Ca Phe Sua', price: 35000, available: 1 }],
+      },
+      batchCalls,
+    );
+    const res = await placeOrder(db, {
+      customerId: 'cus_new',
+      customerPhone: '0901234567',
+      customerName: 'Khach Moi',
+      channel: 'pickup',
+      items: [{ menuItemId: 'm1', quantity: 1 }],
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.status).toBe('pending');
+      expect(res.totalCents).toBe(35000);
+    }
+    expect(batchCalls).toHaveLength(0);
+  });
+
+  it('rewardReferralOnFirstOrder preserves referee existing wallet balance and reverseReferralCashback reverses both sides', async () => {
+    const batchCalls: BatchCall[] = [];
+    const db = createMockDB(
+      {
+        [sqlMatch("FROM referrals WHERE referred_customer_id = ? AND status = 'pending'")]: [{
+          id: 'ref_1',
+          referrer_id: 'cus_ref',
+          referred_customer_id: 'cus_new',
+          referral_code: 'REF123',
+          points_awarded: 50,
+          cashback_awarded_vnd: 10000,
+          first_order_id: null,
+          first_order_amount: null,
+          status: 'pending',
+          bonus_type: 'cashback',
+          reward_paid_at: null,
+          created_at: '2026-10-28T00:00:00Z',
+        }],
+        [sqlMatch('FROM customers WHERE id')]: [{
+          id: 'cus_ref',
+          loyalty_points: 0,
+          lifetime_points: 0,
+          loyalty_tier: 'bronze',
+        }],
+        [sqlMatch('FROM cashback_wallets WHERE customer_id')]: [
+          { id: 'wal_ref', balance: 20000, total_earned: 20000 },
+          { id: 'wal_new', balance: 50000, total_earned: 50000 },
+        ],
+      },
+      batchCalls,
+    );
+
+    const reward = await rewardReferralOnFirstOrder(db, 'cus_new', 'ord_paid_1', 45000);
+    expect(reward.success).toBe(true);
+    expect(reward.reward_vnd).toBe(10000);
+    expect(batchCalls.length).toBeGreaterThanOrEqual(4);
+
+    const revBatchCalls: BatchCall[] = [];
+    const revDb = createMockDB(
+      {
+        [sqlMatch("FROM referrals WHERE id = ? AND status = 'completed'")]: [{
+          id: 'ref_1',
+          referrer_id: 'cus_ref',
+          referred_customer_id: 'cus_new',
+          referral_code: 'REF123',
+          points_awarded: 0,
+          cashback_awarded_vnd: 10000,
+          first_order_id: 'ord_paid_1',
+          first_order_amount: 45000,
+          status: 'completed',
+          bonus_type: 'cashback',
+          reward_paid_at: '2026-10-28T00:00:00Z',
+          created_at: '2026-10-28T00:00:00Z',
+        }],
+        [sqlMatch('FROM cashback_wallets WHERE customer_id')]: [
+          { id: 'wal_ref', balance: 30000 },
+          { id: 'wal_new', balance: 55000 },
+        ],
+        [sqlMatch('FROM cashback_transactions WHERE customer_id')]: [
+          { id: 'cbt_welcome', wallet_id: 'wal_new', amount: 5000 },
+        ],
+      },
+      revBatchCalls,
+    );
+
+    const rev = await reverseReferralCashback(revDb, 'ref_1');
+    expect(rev.success).toBe(true);
+    expect(revBatchCalls.length).toBe(6);
   });
 });

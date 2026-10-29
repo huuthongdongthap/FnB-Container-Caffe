@@ -10,6 +10,19 @@ import {
 } from '@aura/domain-crm';
 
 export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void {
+  async function assertCustomerInTenant(db: import('@cloudflare/workers-types').D1Database, customerId: string, tenantId?: string): Promise<boolean> {
+    if (!tenantId) return true;
+    try {
+      const row = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(customerId).first<{ tenant_id?: string | null }>();
+      if (row && row.tenant_id && row.tenant_id !== tenantId) {
+        return false;
+      }
+    } catch {
+      // Optional tenant_id column in partial schemas
+    }
+    return true;
+  }
+
   /**
    * GET /api/crm/customers/:id/events
    * Returns chronological event feed for a customer.
@@ -22,9 +35,13 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
     if (!customerId) {
       return c.json({ success: false, error: 'customerId is required' }, 400);
     }
+    const auth = c.get('user');
+    if (!(await assertCustomerInTenant(db, customerId, auth?.tenantId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
     const limitParam = c.req.query('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 20), 100) : undefined;
 
     const result = await aggregateEvents(db, customerId, { limit });
 
@@ -41,6 +58,10 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
 
     if (!customerId) {
       return c.json({ success: false, error: 'customerId is required' }, 400);
+    }
+    const auth = c.get('user');
+    if (!(await assertCustomerInTenant(db, customerId, auth?.tenantId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     const events = await aggregateEvents(db, customerId, { limit: 10 });
@@ -59,10 +80,14 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
     if (!customerId) {
       return c.json({ success: false, error: 'customerId is required' }, 400);
     }
+    const auth = c.get('user');
+    if (!(await assertCustomerInTenant(db, customerId, auth?.tenantId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
     const eventLimitParam = c.req.query('eventLimit');
-    const eventLimit = eventLimitParam ? parseInt(eventLimitParam, 10) : undefined;
+    const eventLimit = eventLimitParam ? Math.min(Math.max(1, parseInt(eventLimitParam, 10) || 20), 100) : undefined;
 
     const result = await getCustomer360(db, customerId, kv, { eventLimit });
 
@@ -81,8 +106,11 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
     if (auth?.role === 'customer' && auth.id !== customerId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
-
     const db = c.env.AURA_DB;
+    if (!(await assertCustomerInTenant(db, customerId, auth?.tenantId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
     const status = await getReferralStatus(db, customerId);
     const code = status.code ?? (await getOrCreateReferralCode(db, customerId)).code;
 

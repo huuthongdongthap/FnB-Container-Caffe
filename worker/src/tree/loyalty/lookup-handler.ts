@@ -5,11 +5,62 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import type { Customer, CashbackWallet } from '../../types/models';
+import { authenticateRequest } from '../../lib/staff-session-auth';
+import { StaffSessionError, isStaffRole, staffTenant } from '../../lib/staff-session';
+import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 
 const DEFAULT_TIER = 'bronze';
 const TIER_VI_MAP: Record<string, string> = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
+const POS_LOOKUP_ROLES = new Set(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']);
 
 export async function handleLookup(c: Context<{ Bindings: Env }>) {
+  let tenantId = 'default';
+  try {
+    tenantId = resolvePilotStore(c.env);
+  } catch (err) {
+    if (err instanceof PilotStoreError) {
+      return c.json({ ok: false, code: err.code, error: err.message }, 503);
+    }
+    throw err;
+  }
+
+  let callerCustomerId: string | null = null;
+  if (c.req.raw) {
+    try {
+      const session = await authenticateRequest(c.req.raw, c.env);
+      if (!session) {
+        return c.json({ ok: false, error: 'Chưa đăng nhập' }, 401);
+      }
+      if ('blocked' in session) {
+        return c.json({ ok: false, error: session.blocked }, 403);
+      }
+      if (session.account) {
+        const acctRole = String(session.account.role || '');
+        const acctTenant = staffTenant(session.account);
+        if (!isStaffRole(acctRole) || !POS_LOOKUP_ROLES.has(acctRole)) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
+        }
+        const isHqOwner = acctRole === 'owner' && (!acctTenant || acctTenant === 'default' || acctTenant === 'hq');
+        if (!isHqOwner && acctTenant !== tenantId) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+        }
+        tenantId = isHqOwner ? tenantId : acctTenant;
+      } else if (session.payload.role === 'customer') {
+        callerCustomerId = String(session.payload.id || (session.payload as unknown as Record<string, unknown>).sub || '');
+        if (!callerCustomerId) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
+        }
+      } else {
+        return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
+      }
+    } catch (err) {
+      if (err instanceof StaffSessionError) {
+        return c.json({ ok: false, code: err.code, error: err.message }, err.status);
+      }
+      return c.json({ ok: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ xác thực tạm thời gián đoạn' }, 503);
+    }
+  }
+
   // Normalize to digits so "0901 234 567" and "0901234567" match the same row
   const phone = (c.req.query('phone') || '').replace(/\D/g, '');
   if (phone.length < 9 || phone.length > 12) {
@@ -20,15 +71,24 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   let customer: Customer | null = null;
   try {
     customer = await db.prepare(
-      'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-    ).bind(phone).first<Customer>();
+      "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+    ).bind(phone, tenantId).first<Customer>();
   } catch {
-    customer = await db.prepare(
-      'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-    ).bind(phone).first<Customer>();
+    try {
+      customer = await db.prepare(
+        'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+      ).bind(phone).first<Customer>();
+    } catch {
+      customer = await db.prepare(
+        'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+      ).bind(phone).first<Customer>();
+    }
   }
   if (!customer) {
     return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);
+  }
+  if (callerCustomerId && String(customer.id) !== callerCustomerId) {
+    return c.json({ ok: false, error: 'Không đủ quyền truy cập hồ sơ khách hàng khác' }, 403);
   }
 
   const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet>();

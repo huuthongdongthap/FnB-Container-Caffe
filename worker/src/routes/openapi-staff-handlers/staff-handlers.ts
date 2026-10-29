@@ -3,6 +3,13 @@ import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
 import { getDatabase } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
+import { loadStaffAccount, SessionUnavailableError } from '../../lib/staff-session';
+import { staffManagementDenial, staffMutationGuard } from '../../lib/staff-account-mutation';
+import { createStaffIdentity, staffEmailInUse } from '../../lib/staff-login-identity';
+
+import { shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
+import { listShifts } from '../../../../packages/domain/shift/commands/shift-repository';
+import { shiftDto, attendanceDto } from '../../../../packages/domain/shift/model/shift-types';
 
 export { hashPassword };
 
@@ -38,8 +45,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
 
-    let whereClause = 'WHERE role != \'customer\'';
-    const params: (string | number)[] = [];
+    let whereClause = "WHERE role != 'customer' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    const params: (string | number)[] = [c.get('user')?.tenantId || 'default'];
 
     if (role) {
       whereClause += ' AND role = ?';
@@ -84,8 +91,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       ).bind(...params, limit, offset).all()) as { results: any[] };
       rawRows = rows.results || [];
     } catch {
-      let canonicalWhere = 'WHERE role != \'customer\'';
-      const canonicalParams: (string | number)[] = [];
+      let canonicalWhere = "WHERE role != 'customer' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      const canonicalParams: (string | number)[] = [c.get('user')?.tenantId || 'default'];
       if (role) {
         canonicalWhere += ' AND role = ?';
         canonicalParams.push(role);
@@ -133,6 +140,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(StaffRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
+    const account = await loadStaffAccount(db, id);
+    if (!account.ok || (account.account.tenant_id || 'default') !== (c.get('user')?.tenantId || 'default')) return c.json({ success: false, error: 'Staff not found' }, 404);
+
 
     let staff: any = null;
     try {
@@ -151,41 +161,11 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
-    // Get shifts for this staff
-    let shiftResults: any[] = [];
-    try {
-      const shifts = (await db.prepare(
-        'SELECT * FROM staff_shifts WHERE staff_id = ? ORDER BY date DESC, start_time DESC LIMIT 10'
-      ).bind(id).all()) as { results: any[] };
-      shiftResults = shifts.results || [];
-    } catch {
-      try {
-        const shifts = (await db.prepare(
-          'SELECT *, user_id as staff_id, shift_date as date FROM shifts WHERE user_id = ? ORDER BY shift_date DESC, start_time DESC LIMIT 10'
-        ).bind(id).all()) as { results: any[] };
-        shiftResults = shifts.results || [];
-      } catch {
-        shiftResults = [];
-      }
-    }
-
-    // Get attendance for this staff
-    let attendanceResults: any[] = [];
-    try {
-      const attendance = (await db.prepare(
-        'SELECT * FROM staff_attendance WHERE staff_id = ? ORDER BY date DESC LIMIT 10'
-      ).bind(id).all()) as { results: any[] };
-      attendanceResults = attendance.results || [];
-    } catch {
-      try {
-        const attendance = (await db.prepare(
-          'SELECT id, user_id as staff_id, id as shift_id, shift_date as date, actual_start as check_in, actual_end as check_out, status, notes, created_at FROM shifts WHERE user_id = ? AND actual_start IS NOT NULL ORDER BY shift_date DESC LIMIT 10'
-        ).bind(id).all()) as { results: any[] };
-        attendanceResults = attendance.results || [];
-      } catch {
-        attendanceResults = [];
-      }
-    }
+    const scope = await shiftScope(c.env, c.get('user'));
+    const shifts = await listShifts(scope, { staffId: id, limit: 10 });
+    const attendance = await listShifts(scope, { staffId: id, attendanceOnly: true, limit: 10 });
+    const shiftResults = shifts.rows.map(shiftDto);
+    const attendanceResults = attendance.rows.map(attendanceDto);
 
     return c.json({
       success: true,
@@ -213,6 +193,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.role === 'owner' && user?.role !== 'owner') {
       return c.json({ success: false, error: 'Only owners can create owner accounts' }, 403);
     }
+    if (user?.role === 'manager' && ['owner', 'admin', 'manager'].includes(body.role)) {
+      return c.json({ success: false, error: 'Manager không được tạo tài khoản quản lý' }, 403);
+    }
 
     // Check if email exists
     let existing: unknown = null;
@@ -230,37 +213,16 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
 
-    try {
-      await db.prepare(
-        `INSERT INTO users (id, name, email, phone, password_hash, role, locale, is_active, avatar_url, hire_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.email,
-        body.phone || null,
-        passwordHash,
-        body.role,
-        body.locale || 'vi',
-        body.isActive !== false ? 1 : 0,
-        null,
-        body.hireDate || now.slice(0, 10),
-        now,
-        now
-      ).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO users (id, phone, name, role, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.phone || body.email || id,
-        body.name,
-        body.role,
-        body.isActive !== false ? 1 : 0,
-        now,
-        now
-      ).run();
+    if (!await createStaffIdentity(c.env, { id, name: body.name, email: body.email,
+      phone: body.phone || '', role: body.role, tenant_id: user.tenantId || 'default',
+      password: passwordHash, active: body.isActive !== false })) {
+      return c.json({ success: false, error: 'Email already exists' }, 409);
+    }
+    if (c.env.AUTH_KV) {
+      const credential = JSON.stringify({ id, name: body.name, email: body.email, role: body.role,
+        phone: body.phone || '', password: passwordHash, tenant_id: user.tenantId || 'default', active: body.isActive !== false });
+      await c.env.AUTH_KV.put(`user:${body.email}`, credential).catch(() => {});
+      await c.env.AUTH_KV.put(`user:${id}`, credential).catch(() => {});
     }
 
     // Audit log (redact password)
@@ -307,6 +269,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
+    const authority = await loadStaffAccount(db, id);
+    if (!authority.ok) return c.json({ success: false, error: 'Staff not found' }, 404);
+    const denied = staffManagementDenial(user, authority.account, body.role);
+    if (denied) return c.json({ success: false, error: denied }, 403);
 
     if ((existing.role === 'owner' || body.role === 'owner') && user?.role !== 'owner') {
       return c.json({ success: false, error: 'Only owners can modify or assign owner accounts' }, 403);
@@ -324,6 +290,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       canonicalParams.push(body.name);
     }
     if (body.email !== undefined) {
+      if (await staffEmailInUse(c.env, body.email, id)) return c.json({ success: false, error: 'Email already exists' }, 409);
+      const identity = await db.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ? AND staff_id != ?')
+        .bind(body.email, id).first();
+      if (identity) return c.json({ success: false, error: 'Email already exists' }, 409);
       let emailExists: unknown = null;
       try {
         emailExists = await db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(body.email, id).first();
@@ -357,23 +327,36 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.avatarUrl !== undefined) { updates.push('avatar_url = ?'); params.push(body.avatarUrl); }
     if (body.hireDate !== undefined) { updates.push('hire_date = ?'); params.push(body.hireDate); }
 
-    updates.push('updated_at = ?');
-    params.push(now);
-    params.push(id);
-
-    canonicalUpdates.push('updated_at = ?');
-    canonicalParams.push(now);
-    canonicalParams.push(id);
-
-    if (updates.length > 1) {
-      try {
-        await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-      } catch {
-        if (canonicalUpdates.length > 1) {
-          await db.prepare(`UPDATE users SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
-        }
-      }
+    const invalidatesSession = body.role !== undefined || body.isActive !== undefined || body.email !== undefined;
+    if (invalidatesSession) {
+      updates.push('auth_version = auth_version + 1');
+      canonicalUpdates.push('auth_version = auth_version + 1');
     }
+    const guard = staffMutationGuard(authority.account,
+      body.isActive === false || (body.role !== undefined && body.role !== 'owner'));
+    updates.push('updated_at = ?'); params.push(now, ...guard.values);
+    canonicalUpdates.push('updated_at = ?'); canonicalParams.push(now, ...guard.values);
+    const saveAccount = async (sql: string, values: (string | number | null)[]) => {
+      const update = db.prepare(sql).bind(...values);
+      if (body.email === undefined) return update.run();
+      // Both statements use the same account/version/tenant guard and execute
+      // in one D1 batch. The directory runs first so a stale write cannot rename
+      // credentials after a competing account mutation advances the version.
+      const identity = db.prepare(`INSERT INTO staff_login_identities (email, staff_id)
+        SELECT ?, id FROM users WHERE ${guard.sql}
+        ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`).bind(body.email, ...guard.values);
+      const results = await db.batch([identity, update]);
+      return results[1];
+    };
+    let saved;
+    try {
+      saved = await saveAccount(`UPDATE users SET ${updates.join(', ')} WHERE ${guard.sql}`, params);
+    } catch {
+      try {
+        saved = await saveAccount(`UPDATE users SET ${canonicalUpdates.join(', ')} WHERE ${guard.sql}`, canonicalParams);
+      } catch { throw new SessionUnavailableError(); }
+    }
+    if (!saved.meta.changes) return c.json({ success: false, error: 'Không thể thay đổi owner cuối cùng hoặc trạng thái đã đổi; vui lòng tải lại' }, 409);
 
     // Sync with staff_users table if present
     try {
@@ -471,38 +454,23 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
+    const authority = await loadStaffAccount(db, id);
+    if (!authority.ok) return c.json({ success: false, error: 'Staff not found' }, 404);
+    const denied = staffManagementDenial(user, authority.account, undefined);
+    if (denied) return c.json({ success: false, error: denied }, 403);
 
     if (existing.role === 'owner' && user?.role !== 'owner') {
       return c.json({ success: false, error: 'Only owners can delete owner accounts' }, 403);
     }
 
-    // Check for related records
-    let shifts: { count: number } | null = null;
+    // Preserve historical references; disabling also revokes every old session.
+    const guard = staffMutationGuard(authority.account, true);
+    let result;
     try {
-      shifts = (await db.prepare('SELECT COUNT(*) as count FROM staff_shifts WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
-    } catch {
-      shifts = (await db.prepare('SELECT COUNT(*) as count FROM shifts WHERE user_id = ?').bind(id).first().catch(() => null)) as { count: number } | null;
-    }
-    let attendance: { count: number } | null = null;
-    try {
-      attendance = (await db.prepare('SELECT COUNT(*) as count FROM staff_attendance WHERE staff_id = ?').bind(id).first()) as { count: number } | null;
-    } catch {
-      attendance = null;
-    }
-    let orders: { count: number } | null = null;
-    try {
-      orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE created_by = ?').bind(id).first()) as { count: number } | null;
-    } catch {
-      orders = null;
-    }
-
-    if ((shifts?.count || 0) > 0 || (attendance?.count || 0) > 0 || (orders?.count || 0) > 0) {
-      // Soft delete
-      await db.prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
-    } else {
-      // Hard delete
-      await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
-    }
+      result = await db.prepare(`UPDATE users SET is_active = 0, auth_version = auth_version + 1, updated_at = ? WHERE ${guard.sql}`)
+        .bind(now, ...guard.values).run();
+    } catch { throw new SessionUnavailableError(); }
+    if (!result.meta.changes) return c.json({ success: false, error: 'Không thể vô hiệu hóa owner cuối cùng hoặc trạng thái đã đổi' }, 409);
 
     // Audit log
     await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now);

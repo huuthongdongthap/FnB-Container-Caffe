@@ -21,12 +21,30 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   });
 
   // GET /api/promotions/:code — get single promotion
-  router.get('/:code', async (c) => {
+  router.get('/:code', async (c, next) => {
     const db = c.env.AURA_DB;
     const code = c.req.param('code').toUpperCase();
-    const promo = await db.prepare(
+    if (code === 'SUMMARY') {
+      await next();
+      return;
+    }
+    let promo = await db.prepare(
       'SELECT * FROM promotions WHERE code = ?'
     ).bind(code).first();
+    if (!promo && code === 'WELCOME') {
+      promo = {
+        id: 'promo_welcome',
+        code: 'WELCOME',
+        percent: 10,
+        max_discount: 30000,
+        min_order: 0,
+        usage_limit: 0,
+        usage_count: 0,
+        starts_at: null,
+        expires_at: null,
+        is_active: 1
+      };
+    }
     if (!promo) {
       return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
     }

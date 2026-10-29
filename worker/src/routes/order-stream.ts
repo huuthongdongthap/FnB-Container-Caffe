@@ -11,6 +11,8 @@
  * - Reconnect resumes safely via Last-Event-ID or latest canonical state
  */
 
+import { authenticateRequest } from '../lib/staff-session-auth';
+import { StaffSessionError } from '../lib/staff-session';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { isTerminal, canAccessOrder, projectCustomerOrderPayload } from '@aura/domain-order';
@@ -35,21 +37,20 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
 
   if (!kv) return c.json({ error: 'KV not available' }, 500);
 
-  let order = await db.prepare('SELECT id, customer_id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status: string }>();
-  if (!order) {
-    order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; customer_id?: string | null; status: string }>();
-  }
+  const user = c.get('user') as { id?: string; role?: string; tenantId?: string } | undefined;
+  const staffTenant = user && user.role !== 'customer' ? (user.tenantId || 'default') : undefined;
+  const scope = staffTenant === undefined ? '' : ' AND tenant_id = ?';
+  const values = staffTenant === undefined ? [orderId] : [orderId, staffTenant];
+  const order = await db.prepare(`SELECT id, customer_id, status FROM orders WHERE id = ?${scope}`)
+    .bind(...values).first<{ id: string; customer_id?: string | null; status: string }>();
   if (!order) return c.json({ error: 'Order not found' }, 404);
-
-  // optionalAuth on the route resolves the identity when a token is present and
-  // leaves it undefined for anonymous guests.
-  const user = c.get('user' as any) as { id?: string; role?: string } | undefined;
 
   const access = canAccessOrder(user, order);
   if (!access.allowed) return c.json({ error: access.reason || 'Forbidden' }, 403);
 
   let currentStatus = order.status || '';
 
+  let cancelStream = () => {};
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -71,6 +72,24 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
         try { controller.close(); } catch { /* ignore */ }
       };
 
+      const checkSession = async () => {
+        if (!user) return true;
+        try {
+          const live = await authenticateRequest(c.req.raw, c.env);
+          if (!live || 'blocked' in live) {
+            send('auth_error', { code: 'SESSION_EXPIRED' });
+            closeStream();
+            return false;
+          }
+          return true;
+        } catch (error) {
+          send('auth_error', { code: error instanceof StaffSessionError ? error.code : 'AUTH_STATE_UNAVAILABLE' });
+          closeStream(); return false;
+        }
+      };
+      if (!await checkSession()) return;
+
+      cancelStream = closeStream;
       let replayedCount = 0;
       if (lastEventId) {
         const replayedEvents = await getEventsAfter(kv, orderId, lastEventId);
@@ -84,7 +103,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
         }
       }
 
-      const initialOrder = await fetchOrderRecord(db, orderId);
+      const initialOrder = await fetchOrderRecord(db, orderId, staffTenant);
       if (initialOrder) {
         const safePayload = projectCustomerOrderPayload(initialOrder);
         if (replayedCount === 0 || safePayload.status !== currentStatus) {
@@ -95,6 +114,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
         }
       }
 
+      if (!initialOrder && staffTenant !== undefined) { closeStream(); return; }
       if (isTerminal(currentStatus as any)) {
         closeStream();
         return;
@@ -103,7 +123,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
       const run = async () => {
         while (!closed) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-          if (closed) break;
+          if (closed || !await checkSession()) break;
 
           try {
             const eventRaw = await kv.get(`order_event:${orderId}`);
@@ -114,12 +134,14 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
             }
 
             if (!shouldFetch) {
-              const dbOrder = await db.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; status: string }>();
+              const dbOrder = await db.prepare(`SELECT id, status FROM orders WHERE id = ?${scope}`).bind(...values).first<{ id: string; status: string }>();
+              if (!dbOrder && staffTenant !== undefined) { closeStream(); break; }
               if (dbOrder && (dbOrder.status ?? '') !== currentStatus) shouldFetch = true;
             }
 
             if (shouldFetch) {
-              const updated = await fetchOrderRecord(db, orderId);
+              const updated = await fetchOrderRecord(db, orderId, staffTenant);
+              if (!updated && staffTenant !== undefined) { closeStream(); break; }
               if (updated) {
                 const payload = projectCustomerOrderPayload(updated);
                 currentStatus = payload.status;
@@ -150,7 +172,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
 
       await Promise.race([pollPromise, new Promise((resolve) => setTimeout(resolve, SSE_TIMEOUT_MS))]);
     },
-    cancel() {},
+    cancel() { cancelStream(); },
   });
 
   return new Response(stream, {

@@ -8,9 +8,9 @@
  *   NAV    (network-only)  -> any other navigation route (no caching)
  */
 
-const STATIC_CACHE = 'aura-static-v4';
-const API_QUEUE_CACHE = 'aura-api-queue-v4';
-const CACHE_VERSION = 'aura-v4';
+const STATIC_CACHE = 'aura-static-v5';
+const API_QUEUE_CACHE = 'aura-api-queue-v5';
+const CACHE_VERSION = 'aura-v5';
 
 // ---- Pre-cache list (critical shell assets) ----
 const PRECACHE_URLS = [
@@ -45,10 +45,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// ---- Message: allow client-triggered skipWaiting ----
+// ---- Message: allow client-triggered skipWaiting and auth cache purge ----
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_AUTH_CACHE') {
+    event.waitUntil(caches.delete(API_QUEUE_CACHE));
   }
 });
 
@@ -76,6 +79,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+  // Mobile aliases may return private JSON outside /api. Neither authenticated
+  // responses nor these aliases belong in the navigation/static cache.
+  if (event.request.headers.has('Authorization') || url.pathname.startsWith('/mobile/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // Static assets: cache-first
   if (isStaticAsset(url)) {

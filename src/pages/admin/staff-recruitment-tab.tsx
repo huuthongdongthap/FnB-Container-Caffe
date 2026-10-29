@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { submissionSession, useSubmissionSession } from '@/lib/server-confirmed-submission';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
@@ -35,8 +37,15 @@ const SHIFT_LABELS: Record<string, string> = {
 };
 
 export function RecruitmentTab() {
+  const session = useSubmissionSession();
+  const allowed = useAuthStore(state => ['owner', 'manager'].includes(state.user?.role || ''));
+  return allowed ? <RecruitmentSession key={session} /> : null;
+}
+
+function RecruitmentSession() {
   const { t } = useTranslation();
-  const { applications, loading, error, fetchApplications, updateStatus, deleteApplication, addCandidate } = useAdminRecruitmentStore();
+  const { applications, loading, pending, error, fetchApplications, updateStatus, deleteApplication, addCandidate } = useAdminRecruitmentStore();
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [search, setSearch] = useState('');
   const [filterPos, setFilterPos] = useState('all');
@@ -50,6 +59,17 @@ export function RecruitmentTab() {
     });
   }, [fetchApplications, search, filterPos, filterStatus]);
 
+  const filters = { search: search || undefined, position: filterPos, status: filterStatus };
+  const runMutation = async (action: () => Promise<boolean>) => {
+    const session = submissionSession();
+    setMutationError(null);
+    try {
+      const ok = await action();
+      if (!ok && session === submissionSession()) setMutationError('Chưa xác nhận đã lưu. Vui lòng thử lại.');
+    } catch (error) {
+      if (session === submissionSession()) setMutationError(error instanceof Error ? error.message : 'Chưa xác nhận đã lưu.');
+    }
+  };
   const cleanPhone = (phone: string) => phone.replace(/\D/g, '');
 
   return (
@@ -99,16 +119,17 @@ export function RecruitmentTab() {
         </div>
       </div>
 
+      {(error || mutationError) && applications.length > 0 && <p role="alert" className="text-sm text-destructive">{error || mutationError}</p>}
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-28 w-full" />
           ))}
         </div>
-      ) : error ? (
+      ) : error && applications.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-sm text-destructive mb-2">{error}</p>
-          <Button variant="secondary" size="sm" onClick={() => fetchApplications()}>
+          <Button variant="secondary" size="sm" onClick={() => fetchApplications(filters)}>
             {t('common.retry', 'Thử lại')}
           </Button>
         </div>
@@ -180,7 +201,9 @@ export function RecruitmentTab() {
 
                   <select
                     value={app.status}
-                    onChange={(e) => updateStatus(app.id, e.target.value as RecruitmentApplication['status'])}
+                    disabled={pending?.[app.id]}
+                    aria-label={`Trạng thái ${app.fullName}`}
+                    onChange={(e) => { const status = e.target.value as RecruitmentApplication['status']; void runMutation(() => updateStatus(app.id, status)); }}
                     className="text-xs bg-surface border border-border rounded-lg px-2.5 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="pending">Chờ liên hệ</option>
@@ -193,11 +216,12 @@ export function RecruitmentTab() {
                   <button
                     onClick={() => {
                       if (window.confirm(`Xác nhận xóa hồ sơ ứng viên ${app.fullName}?`)) {
-                        deleteApplication(app.id);
+                        void runMutation(() => deleteApplication(app.id));
                       }
                     }}
                     className="p-2 text-muted hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                     title="Xóa hồ sơ"
+                    disabled={pending?.[app.id]}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -208,11 +232,11 @@ export function RecruitmentTab() {
         </div>
       )}
 
-      <AddCandidateModal
+      {showAddModal && <AddCandidateModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={addCandidate}
-      />
+      />}
     </div>
   );
 }

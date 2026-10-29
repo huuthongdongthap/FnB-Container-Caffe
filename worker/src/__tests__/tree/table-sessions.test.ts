@@ -20,10 +20,14 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
   const callLog: string[] = [];
   const boundLog: { sql: string; args: unknown[] }[] = [];
   let idx = 0;
+  // The request-time session gate reads the staff account row; without a fixture
+  // for it the gate cannot tell a live session from a revoked one.
+  const acctStmt: any = { bind: () => acctStmt, first: async () => ({ id: 'u1', name: 'A', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }), all: async () => ({ results: [], success: true, meta: {} }), run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }), raw: async () => [] };
   const db = {
     _log: callLog,
     _bound: boundLog,
     prepare: (sql: string) => {
+      if (/FROM users WHERE id = \?/i.test(sql)) return acctStmt;
       callLog.push(sql);
       // Consume handlers in FIFO order so repeated identical SQL gets fresh data.
       // When the queue is exhausted, reuse the last handler whose SQL pattern
@@ -70,7 +74,7 @@ testApp.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']))
 testApp.route('/api/table-sessions', tableSessionsRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown) {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' }, TEST_JWT_SECRET);
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

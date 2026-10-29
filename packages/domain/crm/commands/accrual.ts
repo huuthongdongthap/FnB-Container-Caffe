@@ -267,17 +267,14 @@ export async function applyAccrual(
     if (msg.includes('UNIQUE') || msg.includes('constraint')) {
       return { ok: false, reason: 'already_processed' };
     }
-    let anySucceeded = false;
-    for (const stmt of stmts) {
-      await stmt
-        .run()
-        .then(() => {
-          anySucceeded = true;
-        })
-        .catch(() => {});
-    }
-    if (!anySucceeded) {
-      return { ok: false, reason: 'd1_error', error: msg };
+    try {
+      await db.batch(stmts.slice(0, 5));
+    } catch (coreErr) {
+      const coreMsg = (coreErr as Error).message || '';
+      if (coreMsg.includes('UNIQUE') || coreMsg.includes('constraint')) {
+        return { ok: false, reason: 'already_processed' };
+      }
+      return { ok: false, reason: 'd1_error', error: coreMsg || msg };
     }
   }
 

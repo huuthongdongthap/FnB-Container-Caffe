@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
-import { StitchReviewsNew } from '../StitchReviewsNew';
+import { StitchReviewsNew, GOOGLE_WRITE_REVIEW_URL } from '../StitchReviewsNew';
 import type { ReviewsPageData } from '../StitchReviewsNew';
 
 vi.mock('react-i18next', () => ({
@@ -81,6 +81,14 @@ describe('StitchReviewsNew', () => {
     const btn = screen.getByRole('button', { name: /write/i });
     fireEvent.click(btn);
     expect(onWriteReview).toHaveBeenCalled();
+  });
+
+  it('links directly to Google Write Review URL when onWriteReview is omitted', () => {
+    renderWithProviders(<StitchReviewsNew data={MOCK_DATA} />);
+    const link = screen.getByRole('link', { name: /write/i });
+    expect(link.getAttribute('href')).toBe(GOOGLE_WRITE_REVIEW_URL);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
   });
 
   it('calls onFilterChange when filter button is clicked', () => {

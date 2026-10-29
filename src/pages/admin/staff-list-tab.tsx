@@ -18,17 +18,24 @@ function formatDate(iso?: string | null): string {
 
 export function StaffListTab() {
   const { t } = useTranslation();
-  const { staff, loading, error, fetchStaff, registerStaff, toggleStaffActive } = useAdminStaffStore();
+  const { staff, loading, error, fetchStaff, registerStaff, toggleStaffActive, pendingToggles } = useAdminStaffStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', role: 'staff', phone: '', email: '', password: '' });
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const displayedError = toggleError || error;
 
   useEffect(() => {
     fetchStaff();
   }, [fetchStaff]);
 
-  const handleToggleActive = (id: string) => {
-    void toggleStaffActive(id);
+  const handleToggleActive = async (id: string) => {
+    setToggleError(null);
+    try {
+      await toggleStaffActive(id);
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : t('common.error'));
+    }
   };
 
   const handleAdd = async () => {
@@ -64,10 +71,10 @@ export function StaffListTab() {
     );
   }
 
-  if (error && staff.length === 0) {
+  if (displayedError && staff.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-destructive mb-2">{error}</p>
+        <p className="text-sm text-destructive mb-2">{displayedError}</p>
         <Button variant="secondary" size="sm" onClick={() => fetchStaff()}>
           {t('common.retry')}
         </Button>
@@ -89,6 +96,12 @@ export function StaffListTab() {
         </div>
         <Button onClick={() => setShowAddModal(true)}>{t('adminStaff.addStaff')}</Button>
       </div>
+
+      {displayedError && staff.length > 0 && (
+        <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {displayedError}
+        </div>
+      )}
 
       {staff.length === 0 ? (
         <Card>
@@ -120,9 +133,10 @@ export function StaffListTab() {
                         variant="ghost"
                         size="sm"
                         className="w-full text-xs text-muted"
+                        disabled={pendingToggles.has(member.id)}
                         onClick={() => handleToggleActive(member.id)}
                       >
-                        {t('adminStaff.deactivate')}
+                        {pendingToggles.has(member.id) ? t('common.saving') : t('adminStaff.deactivate')}
                       </Button>
                     </div>
                   </CardBody>
@@ -146,8 +160,13 @@ export function StaffListTab() {
                       <span className="text-sm">{member.name}</span>
                       <Badge>{member.role}</Badge>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleToggleActive(member.id)}>
-                      {t('adminStaff.reactivate')}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={pendingToggles.has(member.id)}
+                      onClick={() => handleToggleActive(member.id)}
+                    >
+                      {pendingToggles.has(member.id) ? t('common.saving') : t('adminStaff.reactivate')}
                     </Button>
                   </div>
                 ))}

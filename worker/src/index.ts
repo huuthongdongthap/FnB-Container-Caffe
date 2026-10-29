@@ -35,6 +35,8 @@ import { openApiTablesRouter } from './routes/openapi-tables';
 import { openApiAuthRouter } from './routes/openapi-auth';
 import { openApiPaymentsRouter } from './routes/openapi-payments';
 import { openApiStaffRouter } from './routes/openapi-staff';
+import { openApiSopRouter } from './routes/openapi-sop';
+import { sopMobileRouter } from './routes/sop-mobile';
 import { openApiInventoryRouter } from './routes/openapi-inventory';
 import { openApiLoyaltyRouter } from './routes/openapi-loyalty';
 import { openApiPromotionsRouter } from './routes/openapi-promotions';
@@ -109,11 +111,20 @@ app.route('/api/kds/orders', kdsStreamRouter);
 // The KDS queue is the only other consumer of this prefix, so it gets its own
 // router instead of re-mounting the whole unified orders surface here.
 app.route('/api/kds/orders', kdsOrdersRouter);
-app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
+app.get('/api/realtime/:channelId', requireAuth(KDS_ROLES), tenantMiddleware, (c) => {
+  const user = c.get('user');
+  const channelId = c.req.param('channelId');
+  const tenantId = user?.tenantId || 'default';
+  if (channelId !== tenantId && !channelId.startsWith(`${tenantId}:`) && channelId !== 'kitchen') {
+    return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
+  }
+  return realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx);
+});
 
 // ── Auth & Mobile ──
 app.route('/api/auth', authEndpointsRouter);
 app.route('/mobile', staffMobileRouter);
+app.route('/api/sop', sopMobileRouter);
 app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
 
 // ── Domain Features & External Integrations ──
@@ -126,6 +137,7 @@ app.route('/', openApiTablesRouter);
 app.route('/', openApiAuthRouter);
 app.route('/', openApiPaymentsRouter);
 app.route('/', openApiStaffRouter);
+app.route('/', openApiSopRouter);
 app.route('/', openApiInventoryRouter);
 app.route('/', openApiLoyaltyRouter);
 app.route('/', openApiPromotionsRouter);

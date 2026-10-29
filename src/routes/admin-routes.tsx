@@ -1,6 +1,6 @@
 import React from 'react';
 import { Route, Navigate } from 'react-router-dom';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute, ADMIN_SHELL_ROLES } from '@/components/auth/ProtectedRoute';
 import AdminShell from '@/components/stitch/AdminShell';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
@@ -40,7 +40,7 @@ const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManageme
 
 export const adminRoutes = [
   <Route key="/admin/login" path="/admin/login" element={guarded(<AdminLoginPage />)} />,
-  <Route key="/admin" element={<ProtectedRoute />}>
+  <Route key="/admin" element={<ProtectedRoute allowedRoles={ADMIN_SHELL_ROLES} />}>
     <Route element={<AdminShell />}>
       <Route path="/admin" element={guarded(<AdminDashboardPage />)} />
       <Route path="/admin/audit-logs" element={guarded(<AuditLogViewerPage />)} />

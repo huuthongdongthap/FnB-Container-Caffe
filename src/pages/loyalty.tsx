@@ -1,4 +1,5 @@
 import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
+import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,7 +68,8 @@ export function LoyaltyPage({
   const history = propHistory ?? store.history;
   const storeError = store.error;
   const storeLoading = store.loading;
-  const referralCode = propReferralCode ?? 'AURA-PLAT-882';
+  const storeReferralCode = useReferralStore((s) => s.referralCode);
+  const referralCode = propReferralCode ?? storeReferralCode ?? '';
   const checkinDays = propCheckinDays ?? DEFAULT_CHECKIN;
 
   /* ── Derived loading state for StitchLoyaltyNew ────────────────── */

@@ -68,15 +68,75 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_available ON menu_items(available);
 -- 2. USERS & LOYALTY (CRM)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-    id           TEXT PRIMARY KEY,
-    phone        TEXT UNIQUE NOT NULL,
-    full_name    TEXT,
-    tier         TEXT DEFAULT 'Silver',
-    total_points INTEGER DEFAULT 0,
-    created_at   TEXT DEFAULT (datetime('now'))
+    id                  TEXT PRIMARY KEY,
+    email               TEXT UNIQUE,
+    username            TEXT UNIQUE,
+    password_hash       TEXT,
+    name                TEXT,
+    full_name           TEXT,
+    phone               TEXT UNIQUE,
+    role                TEXT NOT NULL DEFAULT 'staff',
+    tenant_id           TEXT NOT NULL DEFAULT 'default',
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    auth_version        INTEGER NOT NULL DEFAULT 1,
+    password_changed_at TEXT,
+    tier                TEXT DEFAULT 'Silver',
+    total_points        INTEGER DEFAULT 0,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+
+CREATE TABLE IF NOT EXISTS staff_devices (
+    id            TEXT PRIMARY KEY,
+    staff_id      TEXT NOT NULL REFERENCES users(id),
+    device_name   TEXT,
+    device_token  TEXT NOT NULL UNIQUE,
+    pin_hash      TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'staff',
+    last_login_at TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS staff_login_identities (
+    email      TEXT PRIMARY KEY,
+    staff_id   TEXT NOT NULL UNIQUE REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+    id                TEXT PRIMARY KEY,
+    tenant_id         TEXT NOT NULL DEFAULT 'default',
+    phone             TEXT UNIQUE,
+    email             TEXT UNIQUE,
+    name              TEXT,
+    tier              TEXT NOT NULL DEFAULT 'bronze',
+    loyalty_tier      TEXT NOT NULL DEFAULT 'bronze',
+    loyalty_points    INTEGER NOT NULL DEFAULT 0,
+    lifetime_points   INTEGER NOT NULL DEFAULT 0,
+    total_spent       REAL NOT NULL DEFAULT 0,
+    total_orders      INTEGER NOT NULL DEFAULT 0,
+    date_of_birth     TEXT,
+    birthday          TEXT,
+    notes             TEXT,
+    zalo              TEXT,
+    source            TEXT,
+    capture_source    TEXT,
+    marketing_consent INTEGER NOT NULL DEFAULT 0,
+    consent_marketing INTEGER NOT NULL DEFAULT 0,
+    consent_analytics INTEGER NOT NULL DEFAULT 0,
+    consent_timestamp TEXT,
+    verified_at       TEXT,
+    first_visit_at    TEXT,
+    last_visit_at     TEXT,
+    referral_code     TEXT,
+    referred_by       TEXT,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE IF NOT EXISTS rewards (
     id             TEXT PRIMARY KEY,
@@ -219,16 +279,44 @@ CREATE TABLE IF NOT EXISTS promotions (
     starts_at      TEXT,
     expires_at     TEXT,
     is_active      INTEGER DEFAULT 1,
+    tenant_id      TEXT NOT NULL DEFAULT 'default',
     created_at     TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_promo_active ON promotions(is_active);
+CREATE INDEX IF NOT EXISTS idx_promo_tenant ON promotions(tenant_id, is_active);
+
+CREATE TABLE IF NOT EXISTS promotion_redemptions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    promotion_id    TEXT,
+    code            TEXT NOT NULL,
+    order_id        TEXT UNIQUE NOT NULL,
+    customer_id     TEXT,
+    customer_phone  TEXT,
+    discount_amount INTEGER NOT NULL DEFAULT 0,
+    order_total     INTEGER NOT NULL DEFAULT 0,
+    tenant_id       TEXT NOT NULL DEFAULT 'default',
+    redeemed_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotion_redemptions_order ON promotion_redemptions(order_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_redemptions_code  ON promotion_redemptions(code, tenant_id);
+
+CREATE TABLE IF NOT EXISTS promotion_usages (
+    id              TEXT PRIMARY KEY,
+    promotion_id    TEXT NOT NULL,
+    customer_id     TEXT,
+    order_id        TEXT UNIQUE,
+    discount_amount REAL NOT NULL DEFAULT 0,
+    tenant_id       TEXT NOT NULL DEFAULT 'default',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- Seed active discount codes
-INSERT OR IGNORE INTO promotions (code, percent, max_discount, starts_at, expires_at, is_active) VALUES
-    ('AURA20',  20, 50000, '2026-06-06T00:00:00Z', '2026-06-06T23:59:59Z', 1),
-    ('AURA10',  10, 30000, '2026-06-07T00:00:00Z', '2026-06-13T23:59:59Z', 1),
-    ('WELCOME', 10, 30000, NULL,                  NULL,                  1);
+INSERT OR IGNORE INTO promotions (code, percent, max_discount, starts_at, expires_at, is_active, tenant_id) VALUES
+    ('AURA20',  20, 50000, '2026-06-06T00:00:00Z', '2026-06-06T23:59:59Z', 1, 'default'),
+    ('AURA10',  10, 30000, '2026-06-07T00:00:00Z', '2026-06-13T23:59:59Z', 1, 'default'),
+    ('WELCOME', 10, 30000, NULL,                  NULL,                  1, 'default');
 
 -- ─────────────────────────────────────────────
 -- 9. STAFF SHIFTS (Chấm công)

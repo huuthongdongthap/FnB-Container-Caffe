@@ -9,19 +9,33 @@
 import { describe, it, expect } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockDB } from '../test-utils';
+import { createMockEnv, createMockDB, isStaffAccountLookup, staffSessionClaims } from '../test-utils';
 
 const TEST_SECRET = 'test-jwt-secret-at-least-16-chars';
+
+/**
+ * Account rows the staff-session gate resolves, keyed by the staff id each
+ * token names. The row's role has to equal the token's role claim: when they
+ * diverge the gate revokes the session as a changed authority.
+ */
+const STAFF_ACCOUNTS: Record<string, Record<string, unknown>> = {
+  'staff-1': { id: 'staff-1', name: 'Barista', phone: null, role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 },
+  'mgr-1': { id: 'mgr-1', name: 'Manager', phone: null, role: 'manager', tenant_id: 'default', is_active: 1, auth_version: 1 },
+  'owner-1': { id: 'owner-1', name: 'Owner', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 },
+};
 
 function makeTestEnv() {
   const store = new Map<string, string>();
   const db = createMockDB();
 
   db.prepare = (_sql: string) => {
+    let boundParams: unknown[] = [];
     const stmt = {
-      bind: (..._args: unknown[]) => stmt,
+      bind: (...args: unknown[]) => { boundParams = args; return stmt; },
       run: async () => ({ success: true, changes: 1, lastRowId: 1 }),
       first: async () => {
+        // Staff sessions are judged against the account row behind the token.
+        if (isStaffAccountLookup(_sql)) return STAFF_ACCOUNTS[String(boundParams[0] ?? '')] ?? null;
         if (_sql.includes('FROM categories WHERE id = ?')) {
           return { id: 'cat-1', name: 'Coffee', slug: 'coffee', sort_order: 1 };
         }
@@ -247,7 +261,7 @@ describe('Catalog Routes Security and Public Access', () => {
   describe('Authenticated staff mutations succeed', () => {
     it('allows staff POST /api/categories', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ sub: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET);
+      const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims() }, TEST_SECRET, 28800);
       const res = await app.fetch(
         new Request('https://test.aura/api/categories', {
           method: 'POST',
@@ -266,7 +280,7 @@ describe('Catalog Routes Security and Public Access', () => {
 
     it('allows staff POST /api/products', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET);
+      const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims() }, TEST_SECRET, 28800);
       const res = await app.fetch(
         new Request('https://test.aura/api/products', {
           method: 'POST',
@@ -285,7 +299,7 @@ describe('Catalog Routes Security and Public Access', () => {
 
     it('allows staff POST /api/menu-modifiers/groups', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ sub: 'owner-1', role: 'owner', name: 'Owner' }, TEST_SECRET);
+      const token = await generateJWT({ id: 'owner-1', role: 'owner', name: 'Owner', ...staffSessionClaims() }, TEST_SECRET, 28800);
       const res = await app.fetch(
         new Request('https://test.aura/api/menu-modifiers/groups', {
           method: 'POST',

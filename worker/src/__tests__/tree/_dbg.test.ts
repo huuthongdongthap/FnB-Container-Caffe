@@ -37,12 +37,15 @@ describe('dbg', () => {
   it('debug POST', async () => {
     const TEST_KV = new Map<string, string>();
     const db = makeScriptedDB([
+      // The request-time session gate reads the account row behind the owner
+      // token; without it every request reads as a revoked session.
+      { match: (s) => /FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(s), rows: [{ id: 'u1', name: 'A', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }], firstRow: { id: 'u1', name: 'A', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 } },
       { match: (s) => s.includes('table_sessions') && s.includes("status = 'active'"), rows: [], firstRow: null },
       { match: (s) => s.includes('cafe_tables') && s.includes('WHERE id ='), rows: [{ id: 'T1', table_number: 5, zone: 'A', status: 'Available' }], firstRow: { id: 'T1', table_number: 5, zone: 'A', status: 'Available' } },
       { match: (s) => s.startsWith('INSERT INTO table_sessions'), rows: [], firstRow: null },
       { match: (s) => s.startsWith('SELECT * FROM table_sessions WHERE id ='), rows: [{ id: 'SES-NEW', table_id: 'T1', status: 'active', order_count: 0, total_amount: 0 }], firstRow: { id: 'SES-NEW', table_id: 'T1', status: 'active', order_count: 0, total_amount: 0 } },
     ]);
-    const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' }, 'test-jwt-secret-at-least-16-chars');
+    const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, 'test-jwt-secret-at-least-16-chars', 28800);
     const app = new Hono();
     app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']));
     app.route('/api/table-sessions', tableSessionsRouter);

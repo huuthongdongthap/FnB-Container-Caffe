@@ -4,18 +4,33 @@
  */
 
 import { verifyJWT } from '../lib/jwt';
+import { resolvePilotStore } from '../lib/pilot-store';
 
-export async function getAdminCustomers(request: Request, env: Record<string, unknown>) {
+function resolveEnvTenant(env: Record<string, unknown>, explicitTenantId?: string): string {
+  if (explicitTenantId && explicitTenantId.trim()) {
+    return explicitTenantId.trim();
+  }
+  try {
+    return resolvePilotStore(env);
+  } catch {
+    return 'default';
+  }
+}
+
+export async function getAdminCustomers(request: Request, env: Record<string, unknown>, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
+  const tenantId = resolveEnvTenant(env, effectiveTenantId);
   const url = new URL(request.url);
-  const page = parseInt(url.searchParams.get('page') || '1', 10);
-  const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+  const rawPage = parseInt(url.searchParams.get('page') || '1', 10);
+  const rawLimit = parseInt(url.searchParams.get('limit') || '50', 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
   const search = url.searchParams.get('search') || '';
   const tier = url.searchParams.get('tier') || '';
   const offset = (page - 1) * limit;
 
-  const clauses: string[] = [];
-  const params: unknown[] = [];
+  const clauses: string[] = ["COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?"];
+  const params: unknown[] = [tenantId];
 
   if (search) {
     clauses.push('(c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)');
@@ -76,8 +91,9 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   return Response.json({ success: true, data: customers, customers, pagination: { page, limit, total } });
 }
 
-export async function createAdminCustomer(request: Request, env: Record<string, unknown>) {
+export async function createAdminCustomer(request: Request, env: Record<string, unknown>, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
+  const tenantId = resolveEnvTenant(env, effectiveTenantId);
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     phone?: string;
@@ -100,25 +116,34 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
   try {
     await db
       .prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)'
+        'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, source, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
       )
-      .bind(id, email, name, phone, tier, 'admin', now, now)
+      .bind(id, email, name, phone, tier, 'admin', tenantId, now, now)
       .run();
   } catch {
     try {
       await db
         .prepare(
-          'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)'
+          'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)'
         )
-        .bind(id, email, name, phone, tier, now, now)
+        .bind(id, email, name, phone, tier, 'admin', now, now)
         .run();
     } catch {
-      await db
-        .prepare(
-          'INSERT INTO customers (id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)'
-        )
-        .bind(id, name, phone, email, tier, now)
-        .run();
+      try {
+        await db
+          .prepare(
+            'INSERT INTO customers (id, email, name, phone, loyalty_tier, loyalty_points, lifetime_points, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)'
+          )
+          .bind(id, email, name, phone, tier, now, now)
+          .run();
+      } catch {
+        await db
+          .prepare(
+            'INSERT INTO customers (id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)'
+          )
+          .bind(id, name, phone, email, tier, now)
+          .run();
+      }
     }
   }
 
@@ -141,8 +166,9 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
   );
 }
 
-export async function updateAdminCustomer(request: Request, env: Record<string, unknown>, id: string) {
+export async function updateAdminCustomer(request: Request, env: Record<string, unknown>, id: string, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
+  const tenantId = resolveEnvTenant(env, effectiveTenantId);
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     phone?: string;
@@ -176,24 +202,40 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
       canonicalUpdates.push('loyalty_tier = ?');
       canonicalParams.push(tierValue);
     }
-    canonicalParams.push(id);
-    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+    canonicalParams.push(id, tenantId);
+    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...canonicalParams).run();
   } catch {
-    const legacyUpdates = [...baseUpdates];
-    const legacyParams = [...baseParams];
-    if (tierValue) {
-      legacyUpdates.push('tier = ?');
-      legacyParams.push(tierValue);
+    try {
+      const canonicalUpdates = [...baseUpdates];
+      const canonicalParams = [...baseParams];
+      if (tierValue) {
+        canonicalUpdates.push('loyalty_tier = ?');
+        canonicalParams.push(tierValue);
+      }
+      canonicalParams.push(id);
+      await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+    } catch {
+      const legacyUpdates = [...baseUpdates];
+      const legacyParams = [...baseParams];
+      if (tierValue) {
+        legacyUpdates.push('tier = ?');
+        legacyParams.push(tierValue);
+      }
+      legacyParams.push(id);
+      await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
     }
-    legacyParams.push(id);
-    await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
   }
   return Response.json({ success: true, id });
 }
 
-export async function deleteAdminCustomer(env: Record<string, unknown>, id: string) {
+export async function deleteAdminCustomer(env: Record<string, unknown>, id: string, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
-  await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run();
+  const tenantId = resolveEnvTenant(env, effectiveTenantId);
+  try {
+    await db.prepare("DELETE FROM customers WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(id, tenantId).run();
+  } catch {
+    await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run();
+  }
   return Response.json({ success: true, id });
 }
 

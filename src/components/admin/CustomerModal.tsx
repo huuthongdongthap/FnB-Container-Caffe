@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, UserPlus, Save, AlertCircle } from 'lucide-react';
 import type { AdminCustomer } from '@/hooks/use-admin';
+import { createSubmissionKey, submissionSession } from '@/lib/server-confirmed-submission';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface CustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; phone: string; tier: string }) => Promise<boolean>;
+  onSave: (data: { name: string; phone: string; tier: string }, requestKey?: string) => Promise<boolean>;
   customer?: AdminCustomer | null;
 }
 
@@ -19,6 +20,10 @@ export function CustomerModal({
   onSave,
   customer,
 }: CustomerModalProps) {
+  const requestKey = useRef(createSubmissionKey());
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [tier, setTier] = useState('bronze');
@@ -42,6 +47,9 @@ export function CustomerModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
+    const session = submissionSession();
+    const current = () => mounted.current && session === submissionSession();
     if (!name.trim()) {
       setError('Vui lòng nhập họ và tên khách hàng.');
       return;
@@ -51,19 +59,22 @@ export function CustomerModal({
       return;
     }
 
+    inFlight.current = true;
     setSubmitting(true);
     setError(null);
     try {
-      const ok = await onSave({ name: name.trim(), phone: phone.trim(), tier });
+      const data = { name: name.trim(), phone: phone.trim(), tier };
+      const ok = await onSave(data, requestKey.current.forPayload(data));
+      if (!current()) return;
       if (ok) {
         onClose();
       } else {
-        setError('Không thể lưu thông tin khách hàng. Vui lòng thử lại.');
+        setError('Chưa xác nhận đã lưu thông tin khách hàng. Vui lòng thử lại.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lỗi hệ thống');
+      if (current()) setError(err instanceof Error ? err.message : 'Lỗi hệ thống');
     } finally {
-      setSubmitting(false);
+      if (current()) { inFlight.current = false; setSubmitting(false); }
     }
   };
 

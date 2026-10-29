@@ -2,68 +2,55 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
-import { getAuthToken, verifyJWT } from '../../lib/jwt';
+import { authenticateRequest } from '../../lib/staff-session-auth';
+import { staffSessionErrorResponse, staffTenant } from '../../lib/staff-session';
+import type { Env } from '../../types/env';
 
 const log = createLogger({ route: 'auth' });
 
 export async function getCurrentUser(request: Request, env: Record<string, unknown>) {
   try {
-    const token = getAuthToken(request);
-    if (!token) {
-      return errorResponse('Unauthorized: thiếu Authorization header', 401);
-    }
-
-    const payload = await verifyJWT(token, env.JWT_SECRET as string);
-    if (!payload) {
-      return errorResponse('Token verify thất bại — signature/expiry/format invalid', 401);
-    }
-
+    const session = await authenticateRequest(request, env as unknown as Env);
+    if (!session) return errorResponse('Chưa đăng nhập', 401);
+    if ('blocked' in session) return errorResponse(session.blocked, 403);
+    const { payload, account } = session;
+    if (account) return jsonResponse({ success: true, user: {
+      id: account.id, email: payload.email || '', name: account.name || account.id,
+      phone: account.phone || '', role: account.role, tenantId: staffTenant(account),
+    } });
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const revoked = await authKV.get(`revoked:${token}`);
-    if (revoked) {
-      return errorResponse('Token đã bị thu hồi (logout)', 401);
-    }
-
     let userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
     if (!userStr && payload.id) {
       userStr = await authKV.get(`user:${payload.id}`);
     }
-    if (!userStr && !payload.email && payload.id) {
+    if (!userStr && payload.role === 'customer' && payload.id) {
       const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
       if (db) {
         try {
-          const d1User = await db
-            .prepare('SELECT id, email, name, phone, role FROM users WHERE id = ?')
+          const customer = await db
+            .prepare('SELECT id, email, name, phone, tenant_id FROM customers WHERE id = ?')
             .bind(payload.id)
-            .first<{ id: string; email?: string; name?: string; phone?: string; role?: string }>();
-          if (d1User?.id) {
+            .first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null }>();
+          if (customer?.id) {
             return jsonResponse({
               success: true,
               user: {
-                id: d1User.id,
-                email: d1User.email || '',
-                name: d1User.name || payload.name || d1User.id,
-                phone: d1User.phone || '',
-                role: d1User.role || payload.role || 'staff',
+                id: customer.id,
+                email: customer.email || '',
+                name: customer.name || payload.name || '',
+                phone: customer.phone || '',
+                role: 'customer',
+                tenantId: customer.tenant_id || 'default',
               },
             });
           }
         } catch {
-          // Fall through to token payload claims
+          // Fall through to 404 if customers table unavailable
         }
       }
-      return jsonResponse({
-        success: true,
-        user: {
-          id: payload.id,
-          email: '',
-          name: payload.name || payload.id,
-          role: payload.role || 'staff',
-        },
-      });
     }
     if (!userStr) {
-      return errorResponse(`User '${payload.email}' không tồn tại trong KV`, 404);
+      return errorResponse(`User '${payload.email || payload.id}' không tồn tại`, 404);
     }
 
     const user = JSON.parse(userStr);
@@ -73,6 +60,8 @@ export async function getCurrentUser(request: Request, env: Record<string, unkno
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' }
     });
   } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
     log.error('GetUser error:', { message: (error as Error).message });
     return errorResponse('Lỗi server', 500);
   }

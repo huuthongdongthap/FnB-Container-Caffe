@@ -10,10 +10,17 @@ import { generateJWT } from '../../lib/jwt';
 function fixture(status = 'completed', tenant = 'default') {
   const sql = paymentSqliteDB(); sql.order('ORDER', tenant); sql.payment('ORDER', status);
   sql.sqlite.exec("UPDATE orders SET payment_status = 'paid'");
+  // Known fixture actors remain independent of the token generation helper.
+  for (const [role, tenant] of [['owner','default'], ['cashier','cafe-a'], ['staff','default'], ['waiter','default'], ['kitchen','default']]) {
+    sql.staffAccount(`${role}-${tenant}`, role, tenant);
+  }
   return { ...sql, env: { ...createMockEnv(), AURA_DB: sql.db }, app: new Hono().route('/api/payments', refundRouter) };
 }
 async function headers(role = 'owner', tenantId = 'default') {
-  const token = await generateJWT({ id: 'USER', role, tenantId, name: 'Local' }, TEST_JWT_SECRET);
+  // Claims the staff-session gate requires: the credential entry this session
+  // came from and the session version it was issued at.
+  const token = await generateJWT({ id: `${role}-${tenantId}`, role, tenantId, name: 'Local',
+    ...(role === 'customer' ? {} : { authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }) }, TEST_JWT_SECRET, 28800);
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 function req(body: Record<string, unknown>, auth: Record<string, string> = {}) {

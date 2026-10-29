@@ -1,288 +1,97 @@
-/* ═══════════════════════════════════════════════════════════════════
-useMobileAuth — JWT + device_token management for AURA Mobile staff
-Storage: localStorage keys `mobile_token`, `mobile_user`, `mobile_device`
-═══════════════════════════════════════════════════════════════════ */
-
+/** Staff sessions share identity with web; PIN enrollment survives session expiry. */
 import { useState, useCallback, useEffect, createContext, useContext } from 'react';
-import { API_BASE } from '@/lib/api-client';
+import { API_BASE, apiFetch } from '@/lib/api-client';
+import { readClientSession, storedDevice, saveClientSession, invalidateClientSession,
+  beginClientLogin, isCurrentLogin, sessionErrorRequiresLogin, subscribeClientSession, tokenClaims, type ClientSessionUser } from '@/lib/client-session';
 
-const STORAGE_KEYS = {
-  token: 'mobile_token',
-  user: 'mobile_user',
-  device: 'mobile_device',
-};
-
-interface MobileUser {
-  id: string;
-  name: string;
-  role: 'owner' | 'manager' | 'staff' | 'waiter' | string;
-  email?: string;
-  device_id?: string;
-}
-
-interface AuthState {
-  user: MobileUser | null;
-  token: string | null;
-  deviceToken: string | null;
-  loading: boolean;
-  error: string | null;
-}
-
+interface AuthState { user: ClientSessionUser | null; token: string | null; deviceToken: string | null; loading: boolean; error: string | null }
 interface AuthContextType extends AuthState {
-  login: (tokenOrDevice: string, userOrPin: string | MobileUser) => Promise<boolean>;
-  logout: () => void;
-  refresh: () => Promise<boolean>;
-  isAuthenticated: boolean;
+  login: (tokenOrDevice: string, userOrPin: string | ClientSessionUser) => Promise<boolean>;
+  logout: () => void; forgetDevice: () => void; refresh: () => Promise<boolean>; isAuthenticated: boolean;
 }
-
 const AuthContext = createContext<AuthContextType | null>(null);
 
-/* ── Helpers ──────────────────────────────────────────────────────── */
-
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null || raw === undefined) return fallback;
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return raw as unknown as T;
-    }
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStorage<T>(key: string, value: T) {
-  try {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-    localStorage.setItem(key, serialized);
-  } catch {
-    // quota exceeded or private mode — silent fail
-  }
-}
-
-function clearStorage() {
-  try {
-    Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-    localStorage.removeItem('aura_auth_token');
-    localStorage.removeItem('aura_user_data');
-    localStorage.removeItem('aura_device_token');
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function getStoredToken(): string | null {
-  return readStorage<string | null>(STORAGE_KEYS.token, null) || readStorage<string | null>('aura_auth_token', null);
-}
-
-function getStoredUser(): MobileUser | null {
-  return readStorage<MobileUser | null>(STORAGE_KEYS.user, null) || readStorage<MobileUser | null>('aura_user_data', null);
-}
-
-function getStoredDevice(): string | null {
-  return readStorage<string | null>(STORAGE_KEYS.device, null) || readStorage<string | null>('aura_device_token', null);
-}
-
-/* ── Context Provider ─────────────────────────────────────────────── */
-
 export function MobileAuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => ({
-    user: getStoredUser(),
-    token: getStoredToken(),
-    deviceToken: getStoredDevice(),
-    loading: false,
-    error: null,
-  }));
+  const [state, setState] = useState<AuthState>(() => ({ ...readClientSession(), loading: false }));
+  useEffect(() => subscribeClientSession(session => setState({ ...session, loading: false })), []);
 
-  /* Auto-refresh on mount if token exists */
-  useEffect(() => {
-    if (!state.token || !state.deviceToken) return;
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch(
-          `${API_BASE}/mobile/refresh`,
-          {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device_token: state.deviceToken }),
-            signal: controller.signal,
-          }
-        );
-        if (!res.ok) {
-          clearStorage();
-          setState(s => ({ ...s, user: null, token: null, deviceToken: null, error: null }));
-          return;
-        }
-        const data = await res.json();
-        writeStorage(STORAGE_KEYS.token, data.token);
-        writeStorage(STORAGE_KEYS.device, state.deviceToken);
-        writeStorage('aura_auth_token', data.token);
-        writeStorage('aura_device_token', state.deviceToken);
-        if (data.user) {
-          writeStorage(STORAGE_KEYS.user, data.user);
-          writeStorage('aura_user_data', data.user);
-        }
-        setState(s => ({
-          ...s,
-          user: data.user ?? s.user,
-          token: data.token,
-          deviceToken: state.deviceToken,
-          error: null,
-        }));
-      } catch { /* network error or aborted */ }
-    })();
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const refreshToken = useCallback(async (): Promise<boolean> => {
-    const deviceToken = state.deviceToken || getStoredDevice();
-    if (!deviceToken) return false;
-
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    const { token, user } = readClientSession();
+    const device = storedDevice();
+    if (!token || !user || !device) return false;
+    // Password sessions can use mobile screens but cannot become PIN refresh sessions.
+    if (tokenClaims(token).sessionType === 'staff-web') return true;
     try {
-      const res = await fetch(
-        `${API_BASE}/mobile/refresh`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_token: deviceToken }),
-        }
-      );
+      const res = await fetch(`${API_BASE}/mobile/refresh`, {
+        method: 'POST', credentials: 'include', signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ device_token: device }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (signal?.aborted || readClientSession().token !== token) return false;
       if (!res.ok) {
-        // Token invalid — clean up
-        clearStorage();
-        setState(s => ({ ...s, user: null, token: null, deviceToken: null, error: null }));
+        if (sessionErrorRequiresLogin(res.status, data.code)) invalidateClientSession(token, data.error || 'Vui lòng nhập PIN lại');
+        else setState(s => ({ ...s, error: data.error || 'Không thể kiểm tra phiên, vui lòng thử lại' }));
         return false;
       }
-      const data = await res.json();
-      writeStorage(STORAGE_KEYS.token, data.token);
-      writeStorage(STORAGE_KEYS.device, deviceToken);
-      writeStorage('aura_auth_token', data.token);
-      writeStorage('aura_device_token', deviceToken);
-      if (data.user) {
-        writeStorage(STORAGE_KEYS.user, data.user);
-        writeStorage('aura_user_data', data.user);
-      }
-      setState(s => ({
-        ...s,
-        user: data.user ?? s.user,
-        token: data.token,
-        deviceToken,
-        error: null,
-      }));
+      if (!data.token || !data.user) return false;
+      saveClientSession(data.token, data.user, device);
       return true;
-    } catch {
-      return false;
-    }
-  }, [state.deviceToken]);
+    } catch { return false; }
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (readClientSession().token && storedDevice()) void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh]);
+  useEffect(() => {
+    const exp = tokenClaims(state.token).exp;
+    if (!state.token || !Number.isFinite(exp)) return;
+    const token = state.token;
+    const timer = setTimeout(() => invalidateClientSession(token, 'Phiên đã hết hạn, vui lòng nhập PIN lại'), Math.max(0, exp! * 1000 - Date.now()));
+    return () => clearTimeout(timer);
+  }, [state.token]);
 
-  const login = useCallback(async (tokenOrDevice: string, userOrPin: string | MobileUser): Promise<boolean> => {
-    if (typeof userOrPin === 'object' && userOrPin !== null) {
-      const device = getStoredDevice();
-      writeStorage(STORAGE_KEYS.token, tokenOrDevice);
-      writeStorage(STORAGE_KEYS.user, userOrPin);
-      writeStorage('aura_auth_token', tokenOrDevice);
-      writeStorage('aura_user_data', userOrPin);
-      setState({
-        user: userOrPin,
-        token: tokenOrDevice,
-        deviceToken: device,
-        loading: false,
-        error: null,
-      });
+  const login = useCallback(async (tokenOrDevice: string, userOrPin: string | ClientSessionUser) => {
+    if (typeof userOrPin === 'object') {
+      saveClientSession(tokenOrDevice, userOrPin, storedDevice());
       return true;
     }
-    const deviceToken = tokenOrDevice;
-    const pin = userOrPin;
+    const attempt = beginClientLogin();
     setState(s => ({ ...s, loading: true, error: null }));
     try {
-      const res = await fetch(
-        `${API_BASE}/mobile/login`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_token: deviceToken, pin }),
-        }
-      );
+      const res = await fetch(`${API_BASE}/mobile/login`, { method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_token: tokenOrDevice, pin: userOrPin }) });
       const data = await res.json();
-      const userProfile = data.staff ?? data.user;
-      if (!res.ok || data.success === false) {
+      if (!isCurrentLogin(attempt)) return false;
+      const user = data.user || data.staff;
+      if (!res.ok || !data.token || !user) {
         setState(s => ({ ...s, loading: false, error: data.error || 'Đăng nhập thất bại' }));
         return false;
       }
-      writeStorage(STORAGE_KEYS.token, data.token);
-      writeStorage(STORAGE_KEYS.user, userProfile);
-      writeStorage(STORAGE_KEYS.device, deviceToken);
-      writeStorage('aura_auth_token', data.token);
-      writeStorage('aura_user_data', userProfile);
-      writeStorage('aura_device_token', deviceToken);
-      setState({
-        user: userProfile,
-        token: data.token,
-        deviceToken,
-        loading: false,
-        error: null,
-      });
+      saveClientSession(data.token, user, tokenOrDevice);
       return true;
-    } catch (err) {
-      setState(s => ({
-        ...s,
-        loading: false,
-        error: err instanceof Error ? err.message : 'Lỗi mạng',
-      }));
+    } catch (error) {
+      if (!isCurrentLogin(attempt)) return false;
+      setState(s => ({ ...s, loading: false, error: error instanceof Error ? error.message : 'Lỗi mạng' }));
       return false;
     }
   }, []);
-
   const logout = useCallback(() => {
-    clearStorage();
-    setState({ user: null, token: null, deviceToken: null, loading: false, error: null });
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    invalidateClientSession();
   }, []);
-
-  const currentUser = state.user ?? getStoredUser();
-  const currentToken = state.token ?? getStoredToken();
-  const currentDeviceToken = state.deviceToken ?? getStoredDevice();
-
-  const value: AuthContextType = {
-    ...state,
-    user: currentUser,
-    token: currentToken,
-    deviceToken: currentDeviceToken,
-    login,
-    logout,
-    refresh: refreshToken,
-    isAuthenticated: !!currentToken && !!currentUser,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const forgetDevice = useCallback(() => {
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    invalidateClientSession(undefined, null, true);
+  }, []);
+  return <AuthContext.Provider value={{ ...state, login, logout, forgetDevice, refresh, isAuthenticated: Boolean(state.token && state.user) }}>{children}</AuthContext.Provider>;
 }
-
-/* ── Hook (convenience — use context directly OR this standalone) ─── */
-
 export function useMobileAuth(): AuthContextType {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    // Standalone fallback: read from localStorage directly
-    const token = getStoredToken();
-    const user = getStoredUser();
-    const deviceToken = getStoredDevice();
-    return {
-      user,
-      token,
-      deviceToken,
-      loading: false,
-      error: null,
-      login: async () => false,
-      logout: () => clearStorage(),
-      refresh: async () => false,
-      isAuthenticated: !!token && !!user,
-    };
-  }
-  return ctx;
+  const context = useContext(AuthContext);
+  if (context) return context;
+  const state = readClientSession();
+  return { ...state, loading: false, login: async () => false, refresh: async () => false,
+    logout: () => invalidateClientSession(), forgetDevice: () => invalidateClientSession(undefined, null, true),
+    isAuthenticated: Boolean(state.token && state.user) };
 }

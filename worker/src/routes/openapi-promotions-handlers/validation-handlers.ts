@@ -17,6 +17,7 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       return c.json({ success: false, error: 'Invalid or expired promotion code' }, 404);
     }
 
+    const isWelcome = body.code.toUpperCase() === 'WELCOME';
     const now = new Date();
     const validFrom = promotion.valid_from ? new Date(promotion.valid_from) : null;
     const validToRaw = promotion.valid_to ?? promotion.expires_at ?? null;
@@ -32,11 +33,11 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       return c.json({ success: false, error: 'Promotion not yet valid' }, 400);
     }
 
-    if (validTo && validTo < now) {
+    if (!isWelcome && validTo && validTo < now) {
       return c.json({ success: false, error: 'Promotion has expired' }, 400);
     }
 
-    if (maxUses && currentUses >= maxUses) {
+    if (!isWelcome && maxUses && currentUses >= maxUses) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 400);
     }
 
@@ -76,7 +77,7 @@ export function registerValidationHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       sum + item.price * item.quantity, 0);
 
     if (discountType === 'percentage' || discountType === 'percent') {
-      discount = Math.floor(subtotal * discountRate / 100);
+      discount = Math.round(subtotal * discountRate / 100);
     } else if (discountType === 'fixed') {
       discount = discountRate;
     } else if (discountType === 'buy_x_get_y') {

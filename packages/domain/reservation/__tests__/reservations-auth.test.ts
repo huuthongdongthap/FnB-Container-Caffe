@@ -14,6 +14,10 @@ function createReservationMockEnv(overrides: Record<string, unknown> = {}) {
           return stmt;
         },
         first: async <T = unknown>() => {
+          if (sql.includes('FROM users WHERE id = ?')) {
+            const accounts = ['staff', 'owner', 'manager'].map(role => ({ id: `user-${role}`, name: role, role, tenant_id: 'default', is_active: 1, auth_version: 1 }));
+            return accounts.find(row => row.id === stmt._binds[0]) as T;
+          }
           if (sql.includes('FROM cafe_tables WHERE id = ?')) {
             return { id: 'tbl_b02', table_number: 'B02', zone: 'Zone B', status: 'Available' } as T;
           }

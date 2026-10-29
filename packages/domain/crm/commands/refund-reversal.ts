@@ -16,6 +16,7 @@ export interface ReversalInput {
   customerId: string;
   /** Refund amount in VND (may be partial). */
   refundAmountVnd: number;
+  reason?: string;
 }
 
 export interface ReversalSuccess {

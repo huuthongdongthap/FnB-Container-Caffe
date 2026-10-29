@@ -44,12 +44,37 @@ export async function creditLoyaltyIfEligible(
     total_amount?: number | null;
     total?: number | null;
     customer_id: string | null;
+    customer_phone?: string | null;
+    customer_email?: string | null;
     status?: string;
     payment_status?: string;
   }>();
 
-  if (!orderRow || !orderRow.customer_id || orderRow.status === 'cancelled') {
-    log.info('Loyalty credit skipped (no order, customer, or cancelled)', { orderId });
+  if (!orderRow || orderRow.status === 'cancelled' || orderRow.status === 'failed' || orderRow.status === 'expired') {
+    log.info('Loyalty credit skipped (no order or cancelled)', { orderId });
+    return;
+  }
+
+  let customerId = orderRow.customer_id;
+  if (!customerId && (orderRow.customer_phone || orderRow.customer_email)) {
+    const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
+    const cust = await db.prepare(
+      'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+    ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+    customerId = cust?.id ?? null;
+  }
+
+  if (!customerId) {
+    log.info('Loyalty credit skipped (no customer)', { orderId });
+    return;
+  }
+
+  if (orderRow.payment_status && orderRow.payment_status !== 'paid') {
+    log.info('Loyalty credit skipped (order payment not yet settled)', {
+      orderId,
+      status: orderRow.status,
+      payment_status: orderRow.payment_status,
+    });
     return;
   }
 
@@ -74,7 +99,7 @@ export async function creditLoyaltyIfEligible(
 
   await applyAccrual(db, policy, {
     orderId,
-    customerId: orderRow.customer_id,
+    customerId,
     orderTotalVnd: total,
   }).catch((err) => {
     log.error('Loyalty accrual failed', { orderId, error: String(err) });

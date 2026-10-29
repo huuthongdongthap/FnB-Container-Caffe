@@ -17,11 +17,33 @@ import {
   TEST_SECRET,
   TEST_CAT_ID,
 } from './catalog-projection-test-helpers';
+import { isStaffAccountLookup, STAFF_ACCOUNT_ROW, staffSessionClaims } from '../test-utils';
+
+/**
+ * The projection helper owns the catalog table mocks, so the staff account row
+ * the session gate needs is layered on top of its `prepare` instead of
+ * being duplicated into it. Everything that is not the gate's `users`
+ * lookup keeps the helper's own behaviour.
+ */
+function createProjectionEnv() {
+  const built = createProjectionTestEnv();
+  const innerPrepare = built.env.AURA_DB.prepare.bind(built.env.AURA_DB);
+  const managerRow = { ...STAFF_ACCOUNT_ROW, role: 'manager' };
+  (built.env.AURA_DB as any).prepare = (sql: string) => {
+    if (isStaffAccountLookup(sql)) {
+      return {
+        bind: (...args: any[]) => ({ first: async () => ({ ...managerRow, id: String(args[0] ?? managerRow.id) }), all: async () => ({ results: [], success: true }), run: async () => ({ success: true, changes: 0 }) }),
+      } as any;
+    }
+    return innerPrepare(sql);
+  };
+  return built;
+}
 
 describe('Catalog Product -> Menu Projection Synchronization', () => {
   it('synchronizes creation: inserts canonical product and projects into menu_items', async () => {
-    const { env, products, menuItems } = createProjectionTestEnv();
-    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET, 3600);
+    const { env, products, menuItems } = createProjectionEnv();
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims() }, TEST_SECRET, 3600);
 
     const res = await app.fetch(
       new Request('https://test.aura/api/products', {
@@ -69,8 +91,8 @@ describe('Catalog Product -> Menu Projection Synchronization', () => {
   });
 
   it('synchronizes update: modifies master and re-projects customer fields', async () => {
-    const { env, products, menuItems } = createProjectionTestEnv();
-    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET, 3600);
+    const { env, products, menuItems } = createProjectionEnv();
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims() }, TEST_SECRET, 3600);
     const prodId = 'prod-test-update';
 
     products.set(prodId, {
@@ -112,8 +134,8 @@ describe('Catalog Product -> Menu Projection Synchronization', () => {
   });
 
   it('synchronizes deletion: soft-delete hides from projection, hard-delete removes', async () => {
-    const { env, products, menuItems, setOrderItemsCount } = createProjectionTestEnv();
-    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET, 3600);
+    const { env, products, menuItems, setOrderItemsCount } = createProjectionEnv();
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims() }, TEST_SECRET, 3600);
     const p1 = 'prod-soft-del';
     const p2 = 'prod-hard-del';
 

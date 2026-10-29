@@ -7,20 +7,11 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
-// Mock JWT: verifyJWT is imported via re-export from auth.ts → ../lib/jwt
-// customers.ts imports from './auth.js' which re-exports from '../lib/jwt'
-// So we need to mock the actual path used by customers.ts (with .js extension)
-vi.mock('../worker/src/routes/auth.js', () => ({
-  verifyJWT: vi.fn(async (token: string) => {
-    if (token === 'valid-token') {
-      return { email: 'test@test.com', sub: 'USR_001', id: 'USR_001', name: 'Test User', role: 'customer' };
-    }
-    return null;
-  }),
-  generateJWT: vi.fn(),
-  getAuthToken: vi.fn(),
-  hashPassword: vi.fn(),
-  verifyPassword: vi.fn(),
+// Keep real token/cookie extraction; stub only cryptographic verification.
+vi.mock('../worker/src/lib/jwt.ts', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../worker/src/lib/jwt.ts')>(),
+  verifyJWT: vi.fn(async (token: string) => token === 'valid-token'
+    ? { email: 'test@test.com', id: 'USR_001', name: 'Test User', role: 'customer', exp: Math.floor(Date.now() / 1000) + 3600 } : null),
 }));
 
 import { customersRouter } from '../worker/src/routes/customers.ts';
@@ -127,7 +118,7 @@ describe('Customer Routes', () => {
       const res = await customersRouter.request('/me', { method: 'GET' }, env);
       expect(res.status).toBe(401);
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/Unauthorized/i);
+      expect(body.code).toBe('SESSION_EXPIRED');
     });
 
     test('returns 401 with invalid token', async () => {
@@ -139,7 +130,7 @@ describe('Customer Routes', () => {
       }, env);
       expect(res.status).toBe(401);
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/Token/);
+      expect(body.code).toBe('SESSION_EXPIRED');
     });
 
     test('returns 404 when customer not found', async () => {

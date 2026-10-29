@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../../index';
+import { staffSessionClaims } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import type { D1Database } from '@cloudflare/workers-types';
 
@@ -32,6 +33,7 @@ function makeMockDb(customHandlers?: Array<{ match: (sql: string) => boolean; ro
           return stmt;
         },
         first: async () => {
+          if (/FROM users WHERE id/i.test(sql)) return { id: 'usr-1', name: 'Owner', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 };
           if (customHandlers) {
             const h = customHandlers.find(x => x.match(sql));
             if (h) return h.row ?? (h.rows ? h.rows[0] : null);
@@ -105,7 +107,7 @@ describe('Order Snapshot Contract Integration', () => {
   let token: string;
 
   beforeEach(async () => {
-    token = await generateJWT({ sub: 'usr-1', role: 'owner', name: 'Owner' }, TEST_SECRET);
+    token = await generateJWT({ id: 'usr-1', sub: 'usr-1', role: 'owner', name: 'Owner', ...staffSessionClaims() }, TEST_SECRET, 28800);
   });
 
   it('ignores client prices, calculates server authoritative price and single JSON encodes snapshot', async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '@aura/domain-table';
 import { adminQRRouter } from '../../routes/admin-qr';
 import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../../tree/qr/signer';
-import { createMockEnv, createMockContext, mockRequestWithRole } from '../test-utils';
+import { createMockEnv, createMockContext, isStaffAccountLookup, mockRequestWithRole } from '../test-utils';
 
 const VALID_SECRET = 'qr-signing-secret-2026';
 
@@ -19,12 +19,20 @@ function buildDb(tables: any[] = [], qrRows: any[] = [], qrRow: any = null, tabl
   return {
     prepare: (sql: string) => {
       const stmt: any = {
-        bind() {
+        bind(...args: any[]) {
+          (stmt as any)._bound = args;
           return stmt;
         },
         raw: async() => [],
         run: async() => ({ success: true, changes: 1 }),
         first: async() => {
+          // The session gate reads the account row behind a staff token, so a
+          // staff PATCH on a table cannot be recognised as a live session
+          // unless this lookup answers too.
+          if (isStaffAccountLookup(sql)) {
+            const id = String((stmt as any)._bound?.[0] ?? 'user-staff');
+            return { id, name: `User ${id.replace(/^user-/, '')}`, phone: null, role: id.replace(/^user-/, ''), tenant_id: 'default', is_active: 1, auth_version: 1 };
+          }
           if (sql.includes('table_qr_codes') && sql.includes('WHERE slug')) {
             return qrRow?.row ?? null;
           }

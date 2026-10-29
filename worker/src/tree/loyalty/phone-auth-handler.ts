@@ -6,6 +6,7 @@ import type { Context } from 'hono';
 import { createLogger } from '../../middleware/logger';
 import { generateJWT } from '../../lib/jwt';
 import { phoneAuthSchema } from '../../lib/validators';
+import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import type { Env } from '../../types/env';
 import type { Customer } from '../../types/models';
 import { genId, throttle } from './helpers';
@@ -43,6 +44,15 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
     const db = c.env.AURA_DB;
     const now = new Date().toISOString();
+    let tenantId = 'default';
+    try {
+      tenantId = resolvePilotStore(c.env);
+    } catch (err) {
+      if (err instanceof PilotStoreError) {
+        return c.json({ success: false, code: err.code, error: err.message }, 503);
+      }
+      throw err;
+    }
 
     let customer: Customer | null = null;
     try {
@@ -58,6 +68,26 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     let bonusMessage: string | null = null;
     let isNew = false;
 
+    if (customer) {
+      try {
+        const meta = await db.prepare(
+          'SELECT tenant_id, verified_at FROM customers WHERE id = ?'
+        ).bind(customer.id).first<{ tenant_id?: string | null; verified_at?: string | null }>();
+        if (meta?.tenant_id && meta.tenant_id !== tenantId) {
+          return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+        }
+        if (meta?.verified_at && !body.otp_verified && !body.otp) {
+          return c.json({
+            success: false,
+            code: 'PHONE_VERIFICATION_REQUIRED',
+            error: 'Số điện thoại đã xác thực. Vui lòng xác minh OTP để đăng nhập.',
+          }, 403);
+        }
+      } catch {
+        // Optional metadata columns in partial test schemas
+      }
+    }
+
     if (!customer) {
       isNew = true;
       const id = genId('CUS_');
@@ -65,24 +95,36 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       const name = validated.name || 'Thành viên';
       try {
         await db.prepare(
-          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
-        ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
+          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, tenantId, now, now).run();
       } catch {
         try {
           await db.prepare(
-            'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'
-          ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
+          ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
         } catch {
-          await db.prepare(
-            'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-          ).bind(id, email, name, phone, DEFAULT_TIER, now).run();
+          try {
+            await db.prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'
+            ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+          } catch {
+            await db.prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+            ).bind(id, email, name, phone, DEFAULT_TIER, now).run();
+          }
         }
       }
 
       const wid = genId('wal_');
-      await db.prepare(
-        'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
-      ).bind(wid, id, now, now).run();
+      try {
+        await db.prepare(
+          'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
+        ).bind(wid, id, tenantId, now, now).run();
+      } catch {
+        await db.prepare(
+          'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+        ).bind(wid, id, now, now).run();
+      }
 
       customer = { id, email, name, phone, loyalty_points: 0, lifetime_points: 0, loyalty_tier: DEFAULT_TIER, created_at: now } as Customer;
 
@@ -94,20 +136,35 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
           ).bind(campaign.id).first<{ count: number }>();
 
           if (!campaign.signup_bonus_cap || (grantedCount?.count || 0) < campaign.signup_bonus_cap) {
-            bonusGranted = campaign.signup_bonus_vnd;
+            const candidateBonus = campaign.signup_bonus_vnd;
             const bonusExpiresAt = new Date(Date.now() + 90 * 86400000).toISOString();
-            await db.batch([
-              db.prepare(
-                'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-              ).bind(genId('cbt_'), wid, id, null, 'bonus', bonusGranted, bonusGranted, bonusExpiresAt, campaign.id, `Quà khai truong — ${campaign.name}`, now),
-              db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(bonusGranted, bonusGranted, now, wid),
-              db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, bonusGranted, now),
-              db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', bonusGranted, JSON.stringify({ campaign: campaign.code, position: (grantedCount?.count || 0) + 1, cap: campaign.signup_bonus_cap }), now)
-            ]);
-            bonusMessage = `🚀 B?n duoc t?ng ${bonusGranted.toLocaleString('vi-VN')}d vao vi khai truong AURA!`;
+            const auditMeta = JSON.stringify({ campaign: campaign.code, position: (grantedCount?.count || 0) + 1, cap: campaign.signup_bonus_cap });
+            try {
+              await db.batch([
+                db.prepare(
+                  'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now),
+                db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(candidateBonus, candidateBonus, now, wid),
+                db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, candidateBonus, now),
+                db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', candidateBonus, auditMeta, now)
+              ]);
+            } catch {
+              await db.batch([
+                db.prepare(
+                  'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now),
+                db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(candidateBonus, candidateBonus, now, wid),
+                db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, amount_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, candidateBonus, now),
+                db.prepare('INSERT INTO loyalty_audit_log (customer_id, event_type, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', candidateBonus, auditMeta, now)
+              ]);
+            }
+            bonusGranted = candidateBonus;
+            bonusMessage = `🚀 Bạn được tặng ${bonusGranted.toLocaleString('vi-VN')}đ vào ví khai trương AURA!`;
           }
         }
       } catch (e) {
+        bonusGranted = 0;
+        bonusMessage = null;
         log.error('Signup bonus error (non-fatal):', { message: (e as Error).message });
       }
 
@@ -152,7 +209,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     }
 
     const token = await generateJWT(
-      { email: customer.email || '', name: customer.name || '', id: customer.id, role: 'customer' },
+      { email: customer.email || '', name: customer.name || '', id: customer.id, role: 'customer', tenantId },
       c.env.JWT_SECRET,
       c.env.JWT_EXPIRY_SECONDS
     );

@@ -3,6 +3,10 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { hashPassword } from '../../lib/jwt';
+import { staffSessionErrorResponse, staffTenant } from '../../lib/staff-session';
+import { createStaffIdentity } from '../../lib/staff-login-identity';
+import { authenticateRequest } from '../../lib/staff-session-auth';
+import type { Env } from '../../types/env';
 import { registerStaffSchema } from '../../lib/validators';
 import { generateId, parseJSON } from './helpers';
 
@@ -17,6 +21,12 @@ export async function registerStaff(request: Request, env: Record<string, unknow
       return errorResponse(first.message, 400);
     }
     const { email, password, name, phone, role, tenant_id } = parsed.data;
+    const session = await authenticateRequest(request, env as unknown as Env);
+    if (!session || 'blocked' in session) return errorResponse('Vui lòng đăng nhập', 401);
+    if (!session.account || !['owner', 'admin'].includes(session.account.role)) return errorResponse('Không đủ quyền tạo nhân viên', 403);
+    const actorTenant = staffTenant(session.account);
+    if (tenant_id && tenant_id !== actorTenant) return errorResponse('Không được tạo nhân viên tại cửa hàng khác', 403);
+
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
     const existingUser = await authKV.get(`user:${email}`);
@@ -39,7 +49,7 @@ export async function registerStaff(request: Request, env: Record<string, unknow
     const assignedRole = allowedStaffRoles.has(normalizedRoleInput)
       ? normalizedRoleInput
       : 'staff';
-    const effectiveTenantId = tenant_id || 'default';
+    const effectiveTenantId = actorTenant;
     const now = new Date().toISOString();
 
     const user = {
@@ -50,33 +60,15 @@ export async function registerStaff(request: Request, env: Record<string, unknow
       password: hashedPassword,
       role: assignedRole,
       position: role || assignedRole,
-      tenant_id: tenant_id || undefined,
+      tenant_id: effectiveTenantId,
       active: true,
       created_at: now,
       updated_at: now
     };
 
-    await authKV.put(`user:${email}`, JSON.stringify(user));
-
-    // Always mirror into D1 users so D1-backed staff/shift/attendance/tips routes
-    // and tenant claim resolution stay consistent with AUTH_KV.
-    const dbx = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
-    if (dbx) {
-      try {
-        await dbx.prepare(
-          `INSERT OR IGNORE INTO users (id, email, name, role, phone, password_hash, is_active, tenant_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
-        ).bind(user.id, user.email, user.name, user.role, user.phone, hashedPassword, effectiveTenantId, now, now).run();
-      } catch {
-        try {
-          await dbx.prepare(
-            'INSERT OR IGNORE INTO users (id, name, role, phone, tenant_id) VALUES (?, ?, ?, ?, ?)'
-          ).bind(user.id, user.name, user.role, user.phone, effectiveTenantId).run();
-        } catch (dbError) {
-          log.warn('RegisterStaff D1 mirror failed:', { message: (dbError as Error).message });
-        }
-      }
-    }
+    if (!await createStaffIdentity(env as unknown as Env, user)) return errorResponse('Email đã được đăng ký', 409);
+    await authKV.put(`user:${email}`, JSON.stringify(user)).catch(() => {});
+    await authKV.put(`user:${user.id}`, JSON.stringify(user)).catch(() => {});
 
     return jsonResponse({
       success: true,
@@ -93,6 +85,8 @@ export async function registerStaff(request: Request, env: Record<string, unknow
       message: `Tạo tài khoản ${assignedRole} thành công`
     }, 201);
   } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
     log.error('RegisterStaff error:', { message: (error as Error).message });
     return errorResponse('Tạo tài khoản staff thất bại', 500);
   }

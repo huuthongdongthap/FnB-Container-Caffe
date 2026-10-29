@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createLocalRuntime, ROOT } from './local-runtime.mjs';
+import { createLocalRuntime, ROOT, verificationDir } from './local-runtime.mjs';
 import { runApiFlow } from './local-flow-api.mjs';
 import { runSecurityChecks } from './local-flow-security.mjs';
 import { runBrowserFlow } from './local-flow-browser.mjs';
@@ -50,7 +50,7 @@ try {
   report.finishedAt = new Date().toISOString();
   report.sourceDiffUnchanged = sourceHash() === report.baseline.sourceDiffSha256;
   report.summary = { passed: report.checks.filter(check => check.pass).length, failed: report.checks.filter(check => !check.pass).length, fatal: Boolean(report.fatal) };
-  await writeFile(path.join(ROOT, `plans/261020-1225-payment-kds-remediation/verification/${apiOnly ? 'api-flow-results' : 'local-flow-results'}.json`), JSON.stringify(report, null, 2));
+  await writeFile(path.join(verificationDir(), `${apiOnly ? 'api-flow-results' : 'local-flow-results'}.json`), JSON.stringify(report, null, 2));
   console.log('RESULT', JSON.stringify(report.summary));
   process.exitCode = report.summary.failed || report.summary.fatal ? 1 : 0;
 }

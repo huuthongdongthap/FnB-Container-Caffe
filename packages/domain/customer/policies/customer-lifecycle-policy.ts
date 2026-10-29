@@ -117,10 +117,10 @@ export async function findOrCreateCustomerByIdentifier(input: {
   ).bind(normalized).first<{ id: string }>();
 
   if (matchedCustomer?.id) {
-    // Backfill customer_identities mapping
+    // Backfill customer_identities mapping without stamping verified_at without proof
     await db.prepare(
       'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at) VALUES (?, ?, ?, ?, 1, ?)'
-    ).bind(genCustomerId('ident_'), matchedCustomer.id, identifierType, normalized, nowIso()).run();
+    ).bind(genCustomerId('ident_'), matchedCustomer.id, identifierType, normalized, null).run();
     return { customerId: matchedCustomer.id, created: false };
   }
 
@@ -137,7 +137,7 @@ export async function findOrCreateCustomerByIdentifier(input: {
 
   await db.prepare(
     'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at) VALUES (?, ?, ?, ?, 1, ?)'
-  ).bind(genCustomerId('ident_'), newId, identifierType, normalized, now).run();
+  ).bind(genCustomerId('ident_'), newId, identifierType, normalized, null).run();
 
   return { customerId: newId, created: true };
 }

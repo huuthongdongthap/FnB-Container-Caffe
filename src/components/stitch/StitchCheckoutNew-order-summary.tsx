@@ -199,6 +199,14 @@ export function OrderSummaryPanel({
                 : formatPrice(summary.deliveryFee, locale)}
             </span>
           </div>
+          {(summary.discount ?? 0) > 0 && (
+            <div className="flex justify-between text-emerald-400 text-sm font-body" data-testid="checkout-discount-row">
+              <span>{summary.promoCode ? `Ưu đãi (${summary.promoCode})` : t('stitch.discount', 'Ưu đãi giảm giá')}</span>
+              <span className="font-mono font-semibold">
+                -{formatPrice(summary.discount ?? 0, locale)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between items-baseline pt-4 border-t border-white/10 text-white font-body">
             <span className="text-base font-semibold uppercase tracking-wider">
               {t('stitch.totalAmount', 'Tổng thanh toán')}

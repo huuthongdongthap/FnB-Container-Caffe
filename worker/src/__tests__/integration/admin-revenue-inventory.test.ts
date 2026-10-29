@@ -12,8 +12,31 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getAdminOrders, getStats } from '@aura/domain-order';
-import { createMockDB, createMockEnv, mockRequestWithRole, TEST_JWT_SECRET } from '../test-utils';
+import { createMockDB, createMockEnv, isStaffAccountLookup, mockRequestWithRole, TEST_JWT_SECRET } from '../test-utils';
 import app from '../../index';
+
+/**
+ * The staff-session gate judges a presented token against its account row, so
+ * every staff request in this suite answers the account lookup with the row the
+ * token names — authorization reads the role from the token, but a live session
+ * still requires the account row to exist, be active, and match the version.
+ */
+function staffAccountRow(role: string) {
+  return { id: `user-${role}`, name: `User ${role}`, phone: null, role, tenant_id: 'default', is_active: 1, auth_version: 1 };
+}
+
+/** Statement that answers only the gate's account read. */
+function accountStatement(role: string) {
+  const row = staffAccountRow(role);
+  const stmt: any = {
+    bind: () => stmt,
+    first: async () => row,
+    all: async () => ({ results: [row], success: true, meta: {} }),
+    run: async () => ({ success: true, changes: 0, lastRowId: 0, meta: {} }),
+    raw: async () => [],
+  };
+  return stmt;
+}
 
 describe('Admin DB, Revenue & Inventory Verification', () => {
   beforeEach(() => {
@@ -55,7 +78,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('owner')
+          : chain))
       };
 
       const env = { AURA_DB: mockDb };
@@ -99,7 +126,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('owner')
+          : chain))
       };
 
       const env = { AURA_DB: mockDb };
@@ -141,7 +172,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('owner')
+          : chain))
       };
 
       const env = createMockEnv({ AURA_DB: mockDb });
@@ -189,7 +224,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('staff')
+          : chain))
       };
 
       const env = createMockEnv({ AURA_DB: mockDb });
@@ -218,7 +257,13 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
         all: vi.fn().mockResolvedValue({ results: [] }),
         run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 0 } })
       };
-      const env = createMockEnv({ AURA_DB: { prepare: vi.fn().mockReturnValue(chain) } });
+      const env = createMockEnv({
+        AURA_DB: {
+          // Same rule as the other mocks: the session gate's account read is
+          // answered before the scripted chain so the manager request survives.
+          prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql) ? accountStatement('manager') : chain))
+        } as any
+      });
 
       const customerReq = await mockRequestWithRole('GET', '/api/inventory/items', 'customer');
       const customerRes = await app.fetch(customerReq, env as any);
@@ -230,7 +275,9 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
     });
 
     it('enforces requireAuth on /api/erpnext-pos/* and /api/erpnext-invoices/*', async () => {
-      const env = createMockEnv();
+      // The admin request below must reach the route, so the default DB has to
+      // carry the account row the session gate compares that token against.
+      const env = createMockEnv({ AURA_DB: createMockDB([staffAccountRow('admin')]) });
 
       const unauthPos = new Request('https://test.aura/api/erpnext-pos/products/changed');
       const unauthPosRes = await app.fetch(unauthPos, env as any);
@@ -272,7 +319,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('owner')
+          : chain))
       };
 
       const env = createMockEnv({ AURA_DB: mockDb });
@@ -305,7 +356,11 @@ describe('Admin DB, Revenue & Inventory Verification', () => {
       };
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue(chain)
+        // The session gate's own account read is answered before the
+        // scripted chain, otherwise every staff request reads as revoked.
+        prepare: vi.fn((sql: string) => (isStaffAccountLookup(sql)
+          ? accountStatement('staff')
+          : chain))
       };
 
       const env = createMockEnv({ AURA_DB: mockDb });

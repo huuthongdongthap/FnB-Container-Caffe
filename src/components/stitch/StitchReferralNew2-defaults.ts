@@ -40,22 +40,22 @@ export const DEFAULT_FRIENDS: ReferralFriendEntry[] = [
 ];
 
 export const DEFAULT_HISTORY: RewardHistoryRow[] = [
-  { id: 'h1', date: 'Oct 12, 2023', source: 'Referral Reward (Alex N.)', amount: 15.0 },
-  { id: 'h2', date: 'Oct 01, 2023', source: 'Monthly Bonus Reward', amount: 10.0 },
-  { id: 'h3', date: 'Sept 24, 2023', source: 'Referral Reward (Marcus C.)', amount: 15.0 },
-  { id: 'h4', date: 'Aug 15, 2023', source: 'Account Verified', amount: 5.0 },
+  { id: 'h1', date: 'Oct 12, 2023', source: 'Referral Reward (Alex N.)', amount: 10000 },
+  { id: 'h2', date: 'Oct 01, 2023', source: 'Monthly Bonus Reward', amount: 10000 },
+  { id: 'h3', date: 'Sept 24, 2023', source: 'Referral Reward (Marcus C.)', amount: 10000 },
+  { id: 'h4', date: 'Aug 15, 2023', source: 'Welcome Referral Bonus', amount: 5000 },
 ];
 
 export const DEFAULT_REFERRAL_DATA: ReferralPageData = {
-  rewardAmount: 15.0,
+  rewardAmount: 10000,
   referralCode: 'AURA-VIP-2024-X',
   currentReferrals: 3,
   targetReferrals: 5,
   progressPercent: 60,
-  nextBonusAmount: 50.0,
-  nextBonusLabel: 'Unlock a $50 Premium Reserve credit upon reaching 5 referrals.',
+  nextBonusAmount: 50000,
+  nextBonusLabel: 'Nhận 10.000đ cho người giới thiệu và 5.000đ cho bạn mới ngay sau đơn đầu tiên thanh toán thành công.',
   memberTier: 'SILVER MEMBER',
-  totalEarned: 45.0,
+  totalEarned: 30000,
   friends: DEFAULT_FRIENDS,
   rewardHistory: DEFAULT_HISTORY,
 };

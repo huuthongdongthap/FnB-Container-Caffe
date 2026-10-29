@@ -17,7 +17,7 @@ function mockError(message: string) {
 
 describe('useAdminStaffStore', () => {
   beforeEach(() => {
-    useAdminStaffStore.setState({ staff: [], loading: false, error: null });
+    useAdminStaffStore.setState({ staff: [], loading: false, error: null, pendingToggles: new Set() });
     vi.restoreAllMocks();
     mockApiFetch.mockReset();
   });
@@ -116,5 +116,149 @@ describe('useAdminStaffStore', () => {
         password: 'pass123',
       }),
     });
+  });
+});
+
+describe('toggleStaffActive', () => {
+  const seedStaff = () => [
+    { id: 'S001', name: 'A', role: 'staff', phone: '', email: '', isActive: true, startedAt: '' },
+    { id: 'S002', name: 'B', role: 'staff', phone: '', email: '', isActive: true, startedAt: '' },
+  ];
+
+  beforeEach(() => {
+    useAdminStaffStore.setState({
+      staff: seedStaff(),
+      loading: false,
+      error: null,
+      pendingToggles: new Set<string>(),
+    });
+    vi.restoreAllMocks();
+    mockApiFetch.mockReset();
+  });
+
+  it('commits server state after a successful write', async () => {
+    const refetch = vi.fn().mockResolvedValue([]);
+    mockApiFetch.mockResolvedValueOnce({}).mockImplementation((path: string) =>
+      path === '/api/auth/staff' ? refetch() : Promise.resolve({}),
+    );
+
+    await useAdminStaffStore.getState().toggleStaffActive('S001');
+
+    expect(mockApiFetch).toHaveBeenNthCalledWith(1, '/api/staff/S001', {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive: false, is_active: 0, active: false }),
+    });
+    // Server is authoritative only after the write is accepted.
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(useAdminStaffStore.getState().pendingToggles.size).toBe(0);
+  });
+
+  it('reverts optimistic state and surfaces the error when the write fails', async () => {
+    // Write fails; the post-failure refetch returns the server's list unchanged.
+    mockApiFetch.mockRejectedValueOnce(new Error('Quyền không đủ')).mockResolvedValueOnce(seedStaff());
+
+    await expect(useAdminStaffStore.getState().toggleStaffActive('S001')).rejects.toThrow('Quyền không đủ');
+
+    const s = useAdminStaffStore.getState();
+    expect(s.staff.find((m) => m.id === 'S001')?.isActive).toBe(true);
+    expect(s.error).toContain('Quyền không đủ');
+    expect(s.pendingToggles.size).toBe(0);
+  });
+
+  it('refetches after a failed write to reconcile with the server', async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error('500')).mockResolvedValueOnce([
+      { id: 'S001', name: 'A', role: 'staff', phone: '', email: '', isActive: true, startedAt: '' },
+      { id: 'S002', name: 'B', role: 'staff', phone: '', email: '', isActive: true, startedAt: '' },
+    ]);
+
+    await expect(useAdminStaffStore.getState().toggleStaffActive('S001')).rejects.toThrow('500');
+
+    expect(mockApiFetch).toHaveBeenNthCalledWith(2, '/api/auth/staff');
+    expect(useAdminStaffStore.getState().error).toContain('500');
+  });
+
+  it('keeps the rolled-back snapshot when the post-failure refetch also fails', async () => {
+    mockApiFetch
+      .mockRejectedValueOnce(new Error('Write rejected'))
+      .mockRejectedValueOnce(new Error('Network down'));
+
+    await expect(useAdminStaffStore.getState().toggleStaffActive('S001')).rejects.toThrow('Write rejected');
+
+    const s = useAdminStaffStore.getState();
+    expect(s.staff.find((m) => m.id === 'S001')?.isActive).toBe(true);
+    // The original write failure stays the reported cause, not the refetch echo.
+    expect(s.error).toContain('Write rejected');
+  });
+
+  it('drops a concurrent second toggle for the same staff id', async () => {
+    let release!: () => void;
+    mockApiFetch.mockImplementationOnce(() => new Promise((r) => { release = () => r({}); }));
+
+    const first = useAdminStaffStore.getState().toggleStaffActive('S001');
+    expect(useAdminStaffStore.getState().pendingToggles.has('S001')).toBe(true);
+
+    // Second toggle for the same id is ignored while the first is in flight.
+    await useAdminStaffStore.getState().toggleStaffActive('S001');
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+
+    release();
+    await first;
+    expect(useAdminStaffStore.getState().pendingToggles.size).toBe(0);
+  });
+
+  it('allows toggling two different staff members concurrently', async () => {
+    const settles: Array<() => void> = [];
+    mockApiFetch.mockImplementationOnce(() => new Promise((r) => { settles.push(() => r({})); }));
+    mockApiFetch.mockImplementationOnce(() => new Promise((r) => { settles.push(() => r({})); }));
+    // Refetch after each accepted write resolves immediately.
+    mockApiFetch.mockResolvedValue([]);
+
+    const a = useAdminStaffStore.getState().toggleStaffActive('S001');
+    const b = useAdminStaffStore.getState().toggleStaffActive('S002');
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    settles.forEach((resolve) => resolve());
+    await Promise.all([a, b]);
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/staff/S002', expect.objectContaining({ method: 'PATCH' }));
+  });
+
+  it('ignores a toggle for an id that is not in the list', async () => {
+    await useAdminStaffStore.getState().toggleStaffActive('UNKNOWN');
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not let an older refetch overwrite another staff member newer confirmed save', async () => {
+    let releaseOlder!: (value: unknown) => void;
+    let reads = 0;
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path !== '/api/auth/staff') return Promise.resolve({});
+      reads++;
+      if (reads === 1) return new Promise(resolve => { releaseOlder = resolve; });
+      return Promise.resolve(seedStaff().map(member => ({ ...member, isActive: false })));
+    });
+    const a = useAdminStaffStore.getState().toggleStaffActive('S001');
+    await vi.waitFor(() => expect(reads).toBe(1));
+    await useAdminStaffStore.getState().toggleStaffActive('S002');
+    releaseOlder(seedStaff().map(member => member.id === 'S001' ? { ...member, isActive: false } : member));
+    await a;
+    expect(useAdminStaffStore.getState().staff.map(member => member.isActive)).toEqual([false, false]);
+  });
+
+  it('preserves B pending state through A refetch when B later saves but its refetch fails', async () => {
+    let releaseB!: () => void;
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/api/staff/S002') return new Promise(resolve => { releaseB = () => resolve({}); });
+      if (path === '/api/staff/S001') return Promise.resolve({});
+      return Promise.resolve(seedStaff().map(member => member.id === 'S001' ? { ...member, isActive: false } : member));
+    });
+    const b = useAdminStaffStore.getState().toggleStaffActive('S002');
+    await useAdminStaffStore.getState().toggleStaffActive('S001');
+    expect(useAdminStaffStore.getState().staff[1]?.isActive).toBe(false);
+    mockApiFetch.mockRejectedValueOnce(new Error('Refetch unavailable'));
+    releaseB();
+    await b;
+    expect(useAdminStaffStore.getState().staff[1]?.isActive).toBe(false);
+    expect(useAdminStaffStore.getState().error).toBe('Refetch unavailable');
   });
 });

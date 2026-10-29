@@ -52,13 +52,16 @@ export async function getEventsAfter(
 
 export async function fetchOrderRecord(
   db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: () => Promise<unknown> } } },
-  orderId: string
+  orderId: string,
+  tenantId?: string
 ): Promise<Record<string, unknown> | null> {
+  const scope = tenantId === undefined ? '' : ' AND o.tenant_id = ?';
+  const values = tenantId === undefined ? [orderId] : [orderId, tenantId];
   const withTable = (await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?`
-  ).bind(orderId).first()) as Record<string, unknown> | null;
+     FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?${scope}`
+  ).bind(...values).first()) as Record<string, unknown> | null;
 
   if (withTable) return withTable;
-  return (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first()) as Record<string, unknown> | null;
+  return (await db.prepare(`SELECT * FROM orders WHERE id = ?${tenantId === undefined ? '' : ' AND tenant_id = ?'}`).bind(...values).first()) as Record<string, unknown> | null;
 }

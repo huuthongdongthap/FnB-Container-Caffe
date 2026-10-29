@@ -131,7 +131,8 @@ export function useHandleViewCart({
           customer_name: guestName.trim(),
           customer_phone: normalizePhone(guestPhone).trim(),
           customer_address: '',
-          payment_method: 'cod',
+          order_type: (hasValidTable && tableId ? 'dine_in' : 'takeaway') as 'dine_in' | 'takeaway',
+          payment_method: 'cod' as const,
           table_id: hasValidTable && tableId ? tableId : undefined,
         };
 

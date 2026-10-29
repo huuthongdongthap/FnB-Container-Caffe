@@ -1,9 +1,12 @@
+// @vitest-environment node
 /**
  * Unit tests for auth routes (register, login, logout, getCurrentUser)
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { registerUser, registerWithVerification, verifyEmail, loginUser, logoutUser, getCurrentUser, bootstrapOwner, registerStaff, listStaff, expiresAtFromNow } from '../../routes/auth';
+import { staffSessionFixture } from '../helpers/staff-session-fixture';
+import { paymentSqliteDB } from '../helpers/payment-sqlite-db';
 import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
 
 function mockRequest(method: string, path: string, body?: unknown): Request {
@@ -107,9 +110,13 @@ describe('logoutUser', () => {
   });
 });
 
+const sqliteDatabases: Array<{ close(): void }> = [];
+afterEach(() => { for (const db of sqliteDatabases.splice(0)) db.close(); });
+
 describe('bootstrapOwner', () => {
   it('creates first owner', async() => {
-    const env = createMockEnv();
+    const db = paymentSqliteDB({ canonicalStaff: true }); sqliteDatabases.push(db.sqlite);
+    const env = createMockEnv({ AURA_DB: db.db });
     const req = mockRequest('POST', '/api/auth/bootstrap', { email: 'owner@test.com', password: 'Owner1234!', name: 'Owner' });
     const res = await bootstrapOwner(req, env);
     expect(res.status).toBe(201);
@@ -197,106 +204,31 @@ describe('verifyEmail & registerWithVerification hardening', () => {
     expect(await verifyPassword('WrongPass123!', hash)).toBe(false);
   });
 
-  it('registerStaff mirrors new staff into D1 users even without tenant_id and listStaff returns normalized staff + users', async() => {
-    const env = createMockEnv();
-    const d1Inserted: Array<{ sql: string; args: unknown[] }> = [];
-    (env as any).AURA_DB = {
-      prepare: (sql: string) => ({
-        bind: (...args: unknown[]) => ({
-          run: async () => {
-            d1Inserted.push({ sql, args });
-            return { rowCount: 1 };
-          },
-          all: async () => ({ results: [] }),
-        }),
-        all: async () => ({
-          results: [
-            {
-              id: 'USR_D1_SEED',
-              email: 'd1staff@aura.vn',
-              name: 'D1 Seeded Staff',
-              phone: '0905556666',
-              role: 'manager',
-              is_active: 1,
-              created_at: '2026-10-10T08:00:00Z',
-            },
-          ],
-        }),
-      }),
-    };
-
-    const regReq = mockRequest('POST', '/api/auth/register-staff', {
-      email: 'barista1@aura.vn',
-      password: 'StaffPass123!',
-      name: 'Barista One',
-      phone: '0901234567',
-      role: 'Barista',
+  it('registerStaff writes canonical tenant authority and listStaff returns normalized staff + users', async() => {
+    const f = staffSessionFixture(); sqliteDatabases.push(f.sqlite);
+    const token = await f.token('owner');
+    const req = mockRequestWithHeader('POST', '/api/auth/register-staff', { Authorization: `Bearer ${token}` }, {
+      email: 'barista1@aura.vn', password: 'StaffPass123!', name: 'Barista One', phone: '0901234567', role: 'Barista',
     });
-    const regRes = await registerStaff(regReq, env as unknown as Record<string, unknown>);
-    expect(regRes.status).toBe(201);
-    expect(d1Inserted.length).toBeGreaterThanOrEqual(1);
-    expect(d1Inserted[0].sql).toContain('INSERT OR IGNORE INTO users');
-
-    const listReq = mockRequest('GET', '/api/auth/staff');
-    const listRes = await listStaff(listReq, env as unknown as Record<string, unknown>);
-    expect(listRes.status).toBe(200);
-    const listBody = await listRes.json() as {
-      success: boolean;
-      users: Array<Record<string, unknown>>;
-      staff: Array<Record<string, unknown>>;
-    };
-    expect(listBody.success).toBe(true);
-    expect(listBody.users.length).toBe(2);
-    expect(listBody.staff.length).toBe(2);
-    const kvStaff = listBody.staff.find((s) => s.email === 'barista1@aura.vn');
-    expect(kvStaff).toMatchObject({
-      name: 'Barista One',
-      role: 'Barista',
-      isActive: true,
-    });
-    const d1Staff = listBody.staff.find((s) => s.email === 'd1staff@aura.vn');
-    expect(d1Staff).toMatchObject({
-      id: 'USR_D1_SEED',
-      name: 'D1 Seeded Staff',
-      role: 'manager',
-      isActive: true,
-    });
+    const registered = await registerStaff(req, f.env);
+    expect(registered.status).toBe(201);
+    const created = (await registered.json()).user;
+    expect(f.sqlite.prepare('SELECT role, tenant_id, auth_version FROM users WHERE id = ?').get(created.id))
+      .toMatchObject({ role: 'barista', tenant_id: 'cafe-a', auth_version: 1 });
+    const list = await listStaff(mockRequestWithHeader('GET', '/api/auth/staff', { Authorization: `Bearer ${token}` }), f.env);
+    expect(list.status).toBe(200);
+    const body = await list.json();
+    expect(body.staff).toEqual(body.users);
+    expect(body.staff.find((row: any) => row.id === created.id))
+      .toMatchObject({ email: 'barista1@aura.vn', name: 'Barista One', role: 'barista', isActive: true });
+    expect(body.staff.map((row: any) => row.id)).not.toContain('other');
   });
 
-  it('getCurrentUser falls back to D1 users lookup for mobile staff JWT without email claim', async() => {
-    const { generateJWT } = await import('../../lib/jwt');
-    const env = createMockEnv();
-    (env as any).AURA_DB = {
-      prepare: (sql: string) => ({
-        bind: (...args: unknown[]) => ({
-          first: async () => {
-            if (sql.includes('FROM users WHERE id = ?') && args[0] === 'USR_MOB_99') {
-              return {
-                id: 'USR_MOB_99',
-                email: 'waiter99@aura.vn',
-                name: 'Waiter 99',
-                phone: '0909998888',
-                role: 'waiter',
-              };
-            }
-            return null;
-          },
-        }),
-      }),
-    };
-
-    const mobileToken = await generateJWT({ id: 'USR_MOB_99', role: 'waiter' }, TEST_JWT_SECRET, '8h');
-    const meReq = mockRequestWithHeader('GET', '/mobile/me', { Authorization: `Bearer ${mobileToken}` });
-    const meRes = await getCurrentUser(meReq, env);
-    expect(meRes.status).toBe(200);
-    const meBody = await meRes.json() as { success: boolean; user: Record<string, unknown> };
-    expect(meBody.success).toBe(true);
-    expect(meBody.user).toMatchObject({
-      id: 'USR_MOB_99',
-      email: 'waiter99@aura.vn',
-      name: 'Waiter 99',
-      phone: '0909998888',
-      role: 'waiter',
-    });
+  it('getCurrentUser reads canonical mobile Staff authority without an email column or KV profile', async() => {
+    const f = staffSessionFixture(); sqliteDatabases.push(f.sqlite);
+    const token = await f.token('staff', true);
+    const response = await getCurrentUser(mockRequestWithHeader('GET', '/mobile/me', { Authorization: `Bearer ${token}` }), f.env);
+    expect(response.status).toBe(200);
+    expect((await response.json()).user).toMatchObject({ id: 'staff', email: '', name: 'Name staff', role: 'staff', tenantId: 'cafe-a' });
   });
 });

@@ -1,3 +1,4 @@
+import { invalidateClientSession, sessionErrorRequiresLogin } from './client-session';
 import { logger } from '@/lib/logger';
 
 export const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? '' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev');
@@ -6,17 +7,20 @@ interface ApiError {
   status: number;
   message: string;
   errors?: Record<string, string[]>;
+  code?: string;
 }
 
 export class ApiClientError extends Error {
   status: number;
   errors?: Record<string, string[]>;
+  code?: string;
 
-  constructor({ status, message, errors }: ApiError) {
+  constructor({ status, message, errors, code }: ApiError) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.errors = errors;
+    this.code = code;
   }
 }
 
@@ -143,7 +147,11 @@ export async function apiFetch<T = unknown>(
       status: res.status,
       message,
       errors: body.errors,
+      code: body.code,
     });
+    const presentedToken = headers.Authorization?.replace(/^Bearer /, '');
+    const publicAuthAction = /\/(?:auth|mobile)\/(?:login|register|bootstrap-owner|reset-password|forgot-password|verify-email)(?:[?]|$)/.test(path);
+    if (presentedToken && !publicAuthAction && sessionErrorRequiresLogin(res.status, body.code)) invalidateClientSession(presentedToken, message);
     reportError(apiError, path, fetchOptions.method ?? 'GET', silent);
     throw apiError;
   }

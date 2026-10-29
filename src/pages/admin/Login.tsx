@@ -34,7 +34,11 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
           throw new Error(authError);
         }
       }
-      onSuccess ? onSuccess() : navigate('/admin');
+      const loggedInUser = useAuthStore.getState().user;
+      const defaultTarget = loggedInUser && ['kitchen', 'barista', 'chef', 'bep'].includes(loggedInUser.role)
+        ? '/kds'
+        : '/admin';
+      onSuccess ? onSuccess() : navigate(defaultTarget);
       setStatus('success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('adminLogin.loginFailed');

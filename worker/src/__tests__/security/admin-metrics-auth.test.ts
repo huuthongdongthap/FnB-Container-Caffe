@@ -10,9 +10,11 @@ import { createMockKV } from '../test-utils';
 
 const TEST_JWT_SECRET = 'test-jwt-secret-at-least-16-chars';
 
-function createTestEnv(overrides?: Record<string, unknown>) {
+function createTestEnv(staffAccount?: Record<string, unknown>, overrides?: Record<string, unknown>) {
+  const db = createStubDB();
+  if (staffAccount) setStaffAccount(db, staffAccount);
   return {
-    AURA_DB: createStubDB(),
+    AURA_DB: db,
     AUTH_KV: createMockKV() as any,
     JWT_SECRET: TEST_JWT_SECRET,
     JWT_EXPIRY_SECONDS: '3600',
@@ -20,7 +22,23 @@ function createTestEnv(overrides?: Record<string, unknown>) {
   } as any;
 }
 
+/** Point the account lookup at the row a staff token should be judged against. */
+function setStaffAccount(db: ReturnType<typeof createStubDB>, row: Record<string, unknown>) {
+  (db as unknown as { _staffState: { staffAccount: Record<string, unknown> | null } })._staffState.staffAccount = row;
+}
+
 function createStubDB() {
+  // The session gate reads the staff account row behind a token, so a lookup by
+  // id has to answer with the account the presented token names. Declared before
+  // the statements so their closures can read it without a use-before-init error.
+  const state: { staffAccount: Record<string, unknown> | null } = { staffAccount: null };
+  const accountStmt = {
+    bind: () => accountStmt,
+    first: async() => state.staffAccount,
+    all: async() => ({ results: [] }),
+    run: async() => ({ meta: { changes: 1 } }),
+    raw: async() => []
+  };
   const stmt = {
     bind: () => stmt,
     first: async() => null,
@@ -28,12 +46,17 @@ function createStubDB() {
     run: async() => ({ meta: { changes: 0 } }),
     raw: async() => []
   };
-  return {
-    prepare: () => stmt,
+  const db = {
+    _staffState: state,
+    prepare: (sql: string) => {
+      if (/FROM users WHERE id = \?/i.test(sql)) return accountStmt as any;
+      return stmt;
+    },
     batch: async() => [],
     exec: async() => ({ count: 0, duration: 0 }),
     dump: async() => new Uint8Array()
   };
+  return db;
 }
 
 /**
@@ -45,7 +68,7 @@ async function signTestJwt(payload: Record<string, unknown>, secret: string): Pr
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const payloadB64 = btoa(JSON.stringify({
-    ...payload,
+    ...payload, id: payload.id || payload.sub,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 3600
   })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -92,8 +115,8 @@ describe('admin-metrics security', () => {
   });
 
   it('returns 200 with valid owner token', async() => {
-    const env = createTestEnv();
-    const token = await signTestJwt({ sub: 'USR_1', role: 'owner' }, TEST_JWT_SECRET);
+    const env = createTestEnv({ id: 'USR_1', name: 'Owner', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 });
+    const token = await signTestJwt({ sub: 'USR_1', role: 'owner', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_JWT_SECRET);
     const res = await app.request('/api/admin/metrics?range=24h', {
       headers: { Authorization: `Bearer ${token}` }
     }, env);
@@ -101,8 +124,8 @@ describe('admin-metrics security', () => {
   });
 
   it('returns 200 with valid staff token', async() => {
-    const env = createTestEnv();
-    const token = await signTestJwt({ sub: 'USR_2', role: 'staff' }, TEST_JWT_SECRET);
+    const env = createTestEnv({ id: 'USR_2', name: 'Staff', phone: null, role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 });
+    const token = await signTestJwt({ sub: 'USR_2', role: 'staff', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_JWT_SECRET);
     const res = await app.request('/api/admin/metrics?range=24h', {
       headers: { Authorization: `Bearer ${token}` }
     }, env);

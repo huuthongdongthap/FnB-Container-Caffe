@@ -102,6 +102,42 @@ export async function updateOrder(
     log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
   }
 
+      // Reverse loyalty accrual if order had already earned points/cashback
+      try {
+        const earnRow = await db.prepare(
+          "SELECT customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+        ).bind(id).first<{ customer_id: string; amount: number }>();
+        if (earnRow?.customer_id) {
+          const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
+          const policy = await loadPolicy(db).catch(() => null);
+          if (policy) {
+            await reverseAccrual(db, policy, {
+              orderId: id,
+              customerId: earnRow.customer_id,
+              refundAmountVnd: Number(results[0]?.total ?? 0),
+              reason: 'order_cancelled',
+            });
+          }
+        }
+      } catch (revAccErr) {
+        log.warn('Loyalty accrual reversal error (non-blocking):', { message: (revAccErr as Error).message, orderId: id });
+      }
+
+      // Release promotion redemption usage count if redeemed on this order
+      try {
+        const redRow = await db.prepare(
+          'SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
+        ).bind(id).first<{ promotion_id?: string; code?: string }>();
+        if (redRow && (redRow.promotion_id || redRow.code)) {
+          await db.prepare(
+            'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
+          ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+          await db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(id).run().catch(() => {});
+        }
+      } catch {
+        // Optional promotion_redemptions table in partial schemas
+      }
+
       let refRow: { id: string } | null = null;
       try {
         refRow = await db.prepare(
@@ -112,7 +148,7 @@ export async function updateOrder(
       }
       if (refRow) {
         try {
-          const { reverseReferralCashback } = await import('worker/src/routes/referrals');
+          const { reverseReferralCashback } = await import('@aura/domain-crm');
           await reverseReferralCashback(db, refRow.id);
         } catch (revErr) {
           log.error('Reverse cashback error (non-blocking):', { message: (revErr as Error).message });
@@ -173,21 +209,26 @@ if (['served', 'completed'].includes(body.status as string)) {
 
       try {
         const order = await db.prepare(
-          'SELECT total, customer_email, customer_phone FROM orders WHERE id = ?'
-        ).bind(id).first<{ total: number; customer_email: string | null; customer_phone: string | null }>();
+          'SELECT total, payment_status, customer_id, customer_email, customer_phone FROM orders WHERE id = ?'
+        ).bind(id).first<{ total: number; payment_status?: string | null; customer_id?: string | null; customer_email: string | null; customer_phone: string | null }>();
 
-        if (order && order.total >= 20000) {
-          const customer = await db.prepare(
-            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-          ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
+        if (order && order.total >= 20000 && (!order.payment_status || order.payment_status === 'paid')) {
+          let customerId = order.customer_id || null;
+          if (!customerId) {
+            const customer = await db.prepare(
+              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+            ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
+            customerId = customer?.id || null;
+          }
 
-          if (customer) {
-            const { processReferralCashbackOnFirstOrder } = await import('worker/src/routes/referrals');
-            const result = await processReferralCashbackOnFirstOrder(
-              db, customer.id, id, order.total
+          if (customerId) {
+            const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+            const refPolicy = await resolveReferralPolicy(env.AUTH_KV as any).catch(() => DEFAULT_REFERRAL_POLICY);
+            const result = await rewardReferralOnFirstOrder(
+              db, customerId, id, order.total, refPolicy
             );
             if (result.success) {
-              log.info('Refer v3: +10k cashback granted', { customer_id: customer.id });
+              log.info('Refer v3: +10k cashback granted', { customer_id: customerId });
             }
           }
         }

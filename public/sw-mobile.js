@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aura-mobile-v1';
+const CACHE_NAME = 'aura-mobile-v2';
 const STATIC_ASSETS = [
   '/',
   '/mobile',
@@ -27,18 +27,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
-
-  // API: network-first
-  if (url.pathname.startsWith('/mobile/api/') || url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, clone));
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
+  // Authenticated responses and mobile API aliases must never survive logout.
+  // A network failure stays a failure; an old user's cached body is not a fallback.
+  if (req.method !== 'GET' || req.headers.has('Authorization')
+      || url.pathname.startsWith('/api/')
+      || url.pathname.startsWith('/mobile/')) {
+    event.respondWith(fetch(req));
     return;
   }
 

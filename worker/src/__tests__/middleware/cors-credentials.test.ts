@@ -19,10 +19,11 @@ describe('CORS — Credential Reflection & Error Handling', () => {
       expect(getCorsOrigin('https://pos.auracafe.vn')).toBe('https://pos.auracafe.vn');
     });
 
-    it('falls back to default origin when untrusted origin is passed', () => {
-      expect(getCorsOrigin('https://malicious-site.com')).toBe('http://localhost:5173');
-      expect(getCorsOrigin(null)).toBe('http://localhost:5173');
-      expect(getCorsOrigin(undefined)).toBe('http://localhost:5173');
+    it('rejects untrusted origins by returning false so no ACAO is emitted', () => {
+      expect(getCorsOrigin('https://malicious-site.com')).toBe(false);
+      expect(getCorsOrigin(null)).toBe(false);
+      expect(getCorsOrigin(undefined)).toBe(false);
+      expect(getCorsOrigin('https://auracafe.vn.evil.com')).toBe(false);
     });
   });
 
@@ -34,21 +35,38 @@ describe('CORS — Credential Reflection & Error Handling', () => {
       expect(headers.Vary).toBe('Origin');
     });
 
-    it('replaces wildcard * with safe default origin when withCredentials is true', () => {
+    it('replaces wildcard * with no ACAO when withCredentials is true (spec-invalid to echo * with credentials)', () => {
       const headers = corsHeaders('*', true);
-      expect(headers['Access-Control-Allow-Origin']).not.toBe('*');
-      expect(headers['Access-Control-Allow-Origin']).toBe('http://localhost:5173');
-      expect(headers['Access-Control-Allow-Credentials']).toBe('true');
+      expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Credentials']).toBeUndefined();
+    });
+
+    it('omits ACAO and credentials entirely for a rejected origin', () => {
+      const headers = corsHeaders(false, true);
+      expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Credentials']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Methods']).toBeDefined();
+    });
+
+    it('reflects the real production frontend origin', () => {
+      const headers = corsHeaders('https://fnb-caffe-container.pages.dev', true);
+      expect(headers['Access-Control-Allow-Origin']).toBe('https://fnb-caffe-container.pages.dev');
     });
   });
 
   describe('errorResponse', () => {
+    it('emits no ACAO when the caller origin is not allowlisted', () => {
+      const res = errorResponse('Forbidden', 403, {}, 'https://malicious-site.com');
+      expect(res.status).toBe(403);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+    });
+
     it('never emits wildcard * origin when returning error responses', () => {
       const res = errorResponse('Bad Request', 400);
       expect(res.status).toBe(400);
-      expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
-      expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
-      expect(res.headers.get('Vary')).toBe('Origin');
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
     });
 
     it('dynamically reflects caller origin when valid', () => {

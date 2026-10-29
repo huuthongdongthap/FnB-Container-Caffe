@@ -92,10 +92,22 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Every alias uses the same tenant-scoped state machine and compare-and-set.
   app.patch('/api/admin/orders/:id/status', handleUpdateOrderStatus);
   app.post('/api/admin/orders/:id/complete', (c) => handleUpdateOrderStatus(c, 'completed'));
-  app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
-  app.post('/api/admin/customers', (c) => createAdminCustomer(c.req.raw, c.env));
-  app.patch('/api/admin/customers/:id', (c) => updateAdminCustomer(c.req.raw, c.env, c.req.param('id')));
-  app.delete('/api/admin/customers/:id', (c) => deleteAdminCustomer(c.env, c.req.param('id')));
+  app.get('/api/admin/customers', (c) => {
+    const user = c.get('user' as any) as { tenantId?: string } | undefined;
+    return getAdminCustomers(c.req.raw, c.env, user?.tenantId);
+  });
+  app.post('/api/admin/customers', requireAuth(['owner', 'manager', 'admin']), (c) => {
+    const user = c.get('user' as any) as { tenantId?: string } | undefined;
+    return createAdminCustomer(c.req.raw, c.env, user?.tenantId);
+  });
+  app.patch('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'admin']), (c) => {
+    const user = c.get('user' as any) as { tenantId?: string } | undefined;
+    return updateAdminCustomer(c.req.raw, c.env, c.req.param('id'), user?.tenantId);
+  });
+  app.delete('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'admin']), (c) => {
+    const user = c.get('user' as any) as { tenantId?: string } | undefined;
+    return deleteAdminCustomer(c.env, c.req.param('id'), user?.tenantId);
+  });
   app.get('/api/admin/payments/stuck', requireAuth(['owner', 'manager', 'admin']), (c) => getStuckPayments(c.req.raw, c.env));
   app.route('/api/admin/dindin', dindinRouter);
   app.route('/api/admin/sales', adminSalesRouter);

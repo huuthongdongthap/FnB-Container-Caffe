@@ -7,7 +7,34 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ordersRouter } from '../../routes/orders-hono';
-import { createMockEnv, createMockDB, mockRequestWithRole } from '../test-utils';
+import { generateJWT } from '../../lib/jwt';
+import { createMockEnv, createMockDB, isStaffAccountLookup, STAFF_ACCOUNT_ROW, TEST_JWT_SECRET } from '../test-utils';
+
+/**
+ * Staff token for /checkout: carries the session claims the request-time
+ * staff-session gate requires, and names an account row the stub below answers.
+ */
+async function staffCheckoutToken(overrides: Record<string, unknown> = {}) {
+  return generateJWT({
+    id: STAFF_ACCOUNT_ROW.id,
+    email: 'staff@test.aura',
+    name: STAFF_ACCOUNT_ROW.name,
+    role: STAFF_ACCOUNT_ROW.role,
+    authVersion: 1,
+    authTime: Math.floor(Date.now() / 1000),
+    sessionType: 'staff-web',
+    ...overrides,
+  } as import('../../lib/jwt').JwtPayload, TEST_JWT_SECRET, 28800);
+}
+
+function authRequest(path: string, body: unknown, token: string) {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  };
+}
+
 function stubDB(overrides: {
   insertOrder?: { id: string; total: number };
   table?: { id: string; status: string };
@@ -26,6 +53,7 @@ function stubDB(overrides: {
         return stmt;
       },
       all: async() => ({ results: [], success: true }),
+      raw: async() => [],
       run: async() => {
   const sql = stmt._sql || '';
   if (sql.includes('INSERT INTO orders')) {
@@ -38,6 +66,11 @@ function stubDB(overrides: {
 },
       first: async() => {
         const q = stmt._sql || '';
+        // Account lookup behind the staff-session gate — answer with the row
+        // the token's claims describe, or the gate revokes the session.
+        if (isStaffAccountLookup(q)) {
+          return { ...STAFF_ACCOUNT_ROW };
+        }
         if (q.includes('FROM cafe_tables WHERE table_number = ?') || q.includes('FROM cafe_tables WHERE id = ?')) {
           if (noTable) {
             return null;
@@ -99,13 +132,13 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 201 with order data on valid input', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = await mockRequestWithRole('POST', '/api/orders/checkout', 'staff', {
+      const req = authRequest('/checkout', {
         items: [{ product_id: 'p1', price: 25000, quantity: 2 }],
         total: 50000,
         customer_name: 'Nguyễn Văn A',
         customer_phone: '0909123456',
         payment_method: 'cod'
-      });
+      }, await staffCheckoutToken());
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(201);
       const body = await res.json() as Record<string, unknown>;
@@ -117,13 +150,13 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 400 when items array is empty', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = await mockRequestWithRole('POST', '/api/orders/checkout', 'staff', {
+      const req = authRequest('/checkout', {
         items: [],
         total: 0,
         customer_name: 'Test',
         customer_phone: '0909000000',
         payment_method: 'cod'
-      });
+      }, await staffCheckoutToken());
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(400);
     });

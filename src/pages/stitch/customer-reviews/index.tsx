@@ -7,6 +7,9 @@ import { FILTERS, REVIEWS } from './review-constants';
 import { ReviewCard } from './review-card';
 import { PenLine, Star, Sparkles } from 'lucide-react';
 
+export const GOOGLE_WRITE_REVIEW_URL =
+  'https://search.google.com/local/writereview?placeid=ChIJeZC6BAB_CjERkByXCzIAo-g';
+
 function parseReviewDate(dateStr: string): number {
   const m = dateStr.match(/(\d{1,2})\s+Thg\s+(\d{1,2}),\s*(\d{4})/i);
   if (m) {
@@ -68,10 +71,10 @@ export default function CustomerReviews() {
           </div>
 
           <a
-            href="https://maps.app.goo.gl/KMKbeDY4gM2FBBpw9"
+            href={GOOGLE_WRITE_REVIEW_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] flex items-center gap-2.5 px-8 py-3.5 rounded-full font-body text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-xl active:scale-95 shrink-0"
+            className="bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] flex items-center justify-center gap-2.5 w-full sm:w-auto min-h-[44px] px-8 py-3.5 rounded-full font-body text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-xl active:scale-95 shrink-0"
           >
             <PenLine className="w-4 h-4" />
             Viết Đánh Giá

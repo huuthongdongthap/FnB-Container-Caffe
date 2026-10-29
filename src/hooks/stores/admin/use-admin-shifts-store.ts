@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createPrivateStore as create } from '@/lib/create-private-store';
 import { apiFetch } from '@/lib/api-client';
 import type { AdminShiftsState, TodayResponse } from './admin-shifts-store-types';
 import { INITIAL_LOADING } from './admin-shifts-store-constants';

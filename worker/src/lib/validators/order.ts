@@ -24,6 +24,8 @@ export const createOrderSchema = z.object({
   payment_method: paymentMethodSchema,
   shipping_fee: z.number().nonnegative().optional(),
   discount: z.number().nonnegative().optional(),
+  promo_code: z.string().max(64).optional(),
+  promotion_code: z.string().max(64).optional(),
   notes: z.string().max(1000).optional(),
   delivery_time: z.string().optional(),
   table_id: z.string().optional(),

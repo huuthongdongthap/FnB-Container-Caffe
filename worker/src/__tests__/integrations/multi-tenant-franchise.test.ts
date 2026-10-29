@@ -30,8 +30,11 @@ async function authRequest(
     role,
     email: `${role}@test.aura`,
     name: `User ${role}`,
-    tenantId
-  } as any, TEST_JWT_SECRET);
+    tenantId,
+    authVersion: 1,
+    authTime: Math.floor(Date.now() / 1000),
+    sessionType: 'staff-web'
+  } as any, TEST_JWT_SECRET, 28800);
 
   const init: RequestInit & { headers: Record<string, string> } = {
     method,
@@ -44,6 +47,33 @@ async function authRequest(
     init.body = JSON.stringify(body);
   }
   return new Request(`https://test.aura${path}`, init);
+}
+
+/**
+ * The staff-session gate judges a presented token against its account row, so
+ * every staff request in this suite answers the account lookup with the row
+ * named by `authRequest`'s token.
+ */
+function staffAccountRow(role: string, tenantId: string) {
+  return { id: `user-${role}`, name: `User ${role}`, phone: null, role, tenant_id: tenantId, is_active: 1, auth_version: 1 };
+}
+
+/** True for the exact lookup shape the request-time session gate issues. */
+function isAccountLookup(sql: string): boolean {
+  return /FROM users WHERE id = \?/i.test(sql);
+}
+
+/** Statement answering the gate's account read with the token's own account. */
+function accountStatement(role: string, tenantId: string) {
+  const row = staffAccountRow(role, tenantId);
+  const stmt: any = {
+    bind: () => stmt,
+    first: async () => row,
+    all: async () => ({ results: [row], success: true, meta: {} }),
+    run: async () => ({ success: true, changes: 0, lastRowId: 0, meta: {} }),
+    raw: async () => [],
+  };
+  return stmt;
 }
 
 describe('Multi-Tenant & Franchise Preparation Integration', () => {
@@ -121,12 +151,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       ];
 
       const mockDb = {
-        prepare: vi.fn(() => ({
-          bind: vi.fn(() => ({
-            all: vi.fn().mockResolvedValue({ results: mockLocations }),
-            first: vi.fn().mockResolvedValue(null)
+        prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+          ? accountStatement('owner', 'default')
+          : {
+            bind: vi.fn(() => ({
+              all: vi.fn().mockResolvedValue({ results: mockLocations }),
+              first: vi.fn().mockResolvedValue(null)
+            }))
           }))
-        }))
       };
 
       const env = createMockEnv({
@@ -147,17 +179,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       let boundParams: unknown[] = [];
 
       const mockDb = {
-        prepare: vi.fn((sql: string) => ({
-          bind: vi.fn((...args: unknown[]) => {
-            executedQuery = sql;
-            boundParams = args;
-            return {
-              all: vi.fn().mockResolvedValue({
-                results: [{ id: 'loc_sd_02', code: 'SD-02', tenant_id: 'tenant_sadec_02' }]
-              })
-            };
-          })
-        }))
+        prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+          ? accountStatement('staff', 'tenant_sadec_02')
+          : {
+            bind: vi.fn((...args: unknown[]) => {
+              executedQuery = sql;
+              boundParams = args;
+              return {
+                all: vi.fn().mockResolvedValue({
+                  results: [{ id: 'loc_sd_02', code: 'SD-02', tenant_id: 'tenant_sadec_02' }]
+                })
+              };
+            })
+          }))
       };
 
       const env = createMockEnv({
@@ -176,17 +210,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
   describe('4. Cross-Tenant IDOR Protection & Onboarding', () => {
     it('forbids franchisee from accessing another location profile', async () => {
       const mockDb = {
-        prepare: vi.fn(() => ({
-          bind: vi.fn(() => ({
-            first: vi.fn().mockResolvedValue({
-              id: 'loc_sd_flagship',
-              tenant_id: 'default',
-              code: 'SD-01',
-              name: 'Sa Đéc Flagship'
-            }),
-            all: vi.fn().mockResolvedValue({ results: [] })
+        prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+          ? accountStatement('staff', 'tenant_sadec_02')
+          : {
+            bind: vi.fn(() => ({
+              first: vi.fn().mockResolvedValue({
+                id: 'loc_sd_flagship',
+                tenant_id: 'default',
+                code: 'SD-01',
+                name: 'Sa Đéc Flagship'
+              }),
+              all: vi.fn().mockResolvedValue({ results: [] })
+            }))
           }))
-        }))
       };
 
       const env = createMockEnv({
@@ -205,12 +241,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const env = createMockEnv({
         JWT_SECRET: TEST_JWT_SECRET,
         AURA_DB: {
-          prepare: vi.fn(() => ({
-            bind: vi.fn(() => ({
-              run: vi.fn().mockResolvedValue({ success: true }),
-              first: vi.fn().mockResolvedValue(null)
+          prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+            ? accountStatement('owner', 'tenant_sadec_02')
+            : {
+              bind: vi.fn(() => ({
+                run: vi.fn().mockResolvedValue({ success: true }),
+                first: vi.fn().mockResolvedValue(null)
+              }))
             }))
-          }))
         } as any
       });
 
@@ -230,6 +268,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         prepare: vi.fn((sql: string) => ({
           bind: vi.fn(() => ({
             first: vi.fn().mockImplementation(async () => {
+              if (isAccountLookup(sql)) return staffAccountRow('manager', 'tenant_sadec_02');
               if (sql.includes('franchise_locations')) {
                 return {
                   id: 'loc_sd_02',
@@ -276,18 +315,22 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
     it('prevents non-HQ franchise manager from spoofing ?tenant_id=default across protected routers', async () => {
       const boundTenants: string[] = [];
       const mockDb = {
-        prepare: vi.fn(() => ({
-          bind: vi.fn((...args: unknown[]) => {
-            if (typeof args[0] === 'string') {
-              boundTenants.push(args[0]);
-            }
-            return {
-              all: vi.fn().mockResolvedValue({ results: [] }),
-              first: vi.fn().mockResolvedValue(null),
-              run: vi.fn().mockResolvedValue({ success: true })
-            };
-          })
-        }))
+        // The gate's own account bind is short-circuited before the tracker,
+        // otherwise the expected binding list would include a staff id.
+        prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+          ? accountStatement('manager', 'tenant_sadec_02')
+          : {
+            bind: vi.fn((...args: unknown[]) => {
+              if (typeof args[0] === 'string') {
+                boundTenants.push(args[0]);
+              }
+              return {
+                all: vi.fn().mockResolvedValue({ results: [] }),
+                first: vi.fn().mockResolvedValue(null),
+                run: vi.fn().mockResolvedValue({ success: true })
+              };
+            })
+          }))
       };
 
       const env = createMockEnv({
@@ -319,14 +362,16 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
     it('binds franchise manager writes in dynamic pricing rules to their JWT tenantId', async () => {
       let insertedArgs: unknown[] = [];
       const mockDb = {
-        prepare: vi.fn(() => ({
-          bind: vi.fn((...args: unknown[]) => {
-            insertedArgs = args;
-            return {
-              run: vi.fn().mockResolvedValue({ success: true })
-            };
-          })
-        }))
+        prepare: vi.fn((sql: string) => (isAccountLookup(sql)
+          ? accountStatement('manager', 'tenant_sadec_02')
+          : {
+            bind: vi.fn((...args: unknown[]) => {
+              insertedArgs = args;
+              return {
+                run: vi.fn().mockResolvedValue({ success: true })
+              };
+            })
+          }))
       };
 
       const env = createMockEnv({
@@ -352,6 +397,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const tenantBinds: string[] = [];
       const mockDb = {
         prepare: (sql: string) => {
+          if (isAccountLookup(sql)) return accountStatement('admin', 'default');
           // A privileged cross-tenant read also lands in the audit log; only the
           // tenant bindings of the reads/writes themselves are confined here.
           const isAuditWrite = /INSERT INTO audit_logs/i.test(sql);

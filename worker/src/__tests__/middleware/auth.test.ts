@@ -4,8 +4,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { requireAuth, optionalAuth } from '../../middleware/auth';
-import { TEST_JWT_SECRET, createMockKV } from '../test-utils';
+import { TEST_JWT_SECRET, createMockKV, createStubDB, STAFF_ACCOUNT_ROW } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
+
+// The staff-session gate judges a presented token against the account row, so
+// every staff token minted here has to have a live row to be judged against.
+const staffAccount = { ...STAFF_ACCOUNT_ROW, id: 'USR_2', email: 'staff@b.com', name: 'B', role: 'staff' };
 
 function mockHonoContext(opts: { method?: string; headers?: Record<string, string> } = {}) {
   const raw = new Request('https://test.com', {
@@ -14,7 +18,11 @@ function mockHonoContext(opts: { method?: string; headers?: Record<string, strin
   });
   const ctx = {
     req: { raw, method: raw.method },
-    env: { AUTH_KV: createMockKV(), JWT_SECRET: TEST_JWT_SECRET },
+    env: {
+      AUTH_KV: createMockKV(),
+      AURA_DB: createStubDB(staffAccount),
+      JWT_SECRET: TEST_JWT_SECRET,
+    },
     json: vi.fn().mockReturnValue(new Response('')),
     set: vi.fn(),
     get: vi.fn()
@@ -27,8 +35,7 @@ function bearerHeaders(token: string): Record<string, string> {
 }
 
 async function staffToken(): Promise<string> {
-  return generateJWT(
-    { email: 'staff@b.com', name: 'B', id: 'USR_2', role: 'staff' },
+  return generateJWT({ email: 'staff@b.com', name: 'B', id: 'USR_2', role: 'staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'},
     TEST_JWT_SECRET,
     '3600'
   );
@@ -251,7 +258,7 @@ describe('optionalAuth', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('leaves the request a guest when a write arrives with only a cookie', async() => {
+  it('rejects cookie-only writes rather than silently turning Staff into a guest', async() => {
     const token = await staffToken();
     const c = mockHonoContext({
       method: 'POST',
@@ -260,7 +267,8 @@ describe('optionalAuth', () => {
     const next = vi.fn();
     await optionalAuth()(c, next);
     expect(c.set).not.toHaveBeenCalledWith('user', expect.anything());
-    expect(next).toHaveBeenCalled();
+    expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }), 403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('still sets the user from a cookie on GET, because SSE reads need it', async() => {

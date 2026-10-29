@@ -1,81 +1,87 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMockDB, createMockEnv, createMockKV } from '../test-utils';
-import { Hono } from 'hono';
-import { chatRouter } from '../../routes/chat';
-
-function makeDB(): ReturnType<typeof createMockDB> {
-  return createMockDB();
+// @vitest-environment node
+import { afterEach, describe, expect, it } from 'vitest';
+import { privacyFixture } from '../helpers/privacy-sqlite-fixture';
+const fixtures: ReturnType<typeof privacyFixture>[] = [];
+const fixture = () => { const value = privacyFixture(); fixtures.push(value); return value; };
+afterEach(() => { for (const f of fixtures.splice(0)) f.sqlite.close(); });
+const phone = '0901234567';
+const message = { name: 'Customer', phone, message: 'Support request' };
+function seedPrivacyRows(f: ReturnType<typeof privacyFixture>) {
+  const insert = f.sqlite.prepare(`INSERT INTO contact_messages
+    (id,name,phone,content,category,status,tenant_id,classification,created_at) VALUES (?,?,?,?,?,'unread',?,?,?)`);
+  for (const [id, tenant, classification, category] of [
+    ['visible', 'cafe-a', 'chat', 'chat'], ['candidate', 'cafe-a', null, 'recruitment'],
+    ['wrong-classification', 'cafe-a', 'contact', 'recruitment'], ['foreign', 'cafe-b', 'chat', 'chat'],
+    ['unknown-owner', null, 'chat', 'chat'], ['unknown-classification', 'cafe-a', null, 'chat'],
+    ['legacy', null, null, null],
+  ]) insert.run(id, id, phone, id, category, tenant, classification, id === 'visible' ? '2026-10-22' : '2026-10-23');
 }
-
-describe('chat smoke', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('Chat privacy with actual SQLite queries', () => {
+  it('scopes latest/list/count/history/read-mark and both history aliases', async () => {
+    const f = fixture(); seedPrivacyRows(f);
+    const list = await (await f.request('/api/chat/conversations', 'staff')).json();
+    expect(list.data).toHaveLength(1);
+    expect(list.data[0]).toMatchObject({ last_message: 'visible', message_count: 1, unread_count: 1 });
+    for (const path of [`/api/chat/messages/${phone}`, `/api/chat/conversations/${phone}/messages`]) {
+      const history = await (await f.request(path, 'owner')).json();
+      expect(history.data.map((row: any) => row.id)).toEqual(['visible']);
+    }
+    const hidden = f.sqlite.prepare("SELECT id,status FROM contact_messages WHERE id <> 'visible'").all();
+    expect(hidden.every((row) => row.status === 'unread')).toBe(true);
+    expect(f.sqlite.prepare("SELECT status FROM contact_messages WHERE id='visible'").get()?.status).toBe('read');
+    expect((await (await f.request('/api/chat/conversations', 'owner')).json()).data[0].unread_count).toBe(0);
   });
-
-  it('POST /messages — missing message returns 400', async() => {
-    const app = new Hono();
-    app.route('/api/chat', chatRouter);
-
-    const req = new Request('https://test.aura/api/chat/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-
-    const env = { ...createMockEnv(), AURA_DB: makeDB(), AUTH_KV: createMockKV() };
-    const res = await app.fetch(req, env);
-    expect(res.status).toBe(400);
+  it('public writes set ownership/classification server side even with a foreign JWT and spoofed body', async () => {
+    const f = fixture();
+    const response = await f.request('/api/chat/messages', 'other', 'POST',
+      { ...message, tenant_id: 'cafe-b', category: 'recruitment', classification: 'recruitment' }, { 'X-Tenant-Id': 'cafe-b' });
+    expect(response.status).toBe(201);
+    const { id } = await response.json();
+    expect(f.sqlite.prepare('SELECT tenant_id,classification,category FROM contact_messages WHERE id=?').get(id))
+      .toMatchObject({ tenant_id: 'cafe-a', classification: 'chat', category: 'chat' });
   });
-
-  it('GET /conversations — returns 401 when unauthenticated', async() => {
-    const app = new Hono();
-    app.route('/api/chat', chatRouter);
-
-    const req = new Request('https://test.aura/api/chat/conversations', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    const env = { ...createMockEnv(), AURA_DB: makeDB(), AUTH_KV: createMockKV() };
-    const res = await app.fetch(req, env);
-    expect(res.status).toBe(401);
+  it('admin writes require a verified D1 staff account in the pilot; never downgrade rejection to customer', async () => {
+    const f = fixture();
+    expect((await f.request('/api/chat/messages', undefined, 'POST', { ...message, direction: 'admin' })).status).toBe(401);
+    expect((await f.request('/api/chat/messages', 'other', 'POST', { ...message, direction: 'admin' })).status).toBe(403);
+    expect((await f.request('/api/chat/messages', 'owner', 'POST', { ...message, direction: 'admin' })).status).toBe(201);
+    expect(f.sqlite.prepare('SELECT COUNT(*) count FROM contact_messages').get()?.count).toBe(1);
+    expect((await f.request('/api/chat/conversations', 'other')).status).toBe(403);
+    expect((await f.request('/api/chat/conversations')).status).toBe(401);
   });
-
-  it('POST /messages — enforces IP rate limit across rotating phone numbers and scrubs 500 errors', async() => {
-    const app = new Hono();
-    app.route('/api/chat', chatRouter);
-
-    const kv = createMockKV({ 'rl:chat:ip:203.0.113.77': '20' });
-    const env = { ...createMockEnv(), AURA_DB: makeDB(), AUTH_KV: kv };
-
-    const rateLimitedReq = new Request('https://test.aura/api/chat/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'CF-Connecting-IP': '203.0.113.77',
-      },
-      body: JSON.stringify({ name: 'Spammer', phone: '0901234567', message: 'Spam' }),
-    });
-    const rlRes = await app.fetch(rateLimitedReq, env);
-    expect(rlRes.status).toBe(429);
-
-    const brokenDb = {
-      prepare: () => ({
-        bind: () => ({
-          run: async () => { throw new Error('D1_CHAT_SQL_LEAK'); },
-        }),
-      }),
-    };
-    const errEnv = { ...createMockEnv(), AURA_DB: brokenDb, AUTH_KV: createMockKV() };
-    const errReq = new Request('https://test.aura/api/chat/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Customer', phone: '0909998887', message: 'Hello' }),
-    });
-    const errRes = await app.fetch(errReq, errEnv);
-    expect(errRes.status).toBe(500);
-    const errBody = await errRes.json() as { error: string };
-    expect(errBody.error).toBe('Failed to send message');
-    expect(errBody.error).not.toContain('D1_CHAT_SQL_LEAK');
+  it.each(['legacy', 'mixed'])('supports explicit %s topology while quarantining every unclassified row', async (shape) => {
+    const f = fixture();
+    f.sqlite.exec(`ALTER TABLE contact_messages RENAME TO canonical_contact_fixture;
+      CREATE TABLE contact_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT, message TEXT NOT NULL,
+      direction TEXT NOT NULL, read_at TEXT, created_at TEXT,
+      tenant_id TEXT, classification TEXT ${shape === 'mixed' ? ', content TEXT, category TEXT, status TEXT' : ''});
+      INSERT INTO contact_messages(name,phone,message,direction,created_at,tenant_id,classification)
+      VALUES ('Legacy','${phone}','Private legacy','customer','2026-10-23','cafe-a',NULL);`);
+    const sent = await f.request('/api/chat/messages', undefined, 'POST', message);
+    expect(sent.status).toBe(201);
+    expect((await sent.json()).id).toBe(2);
+    const list = await (await f.request('/api/chat/conversations', 'owner')).json();
+    expect(list.data).toHaveLength(1);
+    expect(list.data[0]).toMatchObject({ message_count: 1, unread_count: 1, last_message: 'Support request' });
+    const history = await (await f.request(`/api/chat/messages/${phone}`, 'owner')).json();
+    expect(history.data.map((row: any) => row.id)).toEqual([2]);
+    expect(f.sqlite.prepare('SELECT read_at FROM contact_messages WHERE id=1').get()?.read_at).toBeNull();
+    expect(f.sqlite.prepare('SELECT read_at FROM contact_messages WHERE id=2').get()?.read_at).toBeTruthy();
+  });
+  it('a missing privacy column fails closed without fallback reads or writes', async () => {
+    const f = fixture(); seedPrivacyRows(f);
+    f.sqlite.exec('ALTER TABLE contact_messages RENAME COLUMN classification TO unverified_classification');
+    expect((await f.request('/api/chat/conversations', 'owner')).status).toBe(503);
+    expect((await f.request(`/api/chat/messages/${phone}`, 'owner')).status).toBe(503);
+    expect((await f.request('/api/chat/messages', undefined, 'POST', message)).status).toBe(503);
+    expect(f.sqlite.prepare("SELECT COUNT(*) count FROM contact_messages WHERE status='read'").get()?.count).toBe(0);
+  });
+  it('rate limits before persistence and missing pilot config is 503', async () => {
+    const f = fixture();
+    await f.env.AUTH_KV.put('rl:chat:ip:203.0.113.77', '20');
+    expect((await f.request('/api/chat/messages', undefined, 'POST', message, { 'CF-Connecting-IP': '203.0.113.77' })).status).toBe(429);
+    delete f.env.PILOT_TENANT_ID;
+    expect((await f.request('/api/chat/messages', undefined, 'POST', message)).status).toBe(503);
   });
 });

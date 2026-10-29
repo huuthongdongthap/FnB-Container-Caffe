@@ -39,6 +39,11 @@ function createMockD1(seed: Record<string, MockRow[]> = {}) {
       return {
         bind: (...args: any[]) => ({
           first: async <T = any>(): Promise<T | null> => {
+            if (sqlLower.includes('from users')) {
+              const actors = [{ id: 'staff_1', role: 'staff' }, { id: 'staff_9', role: 'staff' }, { id: 'w_1', role: 'waiter' }];
+              const account = actors.find(row => row.id === args[0]);
+              return (account ? { ...account, name: account.id, tenant_id: 'default', is_active: 1, auth_version: 1 } : null) as T | null;
+            }
             if (isInsert) {
               const row = { id: args[0] ?? 'gen_id' };
               tables[table] = tables[table] || [];
@@ -76,7 +81,7 @@ function createMockD1(seed: Record<string, MockRow[]> = {}) {
 async function signToken(payload: Record<string, any>): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
-  const fullPayload = { iat: now, exp: now + 3600, ...payload };
+  const fullPayload = { iat: now, exp: now + 3600, ...payload, ...(payload.role === 'customer' ? {} : { authVersion: 1, authTime: now, sessionType: 'staff-web' }) };
 
   const enc = (obj: any) =>
     btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');

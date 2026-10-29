@@ -333,9 +333,9 @@ describe('loginUser', () => {
 // ---------------------------------------------------------------------------
 function mockDBWithUsersRow(row: { tenant_id: string | null } | null) {
   return {
-    prepare: (_sql: string) => ({
+    prepare: (sql: string) => ({
       bind: () => ({
-        first: async() => row,
+        first: async() => sql.includes('staff_login_identities') ? null : row ? { id: 'user-1', name: 'Canonical Staff', role: 'staff', is_active: 1, auth_version: 1, password_hash: 'pbkdf2$some-hash', ...row } : null,
         run: async() => ({ success: true })
       })
     })
@@ -366,7 +366,7 @@ describe('loginUser tenant binding', () => {
     expect(jwtCreds.lastPayload?.tenantId).toBe('tenant_cafe_01');
   });
 
-  it('staff without D1 binding omits tenantId from JWT payload', async() => {
+  it('staff without D1 binding uses the existing default tenant mapping', async() => {
     const kv = createMockKV({ 'user:test@aura.com': JSON.stringify({ ...SEEDED_USER, role: 'staff' }) });
     const env = createMockEnv({
       AUTH_KV: kv,
@@ -378,7 +378,7 @@ describe('loginUser tenant binding', () => {
 
     const response = await loginUser(request, env);
     expect(response.status).toBe(200);
-    expect(jwtCreds.lastPayload?.tenantId).toBeUndefined();
+    expect(jwtCreds.lastPayload?.tenantId).toBe('default');
   });
 
   it('owner without users.tenant_id still resolves via saas_tenants fallback', async() => {

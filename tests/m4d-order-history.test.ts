@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { app } from '../worker/src/index';
+import { staffSessionClaims } from '../worker/src/__tests__/test-utils';
 import { generateJWT } from '../worker/src/lib/jwt';
 import { CustomerOrderResponseSchema } from '../worker/src/schemas/orders';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -32,7 +33,7 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
       const stmt = {
         bind: (...args: unknown[]) => { boundLog.push({ sql, args }); return stmt; },
         run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }),
-        first: async () => firstRow,
+        first: async () => /FROM users WHERE id/i.test(sql) ? { id: STAFF_OWNER_ID, name: 'Staff Owner', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 } : firstRow,
         all: async () => ({ results: rows, success: true, meta: {} }),
         raw: async () => [],
       };
@@ -90,7 +91,7 @@ describe('M4-D: Customer Order History (GET /api/orders)', () => {
   beforeEach(async() => {
     custAToken = await generateJWT({ sub: CUST_A_ID, role: 'customer', name: 'Customer A' }, TEST_JWT_SECRET);
     custBToken = await generateJWT({ sub: CUST_B_ID, role: 'customer', name: 'Customer B' }, TEST_JWT_SECRET);
-    staffToken = await generateJWT({ sub: STAFF_OWNER_ID, role: 'owner', name: 'Staff Owner' }, TEST_JWT_SECRET);
+    staffToken = await generateJWT({ id: STAFF_OWNER_ID, sub: STAFF_OWNER_ID, role: 'owner', name: 'Staff Owner', ...staffSessionClaims() }, TEST_JWT_SECRET, 28800);
   });
 
   it('customer sees only their own orders with customer-safe projection', async() => {

@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -46,16 +46,35 @@ function getInitialsAvatar(name: string): string {
 
 export function ReferralPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const store = useReferralStore();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = !!user;
 
   useEffect(() => {
+    const incomingRef = searchParams.get('ref')?.trim();
+    if (incomingRef) {
+      if (isAuthenticated) {
+        store.applyReferralCode(incomingRef);
+      } else {
+        try {
+          localStorage.setItem('aura_pending_referral_code', incomingRef);
+        } catch { /* ignore storage errors */ }
+      }
+    } else if (isAuthenticated) {
+      try {
+        const pendingRef = localStorage.getItem('aura_pending_referral_code');
+        if (pendingRef) {
+          localStorage.removeItem('aura_pending_referral_code');
+          store.applyReferralCode(pendingRef);
+        }
+      } catch { /* ignore storage errors */ }
+    }
     if (isAuthenticated) {
       store.fetchReferralData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [isAuthenticated, searchParams]);
 
   /* ─── Map store state to Stitch component props ───────────────── */
 
@@ -98,11 +117,7 @@ export function ReferralPage() {
       amount: r.cashbackAwarded,
     }));
 
-  const rewardAmount = store.cashbackEarned > 0
-    ? store.cashbackEarned
-    : store.referralCount > 0
-      ? store.referralCount * 10000
-      : 0;
+  const rewardAmount = store.cashbackEarned;
 
   const data: ReferralPageData | undefined = store.referralCode
     ? {

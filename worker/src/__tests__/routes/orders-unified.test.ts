@@ -6,14 +6,37 @@
 import { describe, it, expect } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockDB } from '../test-utils';
+import { createMockEnv, createMockDB, isStaffAccountLookup } from '../test-utils';
 
 const TEST_SECRET = 'test-jwt-secret-at-least-16-chars';
 
+/**
+ * The account rows the request-time session gate reads behind each staff token.
+ * The row's role has to match the token's role claim, because the gate treats a
+ * divergence as a role change and revokes the session.
+ */
+const STAFF_ROWS = [
+  { id: 'staff-1', name: 'Staff', phone: null, role: 'staff', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'cashier-1', name: 'Cashier', phone: null, role: 'cashier', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'mgr-1', name: 'Store Manager', phone: null, role: 'manager', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'w-1', name: 'Waiter', phone: null, role: 'waiter', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'b-1', name: 'Barista', phone: null, role: 'barista', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+];
+
 function makeTestEnv() {
   const store = new Map<string, string>();
-  const db = createMockDB();
+  const db = createMockDB(STAFF_ROWS);
   db.prepare = (_sql: string) => {
+    // The session gate's account read is answered from the rows above; every
+    // other statement keeps the scripted route data below.
+    if (isStaffAccountLookup(_sql)) {
+      let boundId = '';
+      const account = {
+        bind: (id: unknown) => { boundId = String(id ?? ''); return account; },
+        first: async () => STAFF_ROWS.find(r => r.id === boundId) ?? null,
+      };
+      return account as any;
+    }
     const stmt = {
       bind: (..._args: unknown[]) => stmt,
       run: async () => ({ success: true, changes: 1, lastRowId: 1 }),
@@ -88,7 +111,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('routes GET /api/orders/summary to summary handler (not captured by /:id)', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'staff-1', role: 'staff', name: 'Staff' }, TEST_SECRET);
+    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
     const res = await app.fetch(
       new Request('https://test.aura/api/orders/summary', {
         headers: { Authorization: `Bearer ${token}` },
@@ -138,7 +161,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
   it('rejects unsupported payment methods on public, guest, and staff order APIs', async () => {
     const env = makeTestEnv();
     const unsupported = ['momo', 'apple_pay', 'google_pay'];
-    const staffToken = await generateJWT({ sub: 'staff-1', role: 'cashier', name: 'Cashier' }, TEST_SECRET);
+    const staffToken = await generateJWT({ sub: 'cashier-1', id: 'cashier-1', role: 'cashier', tenantId: 'cafe-a', name: 'Cashier' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     for (const payment_method of unsupported) {
       const customerOrder = await app.fetch(new Request('https://test.aura/api/orders', {
@@ -195,7 +218,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('routes GET /api/orders/kds and POST /:id/cancel without wildcard collision', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'staff-1', role: 'staff', name: 'Staff' }, TEST_SECRET);
+    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
     const kdsRes = await app.fetch(
       new Request('https://test.aura/api/orders/kds', {
         headers: { Authorization: `Bearer ${token}` },
@@ -280,7 +303,7 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('authorizes manager role on /kds, /checkout, and /:id/status', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Store Manager' }, TEST_SECRET);
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', tenantId: 'cafe-a', name: 'Store Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     const kdsRes = await app.fetch(
       new Request('https://test.aura/api/orders/kds', {
@@ -328,8 +351,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('authorizes waiter on /checkout and barista on /kds and /:id/status', async () => {
     const env = makeTestEnv();
-    const waiterToken = await generateJWT({ sub: 'w-1', role: 'waiter', name: 'Waiter' }, TEST_SECRET);
-    const baristaToken = await generateJWT({ sub: 'b-1', role: 'barista', name: 'Barista' }, TEST_SECRET);
+    const waiterToken = await generateJWT({ sub: 'w-1', role: 'waiter', tenantId: 'cafe-a', name: 'Waiter' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const baristaToken = await generateJWT({ sub: 'b-1', id: 'b-1', role: 'barista', tenantId: 'cafe-a', name: 'Barista', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_SECRET, 28800);
 
     const posRes = await app.fetch(
       new Request('https://test.aura/api/orders/checkout', {

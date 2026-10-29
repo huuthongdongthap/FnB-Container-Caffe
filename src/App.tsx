@@ -50,9 +50,9 @@ function AppContent() {
                 <Route element={<ProtectedRoute />}>
                   <Route path="/kds" element={<KDSPage />} />
                   <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
+                  <Route path="/pos/table/:tableId" element={<TableOrder />} />
                 </Route>
                 <Route path="/tv-menu" element={<TVMenuPage />} />
-                <Route path="/pos/table/:tableId" element={<TableOrder />} />
 
                 {/* ── MOBILE ROUTES (ops staff surfaces) ── */}
                 {mobileRoutes}

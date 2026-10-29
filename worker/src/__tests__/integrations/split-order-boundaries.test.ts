@@ -1,16 +1,17 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../index';
+import { staffSessionClaims } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import { orderCreationFixture } from './order-creation-fixture';
 import { payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 
 const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
-const fixture = () => { const value = orderCreationFixture(); fixtures.push(value); return value; };
+const fixture = () => { const value = orderCreationFixture(); value.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id) VALUES (?,?,?,?)').run('staff-a','Waiter','waiter','cafe-a'); fixtures.push(value); return value; };
 afterEach(() => { vi.restoreAllMocks(); for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
 const entry = { customer_name: 'Split guest', customer_phone: '0900000010', total: 1000,
   items: [{ id: 'coffee', name: 'Forged', quantity: 1, price: 1000 }], discount: 19000, shipping_fee: 0 };
-const auth = () => generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a' }, 'test-jwt-secret-at-least-16-chars');
+const auth = () => generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a', ...staffSessionClaims() }, 'test-jwt-secret-at-least-16-chars', 28800);
 function split(env: any, table_id: string, orders: unknown[], token?: string) {
   return app.fetch(new Request('https://test.aura/api/orders/split?tenant_id=cafe-b', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-tenant-id': 'cafe-b',

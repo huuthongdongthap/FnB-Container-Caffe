@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockDB, createMockKV } from '../test-utils';
+import { createMockEnv, createMockDB, createMockKV, isStaffAccountLookup, staffSessionClaims, STAFF_ACCOUNT_ROW } from '../test-utils';
 
 const TEST_SECRET = 'test-jwt-secret-at-least-16-chars';
 const TEST_CAT_ID = '11111111-1111-4111-8111-111111111111';
@@ -77,6 +77,9 @@ function createCatalogTestEnv(state: {
         return { success: true, changes: 1, lastRowId: 1 };
       },
       first: async () => {
+        // Staff sessions are judged against the `users` row behind the token,
+        // so the catalog mutations this file authorises resolve their account.
+        if (isStaffAccountLookup(_sql)) return { ...STAFF_ACCOUNT_ROW, id: String(boundParams[0] ?? 'staff-1') };
         if (_sql.includes('SELECT id FROM products WHERE slug = ?')) {
           const slug = boundParams[0];
           for (const p of state.products.values()) {
@@ -175,7 +178,7 @@ describe('Catalog Canonical Contract Reconciliation', () => {
       orderItemsCount: 0,
     };
     const env = createCatalogTestEnv(state);
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims() }, TEST_SECRET, 3600);
 
     // 1. Create product
     const createRes = await app.fetch(
@@ -241,7 +244,7 @@ describe('Catalog Canonical Contract Reconciliation', () => {
       orderItemsCount: 5, // Referenced in order_items
     };
     const env = createCatalogTestEnv(state);
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' }, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims() }, TEST_SECRET, 3600);
 
     const delRes = await app.fetch(
       new Request(`https://test.aura/api/products/${prodId}`, {

@@ -2,6 +2,8 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse } from '../lib/staff-session';
+import type { Env } from '../types/env';
 import { generateJWT } from '../lib/jwt';
 import { lookupVerifyCode, deleteVerifyCode, isExpired } from '../tree/auth/email-verification';
 
@@ -68,7 +70,9 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     await deleteVerifyCode(db, record.id);
 
     const tenantId = `tenant_${user.id}`;
-    const token = await generateJWT(
+    const token = user.role && user.role !== 'customer'
+      ? (await issueStaffSession(env as unknown as Env, await requireStaffAccount((env as unknown as Env).AURA_DB, user.id), { email: user.email, sessionType: 'staff-web' })).token
+      : await generateJWT(
       { email: user.email, name: user.name, id: user.id, role: user.role || 'customer', tenantId, tier: 'BASIC', email_verified: true } as unknown as Parameters<typeof generateJWT>[0],
       env.JWT_SECRET as string,
       env.JWT_EXPIRY_SECONDS as string
@@ -82,6 +86,8 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer', email_verified: true }
     });
   } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
     log.error('Verify error:', { message: (error as Error).message });
     return errorResponse('Xác thực thất bại', 500);
   }

@@ -55,6 +55,9 @@ export function isPromotionActive(item: RawPromotion, now = Date.now()): boolean
   if (activeFlag !== undefined && (activeFlag === 0 || activeFlag === false)) {
     return false;
   }
+  if (String(item.code || '').toUpperCase() === 'WELCOME') {
+    return true;
+  }
 
   const startsAt = item.startsAt ?? item.starts_at;
   if (startsAt) {

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Contact Routes Tests — POST /api/contact
  *
@@ -6,41 +7,19 @@
  * @vitest-test-type unit
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-
-// ── Mock D1 Database (simplified for contact) ─────────────────────
-function createMockD1() {
-  const rows: any[] = [];
-  let lastRowId = 0;
-  const db = {
-    prepare: vi.fn((q: string) => {
-      const stmt: any = {
-        _sql: q, _bindValues: [] as any[],
-        bind: vi.fn(function (...vals: any[]) { this._bindValues.push(...vals); return this; }),
-        run: vi.fn(async function () {
-          lastRowId++;
-          const row: any = {};
-          const cols = q.match(/\(([^)]+)\)/);
-          if (cols) {
-            const names = cols[1].split(',').map((c: string) => c.trim());
-            names.forEach((n: string, i: number) => { row[n] = this._bindValues[i]; });
-          }
-          rows.push(row);
-          return { success: true, lastRowId } as any;
-        }),
-      };
-      return stmt;
-    }),
-  };
-  return db;
-}
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { privacyFixture } from '../worker/src/__tests__/helpers/privacy-sqlite-fixture';
+const fixtures: ReturnType<typeof privacyFixture>[] = [];
+afterEach(() => { for (const f of fixtures.splice(0)) f.sqlite.close(); });
 
 let mockKv: Record<string, string>;
 
 function createMockEnv(overrides: Record<string, unknown> = {}) {
   mockKv = {};
+  const f = privacyFixture(); fixtures.push(f);
   return {
-    AURA_DB: createMockD1(),
+    ...f.env,
+    AURA_DB: f.db,
     AUTH_KV: {
       get: vi.fn(async (key: string) => mockKv[key] || null),
       put: vi.fn(async (key: string, value: string, opts?: any) => {

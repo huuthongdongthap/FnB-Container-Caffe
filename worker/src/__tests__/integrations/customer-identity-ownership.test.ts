@@ -8,6 +8,28 @@ import { resolveServerOrderOwnership, canAccessOrder, claimGuestOrder } from '@a
 import { ordersUnifiedRouter } from '../../routes/orders-unified';
 import { generateJWT } from '../../lib/jwt';
 import type { Env } from '../../types/env';
+import { isStaffAccountLookup } from '../test-utils';
+
+/**
+ * Answers the request-time session gate's account read for the staff token below.
+ *
+ * The account role has to equal the token's role claim: the gate revokes the
+ * session the moment the two diverge, so `role: 'staff'` here is load-bearing
+ * for the 200 the test asserts rather than an incidental detail.
+ */
+function staffAccountStatement() {
+  const stmt: any = {
+    bind: () => stmt,
+    first: async () => ({
+      id: 'staff_1', name: 'Staff', phone: null, role: 'staff',
+      tenant_id: 'default', is_active: 1, auth_version: 1,
+    }),
+    all: async () => ({ results: [], success: true }),
+    run: async () => ({ success: true, changes: 1 }),
+    raw: async () => [],
+  };
+  return stmt;
+}
 
 describe('Customer Identity & Order Ownership Contract', () => {
   const mockDbWithCustomer = {
@@ -147,13 +169,18 @@ describe('Customer Identity & Order Ownership Contract', () => {
       { id: 'ORD_CUST', customer_id: 'cust_user_x', order_number: 'ORD-C1', status: 'pending', total_amount: 50000 },
     ];
     const db = {
-      prepare: () => {
+      prepare: (sql: string) => {
+        // Answer the session gate's account read first: this fixture is scoped to
+        // orders, so the users lookup would otherwise resolve to null and read as
+        // a revoked session. Every other statement keeps its previous behaviour.
+        if (isStaffAccountLookup(sql)) return staffAccountStatement();
         let binds: unknown[] = [];
         const stmt = {
           bind: (...args: unknown[]) => { binds = args; return stmt; },
           first: async <T = unknown>() => (orders.find(o => o.id === binds[0]) || null) as unknown as T,
           all: async () => ({ results: [] }),
           run: async () => ({ success: true }),
+          raw: async () => [],
         };
         return stmt as any;
       },
@@ -178,7 +205,10 @@ describe('Customer Identity & Order Ownership Contract', () => {
     }, env);
     expect(resAttacker.status).toBe(403);
 
-    const tokStaff = await generateJWT({ sub: 'staff_1', id: 'staff_1', role: 'staff' }, secret);
+    const tokStaff = await generateJWT({
+      sub: 'staff_1', id: 'staff_1', role: 'staff',
+      authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web',
+    }, secret, 28800);
     const resStaff = await app.request('http://localhost/api/orders/ORD_CUST', {
       method: 'GET', headers: { Authorization: `Bearer ${tokStaff}` }
     }, env);

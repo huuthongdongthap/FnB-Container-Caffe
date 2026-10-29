@@ -1,6 +1,7 @@
-import { create } from 'zustand';
+import { createPrivateStore as create } from '@/lib/create-private-store';
 import type { AdminOrder } from '@/hooks/use-admin';
 import { apiFetch } from '@/lib/api-client';
+import { readClientSession } from '@/lib/client-session';
 
 
 export interface OrderFilters {
@@ -100,13 +101,15 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
   },
 
   updateOrderStatus: async (orderId, status) => {
+    const session = readClientSession().token;
     try {
       try {
         await apiFetch<Record<string, unknown>>(`/api/orders/${orderId}`, {
           method: 'PATCH',
           body: JSON.stringify({ status }),
         });
-      } catch {
+      } catch (error) {
+        if (session !== readClientSession().token) throw error;
         await apiFetch<Record<string, unknown>>(`/api/orders/${orderId}/status`, {
           method: 'PATCH',
           body: JSON.stringify({ status }),

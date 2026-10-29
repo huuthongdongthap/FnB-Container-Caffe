@@ -123,6 +123,40 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   if (!result.idempotent && c.env.AUTH_KV) {
     await publishOrderEvent(c.env.AUTH_KV, id, result.status, { previousStatus: result.status }).catch(() => {});
   }
+  if (!result.idempotent) {
+    try {
+      const orderRow = await c.env.AURA_DB.prepare(
+        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
+      ).bind(id).first<{
+        id: string;
+        total?: number | null;
+        total_amount?: number | null;
+        customer_id?: string | null;
+        customer_phone?: string | null;
+        customer_email?: string | null;
+      }>().catch(() => null);
+      if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
+        const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
+        await creditLoyaltyIfEligible(c.env.AURA_DB, c.env as unknown as Record<string, unknown>, id).catch(() => {});
+        let refCustomerId = orderRow.customer_id || null;
+        if (!refCustomerId && (orderRow.customer_phone || orderRow.customer_email)) {
+          const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
+          const cust = await c.env.AURA_DB.prepare(
+            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+          ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+          refCustomerId = cust?.id ?? null;
+        }
+        const orderTotal = Number(orderRow.total ?? orderRow.total_amount ?? 0);
+        if (refCustomerId && orderTotal >= 20000) {
+          const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+          const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
+          await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy).catch(() => {});
+        }
+      }
+    } catch {
+      // Non-blocking post-payment loyalty/referral trigger
+    }
+  }
   return c.json({ success: true, message: result.idempotent ? 'Already paid' : 'Marked as paid', order_id: id });
 }
 

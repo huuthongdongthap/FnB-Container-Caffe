@@ -348,13 +348,22 @@ export async function rewardReferralOnFirstOrder(
   if (policy.cashbackRefereeVnd > 0) {
     try {
       const refereeCashback = policy.cashbackRefereeVnd;
-      const refWalletId = genId('cbw_');
-      await db
-        .prepare(
-          'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
-        )
-        .bind(refWalletId, refereeId, now)
-        .run();
+      const existingRefWallet = await db
+        .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
+        .bind(refereeId)
+        .first<{ id: string; balance: number; total_earned: number }>()
+        .catch(() => null);
+      const refWalletId = existingRefWallet?.id || genId('cbw_');
+      const existingRefBalance = Number(existingRefWallet?.balance ?? 0);
+      const newRefBalance = existingRefBalance + refereeCashback;
+      if (!existingRefWallet) {
+        await db
+          .prepare(
+            'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
+          )
+          .bind(refWalletId, refereeId, now)
+          .run();
+      }
       await db
         .prepare(
           'UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?',
@@ -371,7 +380,7 @@ export async function rewardReferralOnFirstOrder(
           refWalletId,
           refereeId,
           refereeCashback,
-          refereeCashback,
+          newRefBalance,
           `Referral welcome bonus (ref=${referral.id}): +${refereeCashback} VND`,
           now,
         )
@@ -445,6 +454,39 @@ export async function reverseReferralCashback(
   );
 
   await db.batch(batch);
+
+  // Also reverse referee welcome bonus if credited on this referral
+  if (referral.referred_customer_id) {
+    try {
+      const refTx = await db
+        .prepare(
+          "SELECT id, wallet_id, amount FROM cashback_transactions WHERE customer_id = ? AND type = 'bonus' AND description LIKE ? LIMIT 1",
+        )
+        .bind(referral.referred_customer_id, `Referral welcome bonus (ref=${referralId})%`)
+        .first<{ id: string; wallet_id: string; amount: number }>()
+        .catch(() => null);
+      if (refTx && refTx.wallet_id && typeof refTx.amount === 'number' && refTx.amount > 0) {
+        const refWallet = await db
+          .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+          .bind(referral.referred_customer_id)
+          .first<{ id: string; balance: number }>()
+          .catch(() => null);
+        if (refWallet) {
+          const nextRefBal = Math.max(0, Number(refWallet.balance ?? 0) - refTx.amount);
+          await db.batch([
+            db.prepare('UPDATE cashback_wallets SET balance = ?, total_spent = total_spent + ?, updated_at = ? WHERE id = ?')
+              .bind(nextRefBal, refTx.amount, now, refWallet.id),
+            db.prepare(
+              `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
+               VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`,
+            ).bind(genId('cbt_'), refWallet.id, referral.referred_customer_id, refTx.amount, nextRefBal, `Referral welcome reversal (${referralId}): -${refTx.amount} VND`, now),
+          ]);
+        }
+      }
+    } catch {
+      // Non-blocking referee reversal
+    }
+  }
 
   return { success: true, referrer_id: referral.referrer_id, referral_id: referralId };
 }

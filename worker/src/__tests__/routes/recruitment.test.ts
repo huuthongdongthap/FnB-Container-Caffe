@@ -1,136 +1,74 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Hono } from 'hono';
-import { createMockDB, createMockEnv } from '../test-utils';
-import { recruitmentRouter } from '../../routes/recruitment';
-import { generateJWT } from '../../lib/jwt';
+// @vitest-environment node
+import { afterEach, describe, expect, it } from 'vitest';
+import { privacyFixture, candidate } from '../helpers/privacy-sqlite-fixture';
 
-describe('Recruitment Worker Routes', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+const fixtures: ReturnType<typeof privacyFixture>[] = [];
+const fixture = () => { const value = privacyFixture(); fixtures.push(value); return value; };
+afterEach(() => { for (const f of fixtures.splice(0)) f.sqlite.close(); });
 
-  function makeApp() {
-    const app = new Hono();
-    app.route('/api/recruitment', recruitmentRouter);
-    return app;
-  }
-
-  function makeEnv() {
-    return {
-      ...createMockEnv(),
-      AURA_DB: createMockDB(),
-    };
-  }
-
-  it('POST /apply — rejects invalid phone or empty fullName with 400', async () => {
-    const app = makeApp();
-    const req = new Request('https://test.aura/api/recruitment/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName: '', phone: '123' }),
-    });
-
-    const res = await app.fetch(req, makeEnv() as any);
-    expect(res.status).toBe(400);
-  });
-
-  it('POST /apply — accepts valid candidate payload with 201', async () => {
-    const app = makeApp();
-    const req = new Request('https://test.aura/api/recruitment/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: 'Nguyễn Văn A',
-        phone: '0986470981',
-        birthYear: '2002',
-        position: 'barista',
-        shifts: ['morning', 'afternoon'],
-        experience: 'under_1yr',
-        note: 'Có kinh nghiệm pha chế cơ bản',
-      }),
-    });
-
-    const res = await app.fetch(req, makeEnv() as any);
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { success: boolean; id: string };
-    expect(body.success).toBe(true);
+describe('Store owned recruitment on real SQLite', () => {
+  it('public aliases ignore tenant spoofing and incidental foreign sessions; no PII mirror', async () => {
+    const f = fixture();
+    const response = await f.request('/api/recruitment/apply', 'other', 'POST', { ...candidate, tenantId: 'cafe-b' },
+      { 'X-Tenant-Id': 'cafe-b', 'Idempotency-Key': 'public-apply-0001' });
+    expect(response.status).toBe(201);
+    const body = await response.json();
     expect(body.id).toMatch(/^APP_/);
+    expect(body.data.id).toBe(body.id);
+    expect(f.sqlite.prepare('SELECT tenant_id FROM recruitment_applications WHERE id=?').get(body.id)?.tenant_id).toBe('cafe-a');
+    expect(f.sqlite.prepare('SELECT COUNT(*) count FROM contact_messages').get()?.count).toBe(0);
+    expect((await f.request('/api/recruitment', undefined, 'POST', candidate)).status).toBe(201);
   });
-
-  it('POST /apply — sanitizes internal database errors on HTTP 500 without leaking SQL details', async () => {
-    const app = makeApp();
-    const env = makeEnv();
-    env.AURA_DB.prepare = vi.fn().mockImplementation(() => ({
-      bind: () => ({
-        run: () => Promise.reject(new Error('SQLITE_ERROR: table recruitment_applications has no column named secret_col')),
-      }),
-    }));
-
-    const req = new Request('https://test.aura/api/recruitment/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: 'Trần Thị B',
-        phone: '0912345678',
-        position: 'service',
-      }),
-    });
-
-    const res = await app.fetch(req, env as any);
-    expect(res.status).toBe(500);
-    const bodyText = await res.text();
-    expect(bodyText).not.toContain('SQLITE_ERROR');
-    expect(bodyText).not.toContain('secret_col');
+  it('same-store owner/manager can create, list, patch, and delete persisted records', async () => {
+    const f = fixture();
+    const response = await f.request('/api/recruitment/applications', 'manager', 'POST', candidate, { 'Idempotency-Key': 'admin-create-0001' });
+    expect(response.status).toBe(201);
+    const { id } = await response.json();
+    const list = await (await f.request('/api/recruitment/applications', 'owner')).json();
+    expect(list.data.map((row: any) => row.id)).toEqual([id]);
+    expect((await f.request(`/api/recruitment/applications/${id}`, 'manager', 'PATCH', { status: 'hired' })).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT status FROM recruitment_applications WHERE id=?').get(id)?.status).toBe('hired');
+    expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'DELETE')).status).toBe(200);
+    expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'DELETE')).status).toBe(404);
   });
-
-  it('DELETE /applications/:id — enforces owner/manager RBAC and rejects staff role with 403', async () => {
-    const app = makeApp();
-    const env = makeEnv();
-    const secret = env.JWT_SECRET;
-
-    const staffToken = await generateJWT(
-      { id: 'staff-1', email: 'staff@auraspace.cafe', name: 'Staff', role: 'staff' },
-      secret
-    );
-    const managerToken = await generateJWT(
-      { id: 'mgr-1', email: 'mgr@auraspace.cafe', name: 'Manager', role: 'manager' },
-      secret
-    );
-
-    const staffReq = new Request('https://test.aura/api/recruitment/applications/APP_123', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${staffToken}` },
-    });
-    const staffRes = await app.fetch(staffReq, env as any);
-    expect(staffRes.status).toBe(403);
-
-    const mgrReq = new Request('https://test.aura/api/recruitment/applications/APP_123', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${managerToken}` },
-    });
-    const mgrRes = await app.fetch(mgrReq, env as any);
-    expect(mgrRes.status).toBe(200);
-
-    const adminToken = await generateJWT(
-      { id: 'adm-1', email: 'admin@auraspace.cafe', name: 'Admin', role: 'admin' },
-      secret
-    );
-    const adminListRes = await app.fetch(
-      new Request('https://test.aura/api/recruitment/applications', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      }),
-      env as any
-    );
-    expect(adminListRes.status).toBe(200);
-
-    const adminDelRes = await app.fetch(
-      new Request('https://test.aura/api/recruitment/applications/APP_456', {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${adminToken}` },
-      }),
-      env as any
-    );
-    expect(adminDelRes.status).toBe(200);
+  it.each(['staff', 'admin', 'cashier', 'other', 'wildcard', 'hq'])('denies %s across every management operation', async (actor) => {
+    const f = fixture();
+    for (const [path, method, body] of [
+      ['/api/recruitment/applications', 'GET', undefined], ['/api/recruitment/applications', 'POST', candidate],
+      ['/api/recruitment/applications/foreign', 'PATCH', { status: 'hired' }], ['/api/recruitment/applications/foreign', 'DELETE', undefined],
+    ] as const) expect((await f.request(path, actor, method, body)).status).toBe(403);
+  });
+  it('unauthenticated management gets 401; legacy unowned and foreign rows stay inaccessible', async () => {
+    const f = fixture();
+    for (const [id, tenant] of [['unowned', null], ['foreign', 'cafe-b']])
+      f.sqlite.prepare('INSERT INTO recruitment_applications(id,full_name,phone,tenant_id) VALUES (?,?,?,?)').run(id, 'Hidden', '0901234567', tenant);
+    expect((await f.request('/api/recruitment/applications')).status).toBe(401);
+    expect((await (await f.request('/api/recruitment/applications', 'manager')).json()).data).toEqual([]);
+    for (const id of ['unowned', 'foreign']) {
+      expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'PATCH', { status: 'hired' })).status).toBe(404);
+      expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'DELETE')).status).toBe(404);
+    }
+    expect(f.sqlite.prepare('SELECT COUNT(*) count FROM recruitment_applications').get()?.count).toBe(2);
+  });
+  it('durable retry returns the same ID; payload mismatch conflicts and deleted records do not resurrect', async () => {
+    const f = fixture();
+    const headers = { 'Idempotency-Key': 'durable-apply-0001' };
+    const first = await (await f.request('/api/recruitment/apply', undefined, 'POST', candidate, headers)).json();
+    const second = await (await f.request('/api/recruitment/apply', undefined, 'POST', candidate, headers)).json();
+    expect(second.id).toBe(first.id);
+    expect(f.sqlite.prepare('SELECT COUNT(*) count FROM recruitment_applications').get()?.count).toBe(1);
+    expect((await f.request('/api/recruitment/apply', undefined, 'POST', { ...candidate, fullName: 'Changed' }, headers)).status).toBe(409);
+    await f.request(`/api/recruitment/applications/${first.id}`, 'owner', 'DELETE');
+    expect((await f.request('/api/recruitment/apply', undefined, 'POST', candidate, headers)).status).toBe(409);
+  });
+  it('missing production pilot config and failed SQL report failure without leaking schema', async () => {
+    const f = fixture();
+    delete f.env.PILOT_TENANT_ID;
+    expect((await f.request('/api/recruitment/apply', undefined, 'POST', candidate)).status).toBe(503);
+    f.env.PILOT_TENANT_ID = 'cafe-a';
+    f.sqlite.exec('ALTER TABLE recruitment_applications RENAME TO unavailable_recruitment');
+    const failed = await f.request('/api/recruitment/apply', undefined, 'POST', candidate);
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).not.toContain('unavailable_recruitment');
   });
 });
-

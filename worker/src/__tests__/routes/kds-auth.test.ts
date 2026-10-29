@@ -1,19 +1,59 @@
 import { describe, expect, it } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv } from '../test-utils';
+import { createMockEnv, isStaffAccountLookup, staffSessionClaims } from '../test-utils';
 
 const JWT_SECRET = 'test-jwt-secret-at-least-16-chars';
 
-async function staffToken() {
+/** Account rows the request-time session gate reads behind each staff token. */
+const STAFF_ROWS = [
+  { id: 'staff-kds', name: 'KDS Staff', phone: null, role: 'staff', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'staff-kitchen', name: 'Kitchen Staff', phone: null, role: 'kitchen', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+  { id: 'cashier-1', name: 'Cashier Staff', phone: null, role: 'cashier', tenant_id: 'cafe-a', is_active: 1, auth_version: 1 },
+];
+
+/**
+ * Env whose DB answers the session gate's account lookup from STAFF_ROWS and
+ * otherwise returns no data: every staff request needs the row behind its token,
+ * and a token with no row reads as a revoked session rather than as "no data".
+ */
+function kdsEnv() {
+  return createMockEnv({
+    JWT_SECRET,
+    AURA_DB: {
+      prepare: (sql: string) => {
+        if (isStaffAccountLookup(sql)) {
+          let boundId = '';
+          const account = {
+            bind: (id: unknown) => { boundId = String(id ?? ''); return account; },
+            first: async () => STAFF_ROWS.find(r => r.id === boundId) ?? null,
+          };
+          return account as any;
+        }
+        const empty = {
+          bind: () => empty,
+          first: async () => null,
+          all: async () => ({ results: [], success: true }),
+          run: async () => ({ success: true, changes: 0, lastRowId: 0 }),
+          raw: async () => [],
+        };
+        return empty as any;
+      },
+      batch: async () => [],
+    } as any,
+  }) as any;
+}
+
+async function staffToken(role = 'staff', id = 'staff-kds') {
   return generateJWT({
-    id: 'staff-kds',
-    sub: 'staff-kds',
-    email: 'staff@test.aura',
-    name: 'KDS Staff',
-    role: 'staff',
+    id,
+    sub: id,
+    email: `${id}@test.aura`,
+    name: `KDS ${role}`,
+    role,
     tenantId: 'cafe-a',
-  } as any, JWT_SECRET);
+    ...staffSessionClaims(),
+  } as any, JWT_SECRET, 28800);
 }
 
 describe('KDS session protection', () => {
@@ -41,7 +81,7 @@ describe('KDS session protection', () => {
 
   it('allows an authenticated staff session to load the queue and SSE stream', async () => {
     const token = await staffToken();
-    const env = createMockEnv({ JWT_SECRET });
+    const env = kdsEnv();
 
     const queueResponse = await app.fetch(
       new Request('https://test.aura/api/kds/orders', {
@@ -61,15 +101,8 @@ describe('KDS session protection', () => {
   });
 
   it('does not let kitchen staff collect COD payments', async () => {
-    const token = await generateJWT({
-      id: 'staff-kitchen',
-      sub: 'staff-kitchen',
-      email: 'kitchen@test.aura',
-      name: 'Kitchen Staff',
-      role: 'kitchen',
-      tenantId: 'cafe-a',
-    } as any, JWT_SECRET);
-    const env = createMockEnv({ JWT_SECRET });
+    const token = await staffToken('kitchen', 'staff-kitchen');
+    const env = kdsEnv();
     const response = await app.fetch(
       new Request('https://test.aura/api/orders/ORD_COD/mark-cod-paid', {
         method: 'PATCH',
@@ -101,6 +134,16 @@ describe('KDS session protection', () => {
     const env = createMockEnv({ JWT_SECRET }) as any;
     env.AURA_DB = {
       prepare: (sql: string) => {
+        // The session gate's account read has to be answered before the order
+        // lookup, otherwise this request reads as a revoked session.
+        if (isStaffAccountLookup(sql)) {
+          let boundId = '';
+          const account = {
+            bind: (id: unknown) => { boundId = String(id ?? ''); return account; },
+            first: async () => STAFF_ROWS.find(r => r.id === boundId) ?? null,
+          };
+          return account as any;
+        }
         let binds: unknown[] = [];
         const statement = {
           bind: (...args: unknown[]) => { binds = args; return statement; },
@@ -123,7 +166,8 @@ describe('KDS session protection', () => {
       email: 'cashier@test.aura',
       role: 'cashier',
       tenantId: 'cafe-a',
-    } as any, JWT_SECRET);
+      ...staffSessionClaims(),
+    } as any, JWT_SECRET, 28800);
 
     const response = await app.fetch(
       new Request('https://test.aura/api/orders/ORD_COD/mark-cod-paid', {
@@ -138,7 +182,7 @@ describe('KDS session protection', () => {
   });
   it('serves the KDS queue from the dedicated router, not the unified orders surface', async () => {
     const token = await staffToken();
-    const env = createMockEnv({ JWT_SECRET });
+    const env = kdsEnv();
 
     const queue = await app.fetch(
       new Request('https://test.aura/api/kds/orders', { headers: { Authorization: `Bearer ${token}` } }),

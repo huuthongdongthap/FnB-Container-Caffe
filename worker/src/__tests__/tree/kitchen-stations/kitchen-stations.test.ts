@@ -15,10 +15,14 @@ function makeScriptedDB(rowsBySql: Array<{ match: (sql: string) => boolean; rows
   const callLog: string[] = [];
   const boundLog: { sql: string; args: unknown[] }[] = [];
   let idx = 0;
+  const acctStmt: any = { bind: () => acctStmt, first: async () => ({ id: 'u1', name: 'Staff', phone: null, role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 }), all: async () => ({ results: [], success: true, meta: {} }), run: async () => ({ success: true, changes: 1, lastRowId: 1, meta: {} }), raw: async () => [] };
   const db = {
     _log: callLog,
     _bound: boundLog,
     prepare: (sql: string) => {
+      // The request-time session gate reads the staff account row; without a
+      // fixture for it the gate cannot tell a live session from a revoked one.
+      if (/FROM users WHERE id = \?/i.test(sql)) return acctStmt;
       callLog.push(sql);
       let handler = rowsBySql[idx];
       if (handler && !handler.match(sql)) handler = rowsBySql.find(h => h.match(sql));
@@ -57,7 +61,7 @@ app.use('/api/kitchen-stations/*', requireStaff(['owner', 'manager', 'staff']));
 app.route('/api/kitchen-stations', kitchenStationsRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown) {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'staff' }, SECRET);
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, SECRET, 28800);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

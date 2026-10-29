@@ -57,6 +57,43 @@ export async function createOrder(
     });
     const resolvedCustomerId = ownership.customerId;
     const now = new Date().toISOString();
+    const rawPromoCode = (data.promo_code || data.promotion_code || '').trim().toUpperCase();
+    let appliedPromo: { id: string; code: string; discountAmount: number } | null = null;
+    if (rawPromoCode) {
+      const isWelcome = rawPromoCode === 'WELCOME';
+      let promo = await db.prepare(
+        'SELECT id, code, percent, max_discount, min_order, starts_at, expires_at, usage_limit, usage_count, is_active FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
+      ).bind(rawPromoCode).first<{
+        id: string; code: string; percent: number; max_discount: number; min_order: number;
+        starts_at?: string | null; expires_at?: string | null; usage_limit: number; usage_count: number;
+      }>().catch(() => null);
+      if (!promo && isWelcome) {
+        promo = { id: 'promo_welcome', code: 'WELCOME', percent: 10, max_discount: 30000, min_order: 0, usage_limit: 0, usage_count: 0 };
+      }
+      if (!promo) return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
+      if (promo.starts_at && new Date(promo.starts_at) > new Date()) return errorResponse('Chương trình khuyến mãi chưa bắt đầu', 400);
+      if (!isWelcome && promo.expires_at && new Date(promo.expires_at) < new Date()) return errorResponse('Mã khuyến mãi đã hết hạn', 400);
+      if (!isWelcome && promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
+      if (promo.min_order > 0 && snapshot.subtotal < promo.min_order) return errorResponse(`Đơn hàng tối thiểu ${promo.min_order}đ`, 400);
+      if (isWelcome) {
+        const normalizedPhone = (data.customer_phone || '').replace(/[\s\-().]/g, '');
+        if (!data.customer_name?.trim() || !normalizedPhone) {
+          return errorResponse('Mã WELCOME yêu cầu khách hàng mới để lại thông tin đăng ký', 400);
+        }
+        const prior = await db.prepare(
+          "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
+        ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null);
+        if (Number(prior?.cnt ?? 0) > 0) {
+          return errorResponse('Mã WELCOME chỉ áp dụng cho khách hàng mới lần đầu đến quán', 400);
+        }
+      }
+      const pct = isWelcome ? (promo.percent || 10) : promo.percent;
+      const cap = isWelcome ? (promo.max_discount || 30000) : promo.max_discount;
+      const rawDisc = Math.round((snapshot.subtotal * pct) / 100);
+      snapshot.discount = cap > 0 ? Math.min(rawDisc, cap) : rawDisc;
+      snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + snapshot.shipping_fee + snapshot.tip_amount;
+      appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount };
+    }
     const responseBody = {
       success: true, data: {
         id: orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
@@ -106,6 +143,14 @@ export async function createOrder(
       if (saved) return replayResponse(saved, idem!.fingerprint);
       throw error;
     }
+    if (appliedPromo) {
+      await db.prepare(
+        'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+      ).bind(appliedPromo.code).run().catch(() => {});
+      await db.prepare(
+        'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(appliedPromo.id, appliedPromo.code, orderId, appliedPromo.discountAmount, snapshot.subtotal, now).run().catch(() => {});
+    }
     await publishOrderEvent(env.AUTH_KV as KVNamespace | undefined, orderId, 'pending');
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
     try {
@@ -135,7 +180,7 @@ export async function createOrder(
     }
     return jsonResponse(responseBody, 201);
   } catch (error) {
-    if (error instanceof OrderCreationError) return errorResponse(error.message, error.status);
+    if (error instanceof OrderCreationError) return Response.json({ success: false, error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
     log.error('CreateOrder error:', { message: (error as Error).message });
     return errorResponse('Failed to create order', 500);
   }

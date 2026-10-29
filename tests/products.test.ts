@@ -2,10 +2,11 @@
  * Products Route Tests — /api/products
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { staffSessionClaims } from '../worker/src/__tests__/test-utils';
 import { generateJWT } from '../worker/src/lib/jwt';
 
 function createMockD1(seedData: Record<string, any[]> = {}) {
-  const tables: Record<string, any[]> = {
+  const tables: Record<string, any[]> = { users: [{ id: 'test-user-id', name: 'Owner', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }],
     products: [...(seedData.products || [])],
     categories: [...(seedData.categories || [])],
   };
@@ -88,8 +89,8 @@ beforeEach(async () => {
     id: 'test-user-id',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'owner',
-  }, TEST_JWT_SECRET);
+    role: 'owner', ...staffSessionClaims(),
+  }, TEST_JWT_SECRET, 28800);
   env = createEnv();
   const mod = await import('@aura/domain-catalog');
   router = mod.productsRouter;

@@ -1,3 +1,4 @@
+import { useSubmissionSession } from '@/lib/server-confirmed-submission';
 import { Users, UserPlus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,11 +11,17 @@ import { Button } from '@/components/ui/button';
 import type { AdminCustomer } from '@/hooks/use-admin';
 
 export default function AdminCustomersPage() {
+  const session = useSubmissionSession();
+  return <CustomersSession key={session} />;
+}
+
+function CustomersSession() {
   const { t } = useTranslation('adminCustomers');
   const {
     customers,
     totalCount,
     loading,
+    pending,
     error,
     fetchCustomers,
     addCustomer,
@@ -60,11 +67,11 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const handleSaveCustomer = async (data: { name: string; phone: string; tier: string }) => {
+  const handleSaveCustomer = async (data: { name: string; phone: string; tier: string }, requestKey?: string) => {
     if (editingCustomer) {
       return await updateCustomer(editingCustomer.id, data);
     }
-    return await addCustomer(data);
+    return await addCustomer(data, requestKey);
   };
 
   return (
@@ -157,6 +164,7 @@ export default function AdminCustomersPage() {
             <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
               <CustomerTable
                 customers={customers}
+                pending={pending}
                 tierFilter={tierFilter || undefined}
                 searchQuery={search}
                 onEdit={handleOpenEdit}
@@ -167,12 +175,12 @@ export default function AdminCustomersPage() {
         </div>
       </div>
 
-      <CustomerModal
+      {isModalOpen && <CustomerModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveCustomer}
         customer={editingCustomer}
-      />
+      />}
     </>
   );
 }

@@ -1,13 +1,27 @@
 import { useState } from 'react';
 import { Mail, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { apiFetch } from '@/lib/api-client';
 
 export function NewsletterSection() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    try {
+      localStorage.setItem('aura_selected_promo_code', 'WELCOME');
+      const digits = trimmed.replace(/\D/g, '');
+      if (digits.length >= 9 && digits.length <= 12) {
+        await apiFetch('/api/loyalty/phone-auth', {
+          method: 'POST',
+          body: JSON.stringify({ phone: digits }),
+        }).catch(() => {});
+      }
+    } catch {
+      // ignore storage errors
+    }
     setSubmitted(true);
   };
 

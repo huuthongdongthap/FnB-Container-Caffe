@@ -2,7 +2,10 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
-import { generateJWT, hashPassword } from '../../lib/jwt';
+import { hashPassword } from '../../lib/jwt';
+import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse } from '../../lib/staff-session';
+import { createStaffIdentity } from '../../lib/staff-login-identity';
+import type { Env } from '../../types/env';
 import { bootstrapOwnerSchema } from '../../lib/validators';
 import { generateId, parseJSON, findExistingOwner } from './helpers';
 
@@ -48,26 +51,28 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       phone: '',
       password: hashedPassword,
       role: 'owner',
+      tenant_id: 'default',
       active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    await authKV.put(`user:${email}`, JSON.stringify(user));
-
-    const token = await generateJWT(
-      { email, name: user.name, id: user.id, role: 'owner' },
-      env.JWT_SECRET as string,
-      env.JWT_EXPIRY_SECONDS as string
-    );
+    const db = (env as unknown as Env).AURA_DB;
+    if (!await createStaffIdentity(env as unknown as Env, user, true)) return errorResponse('Owner hoặc email đã tồn tại', 409);
+    await authKV.put(`user:${email}`, JSON.stringify(user)).catch(() => {});
+    await authKV.put(`user:${user.id}`, JSON.stringify(user)).catch(() => {});
+    const session = await issueStaffSession(env as unknown as Env, await requireStaffAccount(db, user.id), { email, sessionType: 'staff-web' });
+    const token = session.token;
 
     return jsonResponse({
       success: true,
       message: 'Owner đầu tiên đã tạo. Endpoint này sẽ từ chối các request sau.',
-      user: { id: user.id, email: user.email, name: user.name, role: 'owner' },
+      user: session.user,
       token
     }, 201);
   } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
     log.error('BootstrapOwner error:', { message: (error as Error).message });
     return errorResponse('Bootstrap owner thất bại', 500);
   }

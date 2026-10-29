@@ -6,9 +6,14 @@ import { birthdayRouter } from '../../routes/birthday';
 import { erpnextSyncRoutes } from '../../routes/erpnext-sync';
 import { executeKdsStatusTransition } from '../../../../packages/domain/kitchen/commands/kds-status-transition';
 import { generateJWT } from '../../lib/jwt';
-import { createMockKV, TEST_JWT_SECRET } from '../test-utils';
+import { createMockKV, isStaffAccountLookup, TEST_JWT_SECRET } from '../test-utils';
 
-function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = []) {
+/** Account rows the staff-session gate reads behind a staff token. */
+const STAFF_ACCOUNTS: any[] = [
+  { id: 'USR_OWNER', name: 'Owner', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 },
+];
+
+function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = [], accountRows: any[] = STAFF_ACCOUNTS) {
   const cafeTables = new Map(initialTables.map((t) => [t.id, t]));
   const orders = new Map(initialOrders.map((o) => [o.id, o]));
   const erpnextLogs: any[] = [];
@@ -23,6 +28,12 @@ function createMockD1Database(initialTables: any[] = [], initialOrders: any[] = 
           return stmt;
         },
         first: async <T = unknown>(): Promise<T | null> => {
+          // The staff-session gate looks the account row up on every request, so
+          // an admin route cannot be exercised without answering its lookup.
+          if (isStaffAccountLookup(sql)) {
+            const id = String(stmt._binds[0]);
+            return (accountRows.find((r) => String(r.id) === id) ?? null) as T;
+          }
           if (sql.includes('FROM products WHERE id = ?')) {
             const products: Record<string, object> = { tea: { id: 'tea', name: 'Trà sen vàng', price: 45000, available: 1 }, bread: { id: 'bread', name: 'Bánh sừng bò', price: 35000, available: 1 } };
             return (products[String(stmt._binds[0])] || null) as T;
@@ -241,10 +252,9 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
       const app = new Hono<{ Bindings: any }>();
       erpnextSyncRoutes(app);
 
-      const token = await generateJWT(
-        { id: 'USR_OWNER', email: 'owner@aura.cafe', name: 'Owner', role: 'owner' },
+      const token = await generateJWT({ id: 'USR_OWNER', email: 'owner@aura.cafe', name: 'Owner', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'},
         TEST_JWT_SECRET,
-        '1h'
+        3600
       );
 
       const statusRes = await app.fetch(

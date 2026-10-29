@@ -1,6 +1,8 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { createLogger } from '../../middleware/logger';
 import type { Env } from '../../types/env';
+import { requireStaffAccount } from '../../lib/staff-session';
+import { changeStaffPassword } from '../../lib/staff-password';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword } from './helpers';
 
@@ -70,7 +72,8 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const passwordHash = await hashPassword(body.newPassword);
-    await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+    if (user.role !== 'customer') await changeStaffPassword(db, await requireStaffAccount(db, user.id), passwordHash);
+    else await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
     try {
       await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
     } catch {

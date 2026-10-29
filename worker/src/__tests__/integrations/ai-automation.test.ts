@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMockEnv, TEST_JWT_SECRET } from '../test-utils';
+import { createMockEnv, isStaffAccountLookup, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import app from '../../index';
 
@@ -26,14 +26,19 @@ async function authRequest(
   };
 
   if (role) {
+    // Session claims the request-time gate requires: without them a staff
+    // token reads as a pre-versioning session and is rejected before the route.
     const token = await generateJWT({
       id: `user-${role}`,
       sub: `user-${role}`,
       role,
       email: `${role}@test.aura`,
       name: `User ${role}`,
-      tenantId
-    } as any, TEST_JWT_SECRET);
+      tenantId,
+      authVersion: 1,
+      authTime: Math.floor(Date.now() / 1000),
+      sessionType: 'staff-web'
+    } as any, TEST_JWT_SECRET, 28800);
     headers.Authorization = `Bearer ${token}`;
   }
 
@@ -47,13 +52,46 @@ async function authRequest(
   return new Request(`https://test.aura${path}`, init);
 }
 
+/** Answers the session gate's account read with the row the token names. */
+function accountStatement() {
+  // The row has to match the id the gate binds, and the role is derived from
+  // that id's `user-<role>` shape so a token for any staff role finds its row.
+  let bound: string[] = [];
+  const stmt: any = {
+    bind: (...args: string[]) => { bound = args; return stmt; },
+    first: async () => {
+      const id = String(bound[0] ?? 'user-owner');
+      const role = id.replace(/^user-/, '') || 'owner';
+      return { id, name: `User ${role}`, phone: null, role, tenant_id: 'default', is_active: 1, auth_version: 1 };
+    },
+    all: async () => ({ results: [], success: true, meta: {} }),
+    run: async () => ({ success: true, changes: 0, lastRowId: 0, meta: {} }),
+    raw: async () => [],
+  };
+  return stmt;
+}
+
 describe('AI & Edge Automation Integration', () => {
   let mockEnv: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockEnv = createMockEnv();
   });
+
+  /**
+   * Install a DB prepare mock while keeping the session gate answerable.
+   *
+   * Every test in this suite replaces `AURA_DB.prepare` to script its own rows,
+   * and a bare replacement makes the request-time session gate's account lookup
+   * return nothing — which reads as a revoked session, not as "no data". The
+   * wrapper answers that lookup first and defers everything else.
+   */
+  function scriptDB(build: () => unknown) {
+    mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+      ? accountStatement()
+      : build());
+  }
 
   describe('1. AI Menu Recommendations', () => {
     it('returns 400 when item_id is missing', async () => {
@@ -66,11 +104,11 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('returns cold-start fallback recommendations when no affinities exist', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({ results: [] })
         })
-      });
+      }));
 
       const req = await authRequest('GET', '/api/recommendations/frequently-bought-together?item_id=prod_cf_den');
       const res = await app.fetch(req, mockEnv);
@@ -83,7 +121,7 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('returns mined co-occurrence companions when affinity data is present', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -92,7 +130,7 @@ describe('AI & Edge Automation Integration', () => {
             ]
           })
         })
-      });
+      }));
 
       const req = await authRequest('GET', '/api/recommendations/frequently-bought-together?item_id=cafe_muoi_sadec');
       const res = await app.fetch(req, mockEnv);
@@ -105,7 +143,7 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('returns trending items based on recent order velocity', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -115,7 +153,7 @@ describe('AI & Edge Automation Integration', () => {
             ]
           })
         })
-      });
+      }));
 
       const req = await authRequest('GET', '/api/recommendations/trending?range=24h');
       const res = await app.fetch(req, mockEnv);
@@ -127,7 +165,7 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('mines order pairs and inserts affinities when called by staff', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -136,7 +174,7 @@ describe('AI & Edge Automation Integration', () => {
           }),
           run: vi.fn().mockResolvedValue({ success: true })
         })
-      });
+      }));
       mockEnv.AURA_DB.batch = vi.fn().mockResolvedValue([]);
 
       const req = await authRequest('POST', '/api/recommendations/mine-affinities', 'owner');
@@ -156,36 +194,35 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('computes run-rate, days-of-supply, and flags CRITICAL stock-outs', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockImplementation((query: string) => {
-        if (query.includes('FROM inventory_items')) {
-          return {
-            bind: vi.fn().mockReturnValue({
-              all: vi.fn().mockResolvedValue({
-                results: [
-                  { id: 'item_1', sku: 'SKU-ROBUSTA', name: 'Hạt Robusta Sa Đéc', current_stock: 5, min_stock: 10, max_stock: 50, unit: 'kg' },
-                  { id: 'item_2', sku: 'SKU-SUA-DAC', name: 'Sữa đặc Ông Thọ', current_stock: 40, min_stock: 10, max_stock: 50, unit: 'lon' }
-                ]
-              })
+      // scriptDB answers the session gate's account read first, then this
+      // per-query dispatcher serves the inventory rows under test.
+      const dispatch = (query: string): unknown => {
+        if (isStaffAccountLookup(query)) return accountStatement();
+        if (query.includes('FROM inventory_items')) return {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                { id: 'item_1', sku: 'SKU-ROBUSTA', name: 'Hạt Robusta Sa Đéc', current_stock: 5, min_stock: 10, max_stock: 50, unit: 'kg' },
+                { id: 'item_2', sku: 'SKU-SUA-DAC', name: 'Sữa đặc Ông Thọ', current_stock: 40, min_stock: 10, max_stock: 50, unit: 'lon' }
+              ]
             })
-          };
-        }
-        if (query.includes('FROM inventory_transactions')) {
-          return {
-            bind: vi.fn().mockReturnValue({
-              all: vi.fn().mockResolvedValue({
-                results: [
-                  // 21 kg depleted over 7 days -> 3 kg/day. Stock = 5 kg -> DOS = 1.67 days -> CRITICAL!
-                  { inventory_item_id: 'item_1', total_depleted: 21 },
-                  // 7 lon depleted over 7 days -> 1 lon/day. Stock = 40 lon -> DOS = 40 days -> HEALTHY
-                  { inventory_item_id: 'item_2', total_depleted: 7 }
-                ]
-              })
+          })
+        };
+        if (query.includes('FROM inventory_transactions')) return {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                // 21 kg depleted over 7 days -> 3 kg/day. Stock = 5 kg -> DOS = 1.67 days -> CRITICAL!
+                { inventory_item_id: 'item_1', total_depleted: 21 },
+                // 7 lon depleted over 7 days -> 1 lon/day. Stock = 40 lon -> DOS = 40 days -> HEALTHY
+                { inventory_item_id: 'item_2', total_depleted: 7 }
+              ]
             })
-          };
-        }
+          })
+        };
         return { bind: vi.fn().mockReturnValue({ all: vi.fn().mockResolvedValue({ results: [] }) }) };
-      });
-
+      };
+      mockEnv.AURA_DB.prepare = vi.fn((sql: string) => dispatch(sql));
       const req = await authRequest('GET', '/api/inventory/forecasting/run-rate?days=7', 'manager');
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
@@ -206,7 +243,7 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('persists inventory forecast snapshots into D1', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -214,7 +251,7 @@ describe('AI & Edge Automation Integration', () => {
             ]
           })
         })
-      });
+      }));
       mockEnv.AURA_DB.batch = vi.fn().mockResolvedValue([]);
 
       const req = await authRequest('POST', '/api/inventory/forecasting/snapshot', 'owner');
@@ -228,13 +265,18 @@ describe('AI & Edge Automation Integration', () => {
 
   describe('3. Edge Demand & Sales Forecasting', () => {
     it('requires owner or manager role for demand forecasting', async () => {
+      // The staff session must be live for the role check to be what rejects
+      // this call: with no account row the session gate answers 401 first.
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : { bind: vi.fn().mockReturnValue({ all: async () => ({ results: [] }), first: async () => null, run: async () => ({ success: true }) }) });
       const req = await authRequest('GET', '/api/admin/metrics/forecast', 'staff');
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(403);
     });
 
     it('computes 7-day projection with day-of-week seasonality and peak windows', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -244,7 +286,7 @@ describe('AI & Edge Automation Integration', () => {
             ]
           })
         })
-      });
+      }));
 
       const req = await authRequest('GET', '/api/admin/metrics/forecast?days=7', 'owner');
       const res = await app.fetch(req, mockEnv);
@@ -259,7 +301,7 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('returns 24-hour distribution of orders', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           all: vi.fn().mockResolvedValue({
             results: [
@@ -268,7 +310,7 @@ describe('AI & Edge Automation Integration', () => {
             ]
           })
         })
-      });
+      }));
 
       const req = await authRequest('GET', '/api/admin/metrics/forecast/hourly', 'owner');
       const res = await app.fetch(req, mockEnv);
@@ -293,11 +335,11 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('recommends Cà phê muối Sa Đéc for alert/strong preference in deterministic mode', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           run: vi.fn().mockResolvedValue({ success: true })
         })
-      });
+      }));
 
       const req = await authRequest('POST', '/api/ai/barista/recommend', undefined, 'default', {
         prompt: 'Tôi muốn ly cà phê thật đậm đà để tỉnh táo làm việc',
@@ -317,11 +359,11 @@ describe('AI & Edge Automation Integration', () => {
     });
 
     it('recommends Trà sen Tháp Mười for relaxed low-caffeine preference', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
+      scriptDB(() => ({
         bind: vi.fn().mockReturnValue({
           run: vi.fn().mockResolvedValue({ success: true })
         })
-      });
+      }));
 
       const req = await authRequest('POST', '/api/ai/barista/recommend', undefined, 'default', {
         prompt: 'Buổi chiều muốn uống gì đó thanh mát thư giãn',

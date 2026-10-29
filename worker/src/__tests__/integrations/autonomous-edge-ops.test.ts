@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createMockEnv, TEST_JWT_SECRET } from '../test-utils';
+import { createMockEnv, isStaffAccountLookup, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import app from '../../index';
 
@@ -31,8 +31,9 @@ async function authRequest(
       role,
       email: `${role}@test.aura`,
       name: `User ${role}`,
-      tenantId
-    } as any, TEST_JWT_SECRET);
+      tenantId,
+      ...(role === 'customer' ? {} : { authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' })
+    } as any, TEST_JWT_SECRET, 28800);
     headers.Authorization = `Bearer ${token}`;
   }
 
@@ -49,9 +50,39 @@ async function authRequest(
 describe('Autonomous Edge Operations Integration (Phase 5)', () => {
   let mockEnv: any;
 
+  /**
+   * Answers the session gate's account read with the row the token names.
+   *
+   * The role is derived from the bound id's `user-<role>` shape, so a token for
+   * any staff role finds a matching row — a diverging role would revoke it.
+   */
+  function accountStatement() {
+    let bound: unknown[] = [];
+    const stmt: any = {
+      bind: (...args: unknown[]) => { bound = args; return stmt; },
+      first: async () => {
+        const id = String(bound[0] ?? 'user-manager');
+        const role = id.replace(/^user-/, '') || 'manager';
+        return { id, name: `User ${role}`, phone: null, role, tenant_id: 'default', is_active: 1, auth_version: 1 };
+      },
+      all: async () => ({ results: [], success: true }),
+      run: async () => ({ success: true, changes: 1 }),
+      raw: async () => []
+    };
+    return stmt;
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockEnv = createMockEnv();
+    // Every test below swaps `prepare` wholesale to script its own rows, and a
+    // bare swap makes the gate's account lookup answer nothing — which reads as
+    // a revoked session. The branch is installed once here so requests that
+    // never script rows still let a staff token through.
+    const basePrepare = (mockEnv.AURA_DB as any).prepare.bind(mockEnv.AURA_DB);
+    (mockEnv.AURA_DB as any).prepare = (sql: string) => (isStaffAccountLookup(sql)
+      ? accountStatement()
+      : basePrepare(sql));
   });
 
   // The watchdog escalates CRITICAL alerts to Telegram, which is a real HTTP
@@ -67,26 +98,28 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
 
   describe('1. Dynamic Pricing & Margin Floor Protection', () => {
     it('returns active rules during configured time window', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          all: vi.fn().mockResolvedValue({
-            results: [
-              {
-                id: 'rule_happy_hour',
-                tenant_id: 'default',
-                name: 'Happy Hour Sa Đéc',
-                rule_type: 'happy_hour',
-                discount_percent: 15,
-                target_category: 'coffee',
-                min_margin_percent: 30,
-                days_of_week: '1,2,3,4,5',
-                start_time: '14:00',
-                end_time: '17:00',
-                is_active: 1
-              }
-            ]
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                {
+                  id: 'rule_happy_hour',
+                  tenant_id: 'default',
+                  name: 'Happy Hour Sa Đéc',
+                  rule_type: 'happy_hour',
+                  discount_percent: 15,
+                  target_category: 'coffee',
+                  min_margin_percent: 30,
+                  days_of_week: '1,2,3,4,5',
+                  start_time: '14:00',
+                  end_time: '17:00',
+                  is_active: 1
+                }
+              ]
+            })
           })
-        })
       });
 
       // Wednesday 15:30 (Day 3, between 14:00 and 17:00 in Asia/Ho_Chi_Minh)
@@ -101,26 +134,28 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('calculates discounted total applying active happy hour discount', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          all: vi.fn().mockResolvedValue({
-            results: [
-              {
-                id: 'rule_happy_hour',
-                tenant_id: 'default',
-                name: 'Happy Hour Sa Đéc',
-                rule_type: 'happy_hour',
-                discount_percent: 15,
-                target_category: 'coffee',
-                min_margin_percent: 30,
-                days_of_week: '1,2,3,4,5',
-                start_time: '14:00',
-                end_time: '17:00',
-                is_active: 1
-              }
-            ]
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                {
+                  id: 'rule_happy_hour',
+                  tenant_id: 'default',
+                  name: 'Happy Hour Sa Đéc',
+                  rule_type: 'happy_hour',
+                  discount_percent: 15,
+                  target_category: 'coffee',
+                  min_margin_percent: 30,
+                  days_of_week: '1,2,3,4,5',
+                  start_time: '14:00',
+                  end_time: '17:00',
+                  is_active: 1
+                }
+              ]
+            })
           })
-        })
       });
 
       const payload = {
@@ -148,26 +183,28 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('caps discount when margin floor protection is breached', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          all: vi.fn().mockResolvedValue({
-            results: [
-              {
-                id: 'rule_flash',
-                tenant_id: 'default',
-                name: 'Flash Sale 50%',
-                rule_type: 'category_flash',
-                discount_percent: 50,
-                target_category: 'coffee',
-                min_margin_percent: 30,
-                days_of_week: '1,2,3,4,5',
-                start_time: '00:00',
-                end_time: '23:59',
-                is_active: 1
-              }
-            ]
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                {
+                  id: 'rule_flash',
+                  tenant_id: 'default',
+                  name: 'Flash Sale 50%',
+                  rule_type: 'category_flash',
+                  discount_percent: 50,
+                  target_category: 'coffee',
+                  min_margin_percent: 30,
+                  days_of_week: '1,2,3,4,5',
+                  start_time: '00:00',
+                  end_time: '23:59',
+                  is_active: 1
+                }
+              ]
+            })
           })
-        })
       });
 
       // Price: 30,000, Unit Cost: 25,000.
@@ -209,15 +246,17 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('retrieves live order status by order ID', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          first: vi.fn().mockResolvedValue({
-            id: 'ord_12345',
-            status: 'preparing',
-            total: 55000
-          }),
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue({
+              id: 'ord_12345',
+              status: 'preparing',
+              total: 55000
+            }),
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const payload = { query: 'Kiểm tra giúp đơn ord_12345' };
@@ -231,15 +270,17 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('queries active table bill by table number', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          first: vi.fn().mockResolvedValue({
-            id: 'ord_tbl_02',
-            total: 85000,
-            status: 'served'
-          }),
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue({
+              id: 'ord_tbl_02',
+              total: 85000,
+              status: 'served'
+            }),
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const payload = { query: 'Bàn 2 tính tiền bao nhiêu vậy?' };
@@ -253,15 +294,17 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('looks up customer loyalty points by phone number', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          first: vi.fn().mockResolvedValue({
-            name: 'Nguyễn Văn A',
-            loyalty_points: 120,
-            loyalty_tier: 'gold'
-          }),
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue({
+              name: 'Nguyễn Văn A',
+              loyalty_points: 120,
+              loyalty_tier: 'gold'
+            }),
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const payload = { query: 'Kiểm tra điểm tích lũy', phone: '0901234567' };
@@ -349,10 +392,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       expect(customerBookingsRes.status).toBe(403);
 
       mockEnv.CAL_WEBHOOK_SECRET = 'cal_sec_test';
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: () => ({
-          run: () => Promise.reject(new Error('SQLITE_ERROR: table bookings has no column secret_col'))
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: () => ({
+            run: () => Promise.reject(new Error('SQLITE_ERROR: table bookings has no column secret_col'))
+          })
       });
 
       const webhookReq = new Request('https://test.aura/api/webhooks/cal-booking', {
@@ -385,10 +430,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
 
   describe('4. Container Edge IoT Telemetry & Autonomous Watchdog', () => {
     it('ingests normal telemetry heartbeat without alerts', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const heartbeat = {
@@ -409,10 +456,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('detects high thermal anomaly (> 38°C) and escalates to CRITICAL', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockResolvedValue({})
+          })
       });
       mockEnv.TELEGRAM_BOT_TOKEN = 'mock-tg-token';
       mockEnv.TELEGRAM_CHAT_ID = 'mock-tg-chat';
@@ -434,10 +483,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('detects power grid loss with low battery (<= 20%) as CRITICAL', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockResolvedValue({})
-        })
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const heartbeat = {
@@ -458,24 +509,26 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
     });
 
     it('returns regional container fleet status for managers', async () => {
-      mockEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          all: vi.fn().mockResolvedValue({
-            results: [
-              {
-                id: 'tel_1',
-                container_id: 'container-sadec-01',
-                power_source: 'grid',
-                battery_percentage: 100,
-                ambient_temp_celsius: 26.5,
-                kds_online: 1,
-                alert_status: 'NORMAL',
-                alert_message: null,
-                created_at: new Date().toISOString()
-              }
-            ]
+      mockEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({
+              results: [
+                {
+                  id: 'tel_1',
+                  container_id: 'container-sadec-01',
+                  power_source: 'grid',
+                  battery_percentage: 100,
+                  ambient_temp_celsius: 26.5,
+                  kds_online: 1,
+                  alert_status: 'NORMAL',
+                  alert_message: null,
+                  created_at: new Date().toISOString()
+                }
+              ]
+            })
           })
-        })
       });
 
       const req = await authRequest('GET', '/api/edge/containers/status', 'manager', 'default');
@@ -494,10 +547,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
         ENVIRONMENT: 'production',
         EDGE_TELEMETRY_SECRET: 'edge_sec_prod_99'
       };
-      prodEnv.AURA_DB.prepare = vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockResolvedValue({})
-        })
+      prodEnv.AURA_DB.prepare = (sql: string) => (isStaffAccountLookup(sql)
+        ? accountStatement()
+        : {
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockResolvedValue({})
+          })
       });
 
       const heartbeat = {

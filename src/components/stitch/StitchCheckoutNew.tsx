@@ -69,9 +69,11 @@ function getInitialCheckoutForm(): {
 
     const params = new URLSearchParams(window.location.search);
     const urlTable = params.get('table');
+    const urlPromo = params.get('promo') || localStorage.getItem('aura_selected_promo_code') || '';
 
     const merged: CheckoutNewFormData = {
       ...defaultForm,
+      ...(urlPromo ? { promoCode: urlPromo } : {}),
       ...(savedProfile ? {
         fullName: savedProfile.fullName || '',
         phone: savedProfile.phone || '',
@@ -126,21 +128,41 @@ export function StitchCheckoutNew({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [promoInput, setPromoInput] = useState<string>(initialState.form.promoCode || '');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string>(initialState.form.promoCode || '');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(initialState.form.discount || 0);
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Loyalty lookup: debounce 400ms on phone change, fetch tier + wallet balance
+  // Loyalty lookup: only query authenticated customer summary (no public phone lookup)
   const lookupLoyalty = useCallback(async (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    if (digits.length < 9 || digits.length > 12) {
+    const hasAuthToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token'));
+    if (digits.length < 9 || digits.length > 12 || !hasAuthToken) {
       setLoyalty(null);
       return;
     }
     setIsLookingUp(true);
     try {
-      const res = await apiFetch<{ ok: boolean; member?: LoyaltyLookupResult }>(
-        `/api/loyalty/lookup?phone=${encodeURIComponent(digits)}`
+      const res = await apiFetch<{ ok?: boolean; success?: boolean; member?: LoyaltyLookupResult; data?: Record<string, unknown> }>(
+        '/api/loyalty/summary'
       );
-      setLoyalty(res?.ok && res.member ? res.member : null);
+      if (res?.member) {
+        setLoyalty(res.member);
+      } else if (res?.data) {
+        const d = res.data;
+        setLoyalty({
+          tier: String(d.tier ?? 'bronze'),
+          tier_vi: String(d.tier_vi ?? d.tier ?? 'Đồng'),
+          balance: Number(d.cashback_balance ?? d.balance ?? 0),
+          loyalty_points: Number(d.points ?? d.loyalty_points ?? 0),
+          member_since: String(d.member_since ?? ''),
+        });
+      } else {
+        setLoyalty(null);
+      }
     } catch {
       setLoyalty(null);
     } finally {
@@ -197,13 +219,60 @@ export function StitchCheckoutNew({
     : (orderType === 'dine_in'
       ? (locale?.startsWith('vi') ? 'Dùng tại quán (0₫)' : 'Dine-in ($0.00)')
       : (locale?.startsWith('vi') ? 'Mang về (0₫)' : 'Takeaway ($0.00)'));
-  const effectiveTotal = summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee;
+  const effectiveDiscount = appliedDiscount > 0 ? appliedDiscount : (summary.discount || 0);
+  const effectivePromoCode = appliedPromoCode || summary.promoCode;
+  const effectiveTotal = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
 
   const activeSummary: CheckoutNewSummary = {
     ...summary,
     deliveryFee: effectiveDeliveryFee,
     deliveryLabel: effectiveDeliveryLabel,
+    ...(effectiveDiscount > 0 ? { discount: effectiveDiscount } : {}),
+    ...(effectivePromoCode ? { promoCode: effectivePromoCode } : {}),
     total: effectiveTotal,
+  };
+
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    setPromoMessage(null);
+    setPromoError(null);
+    if (!code) {
+      setAppliedPromoCode('');
+      setAppliedDiscount(0);
+      return;
+    }
+    setIsValidatingPromo(true);
+    try {
+      const res = await apiFetch<{
+        success?: boolean;
+        data?: { valid?: boolean; code?: string; discount_amount?: number; percent?: number; max_discount?: number; reason?: string };
+      }>('/api/promotions/validate', {
+        method: 'POST',
+        body: JSON.stringify({
+          code,
+          order_total: summary.subtotal,
+          customer_name: form.fullName.trim(),
+          customer_phone: form.phone.replace(/\s/g, ''),
+        }),
+      });
+      const data = res?.data;
+      if (data?.valid) {
+        const discountAmt = Number(data.discount_amount ?? 0);
+        setAppliedPromoCode(data.code || code);
+        setAppliedDiscount(discountAmt);
+        setPromoMessage(`Đã áp dụng mã ${data.code || code} (-${discountAmt.toLocaleString('vi-VN')}₫)`);
+      } else {
+        setAppliedPromoCode('');
+        setAppliedDiscount(0);
+        setPromoError(data?.reason || 'Mã ưu đãi không hợp lệ hoặc không đủ điều kiện');
+      }
+    } catch (err) {
+      setAppliedPromoCode('');
+      setAppliedDiscount(0);
+      setPromoError(err instanceof Error ? err.message : 'Không thể kiểm tra mã ưu đãi');
+    } finally {
+      setIsValidatingPromo(false);
+    }
   };
 
   // VN mobile numbers: exactly 10 digits starting with 0
@@ -233,7 +302,12 @@ export function StitchCheckoutNew({
     }
     setIsSubmitting(true);
     try {
-      await onPlaceOrder({ ...form, paymentMethod, orderType });
+      await onPlaceOrder({
+        ...form,
+        paymentMethod,
+        orderType,
+        ...(effectivePromoCode ? { promoCode: effectivePromoCode, discount: effectiveDiscount } : {}),
+      });
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : t('stitch.orderFailed', 'Đặt hàng thất bại'),
@@ -446,6 +520,42 @@ export function StitchCheckoutNew({
                     multiline
                     rows={3}
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-soft)] mb-2">
+                    {locale?.startsWith('vi') ? 'Mã Ưu Đãi (WELCOME giảm 10% tối đa 30.000₫ cho khách mới)' : 'Promo Code'}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      placeholder="VD: WELCOME"
+                      aria-label="Mã ưu đãi"
+                      data-testid="promo-code-input"
+                      className="flex-1 bg-transparent border border-white/15 rounded-xl px-4 py-3 text-white font-mono text-sm uppercase focus:outline-none focus:border-[var(--aura-chrome-bright)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyPromo}
+                      disabled={isValidatingPromo}
+                      data-testid="apply-promo-btn"
+                      className="px-5 py-3 rounded-xl border border-[rgba(var(--aura-chrome-light),0.3)] bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold uppercase tracking-wider text-[var(--aura-chrome-bright)] transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isValidatingPromo ? 'Đang kiểm tra...' : 'Áp dụng'}
+                    </button>
+                  </div>
+                  {promoMessage && (
+                    <p className="mt-1.5 text-xs text-emerald-400" data-testid="promo-success">
+                      {promoMessage}
+                    </p>
+                  )}
+                  {promoError && (
+                    <p className="mt-1.5 text-xs text-red-400" data-testid="promo-error">
+                      {promoError}
+                    </p>
+                  )}
                 </div>
               </div>
             </section>

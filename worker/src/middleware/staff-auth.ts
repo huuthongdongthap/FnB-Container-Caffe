@@ -1,70 +1,7 @@
-/**
- * Staff Mobile Auth Middleware — AURA Mobile
- * requireStaff(roles?) — JWT verification + role gate for /mobile/* routes.
- * Reuses requireAuth's JWT flow but supports the expanded 4-role enum.
- */
+/** Staff mobile uses the same CSRF, JWT, account and revocation gate as web. */
+import { requireAuth } from './auth';
+import { STAFF_SESSION_ROLES } from '../lib/staff-session';
 
-import type { MiddlewareHandler } from 'hono';
-import type { Env } from '../types/env';
-import { verifyJWT, getAuthToken } from '../lib/jwt';
-import { ROLE_LABELS } from '@aura/domain-staff';
-
-/**
- * Middleware factory: requireStaff(allowedRoles?)
- * Defaults to all 4 staff roles being accepted (no gate by default).
- * @param allowedRoles — subset of ['owner','manager','staff','waiter']; omit or pass [] to accept all.
- */
-export function requireStaff(
-  allowedRoles: string[] = ['owner', 'manager', 'staff', 'waiter', 'admin']
-): MiddlewareHandler<{ Bindings: Env }> {
-  return async (c, next) => {
-    if (!(c.env as Env).JWT_SECRET) {
-      return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
-    }
-
-    const token = getAuthToken(c.req.raw);
-    if (!token) {
-      return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
-    }
-
-    const payload = await verifyJWT(token, (c.env as Env).JWT_SECRET);
-    if (!payload) {
-      return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
-    }
-
-    const authKv = (c.env as Env)?.AUTH_KV;
-    const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
-    if (revoked) {
-      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
-    }
-
-    const userRole = payload.role || 'customer';
-
-    // Reject customers entirely — staff routes should never be reached by a customer token
-    if (userRole === 'customer') {
-      return c.json({ success: false, error: 'Không có quyền truy cập khu vực nhân viên' }, 403);
-    }
-
-    if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-      const label = ROLE_LABELS[userRole as keyof typeof ROLE_LABELS]?.vi ?? userRole;
-      return c.json(
-        {
-          success: false,
-          error: `Vai trò "${label}" không được phép truy cập tài nguyên này`,
-        },
-        403
-      );
-    }
-
-    c.set('user', {
-      id: String(payload.id || (payload as { sub?: string }).sub || ''),
-      email: payload.email || '',
-      name: payload.name || '',
-      role: userRole as 'owner' | 'manager' | 'staff' | 'waiter',
-      tenantId: (payload as { tenantId?: string }).tenantId || 'default',
-      tier: (payload as { tier?: string }).tier,
-    } as any);
-
-    await next();
-  };
+export function requireStaff(allowedRoles: string[] = STAFF_SESSION_ROLES) {
+  return requireAuth(allowedRoles.length ? allowedRoles : STAFF_SESSION_ROLES);
 }

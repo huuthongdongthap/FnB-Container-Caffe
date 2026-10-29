@@ -5,6 +5,7 @@ import { Edit2, Trash2 } from 'lucide-react';
 
 interface CustomerTableProps {
   customers: AdminCustomer[];
+  pending?: Record<string, boolean>;
   tierFilter?: string;
   searchQuery?: string;
   className?: string;
@@ -14,6 +15,7 @@ interface CustomerTableProps {
 
 export function CustomerTable({
   customers,
+  pending = {},
   tierFilter,
   searchQuery = '',
   className,
@@ -100,6 +102,7 @@ export function CustomerTable({
                         <button
                           type="button"
                           onClick={() => onEdit(customer)}
+                          disabled={pending[customer.id]}
                           aria-label={`Sửa thông tin khách ${customer.name}`}
                           className="p-1.5 rounded-md hover:bg-muted/30 text-muted hover:text-foreground transition-colors cursor-pointer"
                         >
@@ -110,6 +113,7 @@ export function CustomerTable({
                         <button
                           type="button"
                           onClick={() => onDelete(customer)}
+                          disabled={pending[customer.id]}
                           aria-label={`Xóa khách ${customer.name}`}
                           className="p-1.5 rounded-md hover:bg-red-500/15 text-muted hover:text-red-400 transition-colors cursor-pointer"
                         >

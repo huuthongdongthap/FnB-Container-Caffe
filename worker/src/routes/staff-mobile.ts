@@ -16,16 +16,18 @@ import {
 import { getKdsMobile, updateKdsStatus } from '@aura/domain-kitchen';
 import { getTablesMobile, updateTableStatus } from './tables-mobile';
 import { getOrdersMobile, createOrderMobile, getOrderDetail } from './orders-mobile';
+import { sopMobileRouter } from './sop-mobile';
 import { getNotifications, markNotificationRead, subscribePush } from './notifications-mobile';
 import type { Env } from '../types/env';
 
 export const staffMobileRouter = new Hono<{ Bindings: Env }>();
 
 // ── Public: device login + token refresh + me ──
+const ALL_STAFF_ROLES = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin'];
 const mobilePublic = new Hono<{ Bindings: Env }>();
 mobilePublic.post('/login', staffMobileLogin);
 mobilePublic.post('/refresh', staffTokenRefresh);
-mobilePublic.get('/me', (c) => getCurrentUser(c.req.raw, c.env));
+mobilePublic.get('/me', requireStaff(ALL_STAFF_ROLES), (c) => getCurrentUser(c.req.raw, c.env));
 staffMobileRouter.route('/', mobilePublic);
 
 // ── Protected: device management (owner|manager|admin) ──
@@ -74,3 +76,6 @@ mobileOrders.get('/', getOrdersMobile);
 mobileOrders.post('/', createOrderMobile);
 mobileOrders.get('/:id', getOrderDetail);
 staffMobileRouter.route('/orders', mobileOrders);
+
+// ── Protected: SOP checklists (start/tick/complete/abandon) ──
+staffMobileRouter.route('/sop', sopMobileRouter);

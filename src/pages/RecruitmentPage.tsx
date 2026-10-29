@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { confirmedRecord, createSubmissionKey, submissionSession, useSubmissionSession } from '@/lib/server-confirmed-submission';
 import { apiFetch } from '@/lib/api-client';
 import {
   Coffee,
@@ -42,6 +43,15 @@ const INITIAL_FORM: ApplicationData = {
 };
 
 export default function RecruitmentPage() {
+  const session = useSubmissionSession();
+  return <RecruitmentFormSession key={session} />;
+}
+
+function RecruitmentFormSession() {
+  const requestKey = useRef(createSubmissionKey());
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [formData, setFormData] = useState<ApplicationData>(INITIAL_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -60,6 +70,9 @@ export default function RecruitmentPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (inFlight.current) return;
+    const session = submissionSession();
+    const current = () => mounted.current && session === submissionSession();
     setErrorMessage(null);
 
     if (!formData.fullName.trim()) {
@@ -71,52 +84,23 @@ export default function RecruitmentPage() {
       return;
     }
 
+    inFlight.current = true;
     setIsSubmitting(true);
 
     try {
-      // 1. Save to local storage for offline resilience
-      const applicationPayload = {
-        ...formData,
-        id: `APP_${Date.now()}`,
-        submittedAt: new Date().toISOString(),
-      };
-      const existing = JSON.parse(localStorage.getItem('aura_recruitment_applications') || '[]');
-      existing.unshift(applicationPayload);
-      localStorage.setItem('aura_recruitment_applications', JSON.stringify(existing.slice(0, 50)));
-
-      // 2. Post to API backend (with dual resilience)
-      try {
-        await apiFetch('/api/recruitment/apply', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-          silent: true,
-        });
-      } catch {
-        try {
-          await apiFetch('/api/contact', {
-            method: 'POST',
-            body: JSON.stringify({
-              name: formData.fullName.trim(),
-              phone: formData.phone.trim(),
-              category: 'recruitment',
-              content: `[Ứng tuyển AURA CAFE] Vị trí: ${
-                formData.position === 'barista' ? 'Pha chế (Barista)' : 'Phục vụ & Thu ngân'
-              } | Năm sinh: ${formData.birthYear} | Ca đăng ký: ${formData.shifts.join(', ')} | Kinh nghiệm: ${
-                formData.experience
-              } | Ghi chú: ${formData.note || 'Không có'}`,
-            }),
-            silent: true,
-          });
-        } catch {
-          // Fallback: local storage is already saved
-        }
-      }
-
+      const payload = { ...formData, fullName: formData.fullName.trim(), phone: formData.phone.trim() };
+      const response = await apiFetch('/api/recruitment/apply', {
+        method: 'POST', body: JSON.stringify(payload), silent: true,
+        headers: { 'Idempotency-Key': requestKey.current.forPayload(payload) },
+      });
+      confirmedRecord(response);
+      if (!current()) return;
+      requestKey.current.clear();
       setSubmitted(true);
-    } catch {
-      setErrorMessage('Có lỗi xảy ra khi nộp hồ sơ. Vui lòng liên hệ trực tiếp hotline hoặc Zalo 0986.470.981.');
+    } catch (error) {
+      if (current()) setErrorMessage(`Chưa xác nhận đã gửi hồ sơ. ${error instanceof Error ? error.message : 'Vui lòng kiểm tra kết nối.'} Vui lòng thử lại.`);
     } finally {
-      setIsSubmitting(false);
+      if (current()) { inFlight.current = false; setIsSubmitting(false); }
     }
   };
 

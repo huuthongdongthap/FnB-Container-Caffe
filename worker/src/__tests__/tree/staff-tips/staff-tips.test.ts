@@ -8,10 +8,14 @@ import type { D1Database } from '@cloudflare/workers-types';
 interface R { [k: string]: unknown }
 function makeDB(rowsBySql: Array<{ match: (s: string) => boolean; rows: R[]; firstRow?: R | null }>): D1Database {
   const log: string[] = []; const bound: { sql: string; args: unknown[] }[] = []; let idx = 0;
+  const acctStmt: any = { bind: () => acctStmt, first: async () => ({ id: 'u1', name: 'A', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 }), all: async () => ({ results: [] }), run: async () => ({ success: true, changes: 1 }), raw: async () => [] };
   return {
     _log: log, _bound: bound,
     prepare: (sql: string) => {
       log.push(sql);
+      // The request-time session gate reads the staff account row; without a
+      // fixture for it the gate cannot tell a live session from a revoked one.
+      if (sql.includes('FROM users WHERE id')) return acctStmt;
       let h = rowsBySql[idx]; if (h && !h.match(sql)) h = rowsBySql.find(x => x.match(sql));
       if (h) idx = rowsBySql.indexOf(h) + 1;
       const rows = h?.rows ?? []; const fr = h?.firstRow !== undefined ? h.firstRow : (rows[0] ?? null);
@@ -28,7 +32,7 @@ const app = new Hono<{ Bindings: any }>();
 app.use('/api/staff-tips/*', requireAuth(['owner', 'staff', 'manager']));
 app.route('/api/staff-tips', staffTipsRouter);
 async function fh(db: D1Database, m: string, p: string, b?: unknown) {
-  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' }, SECRET);
+  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, SECRET, 28800);
   const r = await app.fetch(new Request(`https://test.aura${p}`, { method: m, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, ...(b ? { body: JSON.stringify(b) } : {}) }), env(db), { waitUntil: () => {} } as any);
   return { status: r.status, json: await r.json().catch(() => ({})) };
 }

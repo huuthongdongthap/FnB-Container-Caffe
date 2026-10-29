@@ -1,4 +1,6 @@
 import React from 'react';
+import { act } from '@testing-library/react';
+import { saveClientSession } from '@/lib/client-session';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, waitFor, fireEvent } from '@/test-utils';
 
@@ -115,4 +117,42 @@ describe('AdminCustomersPage', () => {
     expect(screen.getByText('Failed to load')).toBeTruthy();
     expect(screen.getByText('Retry')).toBeTruthy();
   });
+  it('preserves failed customer inputs and retries the same submission key', async () => {
+    const addCustomer = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    setupStore({ addCustomer }); renderWithProviders(<AdminCustomersPage />);
+    fireEvent.click(screen.getByText('Thêm Khách Hàng'));
+    fireEvent.change(screen.getByPlaceholderText('Nguyễn Văn A'), { target: { value: 'Private A' } });
+    fireEvent.change(screen.getByPlaceholderText('0946013633'), { target: { value: '0901234567' } });
+    fireEvent.click(screen.getByText('Lưu Khách Hàng'));
+    expect(await screen.findByText('Chưa xác nhận đã lưu thông tin khách hàng. Vui lòng thử lại.')).toBeTruthy();
+    expect(screen.getByDisplayValue('Private A')).toBeTruthy();
+    fireEvent.click(screen.getByText('Lưu Khách Hàng'));
+    await waitFor(() => expect(screen.queryByPlaceholderText('Nguyễn Văn A')).toBeNull());
+    expect(addCustomer.mock.calls[0]?.[1]).toBe(addCustomer.mock.calls[1]?.[1]);
+  });
+  it('unmounts A’s held PII and A’s late callback cannot close B’s customer form', async () => {
+    let resolveA!: (body: boolean) => void;
+    let resolveB!: (body: boolean) => void;
+    const addCustomer = vi.fn().mockReturnValueOnce(new Promise<boolean>(r => { resolveA = r; }))
+      .mockReturnValueOnce(new Promise<boolean>(r => { resolveB = r; }));
+    setupStore({ addCustomer }); renderWithProviders(<AdminCustomersPage />);
+    fireEvent.click(screen.getByText('Thêm Khách Hàng'));
+    const fill = (name: string) => {
+      fireEvent.change(screen.getByPlaceholderText('Nguyễn Văn A'), { target: { value: name } });
+      fireEvent.change(screen.getByPlaceholderText('0946013633'), { target: { value: '0901234567' } });
+    };
+    fill('Private A'); fireEvent.submit(screen.getByPlaceholderText('Nguyễn Văn A').closest('form')!);
+    fireEvent.submit(screen.getByPlaceholderText('Nguyễn Văn A').closest('form')!);
+    expect(addCustomer).toHaveBeenCalledTimes(1);
+    act(() => saveClientSession('owner-b', { id: 'b', role: 'owner', name: 'B' }));
+    expect(screen.queryByDisplayValue('Private A')).toBeNull();
+    fireEvent.click(screen.getByText('Thêm Khách Hàng')); fill('Private B');
+    fireEvent.submit(screen.getByPlaceholderText('Nguyễn Văn A').closest('form')!);
+    await act(async () => resolveA(true));
+    expect(screen.getByDisplayValue('Private B')).toBeTruthy();
+    expect(screen.getByText('Đang lưu...').closest('button')).toBeDisabled();
+    await act(async () => resolveB(false));
+    expect(screen.getByDisplayValue('Private B')).toBeTruthy();
+  });
+
 });

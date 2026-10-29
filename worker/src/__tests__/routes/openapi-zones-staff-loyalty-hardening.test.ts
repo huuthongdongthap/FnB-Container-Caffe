@@ -26,13 +26,20 @@ function makeHardeningTestEnv() {
   const executedSqls: string[] = [];
   const auditInserts: Array<{ action: string; metadata: string }> = [];
   const createdUsers: Record<string, any> = {
+    // The request-time session gate reads the account row behind each staff
+    // token; these rows match the role those tokens sign, because a divergence
+    // between row and token reads as a role change and revokes the session.
+    'mgr-1': { id: 'mgr-1', name: 'Manager', email: 'mgr@auraspace.cafe', role: 'manager', tenant_id: 'default', is_active: 1, auth_version: 1, locale: 'vi', hire_date: '2026-01-01', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    'admin-1': { id: 'admin-1', name: 'Admin', email: 'admin@auraspace.cafe', role: 'admin', tenant_id: 'default', is_active: 1, auth_version: 1, locale: 'vi', hire_date: '2026-01-01', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
     [OWNER_ID]: {
       id: OWNER_ID,
       name: 'Store Owner',
       email: 'owner@auraspace.cafe',
       role: 'owner',
-      locale: 'vi',
+      tenant_id: 'default',
       is_active: 1,
+      auth_version: 1,
+      locale: 'vi',
       hire_date: '2026-01-01',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -92,7 +99,8 @@ function makeHardeningTestEnv() {
       all: async () => ({ results: [], success: true }),
       run: async () => {
         if (sql.includes('INSERT INTO users')) {
-          const [id, name, email, phone, password_hash, role, locale, is_active, avatar_url, hire_date, created_at, updated_at] = boundArgs;
+          const [id, name, role, phone, tenant_id, is_active, password_hash, created_at, updated_at] = boundArgs;
+          const email = '', locale = 'vi', avatar_url = null, hire_date = null;
           createdUsers[String(id)] = {
             id,
             name,
@@ -105,7 +113,7 @@ function makeHardeningTestEnv() {
             avatar_url,
             hire_date,
             created_at,
-            updated_at,
+            updated_at, tenant_id, auth_version: 1,
           };
         }
         if (sql.includes('INSERT INTO audit_logs')) {
@@ -114,12 +122,13 @@ function makeHardeningTestEnv() {
             metadata: String(boundArgs[5]),
           });
         }
-        return { success: true, changes: 1, lastRowId: 1 };
+        return { success: true, changes: 1, lastRowId: 1, meta: { changes: 1 } };
       },
     };
     return stmt as any;
   }) as any;
 
+  db.batch = async (statements) => Promise.all(statements.map(statement => statement.run()));
   return {
     env: {
       ...createMockEnv(),
@@ -162,7 +171,7 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('sanitizes ORDER BY sort parameter against SQL injection in /api/table-zones and /api/staff', async () => {
     const { env, executedSqls } = makeHardeningTestEnv();
-    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET);
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     const zoneRes = await app.fetch(
       new Request('https://test.aura/api/table-zones?sort=1;DROP%20TABLE%20users--&order=desc', {
@@ -191,7 +200,7 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('hashes staff password with PBKDF2 and redacts plaintext password from audit_logs', async () => {
     const { env, auditInserts, createdUsers } = makeHardeningTestEnv();
-    const token = await generateJWT({ sub: OWNER_ID, role: 'owner', name: 'Owner' }, TEST_SECRET);
+    const token = await generateJWT({ sub: OWNER_ID, role: 'owner', name: 'Owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     const res = await app.fetch(
       new Request('https://test.aura/api/staff', {
@@ -224,7 +233,7 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('blocks manager from creating, updating, or deleting an owner account (privilege escalation guard)', async () => {
     const { env } = makeHardeningTestEnv();
-    const mgrToken = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' }, TEST_SECRET);
+    const mgrToken = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     // 1. Manager attempting to create an owner account
     const createRes = await app.fetch(
@@ -315,7 +324,7 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('authorizes admin role across OpenAPI loyalty admin summary, staff, table-zones, and cron routers', async () => {
     const { env } = makeHardeningTestEnv();
-    const adminToken = await generateJWT({ sub: 'admin-1', role: 'admin', name: 'Admin' }, TEST_SECRET);
+    const adminToken = await generateJWT({ sub: 'admin-1', role: 'admin', name: 'Admin' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
 
     const summaryRes = await app.fetch(
       new Request('https://test.aura/api/loyalty/admin/summary', {

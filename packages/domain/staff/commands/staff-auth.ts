@@ -6,11 +6,15 @@
 
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
-import { generateJWT, hashPassword } from 'worker/src/lib/jwt';
+import { hashPassword } from 'worker/src/lib/jwt';
+import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
 import { staffRoleSchema, pinSchema, registerDeviceSchema } from 'worker/src/lib/validators';
 import { generateId } from 'worker/src/tree/auth/helpers';
+import {
+  requireStaffAccount, loadStaffAccount, isAccountActive, isStaffRole, issueStaffSession, staffTenant, staffSessionErrorResponse,
+  StaffSessionError, SessionUnavailableError, type StaffSession, type StaffAccount,
+} from 'worker/src/lib/staff-session';
 import type { Env } from 'worker/src/types/env';
-import type { JwtPayload } from 'worker/src/types/api';
 import type { Context } from 'hono';
 
 const log = createLogger({ route: 'staff-auth' });
@@ -86,6 +90,7 @@ function normalizeDeviceRole(rawRole: unknown): StaffDeviceRole {
 }
 
 async function findDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1Database; AUTH_KV: import('@cloudflare/workers-types').KVNamespace }, token: string) {
+  try {
   const row = await env.AURA_DB
     .prepare('SELECT * FROM staff_devices WHERE device_token = ?')
     .bind(token)
@@ -94,27 +99,35 @@ async function findDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1
       pin_hash: string; role: StaffDeviceRole;
     }>();
   return row ?? null;
+  } catch { throw new SessionUnavailableError(); }
 }
 
 async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1Database }, data: {
   staff_id: string; device_token: string; device_name?: string;
-  role: StaffDeviceRole; pin_hash: string;
+  role: StaffDeviceRole; pin_hash: string; account: StaffAccount;
 }) {
   const now = new Date().toISOString();
-  await env.AURA_DB
-    .prepare(
-      `INSERT INTO staff_devices (id, staff_id, device_name, device_token, pin_hash, role, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(device_token) DO UPDATE SET
-         staff_id = excluded.staff_id,
-         pin_hash = excluded.pin_hash,
-         role = excluded.role,
-         device_name = COALESCE(excluded.device_name, staff_devices.device_name),
-         updated_at = excluded.updated_at`
-    )
-    .bind(generateId('DEV_'), data.staff_id, data.device_name ?? null,
-          data.device_token, data.pin_hash, data.role, now, now)
-    .run();
+  const account = data.account;
+  const statement = env.AURA_DB.prepare(
+    `INSERT INTO staff_devices (id, staff_id, device_name, device_token, pin_hash, role, created_at, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ? FROM users
+     WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
+       AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
+     ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
+       role = excluded.role, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
+     WHERE staff_devices.staff_id = excluded.staff_id`,
+  ).bind(generateId('DEV_'), data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, now, now,
+    account.id, account.auth_version, account.role, staffTenant(account));
+  let results;
+  try {
+    results = await env.AURA_DB.batch([statement,
+      env.AURA_DB.prepare(`UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND auth_version = ?
+        AND EXISTS (SELECT 1 FROM staff_devices WHERE device_token = ? AND staff_id = ? AND pin_hash = ?)`)
+        .bind(now, account.id, account.auth_version, data.device_token, data.staff_id, data.pin_hash),
+    ]);
+  } catch { throw new SessionUnavailableError(); }
+  if (!results[0]?.meta.changes || !results[1]?.meta.changes) throw new StaffSessionError('SESSION_REVOKED');
+
 }
 
 // ── Handlers (plain async(c, env) — mounted as inline in index.ts) ──
@@ -124,183 +137,75 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const deviceToken = String(body.device_token ?? '');
-    const pin = String(body.pin ?? '');
-
-    if (!deviceToken) return errorResponse('Thiếu device_token', 400);
-
-    const parsedPin = pinSchema.safeParse(pin);
-    if (!parsedPin.success) return errorResponse(parsedPin.error.issues[0].message, 400);
-
-    const lockoutKey = `pin_lockout:${deviceToken}`;
-    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-    let failedAttempts = 0;
+    const parsed = pinSchema.safeParse(body.pin);
+    if (!deviceToken || !parsed.success) return errorResponse('Thiếu thiết bị hoặc PIN không hợp lệ', 400);
+    const kv = c.env.AUTH_KV;
+    if (!kv) throw new SessionUnavailableError();
+    const key = `pin_lockout:${deviceToken}`;
+    let failures = 0;
     try {
-      if (authKV) {
-        failedAttempts = parseInt((await authKV.get(lockoutKey)) || '0', 10);
-      }
+      failures = Number(await kv.get(key) || 0);
     } catch {
-      // Ignore KV transient error
+      throw new SessionUnavailableError();
     }
-    if (failedAttempts >= 5) {
-      return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
-    }
-
+    if (failures >= 5) return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
     const device = await findDevice(c.env, deviceToken);
     if (!device) return errorResponse('Thiết bị chưa đăng ký', 404);
-
-    const ok = await verifyPin(pin, device.pin_hash);
-    if (!ok) {
-      const nextAttempts = failedAttempts + 1;
+    if (!await verifyPin(parsed.data, device.pin_hash)) {
       try {
-        await authKV?.put(lockoutKey, String(nextAttempts), { expirationTtl: 300 });
+        await kv.put(key, String(failures + 1), { expirationTtl: 900 });
       } catch {
-        // Ignore KV transient error
+        throw new SessionUnavailableError();
       }
-      log.warn('Staff PIN mismatch', { device_id: device.id, staff_id: device.staff_id, attempts: nextAttempts });
-      if (nextAttempts >= 5) {
-        return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
-      }
-      return errorResponse('PIN không đúng', 401);
+      return failures + 1 >= 5 ? errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429) : errorResponse('PIN không đúng', 401);
     }
-
-    try {
-      await authKV?.delete?.(lockoutKey);
-    } catch {
-      // Ignore cleanup error
-    }
-
-    // Fire-and-forget last_login update
-    const loginNow = new Date().toISOString();
-    const updatePromise = c.env.AURA_DB
-      .prepare('UPDATE staff_devices SET last_login_at = ?, updated_at = ? WHERE device_token = ?')
-      .bind(loginNow, loginNow, deviceToken)
-      .run()
-      .catch(() => {});
-    try {
-      c.executionCtx?.waitUntil(updatePromise);
-    } catch {
-      void updatePromise;
-    }
-
-    let staffEmail = '';
-    let staffName = '';
-    try {
-      const staffRaw = await authKV?.get(`user:${device.staff_id}`);
-      if (staffRaw) {
-        const parsedStaff = JSON.parse(staffRaw) as { email?: string; name?: string };
-        staffEmail = parsedStaff.email || '';
-        staffName = parsedStaff.name || '';
-      }
-      if (!staffEmail && !staffName && c.env.AURA_DB) {
-        let d1Staff: { email?: string; name?: string } | null = null;
-        try {
-          d1Staff = await c.env.AURA_DB
-            .prepare('SELECT email, name FROM users WHERE id = ?')
-            .bind(device.staff_id)
-            .first<{ email?: string; name?: string }>();
-        } catch {
-          d1Staff = await c.env.AURA_DB
-            .prepare('SELECT username as email, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
-            .bind(device.staff_id)
-            .first<{ email?: string; name?: string }>();
-        }
-        if (d1Staff) {
-          staffEmail = d1Staff.email || '';
-          staffName = d1Staff.name || '';
-        }
-      }
-    } catch {
-      // Ignore lookup error
-    }
-
-    // Resolve store from the account record even when the display profile came from KV.
-    const staffBinding = await c.env.AURA_DB.prepare('SELECT tenant_id FROM users WHERE id = ?')
-      .bind(device.staff_id).first<{ tenant_id?: string | null }>();
-    if (!staffBinding) return errorResponse('Tài khoản nhân viên không còn tồn tại', 403);
-    const tenantId = staffBinding.tenant_id || 'default';
-    const token = await generateJWT(
-      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role, tenantId },
-      c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
-    );
-
-    return jsonResponse({
-      success: true,
-      user: { id: device.staff_id, email: staffEmail, name: staffName, role: device.role, tenantId, device_id: device.id },
-      token,
-      expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
-    });
-  } catch (err) {
-    log.error('staffMobileLogin error', { message: (err as Error).message });
+    const account = await requireStaffAccount(c.env.AURA_DB, device.staff_id);
+    const session = await issueStaffSession(c.env, account, { sessionType: 'staff-mobile', deviceId: device.id });
+    await kv.delete(key).catch(() => {});
+    const now = new Date().toISOString();
+    await c.env.AURA_DB.prepare('UPDATE staff_devices SET last_login_at = ?, updated_at = ? WHERE id = ?')
+      .bind(now, now, device.id).run();
+    const cookie = `access_token=${session.token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${session.expires_in}`;
+    return jsonResponse({ success: true, user: session.user, token: session.token, expires_in: session.expires_in }, 200, { 'Set-Cookie': cookie });
+  } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
+    log.error('staffMobileLogin error', { message: (error as Error).message });
     return errorResponse('Đăng nhập thất bại', 500);
   }
 }
 
-// POST /mobile/refresh — rotate JWT using valid device_token
+// A device identifier never authorizes refresh without its live Bearer session.
 export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
   try {
+    const session = await authenticateRequest(c.req.raw, c.env, { bearerOnly: true });
+    if (!session || 'blocked' in session) throw new StaffSessionError('SESSION_EXPIRED');
+    const claims = session.payload as StaffSession;
+    if (!session.account || claims.sessionType !== 'staff-mobile') throw new StaffSessionError('SESSION_REVOKED');
     const body = await c.req.json<Record<string, unknown>>();
     const deviceToken = String(body.device_token ?? '');
     if (!deviceToken) return errorResponse('Thiếu device_token', 400);
-
-    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+    if (!c.env.AUTH_KV) throw new SessionUnavailableError();
+    let lockoutCount = 0;
     try {
-      const failedAttempts = parseInt((await authKV?.get(`pin_lockout:${deviceToken}`)) || '0', 10);
-      if (failedAttempts >= 5) {
-        return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
-      }
+      lockoutCount = Number(await c.env.AUTH_KV.get(`pin_lockout:${deviceToken}`) || 0);
     } catch {
-      // Ignore KV transient error
+      throw new SessionUnavailableError();
     }
-
+    if (lockoutCount >= 5) {
+      return errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429);
+    }
     const device = await findDevice(c.env, deviceToken);
-    if (!device) return errorResponse('Thiết bị không hợp lệ', 401);
-
-    let staffEmail = '';
-    let staffName = '';
-    try {
-      const staffRaw = await authKV?.get(`user:${device.staff_id}`);
-      if (staffRaw) {
-        const parsedStaff = JSON.parse(staffRaw) as { email?: string; name?: string };
-        staffEmail = parsedStaff.email || '';
-        staffName = parsedStaff.name || '';
-      }
-      if (!staffEmail && !staffName && c.env.AURA_DB) {
-        let d1Staff: { email?: string; name?: string } | null = null;
-        try {
-          d1Staff = await c.env.AURA_DB
-            .prepare('SELECT email, name FROM users WHERE id = ?')
-            .bind(device.staff_id)
-            .first<{ email?: string; name?: string }>();
-        } catch {
-          d1Staff = await c.env.AURA_DB
-            .prepare('SELECT username as email, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
-            .bind(device.staff_id)
-            .first<{ email?: string; name?: string }>();
-        }
-        if (d1Staff) {
-          staffEmail = d1Staff.email || '';
-          staffName = d1Staff.name || '';
-        }
-      }
-    } catch {
-      // Ignore lookup error
-    }
-
-    const staffBinding = await c.env.AURA_DB.prepare('SELECT tenant_id FROM users WHERE id = ?')
-      .bind(device.staff_id).first<{ tenant_id?: string | null }>();
-    if (!staffBinding) return errorResponse('Tài khoản nhân viên không còn tồn tại', 403);
-    const tenantId = staffBinding.tenant_id || 'default';
-    const newToken = await generateJWT(
-      { email: staffEmail, name: staffName, id: device.staff_id, role: device.role, tenantId },
-      c.env.JWT_SECRET, c.env.JWT_EXPIRY_SECONDS
-    );
-
-    return jsonResponse({
-      success: true, token: newToken,
-      expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
+    if (!device || device.id !== claims.deviceId || device.staff_id !== claims.id) throw new StaffSessionError('DEVICE_REVOKED');
+    const next = await issueStaffSession(c.env, session.account, {
+      sessionType: 'staff-mobile', deviceId: device.id, authTime: claims.authTime,
     });
-  } catch (err) {
-    log.error('staffTokenRefresh error', { message: (err as Error).message });
+    const cookie = `access_token=${next.token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${next.expires_in}`;
+    return jsonResponse({ success: true, token: next.token, expires_in: next.expires_in, user: next.user }, 200, { 'Set-Cookie': cookie });
+  } catch (error) {
+    const response = staffSessionErrorResponse(error);
+    if (response) return response;
+    log.error('staffTokenRefresh error', { message: (error as Error).message });
     return errorResponse('Refresh thất bại', 500);
   }
 }
@@ -328,49 +233,26 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
       ? normalizeDeviceRole(requestedRole)
       : normalizeDeviceRole(parsed.data.role);
 
-    const authKV = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
     if (!staff_id) return errorResponse('staff_id là bắt buộc', 400);
-
-    const userStr = authKV ? await authKV.get(`user:${staff_id}`) : null;
-    let user: { id: string; name: string } | null = userStr
-      ? (JSON.parse(userStr) as { id: string; name: string })
-      : null;
-    if (!user && c.env.AURA_DB) {
-      try {
-        let d1User: { id: string; name?: string } | null = null;
-        try {
-          d1User = await c.env.AURA_DB
-            .prepare('SELECT id, name FROM users WHERE id = ?')
-            .bind(staff_id)
-            .first<{ id: string; name?: string }>();
-        } catch {
-          d1User = await c.env.AURA_DB
-            .prepare('SELECT id, COALESCE(name, full_name, username) as name FROM users WHERE id = ?')
-            .bind(staff_id)
-            .first<{ id: string; name?: string }>();
-        }
-        if (d1User?.id) {
-          user = { id: d1User.id, name: d1User.name || d1User.id };
-        }
-      } catch {
-        // Fallback to 404 if D1 lookup fails
-      }
+    const caller = c.get('user');
+    if (!caller) return errorResponse('Vui lòng đăng nhập', 401);
+    if (!['owner', 'admin', 'manager'].includes(caller.role)) return errorResponse('Không đủ quyền đăng ký thiết bị', 403);
+    const state = await loadStaffAccount(c.env.AURA_DB, staff_id);
+    if (!state.ok || !isStaffRole(state.account.role)) return errorResponse('Tài khoản không tồn tại', 404);
+    const account = state.account;
+    if (!isAccountActive(account)) throw new StaffSessionError('STAFF_ACCOUNT_INACTIVE');
+    if (staffTenant(account) !== (caller.tenantId || 'default')) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    if ((account.role === 'owner' && caller.role !== 'owner')
+      || (caller.role === 'manager' && (!MANAGER_MANAGED_ROLES.has(account.role) || !MANAGER_MANAGED_ROLES.has(role)))) {
+      return errorResponse('Không đủ quyền đăng ký thiết bị cho tài khoản này', 403);
     }
-    if (!user) return errorResponse('staff_id không khớp tài khoản nào trong hệ thống', 404);
-
-    const callerRole = c.get('user')?.role as string | undefined;
-    if (!callerRole) return errorResponse('Vui lòng đăng nhập', 401);
-
-    if (callerRole === 'manager' && !MANAGER_MANAGED_ROLES.has(role) && !MANAGER_MANAGED_ROLES.has(requestedRole)) {
-      return errorResponse('Manager chỉ đăng ký được bếp/phục vụ', 403);
-    } else if (!['owner', 'admin', 'manager'].includes(callerRole)) {
-      return errorResponse('Chỉ owner hoặc manager đăng ký thiết bị', 403);
-    }
-
+    const existing = await findDevice(c.env, device_token);
+    if (existing && existing.staff_id !== staff_id) return errorResponse('Thiết bị đã thuộc tài khoản khác', 409);
+    const user = { id: account.id, name: account.name || account.id };
     const pinHash = await hashPin(pin);
     await upsertDevice(c.env, {
       staff_id: user.id, device_token, device_name,
-      role: role as StaffDeviceRole, pin_hash: pinHash,
+      role: role as StaffDeviceRole, pin_hash: pinHash, account,
     });
 
     return jsonResponse({
@@ -378,6 +260,8 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
       message: 'Đăng ký thiết bị thành công',
     }, 201);
   } catch (err) {
+    const response = staffSessionErrorResponse(err);
+    if (response) return response;
     log.error('registerStaffDevice error', { message: (err as Error).message });
     return errorResponse('Đăng ký thất bại', 500);
   }
@@ -399,20 +283,30 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
       .first<{ id: string; staff_id: string; role: string }>();
     if (!device) return errorResponse('Thiết bị không tồn tại', 404);
 
-    const canDelete =
-      callerRole === 'owner' ||
-      callerRole === 'admin' ||
-      device.staff_id === callerId ||
-      (callerRole === 'manager' && MANAGER_MANAGED_ROLES.has(device.role));
+    const canDelete = ['owner', 'admin'].includes(callerRole) || device.staff_id === callerId
+      || (callerRole === 'manager' && MANAGER_MANAGED_ROLES.has(device.role));
     if (!canDelete) return errorResponse('Không đủ quyền xóa thiết bị', 403);
-
-    await c.env.AURA_DB
-      .prepare('DELETE FROM staff_devices WHERE id = ?')
-      .bind(deviceId)
-      .run();
+    const state = await loadStaffAccount(c.env.AURA_DB, device.staff_id);
+    if (!state.ok) return errorResponse('Tài khoản không tồn tại', 404);
+    const account = state.account;
+    const caller = c.get('user');
+    if (staffTenant(account) !== (caller?.tenantId || 'default')) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    if ((account.role === 'owner' && callerRole !== 'owner')
+      || (callerRole === 'manager' && !MANAGER_MANAGED_ROLES.has(account.role))) return errorResponse('Không đủ quyền xóa thiết bị', 403);
+    // The invalidation and removal commit together. Removing this device also
+    // invalidates every already-issued session for its account in the pilot.
+    try {
+      await c.env.AURA_DB.batch([
+        c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
+          .bind(new Date().toISOString(), device.staff_id),
+        c.env.AURA_DB.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(deviceId, device.staff_id),
+      ]);
+    } catch { throw new SessionUnavailableError(); }
 
     return jsonResponse({ success: true, message: 'Đã hủy đăng ký thiết bị' });
   } catch (err) {
+    const response = staffSessionErrorResponse(err);
+    if (response) return response;
     log.error('revokeStaffDevice error', { message: (err as Error).message });
     return errorResponse('Hủy thất bại', 500);
   }
@@ -425,21 +319,13 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
     const callerId = c.get('user')?.id as string | undefined;
     if (!callerRole || !callerId) return errorResponse('Vui lòng đăng nhập', 401);
 
-    let rows;
-    if (callerRole === 'owner' || callerRole === 'admin') {
-      rows = await c.env.AURA_DB
-        .prepare('SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices ORDER BY created_at DESC')
-        .all();
-    } else if (callerRole === 'manager') {
-      rows = await c.env.AURA_DB
-        .prepare("SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE role IN ('staff','waiter','cashier','kitchen','barista','chef') ORDER BY created_at DESC")
-        .all();
-    } else {
-      rows = await c.env.AURA_DB
-        .prepare('SELECT id, staff_id, device_name, role, last_login_at, created_at FROM staff_devices WHERE staff_id = ? ORDER BY created_at DESC')
-        .bind(callerId)
-        .all();
-    }
+    const caller = c.get('user');
+    const roleClause = callerRole === 'manager' ? " AND u.role IN ('staff','waiter','cashier','kitchen','barista','chef')"
+      : ['owner', 'admin'].includes(callerRole) ? '' : ' AND d.staff_id = ?';
+    const values = [caller?.tenantId || 'default', ...(['owner', 'admin', 'manager'].includes(callerRole) ? [] : [callerId])];
+    const rows = await c.env.AURA_DB.prepare(`SELECT d.id, d.staff_id, d.device_name, d.role, d.last_login_at, d.created_at
+      FROM staff_devices d JOIN users u ON u.id = d.staff_id
+      WHERE COALESCE(NULLIF(u.tenant_id, ''), 'default') = ?${roleClause} ORDER BY d.created_at DESC`).bind(...values).all();
 
     return jsonResponse({
       success: true,

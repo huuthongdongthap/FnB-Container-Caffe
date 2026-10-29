@@ -29,7 +29,7 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     if (!id) return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
     tableRow = { id, table_number: data.table_id };
   } catch (error) {
-    if (error instanceof OrderCreationError) return c.json({ success: false, error: error.message }, error.status === 400 ? 404 : error.status);
+    if (error instanceof OrderCreationError) return c.json({ success: false, error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status === 400 ? 404 : error.status);
     throw error;
   }
 

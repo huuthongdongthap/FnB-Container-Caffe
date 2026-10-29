@@ -11,10 +11,18 @@ function fixture(status = 'preparing', paid = 'unpaid', tenant = 'cafe-a') {
   value.sqlite.prepare(`INSERT INTO orders(id,items,total,status,payment_status,payment_method,customer_name,customer_phone,tenant_id)
     VALUES ('COD_LOCAL','[]',20000,?,?,'cod','Local','0900000010',?)`).run(status, paid, tenant);
   value.sqlite.exec("INSERT INTO payments(id,order_id,method,amount,status) VALUES ('COD_PAYMENT','COD_LOCAL','cod',20000,'pending')");
+  // The request-time session gate reads the account row behind the token; with
+  // no row it cannot tell a live session from a revoked one.
+  // Each actor has an explicit canonical role/tenant matching its session.
+  for (const role of ['cashier', 'staff']) value.sqlite.prepare(`INSERT INTO users (id,name,role,tenant_id,is_active,auth_version)
+    VALUES (?,? ,?,'cafe-a',1,1)`).run(`local-${role}`, `Local ${role}`, role);
   return value;
 }
 async function request(path = '/api/orders/COD_LOCAL/mark-cod-paid', method = 'PATCH', role = 'cashier') {
-  const token = await generateJWT({ id: 'local-cashier', role, tenantId: 'cafe-a', email: 'local@test.aura' } as any, TEST_JWT_SECRET);
+  // The session gate judges these claims against the account row inserted below,
+  // so the auth version must be present and must match that row.
+  const token = await generateJWT({ id: `local-${role}`, role, tenantId: 'cafe-a', email: 'local@test.aura',
+    authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800);
   return new Request(`https://test.aura${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
 }
 afterEach(() => { for (const value of fixtures.splice(0)) value.sqlite.close(); });

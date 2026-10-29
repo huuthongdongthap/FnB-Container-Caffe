@@ -24,7 +24,8 @@ function createMockEnv(overrides: Partial<Env> = {}): Env {
       return {
         bind: (...params: unknown[]) => ({
           first: async() => {
-            if (sql.includes('SELECT id FROM orders WHERE id = ?')) {
+            if (/FROM users WHERE id/i.test(sql)) return { id: 'staff_1', name: 'Kitchen', role: 'kitchen', tenant_id: 'default', is_active: 1, auth_version: 1 };
+            if (sql.includes('SELECT id, customer_id, status FROM orders WHERE id = ?')) {
               const id = params[0];
               if (id === 'non-existent-order') return null;
               if (id === 'owned-order') {
@@ -226,7 +227,7 @@ describe('Order Stream SSE Endpoint (/api/orders/:id/events)', () => {
     it('lets staff stream any order', async () => {
       const app = createApp();
       const env = createMockEnv();
-      const token = await signTestJwt({ id: 'staff_1', role: 'kitchen' });
+      const token = await signTestJwt({ id: 'staff_1', role: 'kitchen', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' });
       const controller = new AbortController();
 
       const res = await app.fetch(

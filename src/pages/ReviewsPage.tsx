@@ -113,7 +113,6 @@ export function ReviewsPage() {
         data={reviewsPageData}
         loadingState={loadingState}
         errorMessage={errorMessage}
-        onWriteReview={() => setShowForm(true)}
         onToggleLike={() => {}}
         onLoadMore={() => handlePageChange(page + 1)}
       />

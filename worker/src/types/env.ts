@@ -3,6 +3,8 @@
  * Typed interface for all env vars used across routes.
  */
 export interface Env {
+  // One explicitly reviewed storefront per pilot deployment; required in production.
+  PILOT_TENANT_ID?: string;
   // D1 Database
   AURA_DB: import('@cloudflare/workers-types').D1Database;
 

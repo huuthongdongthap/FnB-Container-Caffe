@@ -43,7 +43,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).bind(usageId, body.promotionId, body.orderId, user.customerId || user.id, body.discountAmount, body.idempotencyKey || null, now).run();
 
     await db.prepare(
-      'UPDATE promotions SET current_uses = current_uses + 1, updated_at = ? WHERE id = ?'
+      'UPDATE promotions SET current_uses = current_uses + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND (max_uses IS NULL OR max_uses = 0 OR current_uses < max_uses)'
     ).bind(now, body.promotionId).run();
 
     await db.prepare(

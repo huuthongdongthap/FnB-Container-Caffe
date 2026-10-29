@@ -15,6 +15,9 @@
 import { useTranslation } from 'react-i18next';
 import { Star, Pencil } from 'lucide-react';
 
+export const GOOGLE_WRITE_REVIEW_URL =
+  'https://search.google.com/local/writereview?placeid=ChIJeZC6BAB_CjERkByXCzIAo-g';
+
 /* ─── Extracted Modules ────────────────────────────────────────────── */
 
 import type { StitchReviewsNewProps, FilterOption } from './stitch-reviews-new-types';
@@ -98,7 +101,7 @@ export function StitchReviewsNew({
 
       <div role="feed" aria-label="Customer Reviews Feed" className="comment-feed mx-auto max-w-[1200px] px-6 pb-16" style={{ paddingTop: '96px' }}>
         {/* ── Aggregate Rating Header + Write Review CTA ────────── */}
-        <section className="flex flex-col items-end justify-between gap-4 mb-16 md:flex-row md:items-center">
+        <section className="flex flex-col items-start justify-between gap-4 mb-16 md:flex-row md:items-center">
           <div>
             <h1
               className="mb-2"
@@ -124,16 +127,30 @@ export function StitchReviewsNew({
               </span>
             </div>
           </div>
-          <button
-           type="button"
-            onClick={onWriteReview}
-            className="chrome-gradient group flex items-center gap-2 rounded-full px-8 py-4 text-[var(--aura-noir-deep, #0A1A2E)] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
-            style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
-            aria-label={t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
-          >
-            <Pencil className="h-[18px] w-[18px] transition-transform group-hover:rotate-12" />
-            {t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
-          </button>
+          {onWriteReview ? (
+            <button
+              type="button"
+              onClick={onWriteReview}
+              className="chrome-gradient group flex w-full sm:w-auto min-h-[44px] items-center justify-center gap-2 rounded-full px-8 py-4 text-[var(--aura-noir-deep, #0A1A2E)] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 shrink-0"
+              style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
+              aria-label={t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
+            >
+              <Pencil className="h-[18px] w-[18px] transition-transform group-hover:rotate-12" />
+              {t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
+            </button>
+          ) : (
+            <a
+              href={GOOGLE_WRITE_REVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="chrome-gradient group flex w-full sm:w-auto min-h-[44px] items-center justify-center gap-2 rounded-full px-8 py-4 text-[var(--aura-noir-deep, #0A1A2E)] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 shrink-0 no-underline"
+              style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
+              aria-label={t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
+            >
+              <Pencil className="h-[18px] w-[18px] transition-transform group-hover:rotate-12" />
+              {t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
+            </a>
+          )}
         </section>
 
         {/* ── Filter Chips ─────────────────────────────────────── */}

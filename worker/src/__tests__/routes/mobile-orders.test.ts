@@ -2,20 +2,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getOrdersMobile, createOrderMobile, getOrderDetail } from '../../routes/orders-mobile';
 import { staffMobileRouter } from '../../routes/staff-mobile';
 import { generateJWT } from '../../lib/jwt';
-import { createMockEnv, createMockKV, TEST_JWT_SECRET } from '../test-utils';
+import { createMockEnv, createMockKV, isStaffAccountLookup, TEST_JWT_SECRET } from '../test-utils';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildOrdersMockDb(orders: Array<Record<string, unknown>>): any {
+/**
+ * Account row the staff-session gate reads behind a staff JWT. The row's role
+ * must equal the token's role claim, otherwise the gate treats the session as
+ * revoked because the account's authority changed.
+ */
+function staffAccount(id: string, role: string): Record<string, unknown> {
+  return { id, name: 'Staff', phone: null, role, tenant_id: 'default', is_active: 1, auth_version: 1 };
+}
+
+function buildOrdersMockDb(orders: Array<Record<string, unknown>>, account?: Record<string, unknown>): any {
   orders = orders.map(o => ({ tenant_id: 'default', ...o }));
   const orderMap = new Map(orders.map(o => [o.id as string, o]));
 
   return {
     prepare: (_sql: string) => {
-      const s: any = { _sql, _binds: [] as unknown[] };
+      const s: any = { _sql, _binds: [] as unknown[], raw: async () => [] };
       s.bind = (...args: unknown[]) => { s._binds = args; return s; };
       s.first = async () => {
         const sql = s._sql || '';
+        if (account && isStaffAccountLookup(sql)) {
+          return String(s._binds[0]) === String(account.id) ? { ...account } : null;
+        }
         if (sql.includes('FROM orders WHERE id = ?')) {
           const id = String(s._binds[0]);
           const row = orderMap.get(id);
@@ -451,7 +463,7 @@ describe('getOrderDetail', () => {
   });
 
   it('authenticates GET /orders/:id and GET /tables via staffMobileRouter with Bearer JWT and blocks unauthenticated calls', async () => {
-    const db = buildOrdersMockDb([fullOrder]);
+    const db = buildOrdersMockDb([fullOrder], staffAccount('USR_1', 'waiter'));
     const env: any = { AURA_DB: db, AUTH_KV: createMockKV(), JWT_SECRET: TEST_JWT_SECRET };
     const unauthRes = await staffMobileRouter.fetch(
       new Request('https://test.aura/orders/ORD_1', { method: 'GET' }),
@@ -459,10 +471,9 @@ describe('getOrderDetail', () => {
     );
     expect(unauthRes.status).toBe(401);
 
-    const token = await generateJWT(
-      { id: 'USR_1', email: 'waiter@aura.cafe', name: 'Waiter', role: 'waiter' },
+    const token = await generateJWT({ id: 'USR_1', email: 'waiter@aura.cafe', name: 'Waiter', role: 'waiter' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'},
       TEST_JWT_SECRET,
-      '1h'
+      3600
     );
     const authRes = await staffMobileRouter.fetch(
       new Request('https://test.aura/orders/ORD_1', {

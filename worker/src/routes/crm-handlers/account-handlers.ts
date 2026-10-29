@@ -47,6 +47,16 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // Customer role can only update their own consents.
     const targetCustomerId = user.role === 'customer' ? user.id : (body.customerId ?? user.id);
+    if (user.role !== 'customer' && user.tenantId) {
+      try {
+        const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(targetCustomerId).first<{ tenant_id?: string | null }>();
+        if (custRow && custRow.tenant_id && custRow.tenant_id !== user.tenantId) {
+          return c.json({ success: false, error: 'Forbidden' }, 403);
+        }
+      } catch {
+        // Optional tenant_id column in partial schemas
+      }
+    }
 
     const result = await updateConsent(db, {
       customerId: targetCustomerId,

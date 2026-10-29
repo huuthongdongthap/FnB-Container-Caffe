@@ -94,15 +94,31 @@ CREATE INDEX idx_menu_items_available ON menu_items(available);
 -- =====================================================
 CREATE TABLE customers (
     id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    email TEXT UNIQUE,
     name TEXT,
-    phone TEXT,
+    phone TEXT UNIQUE,
+    tier TEXT DEFAULT 'bronze',
     loyalty_points INTEGER DEFAULT 0,
     lifetime_points INTEGER DEFAULT 0,
     loyalty_tier TEXT DEFAULT 'bronze',  -- bronze, silver, gold, platinum
+    total_spent REAL DEFAULT 0,
+    total_orders INTEGER DEFAULT 0,
     date_of_birth TEXT,   -- loyalty phone signup (phone-auth-handler)
+    birthday TEXT,
+    notes TEXT,
     zalo TEXT,
     source TEXT,          -- acquisition channel
+    capture_source TEXT,
+    marketing_consent INTEGER DEFAULT 0,
+    consent_marketing INTEGER DEFAULT 0,
+    consent_analytics INTEGER DEFAULT 0,
+    consent_timestamp TEXT,
+    verified_at TEXT,
+    first_visit_at TEXT,
+    last_visit_at TEXT,
+    referral_code TEXT,
+    referred_by TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -271,6 +287,8 @@ END;
 -- =====================================================
 CREATE TABLE contact_messages (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    classification TEXT CHECK (classification IN ('contact', 'chat')),
     name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
@@ -310,6 +328,10 @@ CREATE TABLE IF NOT EXISTS cashback_wallets (
     balance INTEGER DEFAULT 0,
     total_earned INTEGER DEFAULT 0,
     total_spent INTEGER DEFAULT 0,
+    lifetime_earned INTEGER DEFAULT 0,
+    lifetime_spent INTEGER DEFAULT 0,
+    tier TEXT DEFAULT 'Member',
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id)
@@ -319,12 +341,16 @@ CREATE TABLE IF NOT EXISTS cashback_wallets (
 CREATE TABLE IF NOT EXISTS cashback_transactions (
     id TEXT PRIMARY KEY,
     wallet_id TEXT NOT NULL,
+    customer_id TEXT,
     order_id TEXT,
-    type TEXT NOT NULL,  -- earn, spend, expire, refund
+    type TEXT NOT NULL,  -- earn, spend, expire, refund, bonus, referral
     amount INTEGER NOT NULL,
     balance_after INTEGER NOT NULL,
+    multiplier_applied REAL DEFAULT 1.0,
     description TEXT,
+    campaign_id TEXT,
     expires_at TEXT,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (wallet_id) REFERENCES cashback_wallets(id)
 );
@@ -389,8 +415,12 @@ CREATE TABLE IF NOT EXISTS user_rewards (
 -- PROMOTIONS TABLE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS promotions (
+  id TEXT,
   code TEXT PRIMARY KEY,
-  percent INTEGER NOT NULL,
+  name TEXT,
+  type TEXT DEFAULT 'percent',
+  value REAL,
+  percent INTEGER NOT NULL DEFAULT 0,
   max_discount INTEGER DEFAULT 0,
   min_order INTEGER DEFAULT 0,
   usage_limit INTEGER DEFAULT 0,
@@ -398,7 +428,98 @@ CREATE TABLE IF NOT EXISTS promotions (
   starts_at TEXT,
   expires_at TEXT,
   is_active INTEGER DEFAULT 1,
+  applicable_items TEXT,
+  applicable_tiers TEXT,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS promotion_usages (
+  id TEXT PRIMARY KEY,
+  promotion_id TEXT NOT NULL,
+  customer_id TEXT,
+  order_id TEXT UNIQUE,
+  discount_amount REAL NOT NULL DEFAULT 0,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS promotion_redemptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  promotion_id TEXT,
+  code TEXT NOT NULL,
+  order_id TEXT UNIQUE NOT NULL,
+  customer_id TEXT,
+  customer_phone TEXT,
+  discount_amount INTEGER NOT NULL DEFAULT 0,
+  order_total INTEGER NOT NULL DEFAULT 0,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  redeemed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotion_redemptions_order ON promotion_redemptions(order_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_redemptions_code ON promotion_redemptions(code, tenant_id);
+
+INSERT OR IGNORE INTO promotions (id, code, name, type, value, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active, tenant_id)
+VALUES ('promo_welcome', 'WELCOME', 'Ưu đãi khách hàng mới (-10%, tối đa 30.000đ)', 'percent', 10, 10, 30000, 0, 0, 0, NULL, NULL, 1, 'default');
+
+CREATE TABLE IF NOT EXISTS bonus_campaigns (
+  id TEXT PRIMARY KEY,
+  code TEXT UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  type TEXT NOT NULL DEFAULT 'grand_opening',
+  signup_bonus_vnd INTEGER NOT NULL DEFAULT 50000,
+  signup_bonus_cap INTEGER NOT NULL DEFAULT 100,
+  signup_bonus_claimed INTEGER NOT NULL DEFAULT 0,
+  refer_bonus_vnd INTEGER NOT NULL DEFAULT 10000,
+  max_cap_per_customer_vnd INTEGER NOT NULL DEFAULT 50000,
+  cashback_multiplier REAL NOT NULL DEFAULT 1,
+  min_order_for_bonus INTEGER NOT NULL DEFAULT 0,
+  start_date TEXT,
+  end_date TEXT,
+  starts_at TEXT,
+  ends_at TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS signup_bonus_log (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  bonus_vnd INTEGER NOT NULL DEFAULT 0,
+  amount_vnd INTEGER NOT NULL DEFAULT 0,
+  wallet_tx_id TEXT,
+  phone TEXT,
+  ip_hint TEXT,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  granted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(customer_id, campaign_id)
+);
+
+CREATE TABLE IF NOT EXISTS loyalty_audit_log (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  staff_id TEXT,
+  action TEXT,
+  event_type TEXT NOT NULL DEFAULT 'audit',
+  amount_vnd INTEGER NOT NULL DEFAULT 0,
+  metadata TEXT,
+  points_delta INTEGER NOT NULL DEFAULT 0,
+  points_after INTEGER NOT NULL DEFAULT 0,
+  cashback_delta INTEGER NOT NULL DEFAULT 0,
+  cashback_after INTEGER NOT NULL DEFAULT 0,
+  tier_before TEXT,
+  tier_after TEXT,
+  order_id TEXT,
+  campaign_id TEXT,
+  note TEXT,
+  actor TEXT,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- =====================================================
@@ -411,7 +532,11 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     customer_id TEXT NOT NULL UNIQUE,
     code TEXT NOT NULL UNIQUE,
     times_used INTEGER DEFAULT 0,
+    uses_count INTEGER DEFAULT 0,
+    max_uses INTEGER DEFAULT 50,
     total_points_earned INTEGER DEFAULT 0,
+    total_cashback_earned_vnd INTEGER DEFAULT 0,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
@@ -423,10 +548,20 @@ CREATE INDEX idx_referral_codes_code ON referral_codes(code);
 CREATE TABLE IF NOT EXISTS referrals (
     id TEXT PRIMARY KEY,
     referrer_id TEXT NOT NULL,
-    referred_customer_id TEXT NOT NULL,
+    referred_customer_id TEXT,
+    referee_id TEXT,
     referral_code TEXT NOT NULL,
     points_awarded INTEGER DEFAULT 200,
-    status TEXT DEFAULT 'completed',
+    cashback_awarded_vnd INTEGER DEFAULT 0,
+    referrer_reward INTEGER DEFAULT 10000,
+    referee_reward INTEGER DEFAULT 5000,
+    first_order_id TEXT,
+    first_order_amount REAL,
+    bonus_type TEXT DEFAULT 'cashback',
+    reward_paid_at TEXT,
+    rewarded_at TEXT,
+    status TEXT DEFAULT 'pending',
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (referrer_id) REFERENCES customers(id),
     FOREIGN KEY (referred_customer_id) REFERENCES customers(id)
@@ -440,6 +575,14 @@ CREATE INDEX idx_referrals_referred ON referrals(referred_customer_id);
 -- =====================================================
 CREATE TABLE IF NOT EXISTS staff_shifts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id TEXT,
+  staff_id TEXT,
+  clock_in TEXT,
+  clock_out TEXT,
+  hours_worked REAL,
+  attendance_state TEXT,
+  start_time TEXT,
+  end_time TEXT,
   staff_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'staff',
   date TEXT NOT NULL,
@@ -447,6 +590,167 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
   is_active INTEGER DEFAULT 1,
   notes TEXT,
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX idx_staff_shifts_one_active ON staff_shifts(tenant_id, staff_id)
+  WHERE tenant_id IS NOT NULL AND staff_id IS NOT NULL AND clock_in IS NOT NULL AND clock_out IS NULL;
+CREATE INDEX idx_staff_shifts_tenant_date ON staff_shifts(tenant_id, date);
+
+-- =====================================================
+-- STAFF SOP CHECKLISTS (templates → runs → run items)
+-- Mirrors worker/db/migrations/20261024_01_sop_checklists.sql so a fresh
+-- bootstrap carries the same executable form as the live database.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS sop_templates (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    source TEXT NOT NULL DEFAULT 'SOP01',
+    shift_type TEXT NOT NULL DEFAULT 'any',
+    applicable_roles TEXT NOT NULL DEFAULT 'owner,manager,staff',
+    version INTEGER NOT NULL DEFAULT 1,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_templates_tenant_code ON sop_templates(tenant_id, code);
+CREATE INDEX IF NOT EXISTS idx_sop_templates_shift ON sop_templates(tenant_id, shift_type, is_active);
+
+CREATE TABLE IF NOT EXISTS sop_template_items (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    template_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    is_critical INTEGER NOT NULL DEFAULT 0,
+    requires_note INTEGER NOT NULL DEFAULT 0,
+    requires_value INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sop_template_items_order ON sop_template_items(tenant_id, template_id, order_index);
+
+CREATE TABLE IF NOT EXISTS sop_runs (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    template_id TEXT NOT NULL,
+    template_version INTEGER NOT NULL,
+    shift_id TEXT,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT,
+    shift_type TEXT NOT NULL DEFAULT 'any',
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    scheduled_date TEXT,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    abandoned_reason TEXT,
+    reminder_sent_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_tenant_day ON sop_runs(tenant_id, scheduled_date, status);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_staff ON sop_runs(tenant_id, staff_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_shift ON sop_runs(tenant_id, shift_id);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_template ON sop_runs(tenant_id, template_id);
+
+CREATE TABLE IF NOT EXISTS sop_run_items (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    run_id TEXT NOT NULL,
+    template_item_id TEXT NOT NULL,
+    is_checked INTEGER NOT NULL DEFAULT 0,
+    checked_at TEXT,
+    checked_by TEXT,
+    note TEXT,
+    value REAL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sop_run_items_run ON sop_run_items(tenant_id, run_id, is_checked);
+CREATE INDEX IF NOT EXISTS idx_sop_run_items_tmpl ON sop_run_items(tenant_id, template_item_id);
+
+CREATE TABLE IF NOT EXISTS sop_violations (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
+    staff_id TEXT NOT NULL,
+    staff_name TEXT,
+    category TEXT NOT NULL,
+    is_serious INTEGER NOT NULL DEFAULT 0,
+    description TEXT,
+    occurred_at TEXT,
+    recorded_by TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'recorded',
+    discipline_step TEXT,
+    confirmed_by TEXT,
+    confirmed_at TEXT,
+    applied_by TEXT,
+    applied_at TEXT,
+    appeal_explanation TEXT,
+    audit_log_id TEXT,
+    closed_at TEXT,
+    sanction_note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_tenant_staff ON sop_violations(tenant_id, staff_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_status ON sop_violations(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_month ON sop_violations(tenant_id, strftime('%Y-%m', occurred_at), staff_id);
+
+-- Recurring-duty reminder ledger. Kept apart from sop_runs because a run is
+-- checklist work with a fixed status set, while a reminder is an obligation
+-- about a duty that need not have been started yet.
+--
+-- Deduplication is by (tenant_id, kind, day_key): the scheduled task runs every
+-- five minutes, and each pass must not append a second copy of the same notice.
+-- One row per duty per day is therefore the whole rule — a repeat pass finds the
+-- existing row and writes nothing.
+CREATE TABLE IF NOT EXISTS sop_reminders (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  template_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  day_key TEXT NOT NULL,
+  run_id TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  sent_at TEXT NOT NULL,
+  acknowledged_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_reminders_dedup ON sop_reminders(tenant_id, template_id, kind, day_key, COALESCE(run_id, ''));
+CREATE INDEX IF NOT EXISTS idx_sop_reminders_run ON sop_reminders(tenant_id, run_id);
+CREATE INDEX IF NOT EXISTS idx_sop_reminders_open ON sop_reminders(tenant_id, acknowledged_at, sent_at);
+
+-- Unmapped historical recruitment/contact/customer rows are never implicitly assigned to the pilot.
+CREATE TABLE IF NOT EXISTS recruitment_applications (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT,
+  full_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  birth_year TEXT,
+  position TEXT NOT NULL DEFAULT 'barista',
+  shifts TEXT NOT NULL DEFAULT '[]',
+  experience TEXT DEFAULT 'none',
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_recruitment_tenant_created ON recruitment_applications(tenant_id, created_at);
+CREATE INDEX idx_contact_tenant_classification_phone ON contact_messages(tenant_id, classification, phone);
+CREATE INDEX idx_customers_tenant ON customers(tenant_id);
+
+-- Claims and their entity INSERT commit together; metadata contains no form payload.
+CREATE TABLE resource_creation_requests (
+  scope_key TEXT PRIMARY KEY,
+  request_hash TEXT NOT NULL,
+  resource_id TEXT NOT NULL,
+  resource_type TEXT NOT NULL CHECK(resource_type IN ('customer', 'recruitment')),
+  tenant_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- =====================================================
@@ -644,8 +948,20 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT,
   tenant_id TEXT,
   is_active INTEGER DEFAULT 1,
+  -- Staff session invalidation counter, kept in step with
+  -- db/migrations/20261022_01_staff_auth_version.sql: the request-time session
+  -- gate compares the account's value against the token's claim on every
+  -- request, so a fresh database has to carry the same default that column
+  -- gives existing rows.
+  auth_version INTEGER NOT NULL DEFAULT 1,
+  password_hash TEXT, -- Staff credentials; verified legacy KV imports only
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS staff_login_identities (
+  email TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL UNIQUE REFERENCES users(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);

@@ -16,6 +16,8 @@
 
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
+import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
+import { StaffSessionError } from 'worker/src/lib/staff-session';
 import { getTenantId } from 'worker/src/middleware/tenant';
 
 // Max SSE connection duration: 120s — client reconnects naturally after.
@@ -98,6 +100,18 @@ kdsStreamRouter.get('/stream', async(c) => {
       };
 
       const queryActiveOrders = async(): Promise<KdsStreamOrder[]> => {
+        try {
+          const session = await authenticateRequest(c.req.raw, c.env);
+          if (!session || 'blocked' in session || !session.account) throw new StaffSessionError('SESSION_REVOKED');
+        } catch (error) {
+          const code = error instanceof StaffSessionError ? error.code : 'AUTH_STATE_UNAVAILABLE';
+          send('auth_error', { code, message: 'Phiên Staff không còn khả dụng' });
+          closed = true;
+          if (warningTimer) clearTimeout(warningTimer);
+          if (closeTimer) clearTimeout(closeTimer);
+          try { controller.close(); } catch { /* Disconnected. */ }
+          throw error;
+        }
         const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
         const statement = db.prepare(
           `SELECT id, customer_name, table_id, items, status, created_at FROM orders
@@ -115,6 +129,8 @@ kdsStreamRouter.get('/stream', async(c) => {
       } catch {
         send('error', { message: 'initial snapshot failed' });
       }
+
+      if (closed) return;
 
       // Polling loop: emit only when the payload actually changes.
       let lastPayload = '';

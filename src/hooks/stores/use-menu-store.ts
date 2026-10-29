@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { offlineDb } from '@/lib/offline-db';
+import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
 
 /* ═══════════════════════════════════════════════════════════════════
    Menu store — Zustand, no persistence.
@@ -88,7 +89,7 @@ function mapRawStoreMenuItem(item: RawStoreMenuItem): MenuItem {
     description: item.description ?? '',
     price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
     category: item.category,
-    image_url: item.imageUrl ?? item.image_url ?? '',
+    image_url: resolveMenuDrinkImage(item.id, item.imageUrl ?? item.image_url),
     available: Boolean(item.available),
     tags: Array.isArray(item.tags) ? item.tags : [],
   };
@@ -127,7 +128,10 @@ export const useMenuStore = create<MenuState>((set, get) => ({
           offlineDb.getMenuCategories(),
         ]);
         if (cachedItems.length > 0) {
-          const items = cachedItems as MenuItem[];
+          const items = (cachedItems as MenuItem[]).map((item) => ({
+            ...item,
+            image_url: resolveMenuDrinkImage(item.id, item.image_url),
+          }));
           const cats = cachedCats?.items
             ? (cachedCats.items as { id: string; name: string }[])
             : extractCategories(items);

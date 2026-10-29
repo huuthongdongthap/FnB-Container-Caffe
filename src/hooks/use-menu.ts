@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
 
 /* ═══════════════════════════════════════════════════════════════════
    useMenu — TanStack Query hook for menu items
@@ -55,7 +56,7 @@ function mapRawMenuItem(item: RawMenuItemPayload): MenuItem {
     description: item.description ?? '',
     price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
     category: item.category,
-    image_url: item.imageUrl ?? item.image_url ?? '',
+    image_url: resolveMenuDrinkImage(item.id, item.imageUrl ?? item.image_url),
     available: Boolean(item.available),
     tags: Array.isArray(item.tags) ? item.tags : [],
   };
@@ -82,7 +83,10 @@ export function useMenu(params?: {
       const res = await apiFetch<RawMenuListResponse>(`/api/menu${qs ? `?${qs}` : ''}`);
       let items: MenuItem[] = [];
       if (Array.isArray(res?.items)) {
-        items = res.items;
+        items = res.items.map((item) => ({
+          ...item,
+          image_url: resolveMenuDrinkImage(item.id, item.image_url),
+        }));
       } else if (Array.isArray(res?.data?.categories)) {
         items = res.data.categories.flatMap((cat) => (cat.items || []).map(mapRawMenuItem));
       }

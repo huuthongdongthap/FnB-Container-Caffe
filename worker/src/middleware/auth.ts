@@ -1,20 +1,14 @@
-/**
- * Auth Middleware
- * JWT verification + role-based access control.
- */
-
+/** JWT + D1 Staff session verification and role-based access control. */
 import type { Env } from '../types/env';
-import { verifyJWT, getAuthToken, cookieWriteBlockReason } from '../lib/jwt';
+import { authenticateRequest } from '../lib/staff-session-auth';
+import { StaffSessionError } from '../lib/staff-session';
+import { getAuthToken } from '../lib/jwt';
 
 export interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner';
-  tenantId?: string;
-  tier?: string;
+  id: string; email: string; name: string;
+  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef';
+  tenantId?: string; tier?: string;
 }
-
 declare module 'hono' {
   // eslint-disable-next-line no-unused-vars
   interface ContextVariableMap {
@@ -24,13 +18,12 @@ declare module 'hono' {
     userTier?: string;
   }
 }
-
-/**
- * Middleware factory: requireAuth(allowedRoles)
- * Usage: app.use('/api/admin/*', requireAuth(['owner', 'staff']))
- */
+function toUser(payload: { id: string; email: string; name: string; role: string; tenantId?: string; tier?: string }): AuthUser {
+  return { id: payload.id, email: payload.email || '', name: payload.name || '',
+    role: (payload.role || 'customer') as AuthUser['role'], tenantId: payload.tenantId, tier: payload.tier };
+}
 export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import('hono').MiddlewareHandler<{ Bindings: Env }> {
-  return async(c, next) => {
+  return async (c, next) => {
     const env = c.env as Env;
     const isProd = env?.ENVIRONMENT === 'production' || (env as Record<string, unknown>)?.NODE_ENV === 'production';
     const testHeader = (typeof c?.req?.header === 'function' ? c.req.header('x-playwright-test') : null)
@@ -48,100 +41,32 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
       return next();
     }
 
-    if (!(c.env as Env).JWT_SECRET) {
-      return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
+    if (!env.JWT_SECRET) return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
+    if (!getAuthToken(c.req.raw)) return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập', code: 'SESSION_EXPIRED' }, 401);
+    try {
+      const session = await authenticateRequest(c.req.raw, env);
+      if (!session) return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
+      if ('blocked' in session) return c.json({ success: false, error: session.blocked }, 403);
+      const user = toUser(session.payload);
+      if (!allowedRoles.includes(user.role)) return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
+      c.set('user', user);
+    } catch (error) {
+      if (error instanceof StaffSessionError) return c.json({ success: false, error: error.message, code: error.code }, error.status);
+      return c.json({ success: false, error: 'Authentication unavailable' }, 503);
     }
-
-    // A state-changing call authenticated only by the session cookie is a CSRF
-    // attempt: no first-party caller sends one (the client posts with a Bearer
-    // header, SSE only reads). Reject before touching the token so the failure
-    // names the missing intent rather than a bad credential.
-    const writeBlockReason = cookieWriteBlockReason(c.req.method, c.req.raw);
-    if (writeBlockReason) {
-      return c.json({ success: false, error: writeBlockReason }, 403);
-    }
-
-    const token = getAuthToken(c.req.raw);
-
-    if (!token) {
-      return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
-    }
-
-    const payload = await verifyJWT(token, (c.env as Env).JWT_SECRET, {
-      expectedAudience: (c.env as Env).JWT_AUDIENCE,
-      expectedIssuer: (c.env as Env).JWT_ISSUER,
-    });
-    if (!payload) {
-      return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
-    }
-
-    const authKv = (c.env as Env)?.AUTH_KV;
-    const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
-    if (revoked) {
-      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
-    }
-
-    const userRole = payload.role || 'customer';
-    if (!allowedRoles.includes(userRole)) {
-      return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
-    }
-
-    // Preserve tenant claims from the signed JWT — downstream tenant
-    // middleware must resolve tenancy from here, never from client headers.
-    c.set('user', {
-      id: payload.id || (payload as { sub?: string }).sub || '',
-      email: payload.email,
-      name: payload.name,
-      role: userRole as AuthUser['role'],
-      tenantId: (payload as { tenantId?: string }).tenantId,
-      tier: (payload as { tier?: string }).tier
-    });
-
     await next();
   };
 }
-
-/**
- * Middleware: optionalAuth
- * Extracts JWT token if present and sets c.set('user', ...),
- * but does NOT reject if token is missing or invalid (allows guest access).
- */
+/** Missing credentials allow a guest; a rejected presented session never becomes a guest. */
 export function optionalAuth(): import('hono').MiddlewareHandler<{ Bindings: Env }> {
-  return async(c, next) => {
-    const jwtSecret = (c.env as Env)?.JWT_SECRET;
-    // Optional auth can sit on a read that the caller only reaches when signed
-    // in — order tracking and the order stream are the cases here, and both are
-    // GET, where the session cookie is the credential EventSource can actually
-    // send. On a write the same cookie would confer authority the caller never
-    // named, so a write is left unauthenticated and the route decides.
-    const blockCookieWrite = cookieWriteBlockReason(c.req.method, c.req.raw) !== null;
-    if (jwtSecret && !blockCookieWrite) {
-      const token = getAuthToken(c.req.raw);
-      if (token) {
-        try {
-          const payload = await verifyJWT(token, jwtSecret, {
-          expectedAudience: (c.env as Env).JWT_AUDIENCE,
-          expectedIssuer: (c.env as Env).JWT_ISSUER,
-        });
-          if (payload) {
-            const authKv = (c.env as Env)?.AUTH_KV;
-            const revoked = authKv ? await authKv.get(`revoked:${token}`) : null;
-            if (!revoked) {
-              const userRole = payload.role || 'customer';
-              c.set('user', {
-                id: String(payload.id || (payload as { sub?: string }).sub || ''),
-                email: payload.email,
-                name: payload.name,
-                role: userRole as AuthUser['role'],
-                tenantId: (payload as { tenantId?: string }).tenantId,
-                tier: (payload as { tier?: string }).tier
-              });
-            }
-          }
-        } catch {
-          // Ignore invalid token — guest request
-        }
-      }
+  return async (c, next) => {
+    try {
+      const session = await authenticateRequest(c.req.raw, c.env, { optional: true });
+      if (session && 'blocked' in session) return c.json({ success: false, error: session.blocked }, 403);
+      if (session && 'payload' in session) c.set('user', toUser(session.payload));
+    } catch (error) {
+      if (error instanceof StaffSessionError) return c.json({ success: false, error: error.message, code: error.code }, error.status);
+      return c.json({ success: false, error: 'Authentication unavailable' }, 503);
     }
     await next();
   };
