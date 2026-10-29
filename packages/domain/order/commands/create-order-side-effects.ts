@@ -123,12 +123,13 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
   }
 
   const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
+  const { STAFF_PUSH_ROLE } = await import('worker/src/tree/push/roles.js');
   // @ts-ignore -- PushEnv needs AURA_DB binding
   const pushPromise = sendPushToStaff(env, {
     title: 'Đơn hàng mới 🍳',
     body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
     data: { url: '/kds', orderId }
-  }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
+  }, STAFF_PUSH_ROLE).catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
   if (ctx?.waitUntil) ctx.waitUntil(pushPromise);
 
   if (ctx?.waitUntil) {

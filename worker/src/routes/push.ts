@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { sendPushToStaff } from '../tree/push/notifier';
+import { DEFAULT_STAFF_PUSH_ROLE } from '../tree/push/roles';
 import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErrorResponse } from '../lib/validators';
 
 export const pushRouter = new Hono<{ Bindings: Env }>();
@@ -80,7 +81,7 @@ pushRouter.post('/subscribe', async(c) => {
         p256dh_key: 'manual_pending',
         customer_id: String(raw.name).trim(),
         user_agent: String(raw.name).trim(),
-        role: typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : 'staff',
+        role: typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : DEFAULT_STAFF_PUSH_ROLE,
       }
     : raw;
 

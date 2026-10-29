@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useKDS } from '@/hooks/use-kds';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@/components/stitch/StitchKDSNew';
 import { OVERDUE_THRESHOLD_MIN, calcElapsedSeconds } from './kds-types';
 import { KdsToolbar } from './kds-toolbar';
+import { useKdsAudio } from '@/hooks/use-kds-audio';
 
 /* ─── Re-export types for backward compatibility ─────────────── */
 export type { Ticket, TicketStatus } from './kds-types';
@@ -16,15 +17,16 @@ export type { Ticket, TicketStatus } from './kds-types';
 
 export default function KDSPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [audioUnavailable, setAudioUnavailable] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewFilter, setViewFilter] = useState<
     'all' | 'priority' | 'preparing' | 'ready'
   >('all');
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const prevOrderCountRef = useRef(0);
 
   const { orders, isLoading, isError, error, updateStatus } = useKDS('all');
+
+  // A new order beeps through WebAudio: no static asset to 404, and no
+  // <audio> element whose failed load looks like a silent feature.
+  useKdsAudio(orders.length, soundEnabled);
 
   const orderIdMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -41,21 +43,6 @@ export default function KDSPage() {
     }
     return map;
   }, [orders]);
-
-  useEffect(() => {
-    if (
-      orders.length > prevOrderCountRef.current &&
-      soundEnabled &&
-      !audioUnavailable &&
-      audioRef.current
-    ) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        setAudioUnavailable(true);
-      });
-    }
-    prevOrderCountRef.current = orders.length;
-  }, [orders.length, soundEnabled, audioUnavailable]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -159,15 +146,6 @@ export default function KDSPage() {
         description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
       />
       <div className="relative">
-        <audio
-          ref={audioRef}
-          preload="none"
-          className="hidden"
-          onError={() => setAudioUnavailable(true)}
-        >
-          <source src="/sounds/new-order.mp3" type="audio/mpeg" />
-        </audio>
-
         <KdsToolbar
           soundEnabled={soundEnabled}
           isFullscreen={isFullscreen}

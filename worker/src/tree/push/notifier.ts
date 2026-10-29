@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { createLogger } from '../../middleware/logger';
+import { CUSTOMER_PUSH_ROLE } from './roles';
 
 const log = createLogger({ route: 'push' });
 
@@ -98,6 +99,13 @@ export async function sendPushToCustomer(
   return { sent, failed };
 }
 
+/**
+ * Send a new-order/staff announcement.
+ *
+ * `role` is an exact-match role literal, so the value has to come from the
+ * same vocabulary the subscribe path writes (see ./roles). An empty string
+ * means "every non-customer subscription" and is the broadcast path.
+ */
 export async function sendPushToStaff(
   env: PushEnv,
   payload: PushPayload,
@@ -112,8 +120,8 @@ export async function sendPushToStaff(
   initPush(env);
 
   // Build query: all non-customer roles, or specific role
-  let query = 'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != \'customer\'';
-  const params: unknown[] = [];
+  let query = `SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != ?`;
+  const params: unknown[] = [CUSTOMER_PUSH_ROLE];
 
   if (role) {
     query += ' AND role = ?';

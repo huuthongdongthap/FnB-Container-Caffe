@@ -84,11 +84,12 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
 
   try {
     const { sendPushToStaff: notifyStaff } = await import('../../tree/push/notifier.js');
+    const { STAFF_PUSH_ROLE } = await import('../../tree/push/roles.js');
     const pushPromise = notifyStaff(c.env as Env, {
       title: 'Khách check-in 🪑',
       body: `Ban ${data.table_id} - ${data.customer_name} / ${data.customer_phone}`,
       data: { url: '/kds', orderId }
-    }, 'staff-kitchen').catch(() => {});
+    }, STAFF_PUSH_ROLE).catch(() => {});
     c.executionCtx?.waitUntil(pushPromise);
   } catch { /* push best-effort */ }
 
