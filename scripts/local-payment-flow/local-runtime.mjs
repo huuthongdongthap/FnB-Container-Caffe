@@ -15,7 +15,12 @@ export const verificationDir = () => process.env.LOCAL_FLOW_VERIFICATION_DIR
   ? path.resolve(ROOT, process.env.LOCAL_FLOW_VERIFICATION_DIR)
   : path.join(ROOT, 'plans/261020-1225-payment-kds-remediation/verification');
 // Reuse an installed stable runtime; never install dependencies or select an alpha implicitly.
-const runtimeCandidates = [path.join(ROOT, 'node_modules/miniflare')];
+const runtimeCandidates = [
+  ...(process.env.MINIFLARE_RUNTIME_PATH ? [process.env.MINIFLARE_RUNTIME_PATH] : []),
+  path.join(ROOT, 'node_modules/miniflare'),
+  path.join(path.dirname(ROOT), 'PTP Tech/platform/node_modules/miniflare'),
+  path.join(path.dirname(ROOT), 'sophia-ai-factory/node_modules/wrangler/node_modules/miniflare'),
+];
 for (const parent of [ROOT, path.dirname(ROOT)]) {
   const store = path.join(parent, 'node_modules/.pnpm');
   if (existsSync(store)) for (const name of readdirSync(store).filter(name => /^miniflare@4\./.test(name)).sort().reverse()) {
@@ -27,7 +32,10 @@ const runtimePath = runtimeCandidates.find(candidate => {
 });
 if (!runtimePath) throw new Error('An installed stable Miniflare 4 runtime is required for offline flow tests');
 const { Miniflare, Log, LogLevel } = require(runtimePath);
-const { build } = require('esbuild');
+const runtimeRequire = createRequire(path.join(runtimePath, 'package.json'));
+const { build } = (() => {
+  try { return require('esbuild'); } catch { return runtimeRequire('esbuild'); }
+})();
 export const REVIEW_PASSWORD = 'Local-review-only-123!';
 export const CHECKSUM = 'local-review-checksum-not-a-real-secret';
 
@@ -64,7 +72,10 @@ export async function createLocalRuntime() {
     plugins: [{ name: 'local-review-node-compat', setup(builder) {
       builder.onResolve({ filter: /^(node:)?[a-z][a-z0-9_/-]*$/ }, args => {
         const name = args.path.replace(/^node:/, '');
-        if (['os', 'fs', 'fs/promises', 'tty', 'http', 'https', 'net', 'tls'].includes(name)) return { path: require.resolve(`unenv/node/${name}`) };
+        if (['os', 'fs', 'fs/promises', 'tty', 'http', 'https', 'net', 'tls'].includes(name)) {
+          try { return { path: require.resolve(`unenv/node/${name}`) }; }
+          catch { return { path: runtimeRequire.resolve(`unenv/node/${name}`) }; }
+        }
         if (builtinModules.includes(name)) return { path: `node:${name}`, external: true };
       });
     } }],
