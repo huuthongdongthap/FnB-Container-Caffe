@@ -34,7 +34,10 @@ export interface ModifierValidationResult {
 }
 
 function parseModifierInput(mod: unknown): { modId: string | null; modName: string | null; clientDelta: number | null } {
-  if (typeof mod === 'string') return { modId: mod.trim(), modName: null, clientDelta: null };
+  if (typeof mod === 'string') {
+    const trimmed = mod.trim();
+    return { modId: trimmed, modName: trimmed, clientDelta: null };
+  }
   if (typeof mod === 'object' && mod !== null) {
     const m = mod as Record<string, unknown>;
     const modId = ((m.id || m.choiceId || m.choice_id || m.modifierId || m.modifier_id) as string)?.trim() || null;
@@ -91,6 +94,29 @@ export async function validateProductModifiers(
 
     const choiceRow = await fetchModifierChoice(db, modId, modName);
     if (!choiceRow) {
+      const prodIds = candidateProductIds && candidateProductIds.length > 0 ? candidateProductIds : [productId];
+      const normalizedChoice = (modName || modId || '').trim();
+      const BUNDLED_BOTTLED_CHOICES = new Set(['Sting', 'Coca', 'Pepsi', '7 UP', '7UP', 'Ô long']);
+      if (prodIds.includes('bt002') && BUNDLED_BOTTLED_CHOICES.has(normalizedChoice)) {
+        if (seenSingleGroupIds.has('mg_bottled_choice')) {
+          return {
+            valid: false,
+            validatedModifiers: [],
+            modifierDelta: 0,
+            rejection: { code: 'duplicate_modifier', message: 'Multiple choices selected for single-choice group: mg_bottled_choice' },
+          };
+        }
+        seenSingleGroupIds.add('mg_bottled_choice');
+        validatedModifiers.push({
+          id: `mc_drink_${normalizedChoice.toLowerCase().replace(/\s+/g, '')}`,
+          group_id: 'mg_bottled_choice',
+          name: normalizedChoice,
+          price_delta: 0,
+          is_default: 0,
+          sort_order: 0,
+        });
+        continue;
+      }
       return {
         valid: false,
         validatedModifiers: [],

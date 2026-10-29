@@ -3,6 +3,7 @@ import { createLogger } from '../../middleware/logger';
 import type { Env } from '../../types/env';
 import { requireStaffAccount } from '../../lib/staff-session';
 import { changeStaffPassword } from '../../lib/staff-password';
+import { getAuthToken } from '../../lib/jwt';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword } from './helpers';
 
@@ -23,10 +24,17 @@ async function writeDeviceAuditLog(
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
     } catch {
-      // Ignore audit log error
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
     }
   }
 }
@@ -74,13 +82,10 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const passwordHash = await hashPassword(body.newPassword);
     if (user.role !== 'customer') await changeStaffPassword(db, await requireStaffAccount(db, user.id), passwordHash);
     else await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
-    try {
-      await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
-    } catch {
-      const token = c.req.header('Authorization')?.replace('Bearer ', '');
-      if (token && c.env.AUTH_KV) {
-        await c.env.AUTH_KV.put('revoked:' + token, '1').catch(() => {});
-      }
+    await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run().catch(() => {});
+    const token = getAuthToken(c.req.raw);
+    if (token && c.env.AUTH_KV) {
+      await c.env.AUTH_KV.put('revoked:' + token, '1', { expirationTtl: 604800 }).catch(() => {});
     }
 
     await writeDeviceAuditLog(db, user.id, 'change_password', 'user', user.id, JSON.stringify({}), now);
@@ -130,6 +135,21 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     } catch {
       device = null;
     }
+    if (!device && user.role !== 'customer') {
+      const staffDevice = await db
+        .prepare('SELECT id, device_token, device_name FROM staff_devices WHERE (id = ? OR device_token = ?) AND staff_id = ?')
+        .bind(id, id, user.id)
+        .first()
+        .catch(() => null);
+      if (staffDevice) {
+        await db.batch([
+          db.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(staffDevice.id, user.id),
+          db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id),
+        ]);
+        await writeDeviceAuditLog(db, user.id, 'revoke_device', 'staff_device', String(staffDevice.id), JSON.stringify({ deviceToken: staffDevice.device_token, name: staffDevice.device_name }), now);
+        return c.json({ success: true, data: { success: true } });
+      }
+    }
     if (!device) {
       return c.json({ success: false, error: 'Device not found' }, 404);
     }
@@ -153,13 +173,14 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(user.id).run().catch(() => {});
-    try {
-      await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run();
-    } catch {
-      const token = c.req.header('Authorization')?.replace('Bearer ', '');
-      if (token && c.env.AUTH_KV) {
-        await c.env.AUTH_KV.put('revoked:' + token, '1').catch(() => {});
-      }
+    await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run().catch(() => {});
+    if (user.role !== 'customer') {
+      await db.prepare('DELETE FROM staff_devices WHERE staff_id = ?').bind(user.id).run().catch(() => {});
+      await db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
+    }
+    const token = getAuthToken(c.req.raw);
+    if (token && c.env.AUTH_KV) {
+      await c.env.AUTH_KV.put('revoked:' + token, '1', { expirationTtl: 604800 }).catch(() => {});
     }
 
     await writeDeviceAuditLog(db, user.id, 'revoke_all_devices', 'trusted_device', user.id, JSON.stringify({}), now);

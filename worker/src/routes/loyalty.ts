@@ -12,6 +12,7 @@ import { genId } from '../tree/loyalty/helpers';
 import { getActiveCampaign } from '../tree/loyalty/campaign';
 import { authCustomer } from '../tree/loyalty/auth-middleware';
 import { handlePhoneAuth } from '../tree/loyalty/phone-auth-handler';
+import { handlePhoneOtpRequest } from '../tree/loyalty/phone-otp-handler';
 import { handleSummary } from '../tree/loyalty/summary-handler';
 import { handleSpendCashback } from '../tree/loyalty/spend-cashback-handler';
 import { handleLookup } from '../tree/loyalty/lookup-handler';
@@ -21,6 +22,7 @@ export const loyaltyRouter = new Hono<{ Bindings: Env }>();
 const LEGACY_LOYALTY_PATHS = new Set([
   '/active-campaign',
   '/phone-auth',
+  '/phone-otp/request',
   '/summary',
   '/spend-cashback',
   '/lookup',
@@ -76,6 +78,7 @@ loyaltyRouter.get('/active-campaign', async(c) => {
 });
 
 loyaltyRouter.post('/phone-auth', handlePhoneAuth);
+loyaltyRouter.post('/phone-otp/request', handlePhoneOtpRequest);
 loyaltyRouter.get('/summary', handleSummary);
 loyaltyRouter.post('/spend-cashback', handleSpendCashback);
 loyaltyRouter.get('/lookup', handleLookup);

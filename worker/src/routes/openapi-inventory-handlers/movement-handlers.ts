@@ -170,12 +170,20 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(`audit_${Date.now()}`, user.id, 'stock_movement_create', 'stock_movement', id, JSON.stringify(body), now).run();
     } catch {
+      const metaStr = JSON.stringify(body);
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, 'stock_movement_create', 'stock_movement', id, JSON.stringify(body), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, user.id, 'stock_movement_create', 'stock_movement', id, 'stock_movement', id, metaStr, metaStr, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(user.id, user.id, 'stock_movement_create', 'stock_movement', id, metaStr, now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 

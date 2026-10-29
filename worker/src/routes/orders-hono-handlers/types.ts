@@ -40,6 +40,7 @@ export interface OrderRecord {
   total: number;
   status: string;
   payment_method: string;
+  notes?: string | null;
   created_at: string;
 }
 
@@ -48,6 +49,7 @@ export interface KdsOrder {
   customer_name: string;
   table_id: string | null;
   items: OrderItem[];
+  notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;

@@ -8,7 +8,9 @@ describe('buildDrinkOptions — per-category plans', () => {
     { category: 'frappuccino', tags: ['Blended'], sweetness: null, ice: null, notes: true },
     { category: 'smoothies', tags: ['Blended'], sweetness: null, ice: null, notes: true },
     { category: 'soda', tags: ['Iced'], sweetness: 3, ice: 2, notes: true },
-    { category: 'tea', tags: ['Iced/Hot'], sweetness: 4, ice: 3, notes: true },
+    { category: 'tea', tags: ['Iced/Hot'], sweetness: 4, ice: 4, notes: true },
+    { category: 'tea', tags: ['Iced'], sweetness: 4, ice: 3, notes: true },
+    { category: 'traditional-coffee', tags: ['Iced'], sweetness: 4, ice: 3, notes: true },
     { category: 'yogurt', tags: ['Iced'], sweetness: null, ice: 2, notes: true },
     { category: 'juice', tags: ['Iced'], sweetness: null, ice: 2, notes: true },
     { category: 'juice', tags: ['Fresh'], sweetness: null, ice: 2, notes: true },
@@ -69,10 +71,22 @@ describe('buildDrinkOptions — bypass', () => {
     expect(buildDrinkOptions({ id: 'od002', category: 'other-drinks', tags: ['Hot'] }).bypass).toBe(true);
   });
 
-  it('bt001..bt003 bypass', () => {
-    for (const id of ['bt001', 'bt002', 'bt003']) {
+  it('bt001 and bt003 bypass while bt002 requires drink choice selection', () => {
+    for (const id of ['bt001', 'bt003']) {
       expect(buildDrinkOptions({ id, category: 'bottled', tags: ['Bottled'] }).bypass).toBe(true);
     }
+    const bt002Plan = buildDrinkOptions({
+      id: 'bt002',
+      name: 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long',
+      category: 'bottled',
+      tags: ['Bottled'],
+    });
+    expect(bt002Plan.bypass).toBe(false);
+    expect(bt002Plan.showDrinkChoice).toBe(true);
+    expect(bt002Plan.drinkChoiceOptions).toEqual(['Sting', 'Coca', 'Pepsi', '7 UP', 'Ô long']);
+    expect(bt002Plan.showSweetness).toBe(false);
+    expect(bt002Plan.showIce).toBe(false);
+    expect(bt002Plan.showNotes).toBe(true);
   });
 });
 
@@ -134,7 +148,9 @@ describe('buildDrinkOptions — option set identity', () => {
     expect(buildDrinkOptions({ category: 'juice', tags: ['Iced'] }).iceOptions).toEqual([...ICE_LIGHT]);
   });
 
-  it('tea uses the 3-step ice set (no hot option for an iced/hot menu item)', () => {
-    expect(buildDrinkOptions({ category: 'tea', tags: ['Iced/Hot'] }).iceOptions).toEqual([...ICE_STANDARD]);
+  it('tea with Iced/Hot tag uses the 4-step ice set (includes Uống nóng), while Iced-only uses 3-step', () => {
+    expect(buildDrinkOptions({ category: 'tea', tags: ['Iced/Hot'] }).iceOptions).toEqual([...ICE_FULL]);
+    expect(buildDrinkOptions({ category: 'tea', tags: ['Iced'] }).iceOptions).toEqual([...ICE_STANDARD]);
+    expect(buildDrinkOptions({ id: 'tc007', name: 'Matcha latte đá', category: 'traditional-coffee', tags: ['Iced'] }).iceOptions).toEqual([...ICE_STANDARD]);
   });
 });

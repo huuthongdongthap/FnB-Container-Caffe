@@ -33,6 +33,7 @@ if [ ! -d "${MIGRATIONS_DIR}" ]; then
 fi
 
 SELECTED_FILES=()
+DRY_RUN=0
 
 normalize_and_validate_target() {
   local raw_target="$1"
@@ -116,6 +117,10 @@ while [[ $# -gt 0 ]]; do
     --remote)
       shift
       ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
     --all)
       echo "ERROR: Bulk historical migration replay (--all) is forbidden (fail-closed)." >&2
       usage
@@ -134,6 +139,14 @@ if [[ ${#SELECTED_FILES[@]} -eq 0 ]]; then
   echo "Refusing to replay all historical migrations in ${MIGRATIONS_DIR} without a verified D1 migration ledger." >&2
   usage
   exit 1
+fi
+
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  echo "DRY-RUN: Validated ${#SELECTED_FILES[@]} forward migration(s) in ${MIGRATIONS_DIR}:"
+  for name in "${SELECTED_FILES[@]}"; do
+    echo "  ✓ ${name}"
+  done
+  exit 0
 fi
 
 WRANGLER_CMD=(wrangler)

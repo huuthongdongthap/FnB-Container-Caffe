@@ -30,6 +30,7 @@ async function writeSyncLog(
 ): Promise<void> {
   if (!db) return;
   const id = crypto.randomUUID();
+  const status = error ? 'failed' : 'synced';
   try {
     await db
       .prepare(
@@ -42,13 +43,23 @@ async function writeSyncLog(
     try {
       await db
         .prepare(
-          `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO erpnext_sync_logs (status, method, endpoint, request_body, response_body, error, error_message)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, method, endpoint, requestBody, responseBody, error)
+        .bind(status, method, endpoint, requestBody, responseBody, error, error)
         .run();
     } catch {
-      // Non-blocking log write
+      try {
+        await db
+          .prepare(
+            `INSERT INTO erpnext_sync_log (id, method, endpoint, request_body, response_body, error)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .bind(id, method, endpoint, requestBody, responseBody, error)
+          .run();
+      } catch {
+        // Non-blocking log write
+      }
     }
   }
 }

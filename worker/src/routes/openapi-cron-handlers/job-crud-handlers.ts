@@ -20,10 +20,17 @@ async function writeCronJobAuditLog(
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, action, 'cron_job', entityId, metadata, now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, 'cron_job', entityId, 'cron_job', entityId, metadata, metadata, now).run();
     } catch {
-      // Ignore audit log error
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(userId, userId, action, 'cron_job', entityId, metadata, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
     }
   }
 }
@@ -118,9 +125,12 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
+    const cronExpression = body.cronExpression || body.schedule?.cronExpression || '';
+    const handler = body.handler || (body.payload as any)?.taskType || 'custom';
+
     // Validate cron expression format (basic check)
-    const cronParts = body.cronExpression.split(' ');
-    if (cronParts.length !== 5) {
+    const cronParts = cronExpression.trim().split(/\s+/);
+    if (cronParts.length !== 5 && !cronExpression.startsWith('@')) {
       return c.json({ success: false, error: 'Invalid cron expression format (must have 5 parts)' }, 400);
     }
 
@@ -136,15 +146,15 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       id,
       body.name,
       body.description || null,
-      body.cronExpression,
-      body.handler,
+      cronExpression,
+      handler,
       body.payload ? JSON.stringify(body.payload) : null,
-      body.timeoutSeconds || 300,
-      body.maxRetries || 3,
+      body.timeoutSeconds || (body.payload as any)?.timeoutSeconds || 300,
+      body.maxRetries || (body.payload as any)?.retries || 3,
       body.retryDelaySeconds || 60,
       body.isActive !== false ? 1 : 0,
       'pending',
-      body.locationId || null,
+      body.locationId || body.locationIds?.[0] || null,
       user.id,
       now,
       now

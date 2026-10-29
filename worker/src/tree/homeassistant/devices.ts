@@ -82,7 +82,7 @@ export async function toggleDevice(env: Record<string, unknown>, entityId: strin
     }
 
     await db
-      .prepare('UPDATE ha_device_states SET state = ?, last_updated = datetime("now") WHERE entity_id = ?')
+      .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ?")
       .bind(newState, entityId)
       .run();
 
@@ -144,7 +144,7 @@ export async function cacheDeviceState(env: Record<string, unknown>, device: Dev
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
     await db
       .prepare(
-        'INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime("now"))'
+        "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
       )
       .bind(
         device.entity_id,

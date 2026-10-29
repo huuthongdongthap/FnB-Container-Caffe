@@ -62,6 +62,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       customer_name: order.customer_name,
       table_id: order.table_id,
       items,
+      ...(order.notes ? { notes: order.notes } : {}),
       status: order.status,
       elapsed_minutes: elapsed,
       created_at: order.created_at,

@@ -80,7 +80,6 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
     if (body.discountPercent !== undefined) {
       updates.push('discount_percent = ?'); params.push(body.discountPercent);
-      canonicalUpdates.push('discount_percent = ?'); canonicalParams.push(body.discountPercent);
     }
     if (body.birthdayBonus !== undefined) { updates.push('birthday_bonus = ?'); params.push(body.birthdayBonus); }
     if (body.freeShipping !== undefined) { updates.push('free_shipping = ?'); params.push(body.freeShipping ? 1 : 0); }
@@ -89,7 +88,7 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.icon !== undefined) { updates.push('icon = ?'); params.push(body.icon); }
     if (body.benefits !== undefined) {
       updates.push('benefits = ?'); params.push(JSON.stringify(body.benefits));
-      canonicalUpdates.push('benefits = ?'); canonicalParams.push(JSON.stringify(body.benefits));
+      canonicalUpdates.push('perks = ?'); canonicalParams.push(JSON.stringify(body.benefits));
     }
 
     if (updates.length === 0) {
@@ -118,10 +117,17 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, 'loyalty_tier_update', 'loyalty_tier', tier, JSON.stringify(body), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, user.id, 'loyalty_tier_update', 'loyalty_tier', tier, 'loyalty_tier', tier, JSON.stringify(body), JSON.stringify(body), now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(user.id, user.id, 'loyalty_tier_update', 'loyalty_tier', tier, JSON.stringify(body), now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 

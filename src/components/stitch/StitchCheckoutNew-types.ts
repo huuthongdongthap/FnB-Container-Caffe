@@ -4,6 +4,7 @@ export interface CheckoutNewItem {
   id: string;
   name: string;
   variant: string;
+  notes?: string;
   quantity: number;
   price: number;
   imageUrl: string;

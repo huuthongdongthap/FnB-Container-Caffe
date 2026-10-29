@@ -13,6 +13,31 @@ import { useKdsAudio } from '@/hooks/use-kds-audio';
 /* ─── Re-export types for backward compatibility ─────────────── */
 export type { Ticket, TicketStatus } from './kds-types';
 
+function splitKdsItemModifierAndNotes(item: { modifiers?: string[]; notes?: string }): {
+  modifier?: string;
+  notes?: string;
+} {
+  let extractedOptions = '';
+  let cleanNotes = (item.notes ?? '').trim();
+
+  const optionMatch = cleanNotes.match(/(?:^|\s*\|\s*)Tùy chọn:\s*(.+)$/i);
+  if (optionMatch) {
+    extractedOptions = (optionMatch[1] ?? '').trim();
+    cleanNotes = cleanNotes.slice(0, optionMatch.index).trim();
+  }
+
+  const modList = item.modifiers?.length
+    ? item.modifiers
+    : extractedOptions
+      ? extractedOptions.split(/\s*,\s*/).filter(Boolean)
+      : [];
+
+  return {
+    ...(modList.length > 0 ? { modifier: modList.join(' · ') } : {}),
+    ...(cleanNotes ? { notes: cleanNotes } : {}),
+  };
+}
+
 /* ─── Main Page Component ──────────────────────────────────────── */
 
 export default function KDSPage() {
@@ -101,10 +126,9 @@ export default function KDSPage() {
           items: o.items.map((item) => ({
             name: item.name,
             quantity: item.quantity,
-            ...(item.modifiers?.length
-              ? { modifier: item.modifiers.join(' · ') }
-              : {}),
+            ...splitKdsItemModifierAndNotes(item),
           })),
+          ...(o.notes ? { notes: o.notes } : {}),
           elapsedSeconds,
           ...(o.status === 'ready'
             ? { totalTimeSeconds: elapsedSeconds }

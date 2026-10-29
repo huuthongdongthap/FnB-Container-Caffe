@@ -8,6 +8,7 @@ export interface KDSOrder {
     modifiers?: string[];
     notes?: string;
   }>;
+  notes?: string;
   station?: string;
   createdAt: string;
 }
@@ -18,6 +19,7 @@ export interface KdsStreamOrder {
   customer_name: string;
   table_id: string | null;
   items: Array<{ product_name: string; product_id?: string; quantity: number; unit_price?: number; notes?: string }>;
+  notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;
@@ -47,6 +49,7 @@ export function mapStreamOrders(orders: KdsStreamOrder[]): KDSOrder[] {
         ...(item.notes || rawItem.note ? { notes: String(item.notes ?? rawItem.note) } : {}),
       };
     }),
+    ...(typeof o.notes === 'string' && o.notes.trim() ? { notes: o.notes.trim() } : {}),
     createdAt: o.created_at,
   }));
 }
@@ -90,6 +93,7 @@ export function normalizeKdsOrder(raw: Record<string, unknown>): KDSOrder {
         ...(item.notes || item.note ? { notes: String(item.notes ?? item.note) } : {}),
       };
     }),
+    ...(typeof raw.notes === 'string' && raw.notes.trim() ? { notes: raw.notes.trim() } : {}),
     ...(typeof raw.station === 'string' ? { station: raw.station } : {}),
     createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
   };

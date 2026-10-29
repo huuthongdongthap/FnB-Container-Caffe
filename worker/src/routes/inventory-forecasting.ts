@@ -93,13 +93,27 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
         const res = await db.prepare(`
           SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
           FROM stock_movements
-          WHERE created_at >= ? AND type IN ('out', 'waste', 'adjustment')
+          WHERE created_at >= ? AND type IN ('out', 'consumption', 'waste', 'adjustment')
           GROUP BY ingredient_id
         `).bind(startDate).all<{ item_id: string; total_depleted: number }>();
         depletions = res.results || [];
       } catch {
         depletions = [];
       }
+    }
+  }
+
+  if (depletions.length === 0) {
+    try {
+      const res = await db.prepare(`
+        SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
+        FROM stock_movements
+        WHERE created_at >= ? AND type IN ('out', 'consumption', 'waste', 'adjustment')
+        GROUP BY ingredient_id
+      `).bind(startDate).all<{ item_id: string; total_depleted: number }>();
+      depletions = res.results || [];
+    } catch {
+      // Keep empty depletions
     }
   }
 
@@ -218,13 +232,27 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
         const res = await db.prepare(`
           SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
           FROM stock_movements
-          WHERE created_at >= ? AND type IN ('out', 'waste', 'adjustment')
+          WHERE created_at >= ? AND type IN ('out', 'consumption', 'waste', 'adjustment')
           GROUP BY ingredient_id
         `).bind(sevenDaysAgo).all<{ item_id: string; total_depleted: number }>();
         depletions = res.results || [];
       } catch {
         depletions = [];
       }
+    }
+  }
+
+  if (depletions.length === 0) {
+    try {
+      const res = await db.prepare(`
+        SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
+        FROM stock_movements
+        WHERE created_at >= ? AND type IN ('out', 'consumption', 'waste', 'adjustment')
+        GROUP BY ingredient_id
+      `).bind(sevenDaysAgo).all<{ item_id: string; total_depleted: number }>();
+      depletions = res.results || [];
+    } catch {
+      // Keep empty depletions
     }
   }
 

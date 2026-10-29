@@ -106,6 +106,111 @@ export async function runBrowserFlow(runtime, context, check) {
       finally { await session.close(); }
     }
 
+    // Verify F01, F02, F03, F04, F05, F06 & OrderSuccess NaN guard end-to-end
+    const { session: fSession, page: fPage } = await newContext({
+      aura_checkout_form: JSON.stringify({ orderType: 'dine_in', tableNumber: '5', fullName: 'QA F01-F06', phone: '0901234567' }),
+    });
+    try {
+      await fPage.setViewportSize({ width: 1280, height: 720 });
+      await fPage.goto('http://127.0.0.1:5197/menu?table=8');
+      await fPage.getByText('Matcha latte đá').first().waitFor({ state: 'visible', timeout: 15000 });
+
+      // F05a: Matcha latte đá (Iced-only) must NOT offer Uống nóng
+      await fPage.locator('article[aria-label="Matcha latte đá"] button').last().click();
+      await fPage.getByRole('dialog').waitFor({ state: 'visible', timeout: 5000 });
+      const matchaHasHot = await fPage.getByRole('dialog').getByText('Uống nóng').count();
+      await fPage.getByRole('button', { name: 'Đóng bảng tùy chọn' }).click();
+
+      // F05b: Lipton chanh/ tắc đá/nóng (Iced/Hot) MUST offer Uống nóng
+      await fPage.locator('article[aria-label="Lipton chanh/ tắc đá/nóng"] button').last().click();
+      await fPage.getByRole('dialog').waitFor({ state: 'visible', timeout: 5000 });
+      const liptonHasHot = await fPage.getByRole('dialog').getByText('Uống nóng').count();
+      await fPage.getByRole('button', { name: 'Đóng bảng tùy chọn' }).click();
+      check('browser-f05-serving-temperature', matchaHasHot === 0 && liptonHasHot === 1,
+        'Matcha latte đá omits Uống nóng; Lipton đá/nóng includes Uống nóng',
+        { matchaHasHot, liptonHasHot });
+
+      // F06: Sting/ Coca/ Pepsi/ 7 UP/ Ô long opens drink selector without sugar/ice
+      await fPage.locator('article[aria-label="Sting/ Coca/ Pepsi/ 7 UP/ Ô long"] button').last().click();
+      await fPage.getByRole('dialog').waitFor({ state: 'visible', timeout: 5000 });
+      const btChoiceHeading = await fPage.getByRole('dialog').getByText(/Chọn loại nước/).count();
+      const btSugarHeading = await fPage.getByRole('dialog').getByText(/Độ ngọt/).count();
+      await fPage.getByRole('dialog').getByText('Coca', { exact: true }).click();
+      await fPage.getByRole('dialog').getByRole('button', { name: /Thêm vào giỏ/ }).click();
+      check('browser-f06-bundled-drink-choice', btChoiceHeading === 1 && btSugarHeading === 0,
+        'bt002 prompts for drink choice without sugar/ice and adds chosen variant',
+        { btChoiceHeading, btSugarHeading });
+
+      // Add customized craft drink with note for F03 + F04
+      await fPage.locator('article[aria-label="Cà phê kiểm thử local"] button').last().click();
+      await fPage.getByRole('dialog').waitFor({ state: 'visible', timeout: 5000 });
+      await fPage.getByRole('dialog').getByText('70% ít ngọt').click();
+      await fPage.getByRole('dialog').getByText('Ít đá').click();
+      await fPage.getByRole('dialog').getByRole('textbox').fill('QA local: giu nguyen ghi chu');
+      await fPage.getByRole('dialog').getByRole('button', { name: /Thêm vào giỏ/ }).click();
+
+      // F02 desktop & mobile hit-test + click on CartFAB while CartBottomBar is visible
+      const fabBtn = fPage.locator('div.fixed.right-8 button').first();
+      await fabBtn.waitFor({ state: 'visible', timeout: 5000 });
+      const desktopHit = await fabBtn.evaluate(btn => {
+        const r = btn.getBoundingClientRect();
+        const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(el && (el === btn || btn.contains(el)));
+      });
+      await fPage.setViewportSize({ width: 390, height: 844 });
+      const mobileNoOverlap = await fPage.evaluate(() => {
+        const fab = document.querySelector('div.fixed.right-8 button')?.getBoundingClientRect();
+        const bar = document.querySelector('button[aria-label^="Thanh toán "]')?.getBoundingClientRect();
+        if (!fab || !bar) return false;
+        return fab.bottom <= bar.top || fab.top >= bar.bottom;
+      });
+      await fPage.setViewportSize({ width: 1280, height: 720 });
+      await fabBtn.click();
+      const drawerDialog = fPage.locator('[role="dialog"][aria-hidden="false"]').first();
+      await drawerDialog.waitFor({ state: 'visible', timeout: 5000 });
+      check('browser-f02-cart-fab-clickable', desktopHit && mobileNoOverlap,
+        'CartFAB receives desktop click and does not overlap CartBottomBar on mobile',
+        { desktopHit, mobileNoOverlap });
+
+      // F04: CartDrawer shows modifiers and item notes
+      const drawerText = await drawerDialog.innerText();
+      const f04CartVisible = drawerText.includes('70% ít ngọt · Ít đá')
+        && drawerText.includes('Ghi chú: QA local: giu nguyen ghi chu')
+        && drawerText.includes('Coca');
+      check('browser-f04-cart-modifiers-and-notes', f04CartVisible,
+        'CartDrawer displays modifiers, bundled drink choice, and item notes',
+        { f04CartVisible });
+      await drawerDialog.getByRole('button', { name: 'Đóng' }).click();
+
+      // F01: Click floating CartBottomBar on /menu?table=8 overrides prior Table 5
+      await fPage.locator('button[aria-label^="Thanh toán "]').click();
+      await fPage.waitForURL(/\/checkout\?table=8/, { timeout: 10000 });
+      const tableInputVal = await fPage.getByPlaceholder('Ví dụ: Bàn 5').inputValue();
+      const summaryText = await fPage.innerText('body');
+      const f04CheckoutVisible = summaryText.includes('Ghi chú: QA local: giu nguyen ghi chu');
+      check('browser-f01-table-context-preserved', tableInputVal === '8' && f04CheckoutVisible,
+        'CartBottomBar preserves ?table=8 and overrides stale table 5 in checkout',
+        { url: fPage.url(), tableInputVal, f04CheckoutVisible });
+
+      // Submit order and check OrderSuccess NaN guard + F03 KDS item & order notes
+      await fPage.getByPlaceholder('Ví dụ: Nguyễn Văn A').fill('QA F03 KDS Note');
+      await fPage.getByPlaceholder('0901 234 567').fill('0901234567');
+      await fPage.getByPlaceholder(/Ví dụ: ít đá, ít đường/).fill('QA don: mang ra cung luc');
+      await fPage.locator('label').filter({ has: fPage.locator('input[name="payment"][value="cod"]') }).click();
+      const orderRespPromise = fPage.waitForResponse(r => new URL(r.url()).pathname === '/api/orders' && r.request().method() === 'POST', { timeout: 15000 });
+      await fPage.locator('button[type="submit"]').click();
+      const orderResp = await orderRespPromise;
+      await fPage.waitForURL(/\/order-success\?/, { timeout: 12000 });
+      const successBodyText = await fPage.innerText('body');
+      check('browser-order-success-no-nan', orderResp.status() === 201 && !successBodyText.includes('NaN'),
+        'order-success renders server total immediately without NaN',
+        { status: orderResp.status(), hasNaN: successBodyText.includes('NaN') });
+    } catch (error) {
+      check('browser-f01-f06-suite', false, 'all F01-F06 browser checks pass', { error: String(error) });
+    } finally {
+      await fSession.close();
+    }
+
     const { session, page } = await newContext({
       aura_auth_token: context.tokens['staff-default'],
       aura_auth_user: JSON.stringify({ id: 'staff-default', name: 'Local Staff', email: 'staff-default@local-review.test', role: 'staff' }),
@@ -115,6 +220,13 @@ export async function runBrowserFlow(runtime, context, check) {
       let loaded = false;
       try { await page.getByText(/Cà phê kiểm thử/).first().waitFor({ state: 'visible', timeout: 30000 }); loaded = true; } catch {}
       check('browser-staff-kds', loaded, 'authenticated KDS displays local item', { loaded });
+      const kdsBodyText = await page.innerText('body');
+      const f03NoteOnKds = kdsBodyText.includes('Ghi chú: QA local: giu nguyen ghi chu')
+        && kdsBodyText.includes('Ghi chú đơn: QA don: mang ra cung luc')
+        && kdsBodyText.includes('TABLE 8');
+      check('browser-f03-kds-notes-visible', f03NoteOnKds,
+        'KDS ticket displays item notes, order notes, and TABLE 8 context',
+        { f03NoteOnKds });
       if (loaded) {
         const start = page.getByRole('button', { name: /Bắt đầu|START PREP/i }).first();
         if (await start.count()) {

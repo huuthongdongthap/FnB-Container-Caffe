@@ -68,7 +68,7 @@ function getInitialCheckoutForm(): {
     const savedProfile = savedProfileRaw ? JSON.parse(savedProfileRaw) : null;
 
     const params = new URLSearchParams(window.location.search);
-    const urlTable = params.get('table');
+    const urlTable = (params.get('table') || params.get('ban') || '').trim();
     const urlPromo = params.get('promo') || localStorage.getItem('aura_selected_promo_code') || '';
 
     const merged: CheckoutNewFormData = {

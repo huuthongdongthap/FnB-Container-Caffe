@@ -11,13 +11,15 @@ interface StitchMenuNewCartFabProps {
 export function StitchMenuNewCartFab({ cartItemCount, onCartClick }: StitchMenuNewCartFabProps) {
   const { t } = useTranslation();
 
+  const mobileLift = cartItemCount > 0 ? 'bottom-40 md:bottom-8' : 'bottom-24 md:bottom-8';
+
   return (
-    // Float above the MD3 NavigationBar on shell pages (pb-20 body padding)
-    <div className="fixed bottom-24 right-8 z-40 md:bottom-8">
+    // Float above the MD3 NavigationBar and CartBottomBar on shell pages
+    <div className={`fixed ${mobileLift} right-8 z-[65]`}>
       <button type="button"
         onClick={onCartClick}
         className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] shadow-xl transition-all duration-300 active:scale-95 hover:shadow-2xl hover:shadow-[var(--aura-chrome-bright)]/20"
-        aria-label={t('stitch.cartAriaLabel')}
+        aria-label={t('stitch.cartAriaLabel', 'Giỏ hàng')}
       >
         <ShoppingBag className="h-6 w-6" aria-hidden="true" />
         {cartItemCount > 0 && (

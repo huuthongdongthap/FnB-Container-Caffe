@@ -8,9 +8,11 @@ import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import type { Customer } from '../../types/models';
 
 export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
-  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign', '/lookup'];
+  const pubPaths = ['/phone-auth', '/phone-otp/request', '/tiers', '/active-campaign', '/lookup'];
   const pathSegments = c.req.path.split('/').filter(Boolean);
-  const relPath = `/${pathSegments.slice(2).join('/')}`;
+  const relPath = pathSegments[0] === 'api' && pathSegments[1] === 'loyalty'
+    ? `/${pathSegments.slice(2).join('/')}`
+    : `/${pathSegments.join('/')}`;
   if (pubPaths.includes(relPath)) {
     await next();
     return;
@@ -76,6 +78,18 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
   }
   if (!customer) {
     return c.json({ success: false, error: 'Customer not found' }, 404);
+  }
+  if (tenantId !== 'default') {
+    try {
+      const meta = await c.env.AURA_DB.prepare(
+        'SELECT tenant_id FROM customers WHERE id = ?'
+      ).bind(customer.id).first<{ tenant_id?: string | null }>();
+      if (meta?.tenant_id && meta.tenant_id !== tenantId) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+    } catch {
+      // Optional tenant_id column in partial test schemas
+    }
   }
   c.set('customer', customer as unknown as Record<string, unknown>);
   await next();

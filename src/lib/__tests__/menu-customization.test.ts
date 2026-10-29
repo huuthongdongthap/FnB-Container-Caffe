@@ -3,9 +3,9 @@ import { isReadyToServeItem } from '../menu-customization';
 
 describe('Menu Customization Rules - isReadyToServeItem', () => {
   describe('Bottled and Canned Beverages', () => {
-    it('returns true for items in the bottled category', () => {
+    it('returns true for items in the bottled category while bundled drink choice SKU bt002 requires choice selection', () => {
       expect(isReadyToServeItem({ id: 'bt001', name: 'Nước suối', category: 'bottled' })).toBe(true);
-      expect(isReadyToServeItem({ id: 'bt002', name: 'Sting / Coca / Pepsi / 7UP / Ô long', category: 'bottled' })).toBe(true);
+      expect(isReadyToServeItem({ id: 'bt002', name: 'Sting / Coca / Pepsi / 7UP / Ô long', category: 'bottled' })).toBe(false);
       expect(isReadyToServeItem({ id: 'bt003', name: 'Redbull', category: 'bottled' })).toBe(true);
     });
 

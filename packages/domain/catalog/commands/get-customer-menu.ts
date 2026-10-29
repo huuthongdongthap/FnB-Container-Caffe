@@ -93,13 +93,24 @@ async function attachProductModifiers(
 
   const placeholders = productIds.map(() => '?').join(',');
   try {
-    const modRes = await db.prepare(
-      `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta
-         FROM product_modifier_groups pm
-         JOIN menu_modifiers mm ON mm.group_id = pm.group_id
-        WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
-        ORDER BY mm.option_name`
-    ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+    let modRes: { results?: Array<{ product_id: string } & CustomerMenuItemModifier> };
+    try {
+      modRes = await db.prepare(
+        `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta
+           FROM product_modifier_groups pm
+           JOIN menu_modifiers mm ON mm.group_id = pm.group_id
+          WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
+          ORDER BY mm.option_name`
+      ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+    } catch {
+      modRes = await db.prepare(
+        `SELECT pm.product_id, mm.id, mm.group_id, mm.name AS option_name, mm.price_adjustment AS price_delta
+           FROM product_modifier_groups pm
+           JOIN menu_modifiers mm ON mm.group_id = pm.group_id
+          WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
+          ORDER BY mm.name`
+      ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+    }
 
     const byProduct = new Map<string, CustomerMenuItemModifier[]>();
     for (const row of (modRes.results ?? modRes ?? []) as Array<{ product_id: string } & CustomerMenuItemModifier>) {

@@ -37,7 +37,12 @@ export async function fetchModifierChoice(
   modId: string | null,
   modName: string | null,
 ): Promise<ChoiceRow | null> {
-  for (const cols of ['id, group_id, name, price_delta, is_available', 'id, group_id, name, price_delta']) {
+  for (const cols of [
+    'id, group_id, name, price_delta, is_available',
+    'id, group_id, name, price_delta',
+    'id, group_id, name, price_adjustment AS price_delta, available AS is_available',
+    'id, group_id, name, price_adjustment AS price_delta',
+  ]) {
     try {
       if (modId) {
         const row = await db.prepare(`SELECT ${cols} FROM modifier_choices WHERE id = ?`).bind(modId).first<ChoiceRow>();
@@ -55,7 +60,11 @@ export async function fetchModifierChoice(
 }
 
 export async function fetchModifierGroup(db: D1Like, groupId: string): Promise<GroupRow | null> {
-  for (const cols of ['id, name, type, required, is_active', 'id, name, type, required']) {
+  for (const cols of [
+    'id, name, type, required, is_active',
+    'id, name, type, required',
+    "id, name, CASE WHEN COALESCE(max_select, 1) <= 1 THEN 'single' ELSE 'multiple' END AS type, required",
+  ]) {
     try {
       const row = await db.prepare(`SELECT ${cols} FROM modifier_groups WHERE id = ?`).bind(groupId).first<GroupRow>();
       if (row) return row;

@@ -65,30 +65,65 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       let cafeWhere = 'WHERE 1=1';
       const cafeParams: (string | number)[] = [];
       if (search) {
-        cafeWhere += ' AND (t.name LIKE ? OR CAST(t.table_number AS TEXT) LIKE ?)';
+        cafeWhere += ' AND (t.name LIKE ? OR COALESCE(t.code, CAST(t.table_number AS TEXT)) LIKE ?)';
         cafeParams.push(`%${search}%`, `%${search}%`);
       }
       if (zoneId) {
-        cafeWhere += ' AND t.zone = ?';
-        cafeParams.push(zoneId);
+        cafeWhere += ' AND (t.zone_id = ? OR LOWER(t.zone) = LOWER(?))';
+        cafeParams.push(zoneId, zoneId);
       }
       if (status) {
         cafeWhere += ' AND t.status = ?';
         cafeParams.push(status);
       }
-      const countResult = (await db.prepare(
-        `SELECT COUNT(*) as total FROM cafe_tables t ${cafeWhere}`
-      ).bind(...cafeParams).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+      if (locationId) {
+        cafeWhere += ' AND t.location_id = ?';
+        cafeParams.push(locationId);
+      }
+      try {
+        const countResult = (await db.prepare(
+          `SELECT COUNT(*) as total FROM cafe_tables t ${cafeWhere}`
+        ).bind(...cafeParams).first()) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const rows = (await db.prepare(
-        `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
-         FROM cafe_tables t
-         ${cafeWhere}
-         ORDER BY t.table_number ${safeDirection}
-         LIMIT ? OFFSET ?`
-      ).bind(...cafeParams, limit, offset).all()) as { results: any[] };
-      tableRows = rows.results || [];
+        const rows = (await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           ${cafeWhere}
+           ORDER BY ${orderClause}
+           LIMIT ? OFFSET ?`
+        ).bind(...cafeParams, limit, offset).all()) as { results: any[] };
+        tableRows = rows.results || [];
+      } catch {
+        let legacyWhere = 'WHERE 1=1';
+        const legacyParams: (string | number)[] = [];
+        if (search) {
+          legacyWhere += ' AND (t.name LIKE ? OR CAST(t.table_number AS TEXT) LIKE ?)';
+          legacyParams.push(`%${search}%`, `%${search}%`);
+        }
+        if (zoneId) {
+          legacyWhere += ' AND t.zone = ?';
+          legacyParams.push(zoneId);
+        }
+        if (status) {
+          legacyWhere += ' AND t.status = ?';
+          legacyParams.push(status);
+        }
+        const countResult = (await db.prepare(
+          `SELECT COUNT(*) as total FROM cafe_tables t ${legacyWhere}`
+        ).bind(...legacyParams).first()) as { total: number } | null;
+        total = countResult?.total || 0;
+
+        const rows = (await db.prepare(
+          `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+           FROM cafe_tables t
+           ${legacyWhere}
+           ORDER BY t.table_number ${safeDirection}
+           LIMIT ? OFFSET ?`
+        ).bind(...legacyParams, limit, offset).all()) as { results: any[] };
+        tableRows = rows.results || [];
+      }
     }
 
     const tables = tableRows.map(formatTable);
@@ -113,11 +148,20 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          WHERE t.id = ?`
       ).bind(id).first();
     } catch {
-      row = await db.prepare(
-        `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
-         FROM cafe_tables t
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        row = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        row = await db.prepare(
+          `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+           FROM cafe_tables t
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     }
 
     if (!row) {
@@ -142,14 +186,24 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Check code uniqueness
     let existing: unknown = null;
     try {
-      existing = await db.prepare('SELECT id FROM tables WHERE code = ? AND location_id = ?').bind(body.code, body.locationId).first();
+      existing = await db.prepare('SELECT id FROM tables WHERE code = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\')').bind(body.code, body.locationId || 'default').first();
     } catch {
-      const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || 0;
-      existing = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? OR name = ?').bind(tableNum, body.name).first().catch(() => null);
+      try {
+        existing = await db.prepare('SELECT id FROM cafe_tables WHERE code = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\')').bind(body.code, body.locationId || 'default').first();
+      } catch {
+        const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || 0;
+        existing = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? OR name = ?').bind(tableNum, body.name || body.code).first().catch(() => null);
+      }
     }
     if (existing) {
       return c.json({ success: false, error: 'Table code already exists in this location' }, 409);
     }
+
+    const posX = body.position?.x ?? body.x ?? 0;
+    const posY = body.position?.y ?? body.y ?? 0;
+    const dimW = body.dimensions?.width ?? body.width ?? 80;
+    const dimH = body.dimensions?.height ?? body.height ?? 80;
+    const dimR = body.dimensions?.rotation ?? body.rotation ?? 0;
 
     try {
       await db.prepare(
@@ -162,31 +216,57 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.zoneId || null,
         body.capacity || 4,
         body.status || 'available',
-        body.position?.x || 0,
-        body.position?.y || 0,
-        body.dimensions?.width || 80,
-        body.dimensions?.height || 80,
-        body.dimensions?.rotation || 0,
+        posX,
+        posY,
+        dimW,
+        dimH,
+        dimR,
         body.isActive !== false ? 1 : 0,
-        body.locationId,
+        body.locationId || 'default',
         JSON.stringify(body.metadata || {}),
         now,
         now
       ).run();
     } catch {
-      const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || Math.floor(Date.now() % 10000);
-      await db.prepare(
-        `INSERT INTO cafe_tables (id, table_number, name, capacity, zone, status, qr_code)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        tableNum,
-        body.name,
-        body.capacity || 4,
-        body.zoneId || 'indoor',
-        body.status || 'available',
-        body.qrCode || null
-      ).run();
+      const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || Math.floor(Date.now() % 100000);
+      try {
+        await db.prepare(
+          `INSERT INTO cafe_tables (id, table_number, code, name, capacity, zone, zone_id, status, position_x, position_y, width, height, rotation, is_active, location_id, qr_code, metadata, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          tableNum,
+          body.code,
+          body.name,
+          body.capacity || 4,
+          body.zoneId || 'indoor',
+          body.zoneId || 'indoor',
+          body.status || 'available',
+          posX,
+          posY,
+          dimW,
+          dimH,
+          dimR,
+          body.isActive !== false ? 1 : 0,
+          body.locationId || 'default',
+          body.qrCode || null,
+          JSON.stringify(body.metadata || {}),
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO cafe_tables (id, table_number, name, capacity, zone, status, qr_code)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          tableNum,
+          body.name,
+          body.capacity || 4,
+          body.zoneId || 'indoor',
+          body.status || 'available',
+          body.qrCode || null
+        ).run();
+      }
     }
 
     // Audit log
@@ -201,11 +281,20 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          WHERE t.id = ?`
       ).bind(id).first();
     } catch {
-      created = await db.prepare(
-        `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
-         FROM cafe_tables t
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        created = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        created = await db.prepare(
+          `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+           FROM cafe_tables t
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     }
 
     return c.json({
@@ -236,10 +325,14 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.code && body.code !== existing.code) {
       let codeExists: unknown = null;
       try {
-        codeExists = await db.prepare('SELECT id FROM tables WHERE code = ? AND location_id = ? AND id != ?').bind(body.code, body.locationId || existing.location_id, id).first();
+        codeExists = await db.prepare('SELECT id FROM tables WHERE code = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.code, body.locationId || existing.location_id || 'default', id).first();
       } catch {
-        const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || 0;
-        codeExists = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND id != ?').bind(tableNum, id).first().catch(() => null);
+        try {
+          codeExists = await db.prepare('SELECT id FROM cafe_tables WHERE code = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.code, body.locationId || existing.location_id || 'default', id).first();
+        } catch {
+          const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10) || 0;
+          codeExists = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND id != ?').bind(tableNum, id).first().catch(() => null);
+        }
       }
       if (codeExists) {
         return c.json({ success: false, error: 'Table code already exists in this location' }, 409);
@@ -284,11 +377,16 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       cafeUpdates.push('status = ?');
       cafeParams.push(body.status);
     }
-    if (body.position?.x !== undefined) { updates.push('position_x = ?'); params.push(body.position.x); }
-    if (body.position?.y !== undefined) { updates.push('position_y = ?'); params.push(body.position.y); }
-    if (body.dimensions?.width !== undefined) { updates.push('width = ?'); params.push(body.dimensions.width); }
-    if (body.dimensions?.height !== undefined) { updates.push('height = ?'); params.push(body.dimensions.height); }
-    if (body.dimensions?.rotation !== undefined) { updates.push('rotation = ?'); params.push(body.dimensions.rotation); }
+    const updX = body.position?.x ?? body.x;
+    const updY = body.position?.y ?? body.y;
+    const updW = body.dimensions?.width ?? body.width;
+    const updH = body.dimensions?.height ?? body.height;
+    const updR = body.dimensions?.rotation ?? body.rotation;
+    if (updX !== undefined) { updates.push('position_x = ?'); params.push(updX); }
+    if (updY !== undefined) { updates.push('position_y = ?'); params.push(updY); }
+    if (updW !== undefined) { updates.push('width = ?'); params.push(updW); }
+    if (updH !== undefined) { updates.push('height = ?'); params.push(updH); }
+    if (updR !== undefined) { updates.push('rotation = ?'); params.push(updR); }
     if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
     if (body.locationId !== undefined) { updates.push('location_id = ?'); params.push(body.locationId); }
     if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
@@ -301,8 +399,18 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       try {
         await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
       } catch {
-        if (cafeUpdates.length > 0) {
-          await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
+        try {
+          const fullCafeUpdates = [...updates];
+          const fullCafeParams = [...params];
+          if (body.zoneId !== undefined) {
+            fullCafeUpdates.unshift('zone = ?');
+            fullCafeParams.unshift(body.zoneId);
+          }
+          await db.prepare(`UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ?`).bind(...fullCafeParams).run();
+        } catch {
+          if (cafeUpdates.length > 0) {
+            await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
+          }
         }
       }
     }
@@ -319,11 +427,20 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          WHERE t.id = ?`
       ).bind(id).first();
     } catch {
-      updated = await db.prepare(
-        `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
-         FROM cafe_tables t
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        updated = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        updated = await db.prepare(
+          `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+           FROM cafe_tables t
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     }
 
     return c.json({

@@ -25,10 +25,17 @@ async function logProductAudit(
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, action, 'product', entityId, metadata, now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, 'product', entityId, 'product', entityId, metadata, metadata, now).run();
     } catch {
-      // Ignore audit log failure
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(userId, userId, action, 'product', entityId, metadata, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log failure
+      }
     }
   }
 }

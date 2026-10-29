@@ -61,8 +61,8 @@ export async function logSend(
   const errorMsg = result.error || null;
   try {
     await db.prepare(
-      `INSERT INTO campaign_logs (id, customer_id, trigger, channel, sent_at, status, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO campaign_logs (id, customer_id, trigger, channel, sent_at, status, error, trigger_type, error_message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id,
       result.customer_id,
@@ -70,28 +70,47 @@ export async function logSend(
       result.channel,
       now,
       status,
-      errorMsg
+      errorMsg,
+      result.trigger,
+      errorMsg,
+      now
     ).run();
   } catch (err) {
     const msg = String((err as Error)?.message || '');
     if (msg.includes('column')) {
       try {
         await db.prepare(
-          `INSERT INTO campaign_logs (id, customer_id, trigger_type, channel, status, error_message, created_at)
+          `INSERT INTO campaign_logs (id, customer_id, trigger, channel, sent_at, status, error)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           id,
           result.customer_id,
           result.trigger,
           result.channel,
+          now,
           status,
-          errorMsg,
-          now
+          errorMsg
         ).run();
         return;
-      } catch (fallbackErr) {
-        log.error('logSend failed', { customerId: result.customer_id, error: (fallbackErr as Error).message });
-        return;
+      } catch {
+        try {
+          await db.prepare(
+            `INSERT INTO campaign_logs (id, customer_id, trigger_type, channel, status, error_message, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id,
+            result.customer_id,
+            result.trigger,
+            result.channel,
+            status,
+            errorMsg,
+            now
+          ).run();
+          return;
+        } catch (fallbackErr) {
+          log.error('logSend failed', { customerId: result.customer_id, error: (fallbackErr as Error).message });
+          return;
+        }
       }
     }
     log.error('logSend failed', { customerId: result.customer_id, error: (err as Error).message });

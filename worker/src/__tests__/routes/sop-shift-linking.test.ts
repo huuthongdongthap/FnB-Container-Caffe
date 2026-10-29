@@ -16,7 +16,7 @@
  *    dashboard while the floor was running checklists.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { staffSessionFixture, STAFF_HASH } from '../helpers/staff-session-fixture';
 import { applySopMigrations } from '../helpers/sop-test-db';
 
@@ -26,6 +26,11 @@ describe('sop shift linking', () => {
   let fx: ReturnType<typeof staffSessionFixture>;
 
   beforeAll(async () => {
+    // Pin wall clock to the 2026-10-24 fixture date so monthly duties on the
+    // 15th (deep-clean-m15) and 30th (inventory-audit-m30) do not override the
+    // shift-template assertions when the suite runs on those calendar days.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-24T01:00:00Z'));
     fx = staffSessionFixture();
     applySopMigrations(fx.sqlite);
     // The attendance table the SOP feature reads. Mirrors worker/schema.sql:444
@@ -235,5 +240,9 @@ describe('sop shift linking', () => {
     }
     const complete = await fx.request(`/api/sop/runs/${run.id}/complete`, await fx.token('staff'), 'POST');
     expect(complete.status).toBe(200);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
   });
 });

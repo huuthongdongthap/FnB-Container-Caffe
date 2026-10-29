@@ -130,6 +130,19 @@ export async function deductInventoryForOrder(
     if (bomRes.alreadyDeducted) {
       return;
     }
+    if (bomRes.ok && bomRes.depletions.length > 0) {
+      for (const dep of bomRes.depletions) {
+        try {
+          await env.AURA_DB.prepare(
+            "UPDATE inventory_items SET current_stock = MAX(0, current_stock - ?), updated_at = datetime('now') WHERE id = ?"
+          )
+            .bind(dep.quantity, dep.ingredientId)
+            .run();
+        } catch {
+          // Best-effort sync when inventory_items shares ingredient IDs
+        }
+      }
+    }
     bomProductIds = new Set((bomRes.ok ? bomRes.depletions : []).map((d: any) => d.productId).filter(Boolean));
     const itemsWithProductId = orderItems.filter(i => Boolean(i.product_id));
     if (

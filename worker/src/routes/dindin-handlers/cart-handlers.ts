@@ -22,13 +22,13 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
         results = res.results;
       } catch {
         const res = await c.env.AURA_DB.prepare(
-          'SELECT session_id, cart, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
-        ).all<{ session_id: string; cart: string; updated_at?: string }>();
+          'SELECT session_id, COALESCE(cart, raw) as cart, raw, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
+        ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string }>();
         results = res.results;
       }
       for (const row of results || []) {
         try {
-          const parsed = JSON.parse(row.cart) as {
+          const parsed = JSON.parse(row.cart || (row as { raw?: string }).raw || '{}') as {
             items?: Array<Record<string, unknown>>;
             total?: number;
             createdAt?: string;

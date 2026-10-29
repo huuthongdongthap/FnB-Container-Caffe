@@ -182,7 +182,33 @@ export async function createLocalRuntime() {
     await db.exec(await readFile(path.join(ROOT, 'worker/schema.sql'), 'utf8'));
     await db.prepare('INSERT INTO categories (id,name,slug) VALUES (?,?,?)').bind('review-category', 'Review Coffee', 'review-coffee').run();
     await db.prepare('INSERT INTO products (id,category_id,name,slug,price) VALUES (?,?,?,?,?)').bind('review-coffee', 'review-category', 'Cà phê kiểm thử local', 'review-coffee-product', 20000).run();
-    await db.prepare('INSERT INTO menu_items (id,category,name,price) VALUES (?,?,?,?)').bind('review-coffee', 'Review Coffee', 'Cà phê kiểm thử local', 20000).run();
+    await db.prepare('INSERT INTO menu_items (id,category,name,price,tags) VALUES (?,?,?,?,?)').bind('review-coffee', 'traditional-coffee', 'Cà phê kiểm thử local', 20000, '["Iced/Hot"]').run();
+    const menuSeedItems = [
+      ['tc001', 'cat_trad_coffee', 'traditional-coffee', 'Cà phê sữa đá', 'ca-phe-sua-da', 20000, '["Iced/Hot"]'],
+      ['tc007', 'cat_trad_coffee', 'traditional-coffee', 'Matcha latte đá', 'matcha-latte-da', 30000, '["Iced"]'],
+      ['te001', 'cat_tea', 'tea', 'Lipton chanh/ tắc đá/nóng', 'lipton-chanh-tac', 25000, '["Iced/Hot"]'],
+      ['te005', 'cat_tea', 'tea', 'Trà đào', 'tra-dao', 30000, '["Iced"]'],
+      ['bt001', 'cat_bottled', 'bottled', 'Nước suối', 'nuoc-suoi', 10000, '["Bottled"]'],
+      ['bt002', 'cat_bottled', 'bottled', 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long', 'nuoc-ngot-dong-chai', 15000, '["Bottled"]'],
+    ];
+    for (const [catId, catName, catSlug] of [
+      ['cat_trad_coffee', 'Cà Phê Truyền Thống', 'traditional-coffee'],
+      ['cat_tea', 'Trà Trái Cây & Thảo Mộc', 'tea'],
+      ['cat_bottled', 'Đồ Uống Đóng Chai', 'bottled'],
+    ]) {
+      await db.prepare('INSERT OR IGNORE INTO categories (id,name,slug) VALUES (?,?,?)').bind(catId, catName, catSlug).run();
+    }
+    for (const [id, catId, catSlug, name, slug, price, tags] of menuSeedItems) {
+      await db.prepare('INSERT OR REPLACE INTO products (id,category_id,name,slug,price,tags,is_available) VALUES (?,?,?,?,?,?,1)').bind(id, catId, name, slug, price, tags).run();
+      await db.prepare('INSERT OR REPLACE INTO menu_items (id,category,name,price,tags,available) VALUES (?,?,?,?,?,1)').bind(id, catSlug, name, price, tags).run();
+    }
+    for (const tableNum of [5, 8]) {
+      await db.prepare('INSERT OR IGNORE INTO cafe_tables (id,table_number,name,capacity,zone,status) VALUES (?,?,?,?,?,?)')
+        .bind(tableNum, String(tableNum), `Bàn ${tableNum}`, 4, 'Indoor', 'Available').run();
+    }
+    await db.exec(await readFile(path.join(ROOT, 'worker/db/migrations/20261029_05_catalog_modifiers_kds_stations_and_table_cutover.sql'), 'utf8'));
+    await db.prepare('INSERT OR IGNORE INTO product_modifier_groups (product_id,group_id,sort_order) VALUES (?,?,1)').bind('review-coffee', 'mg_sweetness').run();
+    await db.prepare('INSERT OR IGNORE INTO product_modifier_groups (product_id,group_id,sort_order) VALUES (?,?,2)').bind('review-coffee', 'mg_ice').run();
     const identities = [
       ['staff-default', 'staff', 'default'],
       ['cashier-default', 'cashier', 'default'],

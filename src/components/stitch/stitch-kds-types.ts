@@ -10,6 +10,7 @@ export interface TicketItem {
   name: string;
   quantity: number;
   modifier?: string;
+  notes?: string;
 }
 
 export interface Ticket {
@@ -19,6 +20,7 @@ export interface Ticket {
   status: TicketStatus;
   rawStatus?: string;
   items: TicketItem[];
+  notes?: string;
   elapsedSeconds: number;
   totalTimeSeconds?: number;
 }

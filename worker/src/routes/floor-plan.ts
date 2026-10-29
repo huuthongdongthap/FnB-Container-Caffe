@@ -86,7 +86,7 @@ floorPlanRouter.get('/', async (c) => {
       id: String(r.id),
       table_number: Number(r.table_number),
       zone: String(r.zone),
-      capacity: Number(r.capacity),
+      capacity: Number(r.capacity ?? r.seats ?? 2),
       status: String(r.status) as FloorPlanTable['status'],
       notes: (r.notes as string) ?? null,
       updated_at: (r.updated_at as string) ?? null,

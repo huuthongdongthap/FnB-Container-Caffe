@@ -86,6 +86,11 @@ export function OrderSummaryPanel({
                     {' • '}
                     {item.quantity}x
                   </span>
+                  {item.notes && (
+                    <span className="text-xs italic text-[var(--aura-chrome-light,#dfaf7e)] font-body block mt-0.5">
+                      Ghi chú: {item.notes}
+                    </span>
+                  )}
                   <span className="text-xs text-[var(--aura-chrome-mid)] font-mono block mt-1">
                     Đơn giá: {formatPrice(item.price, locale)}
                   </span>

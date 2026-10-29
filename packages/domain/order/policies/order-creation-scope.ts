@@ -43,11 +43,24 @@ export async function resolveOrderCreationTable(db: D1Like, tableId: string | un
   const code = tableId.trim();
   const byNumber = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
     .bind(code, tenantId).first<{ id: string }>();
-  const table = byNumber || (code !== code.toUpperCase()
+  let table = byNumber || (code !== code.toUpperCase()
     ? await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
       .bind(code.toUpperCase(), tenantId).first<{ id: string }>() : null)
     || await db.prepare('SELECT id FROM cafe_tables WHERE id = ? AND tenant_id = ?')
       .bind(code, tenantId).first<{ id: string }>();
+  if (!table) {
+    const slugOrPaddedMatch = code.match(/^[tT]?0*([1-9]\d*)(?:-[a-z0-9-]+)?$/i);
+    if (slugOrPaddedMatch) {
+      const normalizedNumber = slugOrPaddedMatch[1];
+      const paddedId = `t${normalizedNumber.padStart(2, '0')}`;
+      table = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+        .bind(normalizedNumber, tenantId).first<{ id: string }>()
+        || await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+          .bind(Number(normalizedNumber), tenantId).first<{ id: string }>()
+        || await db.prepare('SELECT id FROM cafe_tables WHERE id = ? AND tenant_id = ?')
+          .bind(paddedId, tenantId).first<{ id: string }>();
+    }
+  }
   if (!table) throw new OrderCreationError('A valid table_id in this store is required', 400);
   return table.id;
 }

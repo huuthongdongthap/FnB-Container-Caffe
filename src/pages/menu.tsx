@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useCustomerMenu, type CustomerMenu, type CustomerMenuItem } from '@/hooks/useCustomerMenu';
 import { useCart } from '@/hooks/use-cart';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { StitchMenuNewSkeleton } from '@/components/stitch/StitchMenuNew-skeleton';
@@ -45,6 +46,25 @@ export function MenuPage() {
 
   const rawTable = searchParams.get('table') || searchParams.get('ban');
   const tableNumber = rawTable?.trim();
+
+  useEffect(() => {
+    if (!tableNumber) return;
+    useCartStore.getState().setTableId(tableNumber);
+    try {
+      const savedFormRaw = localStorage.getItem('aura_checkout_form');
+      const savedForm = savedFormRaw ? JSON.parse(savedFormRaw) : {};
+      localStorage.setItem(
+        'aura_checkout_form',
+        JSON.stringify({
+          ...savedForm,
+          orderType: 'dine_in',
+          tableNumber,
+        }),
+      );
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [tableNumber]);
 
   const [cartOpen, setCartOpen] = useState(false);
 

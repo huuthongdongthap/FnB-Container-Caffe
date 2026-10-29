@@ -92,11 +92,11 @@ With a scheduled handler that calls the backup script and uploads to R2.
 4. **Record results** in incident log with timestamps.
 5. **Clean up** staging DB after verification.
 
-## Secrets Handling
+## Sensitive Data & Secrets Handling
 
-- Backups contain **no secrets** — D1 export only includes schema and data.
-- Secrets (JWT_SECRET, PAYOS keys, etc.) are managed via `wrangler secret put` and never stored in D1.
-- KV namespaces (`AUTH_KV`) are **not backed up** — tokens are ephemeral; revocation list rebuilt from auth events if needed.
+- **CLASSIFICATION: SENSITIVE / RESTRICTED.** While Worker runtime secrets (`JWT_SECRET`, `PAYOS_*`, etc.) are managed via `wrangler secret put` and not stored in D1, D1 SQL exports (`backups/*.sql`) contain **sensitive authentication and personal data**, including `users.password_hash` (PBKDF2 Staff credential hashes), `staff_login_identities`, `staff_devices`, and customer PII (`customers.phone`, `customers.email`, `customers.date_of_birth`, wallet balances).
+- Treat all SQL dumps and R2 backup artifacts with the same access control as production credentials: restrict read/export/restore permissions to authorized DB/Platform Admins with MFA, encrypt artifacts at rest, never commit `.sql` dumps to git, and audit every export/download/restore operation.
+- KV namespaces (`AUTH_KV`) are **not backed up** — if `AUTH_KV` is lost or a D1 backup is restored after an incident, increment `users.auth_version` (and revoke compromised `staff_devices` rows) in D1 before reopening traffic so previously issued Staff tokens are invalidated at the D1 authority layer without relying on KV revocation entries.
 
 ## Migration Compatibility
 

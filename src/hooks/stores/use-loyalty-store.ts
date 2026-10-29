@@ -25,7 +25,7 @@ interface LoyaltyState {
   fetchLoyalty: () => Promise<void>;
   redeemReward: (rewardId: string) => Promise<void>;
   calculateCashback: (amount: number) => number;
-  phoneAuth: (phone: string) => Promise<void>;
+  phoneAuth: (phone: string, otp?: string) => Promise<void>;
   reset: () => void;
   clearError: () => void;
 }
@@ -127,12 +127,13 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
     return Math.round(amount * rate);
   },
 
-  phoneAuth: async (phone: string) => {
+  phoneAuth: async (phone: string, otp?: string) => {
     set({ loading: true, error: null });
     try {
+      const payload = otp ? { phone, otp } : { phone };
       const res = await apiFetch<any>('/api/loyalty/phone-auth', {
         method: 'POST',
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(payload),
       });
       const token = res?.customerToken || res?.token || res?.data?.customerToken || res?.data?.token;
       const user = (res?.user || res?.data?.user) as ClientSessionUser | undefined;

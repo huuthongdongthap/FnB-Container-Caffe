@@ -155,48 +155,62 @@ async function recordDeliveryLog(db: any, intent: NotificationIntent, providerMe
     try {
       await db.prepare(
         `INSERT INTO notification_audit_log (
-          id, channel, recipient, template_id, status, error_message, retry_count, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          channel, recipient, phone, template_id, template_key, status, error_message, retry_count,
+          event_id, idempotency_key, correlation_id, provider, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        intent.id, intent.channel, recipientTarget, intent.templateId, intent.status,
-        intent.errorReason || null, intent.retryCount, intent.createdAt
+        intent.channel, recipientTarget, intent.recipient.phone || recipientTarget,
+        intent.templateId, intent.templateId, intent.status,
+        intent.errorReason || null, intent.retryCount, intent.eventId, intent.idempotencyKey,
+        intent.correlationId || null, intent.provider, intent.createdAt
       ).run();
     } catch {
       try {
         await db.prepare(
           `INSERT INTO notification_audit_log (
-            id, channel, phone, template_key, payload, response, error, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            id, channel, recipient, template_id, status, error_message, retry_count, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
-          intent.id,
-          intent.channel,
-          intent.recipient.phone || recipientTarget,
-          intent.templateId,
-          JSON.stringify(intent.renderedPayload ?? {}),
-          providerMessageId || null,
-          intent.errorReason || null,
-          intent.status,
-          intent.createdAt
+          intent.id, intent.channel, recipientTarget, intent.templateId, intent.status,
+          intent.errorReason || null, intent.retryCount, intent.createdAt
         ).run();
       } catch {
         try {
           await db.prepare(
             `INSERT INTO notification_audit_log (
-              order_id, customer_id, channel, phone, message_type, status, provider_response, sent_at, created_at
+              id, channel, phone, template_key, payload, response, error, status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
           ).bind(
-            (intent.renderedPayload?.orderId as string) || intent.eventId || null,
-            intent.recipient.customerId || null,
+            intent.id,
             intent.channel,
             intent.recipient.phone || recipientTarget,
             intent.templateId,
+            JSON.stringify(intent.renderedPayload ?? {}),
+            providerMessageId || null,
+            intent.errorReason || null,
             intent.status,
-            providerMessageId || intent.errorReason || null,
-            intent.status === 'delivered' ? intent.updatedAt : null,
             intent.createdAt
           ).run();
         } catch {
-          // non-blocking
+          try {
+            await db.prepare(
+              `INSERT INTO notification_audit_log (
+                order_id, customer_id, channel, phone, message_type, status, provider_response, sent_at, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              (intent.renderedPayload?.orderId as string) || intent.eventId || null,
+              intent.recipient.customerId || null,
+              intent.channel,
+              intent.recipient.phone || recipientTarget,
+              intent.templateId,
+              intent.status,
+              providerMessageId || intent.errorReason || null,
+              intent.status === 'delivered' ? intent.updatedAt : null,
+              intent.createdAt
+            ).run();
+          } catch {
+            // non-blocking
+          }
         }
       }
     }

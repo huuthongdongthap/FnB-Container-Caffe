@@ -28,7 +28,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, body.name, body.email, body.phone || null, passwordHash,
-      body.role, body.locale || 'vi', 'bronze', 0, true, null, now, now
+      body.role, body.locale || 'vi', 'bronze', 0, 1, null, now, now
     ).run();
 
     try {
@@ -37,12 +37,20 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(`audit_${Date.now()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
     } catch {
+      const metaStr = JSON.stringify({ role: body.role });
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, user.id, 'register_staff', 'user', id, 'user', id, metaStr, metaStr, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(user.id, user.id, 'register_staff', 'user', id, metaStr, now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 
@@ -147,13 +155,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, body.name, body.email, body.phone || null, passwordHash,
-      'owner', body.locale || 'vi', 'diamond', 0, true, null, now, now
+      'owner', body.locale || 'vi', 'diamond', 0, 1, null, now, now
     ).run();
 
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, true, null, 'Bootstrap Device', now, now).run();
+    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, 1, null, 'Bootstrap Device', now, now).run();
 
     try {
       await db.prepare(
@@ -163,10 +171,17 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(id, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, id, id, 'bootstrap_owner', 'user', id, 'user', id, '{}', '{}', now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(id, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 

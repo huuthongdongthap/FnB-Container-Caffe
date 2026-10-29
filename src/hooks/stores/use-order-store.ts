@@ -48,7 +48,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     try {
       const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload),
         ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}) });
-      const order: CustomerOrder = body.data;
+      const order: CustomerOrder = body.data ?? body;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
     } catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' }); return null; }

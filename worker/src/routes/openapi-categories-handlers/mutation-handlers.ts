@@ -4,6 +4,34 @@ import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
 import { formatCategory, type CategoryRow } from './helpers';
 
+async function writeCategoryAuditLog(
+  db: any,
+  userId: string,
+  action: string,
+  entityId: string,
+  metadata: string,
+  now: string
+): Promise<void> {
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${Date.now()}`, userId, action, 'category', entityId, metadata, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, 'category', entityId, 'category', entityId, metadata, metadata, now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, action, 'category', entityId, metadata, now).run().catch(() => {});
+    }
+  }
+}
+
 export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // POST /api/categories - Create category
   router.openapi(CategoryRoutes.create as any, async (c: any) => {
@@ -49,17 +77,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     }
 
     // Audit log
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'category_create', 'category', id, JSON.stringify(body), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, 'category_create', user.id, 'category', id, JSON.stringify(body), now).run().catch(() => {});
-    }
+    await writeCategoryAuditLog(db, user.id, 'category_create', id, JSON.stringify(body), now);
 
     const created = (await db.prepare(
       'SELECT c.* FROM categories c WHERE c.id = ?'
@@ -132,17 +150,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     }
 
     // Audit log
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'category_update', 'category', id, JSON.stringify(body), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, 'category_update', user.id, 'category', id, JSON.stringify(body), now).run().catch(() => {});
-    }
+    await writeCategoryAuditLog(db, user.id, 'category_update', id, JSON.stringify(body), now);
 
     const updated = (await db.prepare(
       'SELECT c.* FROM categories c WHERE c.id = ?'
@@ -172,17 +180,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     await db.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
 
     // Audit log
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'category_delete', 'category', id, JSON.stringify({ name: existing.name }), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, 'category_delete', user.id, 'category', id, JSON.stringify({ name: existing.name }), now).run().catch(() => {});
-    }
+    await writeCategoryAuditLog(db, user.id, 'category_delete', id, JSON.stringify({ name: existing.name }), now);
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -210,17 +208,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     }
 
     // Audit log
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'category_reorder', 'category', 'multiple', JSON.stringify({ items }), now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, 'category_reorder', user.id, 'category', 'multiple', JSON.stringify({ items }), now).run().catch(() => {});
-    }
+    await writeCategoryAuditLog(db, user.id, 'category_reorder', 'multiple', JSON.stringify({ items }), now);
 
     return c.json({ success: true, data: { success: true } });
   });

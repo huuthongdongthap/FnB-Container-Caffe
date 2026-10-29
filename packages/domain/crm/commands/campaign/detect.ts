@@ -134,9 +134,9 @@ export async function detectCashbackExpiry(db: D1Database): Promise<CampaignCust
         JOIN cashback_wallets cw ON ct.wallet_id = cw.id
         JOIN customers c ON cw.customer_id = c.id
         WHERE ct.type IN ('earn', 'bonus')
-          AND cw.expires_at IS NOT NULL
-          AND cw.expires_at <= ?
-          AND cw.expires_at > datetime('now')
+          AND ct.expires_at IS NOT NULL
+          AND ct.expires_at <= ?
+          AND ct.expires_at > datetime('now')
         GROUP BY cw.customer_id
       `).bind(sevenDaysFromNow).all<ExpiringRow>();
       results = fallback.results || [];

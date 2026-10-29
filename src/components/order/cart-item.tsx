@@ -26,6 +26,16 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
       {/* Item info */}
       <div className="flex-1 min-w-0">
         <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+        {item.modifiers && item.modifiers.length > 0 && (
+          <p className="mt-0.5 text-xs text-muted">
+            {item.modifiers.join(' · ')}
+          </p>
+        )}
+        {item.notes && (
+          <p className="mt-0.5 text-xs italic text-muted">
+            Ghi chú: {item.notes}
+          </p>
+        )}
         <p className="text-xs text-muted">{formatPrice(item.price)} {t('order.perItem')}</p>
       </div>
 

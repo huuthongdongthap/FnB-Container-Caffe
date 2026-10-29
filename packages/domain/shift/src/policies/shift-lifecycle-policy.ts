@@ -96,15 +96,32 @@ export async function openCanonicalShift(
   } catch {
     const today = now.slice(0, 10);
     try {
-      await db.prepare(
-        `INSERT INTO shifts (id, staff_id, staff_name, clock_in, date, notes)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(shift.id, shift.staff_id, shift.staff_name, shift.clock_in, today, shift.notes || '').run();
+      const info = await db.prepare(
+        `INSERT INTO staff_shifts (
+          staff_id, staff_name, role, date, operating_unit_id, clock_in,
+          clock_out, status, opening_cash, total_sales, cash_sales,
+          online_sales, order_count, notes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?)`
+      ).bind(
+        shift.staff_id, shift.staff_name, shift.role, today,
+        shift.operating_unit_id, shift.clock_in, shift.opening_cash,
+        shift.notes, now, now
+      ).run();
+      if (info?.meta?.last_row_id) {
+        shift.id = String(info.meta.last_row_id);
+      }
     } catch {
-      await db.prepare(
-        `INSERT INTO shifts (id, staff_id, staff_name, date, start_time, end_time, actual_start, status, notes)
-         VALUES (?, ?, ?, ?, ?, '23:59', ?, 'active', ?)`
-      ).bind(shift.id, shift.staff_id, shift.staff_name, today, now.slice(11, 16), now, shift.notes || '').run();
+      try {
+        await db.prepare(
+          `INSERT INTO shifts (id, staff_id, staff_name, clock_in, date, notes)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(shift.id, shift.staff_id, shift.staff_name, shift.clock_in, today, shift.notes || '').run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO shifts (id, staff_id, staff_name, date, start_time, end_time, actual_start, status, notes)
+           VALUES (?, ?, ?, ?, ?, '23:59', ?, 'active', ?)`
+        ).bind(shift.id, shift.staff_id, shift.staff_name, today, now.slice(11, 16), now, shift.notes || '').run();
+      }
     }
   }
 

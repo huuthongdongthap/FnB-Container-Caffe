@@ -205,7 +205,7 @@ export async function authorizeWifiOverride(
 
   if (data.action === 'revoke') {
     await db
-      .prepare('UPDATE wifi_sessions SET status = "revoked", expires_at = ? WHERE client_mac = ?')
+      .prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ?")
       .bind(nowIso, normalizedMac)
       .run();
 

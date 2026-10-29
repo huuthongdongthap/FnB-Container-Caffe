@@ -33,28 +33,30 @@ async function getShiftWindow(
   shiftId: string
 ): Promise<{ clock_in: string; clock_out: string | null } | null> {
   try {
-    return await db
+    const row = await db
       .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
       .bind(shiftId)
       .first<{ clock_in: string; clock_out: string | null }>();
+    if (row) return row;
   } catch {
-    try {
-      const staffShift = await db
-        .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null }>();
-      if (staffShift) return staffShift;
-    } catch {
-      // Fallback to shifts with actual_start/start_time
-    }
-    try {
-      return await db
-        .prepare('SELECT COALESCE(actual_start, start_time) AS clock_in, actual_end AS clock_out FROM shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null }>();
-    } catch {
-      return null;
-    }
+    // Fallback to staff_shifts or legacy shifts columns
+  }
+  try {
+    const staffShift = await db
+      .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
+      .bind(shiftId)
+      .first<{ clock_in: string; clock_out: string | null }>();
+    if (staffShift) return staffShift;
+  } catch {
+    // Fallback to shifts with actual_start/start_time
+  }
+  try {
+    return await db
+      .prepare('SELECT COALESCE(actual_start, start_time) AS clock_in, actual_end AS clock_out FROM shifts WHERE id = ?')
+      .bind(shiftId)
+      .first<{ clock_in: string; clock_out: string | null }>();
+  } catch {
+    return null;
   }
 }
 

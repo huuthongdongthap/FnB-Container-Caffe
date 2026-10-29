@@ -140,12 +140,20 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run();
   } catch {
+    const metaStr = JSON.stringify(body);
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(actorId, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(actorId, actorId, actorId, 'order_update', 'order', id, 'order', id, metaStr, metaStr, now).run();
     } catch {
-      // Ignore audit log error
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(actorId, actorId, 'order_update', 'order', id, metaStr, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
     }
   }
 

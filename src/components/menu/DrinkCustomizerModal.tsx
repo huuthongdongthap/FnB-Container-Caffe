@@ -48,6 +48,7 @@ export function DrinkCustomizerModal({
   // ── All hooks MUST be called unconditionally (Rules of Hooks) ──
   const noteInputId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [drinkChoice, setDrinkChoice] = useState('');
   const [sweetness, setSweetness] = useState('');
   const [ice, setIce] = useState('');
   const [notes, setNotes] = useState('');
@@ -59,6 +60,7 @@ export function DrinkCustomizerModal({
   useEffect(() => {
     if (!item) return;
     const next = buildDrinkOptions(item);
+    setDrinkChoice(next.drinkChoiceOptions?.[0] ?? '');
     setSweetness(next.sweetnessOptions[0] ?? '');
     setIce(next.iceOptions[0] ?? '');
     setNotes('');
@@ -75,11 +77,12 @@ export function DrinkCustomizerModal({
 
   // State resets in an effect, so the very first paint would briefly show nothing
   // selected; fall back to the plan's own default until the effect commits.
+  const pickedDrinkChoice = drinkChoice || plan.drinkChoiceOptions?.[0] || '';
   const pickedSweetness = sweetness || plan.sweetnessOptions[0] || '';
   const pickedIce = ice || plan.iceOptions[0] || '';
 
   const handleConfirm = () => {
-    const modifierList = [pickedSweetness, pickedIce, notes.trim()].filter(Boolean);
+    const modifierList = [pickedDrinkChoice, pickedSweetness, pickedIce].filter(Boolean);
     onConfirm({
       item,
       quantity,
@@ -91,6 +94,14 @@ export function DrinkCustomizerModal({
   };
 
   const sections: OptionSection[] = [];
+  if (plan.showDrinkChoice && plan.drinkChoiceOptions?.length) {
+    sections.push({
+      label: 'Chọn loại nước',
+      options: plan.drinkChoiceOptions,
+      selected: pickedDrinkChoice,
+      onChange: setDrinkChoice,
+    });
+  }
   if (plan.showSweetness) {
     sections.push({
       label: 'Độ ngọt (Đường)',

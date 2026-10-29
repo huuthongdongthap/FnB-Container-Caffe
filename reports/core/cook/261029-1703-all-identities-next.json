@@ -1,0 +1,40 @@
+{
+  "command": "/cook next",
+  "plan": "/Users/mac/projects/FnB-Container-Caffe/plans/261029-1815-pilot-go-live-gated-cutover/plan.md",
+  "recipe": "/Users/mac/projects/FnB-Container-Caffe/reports/audit/plan/261029-1703-all-identities/recipe.from-request.json",
+  "head": "b553209bd07a3437c622e3e324ee4e0b17c12f91",
+  "pipeline": {
+    "recipe-load": "PASS",
+    "step-execution": "PASS"
+  },
+  "verification": {
+    "audit_probes": {
+      "tests": 46,
+      "passed": 46,
+      "failed": 0,
+      "files": 3
+    },
+    "regressions": {
+      "tests": 171,
+      "passed": 171,
+      "failed": 0,
+      "files": 15
+    },
+    "total_tests": 217,
+    "total_passed": 217,
+    "total_failed": 0,
+    "browser_traces": [
+      "reports/audit/plan/261029-1703-all-identities/evidence/chromium-browser-trace.zip",
+      "reports/audit/plan/261029-1703-all-identities/evidence/webkit-browser-trace.zip"
+    ]
+  },
+  "gates": {
+    "planning_status": "COMPLETE",
+    "security_control_status": "LOCAL_CHECKS_ONLY",
+    "db_admin_live_status": "UNKNOWN_NOT_RUN",
+    "browser_live_status": "LOCAL_CHROMIUM_AND_SAFARI_WEBKIT_PASS_DEPLOYED_ORIGIN_NOT_RUN",
+    "production_readiness": "NOT_ESTABLISHED",
+    "audited_source_files_unchanged": true,
+    "broader_tracked_product_diff_changed_during_audit": false
+  }
+}

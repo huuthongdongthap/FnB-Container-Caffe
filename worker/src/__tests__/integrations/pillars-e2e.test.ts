@@ -175,7 +175,7 @@ function createInMemoryD1() {
             if (item) item.updated_at = binds[0];
             return { success: true, meta: { changes: 1 } };
           }
-          if (lower.includes('update wifi_sessions') && lower.includes('status = "revoked"')) {
+          if (lower.includes('update wifi_sessions') && (lower.includes('status = "revoked"') || lower.includes("status = 'revoked'"))) {
             const list = store.get('wifi_sessions')!;
             const item = list.find(s => s.client_mac === binds[1]);
             if (item) item.status = 'revoked';

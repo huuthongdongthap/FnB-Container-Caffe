@@ -46,6 +46,7 @@ export interface ResolvedServerPrice {
   unitPriceCents: number;
   available: boolean;
   validatedModifiers: ModifierChoice[];
+  categoryId?: string | null;
   rejection?: ModifierValidationRejection | { code: 'item_unavailable' | 'item_not_found'; message: string };
 }
 
@@ -208,5 +209,6 @@ export async function resolveServerProductPrice(
     unitPriceCents,
     available: true,
     validatedModifiers: modResult.validatedModifiers,
+    categoryId,
   };
 }

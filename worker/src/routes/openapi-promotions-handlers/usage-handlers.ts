@@ -46,10 +46,18 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       'UPDATE promotions SET current_uses = current_uses + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND (max_uses IS NULL OR max_uses = 0 OR current_uses < max_uses)'
     ).bind(now, body.promotionId).run();
 
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user.id, 'promotion_use', 'promotion', body.promotionId, JSON.stringify({ discountAmount: body.discountAmount, orderId: body.orderId }), now).run();
+    const auditMeta = JSON.stringify({ discountAmount: body.discountAmount, orderId: body.orderId });
+    try {
+      await db.prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, user.id, 'promotion_use', 'promotion', body.promotionId, auditMeta, now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(user.id, user.id, user.id, 'promotion_use', 'promotion', body.promotionId, 'promotion', body.promotionId, auditMeta, auditMeta, now).run().catch(() => {});
+    }
 
     const updatedPromotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first()) as any;
 

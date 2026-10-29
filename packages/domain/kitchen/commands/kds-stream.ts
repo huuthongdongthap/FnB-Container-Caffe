@@ -30,6 +30,7 @@ interface KdsStreamOrder {
   customer_name: string;
   table_id: string | null;
   items: unknown[];
+  notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;
@@ -40,6 +41,7 @@ interface OrderRecord {
   customer_name: string;
   table_id: string | null;
   items: string;
+  notes?: string | null;
   status: string;
   created_at: string;
 }
@@ -66,6 +68,7 @@ function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
     customer_name: order.customer_name,
     table_id: order.table_id,
     items,
+    ...(order.notes ? { notes: order.notes } : {}),
     status: order.status,
     elapsed_minutes: elapsed,
     created_at: order.created_at
@@ -114,7 +117,7 @@ kdsStreamRouter.get('/stream', async(c) => {
         }
         const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
         const statement = db.prepare(
-          `SELECT id, customer_name, table_id, items, status, created_at FROM orders
+          `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            ORDER BY created_at ASC LIMIT 50`

@@ -9,18 +9,21 @@
  * stable key between the API rows and the offline fallback data.
  */
 
-import { isReadyToServeItem } from './menu-customization';
+import { isBundledDrinkChoiceItem, isReadyToServeItem } from './menu-customization';
 
 export const SWEETNESS_FULL = ['100% đường (chuẩn)', '70% ít ngọt', '50% ngọt thanh', 'Không đường'] as const;
 export const SWEETNESS_SODA = ['100% ngọt (chuẩn)', '70% ít ngọt', 'Không đường'] as const;
 export const ICE_FULL = ['Đá đầy đủ (chuẩn)', 'Ít đá', 'Đá riêng', 'Uống nóng'] as const;
 export const ICE_STANDARD = ['Đá đầy đủ (chuẩn)', 'Ít đá', 'Đá riêng'] as const;
 export const ICE_LIGHT = ['Đá thường (chuẩn)', 'Ít đá'] as const;
+export const BOTTLED_DRINK_CHOICES = ['Sting', 'Coca', 'Pepsi', '7 UP', 'Ô long'] as const;
 
 /** Option groups the customizer can render. */
 export interface DrinkOptionPlan {
   /** True when the item needs no formulation at all — caller adds it straight to the cart. */
   bypass: boolean;
+  showDrinkChoice?: boolean;
+  drinkChoiceOptions?: readonly string[];
   showSweetness: boolean;
   showIce: boolean;
   sweetnessOptions: readonly string[];
@@ -49,6 +52,30 @@ const isFixedRecipe = (tags: string[] | undefined): boolean =>
 
 const isIceAllowed = (tags: string[] | undefined): boolean =>
   !hasTag(tags, 'blended', 'hot', 'bottled', 'original');
+
+const ICED_ONLY_IDS = new Set(['tc006', 'tc007']);
+const ICED_AND_HOT_IDS = new Set(['tc001', 'tc002', 'tc003', 'tc004', 'te001', 'te002', 'te003', 'te004']);
+
+function resolveIceSetKey(
+  item: RuleInput,
+  defaultIce: CategoryRules['ice'],
+): CategoryRules['ice'] {
+  if (!defaultIce) return null;
+  const id = (item.id ?? '').trim().toLowerCase();
+  const name = (item.name ?? '').trim().toLowerCase();
+
+  if (hasTag(item.tags, 'iced/hot') || ICED_AND_HOT_IDS.has(id) || /đá\s*\/\s*nóng/i.test(name)) {
+    return 'full';
+  }
+  if (
+    hasTag(item.tags, 'iced') ||
+    ICED_ONLY_IDS.has(id) ||
+    (/\bđá\b/i.test(name) && !/nóng/i.test(name))
+  ) {
+    return defaultIce === 'full' ? 'standard' : defaultIce;
+  }
+  return defaultIce;
+}
 
 interface CategoryRules {
   sweetness: 'full' | 'soda' | null;
@@ -107,6 +134,19 @@ export function buildDrinkOptions(item?: RuleInput | null): DrinkOptionPlan {
     return permissivePlan(false);
   }
 
+  if (isBundledDrinkChoiceItem({ id: item.id, name: item.name })) {
+    return {
+      bypass: false,
+      showDrinkChoice: true,
+      drinkChoiceOptions: BOTTLED_DRINK_CHOICES,
+      showSweetness: false,
+      showIce: false,
+      sweetnessOptions: [],
+      iceOptions: [],
+      showNotes: true,
+    };
+  }
+
   if (isReadyToServeItem({ id: item.id, category: item.category, name: item.name })) {
     return { bypass: true, showSweetness: false, showIce: false, sweetnessOptions: [], iceOptions: [], showNotes: false };
   }
@@ -116,17 +156,19 @@ export function buildDrinkOptions(item?: RuleInput | null): DrinkOptionPlan {
   const rules: CategoryRules = CATEGORY_RULES[(item.category ?? '').trim().toLowerCase()]
     ?? { sweetness: 'full', ice: 'full', notes: true };
 
+  const effectiveIceKey = resolveIceSetKey(item, rules.ice);
+
   // Fixed recipes (blended / bottled / fresh-pressed / jarred) are never adjustable,
   // regardless of what the category table says.
   const allowSweetness = !isFixedRecipe(item.tags) && rules.sweetness != null;
-  const allowIce = isIceAllowed(item.tags) && rules.ice != null;
+  const allowIce = isIceAllowed(item.tags) && effectiveIceKey != null;
 
   return {
     bypass: false,
     showSweetness: allowSweetness,
     showIce: allowIce,
     sweetnessOptions: rules.sweetness ? OPTION_SETS[rules.sweetness] : [],
-    iceOptions: rules.ice ? ICE_SETS[rules.ice] : [],
+    iceOptions: allowIce && effectiveIceKey ? ICE_SETS[effectiveIceKey] : [],
     showNotes: rules.notes,
   };
 }

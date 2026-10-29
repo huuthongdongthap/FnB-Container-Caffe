@@ -4,17 +4,22 @@
  * Animated slide-up entrance. Matches Aura Cafe dark luxury design system.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { hasM3NavBar } from '@/components/stitch/shell-config';
 
 export default function CartBottomBar() {
   const items = useCartStore((s) => s.items);
+  const tableId = useCartStore((s) => s.tableId);
   const totalItems = useCartStore((s) => s.totalItems);
   const subtotal = useCartStore((s) => s.subtotal);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [visible, setVisible] = useState(false);
+
+  const rawTable = (searchParams.get('table') || searchParams.get('ban') || tableId || '').trim();
+  const checkoutPath = rawTable ? `/checkout?table=${encodeURIComponent(rawTable)}` : '/checkout';
   // Float above the MD3 NavigationBar on mobile shell pages; on desktop sits cleanly at bottom-4
   const onShell = hasM3NavBar(location.pathname);
   const lift = onShell ? 'bottom-20 md:bottom-4' : 'bottom-0 md:bottom-4';
@@ -46,21 +51,23 @@ export default function CartBottomBar() {
 
   return (
     <div
-      className={`fixed ${lift} left-0 right-0 z-[60] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out ${
+      className={`pointer-events-none fixed ${lift} left-0 right-0 z-[60] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out ${
         visible ? 'translate-y-0' : hide
       }`}
     >
       {/* Glass backdrop */}
-      <div className="mx-auto max-w-lg px-4 pb-4">
+      <div className="pointer-events-none mx-auto max-w-lg px-4 pb-4">
         <button
           type="button"
-          onClick={() => navigate('/checkout')}
+          onClick={() => navigate(checkoutPath)}
           aria-label={`Thanh toán ${count} món — ${formatPrice(total)}`}
-          className="w-full min-h-[44px] flex items-center justify-between gap-3 rounded-2xl px-5 py-3.5
+          className={`${
+            visible ? 'pointer-events-auto' : 'pointer-events-none'
+          } w-full min-h-[44px] flex items-center justify-between gap-3 rounded-2xl px-5 py-3.5
                      bg-[var(--aura-noir-deep)]/95 backdrop-blur-md
                      border border-[var(--aura-border-chrome)]
                      shadow-[0_-4px_24px_rgba(0,0,0,0.4)]
-                     active:scale-[0.98] transition-transform cursor-pointer"
+                     active:scale-[0.98] transition-transform cursor-pointer`}
         >
           {/* Left: item count + label */}
           <div className="flex items-center gap-2.5">

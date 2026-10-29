@@ -3,7 +3,7 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { createMetricsCollector } from '../../lib/metrics-collector';
-import { verifyPassword, hashPassword } from '../../lib/jwt';
+import { verifyPassword, hashPassword, getAuthToken } from '../../lib/jwt';
 import { authenticateRequest } from '../../lib/staff-session-auth';
 import { staffSessionErrorResponse } from '../../lib/staff-session';
 import { verifyStaffPassword, changeStaffPassword } from '../../lib/staff-password';
@@ -49,7 +49,20 @@ export async function changePassword(request: Request, env: Record<string, unkno
     if (account) {
       await changeStaffPassword((env as unknown as Env).AURA_DB, account, user.password);
       if (payload.email) await authKV.put(`user:${payload.email}`, JSON.stringify(user)).catch(() => {});
-    } else await authKV.put(`user:${payload.email}`, JSON.stringify(user));
+    } else {
+      await authKV.put(`user:${payload.email}`, JSON.stringify(user));
+    }
+    const rawToken = getAuthToken(request);
+    if (rawToken && authKV) {
+      await authKV.put(`revoked:${rawToken}`, '1', { expirationTtl: 604800 }).catch(() => {});
+    }
+    if (env.AURA_DB && payload.id) {
+      await (env.AURA_DB as import('@cloudflare/workers-types').D1Database)
+        .prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
+        .bind(user.updated_at, payload.id)
+        .run()
+        .catch(() => {});
+    }
 
     return jsonResponse({
       success: true,

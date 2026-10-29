@@ -123,7 +123,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
           id: resolvedProductId,
           productId: resolvedProductId,
           name: item.name,
-          price: item.unitPriceCents,
+          price: item.unitPriceCents ?? Number(rawItem.price ?? rawItem.unit_price ?? 0),
         });
       }
     });
@@ -151,9 +151,9 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
           id: `${orderForDisplay.id}-${index}`,
           name: item.name,
           quantity: item.quantity,
-          price: item.unitPriceCents,
+          price: item.unitPriceCents ?? (item as unknown as { price?: number }).price ?? 0,
         })),
-        total: orderForDisplay.totalAmount,
+        total: orderForDisplay.totalAmount ?? (orderForDisplay as unknown as { total?: number }).total ?? 0,
         estimatedMinutes: orderForDisplay.estimatedMinutes,
         status: orderForDisplay.status,
         paymentStatus: orderForDisplay.paymentStatus,

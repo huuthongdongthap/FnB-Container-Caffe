@@ -78,7 +78,7 @@ export async function processTIWebhook(
     localOrderId = bridgeRow.local_order_id;
     await db
       .prepare(
-        'UPDATE ti_order_bridge SET status = ?, ti_order_id = COALESCE(?, ti_order_id), synced_at = datetime("now") WHERE id = ?'
+        "UPDATE ti_order_bridge SET status = ?, ti_order_id = COALESCE(?, ti_order_id), synced_at = datetime('now') WHERE id = ?"
       )
       .bind(mappedStatus, tiOrderId ?? null, bridgeId)
       .run();
@@ -87,7 +87,7 @@ export async function processTIWebhook(
     localOrderId = payload.local_order_id ?? `ti-auto-${tiOrderId ?? bridgeId.slice(0, 8)}`;
     await db
       .prepare(
-        'INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, synced_at, created_at) VALUES (?, ?, ?, ?, datetime("now"), datetime("now"))'
+        "INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, synced_at, created_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))"
       )
       .bind(bridgeId, localOrderId, tiOrderId ?? null, mappedStatus)
       .run();
@@ -97,7 +97,7 @@ export async function processTIWebhook(
   if (localOrderId) {
     try {
       await db
-        .prepare('UPDATE orders SET status = ?, updated_at = datetime("now") WHERE id = ?')
+        .prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(mappedStatus, localOrderId)
         .run();
     } catch {

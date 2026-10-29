@@ -113,29 +113,47 @@ export async function writeCanonicalAuditLog(
     try {
       await db.prepare(
         `INSERT INTO audit_logs (
-          id, actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          actor_id, actor_name, user_id, action,
+          resource_type, resource_id, entity_type, entity_id,
+          operating_unit_id, tenant_id, status, details, metadata,
+          correlation_id, ip_address, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        record.id, record.actor_id, record.actor_name, record.action,
-        record.resource_type, record.resource_id, record.details, record.ip_address, record.created_at
+        record.actor_id, record.actor_name, record.user_id, record.action,
+        record.resource_type, record.resource_id, record.entity_type, record.entity_id,
+        record.operating_unit_id, record.tenant_id, record.status, record.details, record.metadata,
+        record.correlation_id, record.ip_address, record.created_at
       ).run();
 
       return { ok: true, record };
-    } catch (fallbackErr) {
+    } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO audit_logs (
+            actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
-          record.id, record.action, record.actor_id, record.resource_type,
-          record.resource_id, record.details, record.ip_address, record.created_at
+          record.actor_id, record.actor_name, record.action,
+          record.resource_type, record.resource_id, record.details, record.ip_address, record.created_at
         ).run();
 
         return { ok: true, record };
-      } catch (canonicalErr) {
-        if (policy === 'strict_fail_closed') {
-          throw new Error(`Audit write failed under strict_fail_closed policy: ${String(canonicalErr || fallbackErr || err)}`);
+      } catch (fallbackErr) {
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (id, action, actor, resource, resource_id, details, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            record.id, record.action, record.actor_id, record.resource_type,
+            record.resource_id, record.details, record.ip_address, record.created_at
+          ).run();
+
+          return { ok: true, record };
+        } catch (canonicalErr) {
+          if (policy === 'strict_fail_closed') {
+            throw new Error(`Audit write failed under strict_fail_closed policy: ${String(canonicalErr || fallbackErr || err)}`);
+          }
+          return { ok: false, record, error: String(canonicalErr || fallbackErr || err) };
         }
-        return { ok: false, record, error: String(canonicalErr || fallbackErr || err) };
       }
     }
   }

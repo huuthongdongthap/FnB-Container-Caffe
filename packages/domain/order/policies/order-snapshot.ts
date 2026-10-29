@@ -81,35 +81,38 @@ export async function calculateOrderSnapshot(
       itemName = resolved.name || itemName;
       validatedModifiers = resolved.validatedModifiers;
       resolvedItemId = resolved.id || itemId;
+      if (!categoryId && resolved.categoryId) {
+        categoryId = resolved.categoryId;
+      }
 
       if (!categoryId) {
         const lookupId = resolved.id || itemId;
         try {
-          const prod = await db.prepare('SELECT id, name, price, available, category FROM products WHERE id = ?')
+          const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
             .bind(lookupId).first<{ category_id?: string; category?: string }>();
           if (prod?.category_id || prod?.category) {
             categoryId = (prod.category_id || prod.category) ?? null;
           }
         } catch {
-          try {
-            const prod = await db.prepare('SELECT id, name, price, available FROM products WHERE id = ?')
-              .bind(lookupId).first<{ category_id?: string; category?: string }>();
-            if (prod?.category_id || prod?.category) {
-              categoryId = (prod.category_id || prod.category) ?? null;
-            }
-          } catch {
-            // Fallback to category_id / menu_items below
-          }
+          // Fallback to legacy column schemas below
         }
         if (!categoryId) {
           try {
-            const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
+            const prod = await db.prepare('SELECT id, name, price, available, category FROM products WHERE id = ?')
               .bind(lookupId).first<{ category_id?: string; category?: string }>();
             if (prod?.category_id || prod?.category) {
               categoryId = (prod.category_id || prod.category) ?? null;
             }
           } catch {
-            // Ignore missing column
+            try {
+              const prod = await db.prepare('SELECT id, name, price, available FROM products WHERE id = ?')
+                .bind(lookupId).first<{ category_id?: string; category?: string }>();
+              if (prod?.category_id || prod?.category) {
+                categoryId = (prod.category_id || prod.category) ?? null;
+              }
+            } catch {
+              // Fallback to menu_items below
+            }
           }
         }
         if (!categoryId) {

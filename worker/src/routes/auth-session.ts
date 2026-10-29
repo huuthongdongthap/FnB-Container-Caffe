@@ -19,9 +19,19 @@ export async function getAuthSession(request: Request, env: Record<string, unkno
       phone: account.phone || '', role: account.role, tenantId: staffTenant(account),
     } });
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    let userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
-    if (!userStr && payload.id) {
-      userStr = await authKV.get(`user:${payload.id}`);
+    let userStr = payload.id ? await authKV.get(`user:${payload.id}`) : null;
+    if (!userStr && payload.email) {
+      const byEmail = await authKV.get(`user:${payload.email}`);
+      if (byEmail) {
+        try {
+          const parsed = JSON.parse(byEmail) as { id?: string };
+          if (!payload.id || !parsed.id || parsed.id === payload.id) {
+            userStr = byEmail;
+          }
+        } catch {
+          // Ignore malformed KV entry
+        }
+      }
     }
     if (!userStr && payload.role === 'customer' && payload.id) {
       const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
@@ -32,6 +42,9 @@ export async function getAuthSession(request: Request, env: Record<string, unkno
             .bind(payload.id)
             .first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null }>();
           if (customer?.id) {
+            if (payload.tenantId && customer.tenant_id && customer.tenant_id !== payload.tenantId) {
+              return errorResponse('Tài khoản thuộc cửa hàng khác', 403);
+            }
             return jsonResponse({
               success: true,
               user: {

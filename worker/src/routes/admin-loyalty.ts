@@ -242,7 +242,7 @@ adminLoyaltyRouter.get('/export', async(c) => {
                c.created_at
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-        ORDER BY created_at DESC
+        ORDER BY c.created_at DESC
       `).all<CustomerExportRow>();
       results = liveRes.results || [];
     }
@@ -258,7 +258,7 @@ adminLoyaltyRouter.get('/export', async(c) => {
                c.created_at
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-        ORDER BY created_at DESC
+        ORDER BY c.created_at DESC
       `).all<CustomerExportRow>();
       results = liveRes.results || [];
     } catch {

@@ -62,7 +62,7 @@ export async function handleHAWebhook(
 
     await db
       .prepare(
-        'INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime("now"))'
+        "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
       )
       .bind(entityId, state, attributes, lastChanged)
       .run();
@@ -80,7 +80,7 @@ export async function handleHAWebhook(
 
     await db
       .prepare(
-        'INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, datetime("now"))'
+        "INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, datetime('now'))"
       )
       .bind(automationId, triggerEntity, JSON.stringify(payload), result)
       .run();

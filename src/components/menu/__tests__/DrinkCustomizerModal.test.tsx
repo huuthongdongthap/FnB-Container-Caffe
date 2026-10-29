@@ -66,6 +66,33 @@ describe('DrinkCustomizerModal — bypass', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('opens drink choice selector for bt002 bundled soft drinks without sweetness or ice', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <DrinkCustomizerModal
+        item={itemFor({
+          id: 'bt002',
+          name: 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long',
+          price: '15.000₫',
+          category: 'bottled',
+          tags: ['Bottled'],
+        })}
+        isOpen
+        onClose={() => {}}
+        onConfirm={onConfirm}
+      />,
+    );
+    expect(numberedSections(screen.getByRole('dialog'))).toEqual([
+      '1. Chọn loại nước',
+      '2. Ghi chú thêm cho quầy bar',
+    ]);
+    await act(async () => {
+      await userEvent.click(screen.getByText('Coca'));
+      await userEvent.click(screen.getByRole('button', { name: /Thêm vào giỏ/ }));
+    });
+    expect(confirmed(onConfirm).modifiers).toEqual(['Coca']);
+  });
 });
 
 /**
@@ -321,7 +348,7 @@ describe('DrinkCustomizerModal — no state leaks between items', () => {
 
     rerender(
       <DrinkCustomizerModal
-        item={itemFor({ id: 'te001', name: 'Lipton', category: 'tea', tags: ['Iced/Hot'] })}
+        item={itemFor({ id: 'te005', name: 'Trà đào', category: 'tea', tags: ['Iced'] })}
         isOpen
         onClose={() => {}}
         onConfirm={() => {}}
@@ -405,6 +432,22 @@ describe('DrinkCustomizerModal — keyboard focus management', () => {
       </div>,
     );
     expect(document.activeElement).toBe(triggerBtn);
+  });
+
+  it('keeps free-text bar notes in notes without duplicating them into modifiers', async () => {
+    const onConfirm = vi.fn();
+    render(<DrinkCustomizerModal item={baseItem} isOpen onClose={() => {}} onConfirm={onConfirm} />);
+
+    await act(async () => {
+      await userEvent.click(screen.getByText('70% ít ngọt'));
+      await userEvent.click(screen.getByText('Ít đá'));
+      await userEvent.type(screen.getByRole('textbox'), 'Ít sữa đặc');
+      await userEvent.click(screen.getByRole('button', { name: /Thêm vào giỏ/ }));
+    });
+
+    const payload = confirmed(onConfirm);
+    expect(payload.modifiers).toEqual(['70% ít ngọt', 'Ít đá']);
+    expect(payload.notes).toBe('Ít sữa đặc');
   });
 });
 

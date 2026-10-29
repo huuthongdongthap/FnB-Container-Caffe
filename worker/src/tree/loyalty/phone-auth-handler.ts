@@ -7,13 +7,15 @@ import { createLogger } from '../../middleware/logger';
 import { generateJWT, verifyJWT, timingSafeEqualString } from '../../lib/jwt';
 import { phoneAuthSchema } from '../../lib/validators';
 import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
+import { StaffSessionError, isStaffIdentity, staffTenant, validateStaffSession, type StaffSession } from '../../lib/staff-session';
 import type { Env } from '../../types/env';
 import type { Customer } from '../../types/models';
-import { genId, throttle } from './helpers';
+import { claimOtpOnce, genId, throttle } from './helpers';
 import { getActiveCampaign } from './campaign';
 
 const log = createLogger({ route: 'loyalty' });
 const DEFAULT_TIER = 'bronze';
+const STAFF_ASSIST_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'cashier']);
 
 // Hono's executionCtx getter throws when no ExecutionContext exists (e.g.
 // router.request() in tests). Never let background capture break signup.
@@ -92,24 +94,53 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
       if (requiresProof) {
         let proofVerified = false;
+        let verifiedByOtp = false;
+        let assistedStaffId: string | null = null;
         if (bearerToken && c.env.JWT_SECRET) {
-          const revoked = await c.env.AUTH_KV?.get?.(`revoked:${bearerToken}`);
-          const verifiedPayload = !revoked ? await verifyJWT(bearerToken, c.env.JWT_SECRET) : null;
-          const role = String(verifiedPayload?.role || '');
-          const isStaffCaller = ['owner', 'admin', 'manager', 'staff', 'cashier'].includes(role);
-          if (
+          let revoked: string | null = null;
+          try {
+            revoked = (await c.env.AUTH_KV?.get?.(`revoked:${bearerToken}`)) ?? null;
+          } catch {
+            return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ xác thực tạm thời gián đoạn' }, 503);
+          }
+          const verifiedPayload = !revoked
+            ? await verifyJWT(bearerToken, c.env.JWT_SECRET, {
+              expectedAudience: c.env.JWT_AUDIENCE,
+              expectedIssuer: c.env.JWT_ISSUER,
+            })
+            : null;
+          if (verifiedPayload && isStaffIdentity(verifiedPayload as Partial<StaffSession>)) {
+            try {
+              const account = await validateStaffSession(db, verifiedPayload as Partial<StaffSession>);
+              if (!STAFF_ASSIST_ROLES.has(account.role) || staffTenant(account) !== tenantId) {
+                return c.json({ success: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+              }
+              proofVerified = true;
+              assistedStaffId = account.id;
+            } catch (err) {
+              if (err instanceof StaffSessionError) {
+                return c.json({ success: false, code: err.code, error: err.message }, err.status);
+              }
+              return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ xác thực tạm thời gián đoạn' }, 503);
+            }
+          } else if (
             verifiedPayload &&
-            (verifiedPayload.id === customer.id || verifiedPayload.email === customer.email || isStaffCaller)
+            (!verifiedPayload.tenantId || verifiedPayload.tenantId === tenantId) &&
+            (verifiedPayload.id === customer.id || verifiedPayload.email === customer.email)
           ) {
             proofVerified = true;
           }
         }
         if (!proofVerified && typeof body.otp === 'string' && body.otp.trim().length >= 4 && c.env.AUTH_KV) {
           const otpKey = `phone_otp:${phone}`;
+          const submittedOtp = body.otp.trim();
           const storedOtp = await c.env.AUTH_KV.get(otpKey);
-          if (storedOtp && timingSafeEqualString(storedOtp, body.otp.trim())) {
-            await c.env.AUTH_KV.delete?.(otpKey);
-            proofVerified = true;
+          if (storedOtp && timingSafeEqualString(storedOtp, submittedOtp)) {
+            if (claimOtpOnce(c.env.AUTH_KV, otpKey, storedOtp)) {
+              await c.env.AUTH_KV.delete?.(otpKey);
+              proofVerified = true;
+              verifiedByOtp = true;
+            }
           }
         }
         if (!proofVerified) {
@@ -118,6 +149,21 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             code: 'PHONE_VERIFICATION_REQUIRED',
             error: 'Số điện thoại đã xác thực. Vui lòng xác minh OTP để đăng nhập.',
           }, 403);
+        }
+        if (verifiedByOtp) {
+          try {
+            await db.prepare('UPDATE customers SET verified_at = COALESCE(verified_at, ?) WHERE id = ?').bind(now, customer.id).run();
+          } catch {
+            // Optional metadata column in partial test schemas
+          }
+        } else if (assistedStaffId) {
+          try {
+            await db.prepare(
+              'INSERT INTO loyalty_audit_log (customer_id, staff_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?)'
+            ).bind(customer.id, assistedStaffId, 'staff_assisted_phone_auth', JSON.stringify({ tenantId, actorId: assistedStaffId }), now).run();
+          } catch {
+            // Optional audit table in partial test schemas
+          }
         }
       }
     }

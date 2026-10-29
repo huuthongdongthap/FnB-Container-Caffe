@@ -169,15 +169,28 @@ export class ErpnextProductClient {
       }
 
       try {
-        await db.prepare(`
-          INSERT INTO erpnext_product_sync
-            (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(product_id) DO UPDATE SET
-            erpnext_item_code = excluded.erpnext_item_code,
-            last_synced_at    = excluded.last_synced_at,
-            erpnext_modified  = excluded.erpnext_modified
-        `).bind(localId, product.name, now, product.modified || now).run();
+        try {
+          await db.prepare(`
+            INSERT INTO erpnext_product_sync
+              (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET
+              erpnext_item_code = excluded.erpnext_item_code,
+              last_synced_at    = excluded.last_synced_at,
+              erpnext_modified  = excluded.erpnext_modified
+          `).bind(localId, product.name, now, product.modified || now).run();
+        } catch {
+          await db.prepare(`
+            INSERT INTO erpnext_product_sync
+              (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date)
+            VALUES (?, 0, ?, ?, ?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET
+              erpnext_item_code  = excluded.erpnext_item_code,
+              last_synced_at     = excluded.last_synced_at,
+              erpnext_modified   = excluded.erpnext_modified,
+              erpnext_write_date = excluded.erpnext_write_date
+          `).bind(localId, product.name, now, product.modified || now, product.modified || now).run();
+        }
 
         updated++;
       } catch (e: unknown) {

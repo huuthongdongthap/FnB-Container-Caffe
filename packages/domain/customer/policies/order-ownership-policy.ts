@@ -160,14 +160,24 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
     ).run();
   } catch { /* best-effort non-blocking event log */ }
 
+  const auditMeta = JSON.stringify({ previous_customer_id: null, claimed_by: actor.id });
   try {
     await db.prepare(
       'INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(
       `audit_${Date.now()}`, actor.id, 'order_claimed', 'order', orderId,
-      JSON.stringify({ previous_customer_id: null, claimed_by: actor.id }), now
+      auditMeta, now
     ).run();
-  } catch { /* best-effort non-blocking audit */ }
+  } catch {
+    try {
+      await db.prepare(
+        'INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        actor.id, actor.id, actor.id, 'order_claimed', 'order', orderId, 'order', orderId,
+        auditMeta, auditMeta, now
+      ).run();
+    } catch { /* best-effort non-blocking audit */ }
+  }
 
   return { success: true, orderId, customerId: actor.id };
 }

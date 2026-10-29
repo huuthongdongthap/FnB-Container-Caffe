@@ -103,12 +103,21 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
   } catch {
+    const actor = user?.id || 'system';
+    const metaStr = JSON.stringify({ reason: body.reason || 'User cancelled' });
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(user?.id || 'system', user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(actor, actor, actor, 'order_cancel', 'order', id, 'order', id, metaStr, metaStr, now).run();
     } catch {
-      // Ignore audit log insert error if schema differs
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(actor, actor, 'order_cancel', 'order', id, metaStr, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log insert error if schema differs
+      }
     }
   }
 

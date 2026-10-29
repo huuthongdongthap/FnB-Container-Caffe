@@ -63,8 +63,13 @@ function sanitizeCartItem(item: CartItem): CartItem {
   const rawId = item.productId || item.id || '';
   const baseId = extractBaseProductId(rawId, item.modifiers);
 
-  // Ready to serve items check (bottled, snack, packaged)
-  const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
+  // Ready to serve items check (bottled except bt002 bundled choice, snack, packaged)
+  const isReadyToServe =
+    (baseId.startsWith('bt') && baseId !== 'bt002') ||
+    baseId === 'od002' ||
+    baseId === 'yo004' ||
+    baseId === 'yg004' ||
+    baseId === 'jc004';
   if (isReadyToServe) {
     return {
       ...item,
@@ -117,7 +122,12 @@ function loadInitialItems(): CartItem[] {
           const rawId = String(item.productId || item.product_id || item.id || '');
           const rawMods = Array.isArray(item.modifiers) ? (item.modifiers as string[]) : undefined;
           const baseId = extractBaseProductId(rawId, rawMods);
-          const isReadyToServe = baseId.startsWith('bt') || baseId === 'od002' || baseId === 'yo004' || baseId === 'yg004' || baseId === 'jc004';
+          const isReadyToServe =
+            (baseId.startsWith('bt') && baseId !== 'bt002') ||
+            baseId === 'od002' ||
+            baseId === 'yo004' ||
+            baseId === 'yg004' ||
+            baseId === 'jc004';
           return {
             id: isReadyToServe ? baseId : String(item.id || ''),
             productId: baseId,

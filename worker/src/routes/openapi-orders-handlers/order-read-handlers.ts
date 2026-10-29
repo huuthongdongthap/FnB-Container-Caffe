@@ -206,6 +206,6 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
 
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(OrderRoutes.list as any, handleListOrders as any);
-  app.openapi(OrderRoutes.get as any, handleGetOrderById as any);
   app.openapi(OrderRoutes.summary as any, handleGetOrderSummary as any);
+  app.openapi(OrderRoutes.get as any, handleGetOrderById as any);
 }

@@ -119,12 +119,20 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     } catch {
       try {
         const tables = (await db.prepare(
-          `SELECT id, CAST(table_number AS TEXT) as code, name, capacity, status, 0 as position_x, 0 as position_y, 80 as width, 80 as height, 0 as rotation
-           FROM cafe_tables WHERE zone = ? ORDER BY name`
-        ).bind(id).all()) as { results: any[] };
+          `SELECT id, COALESCE(code, CAST(table_number AS TEXT)) as code, name, capacity, status, COALESCE(position_x, 0) as position_x, COALESCE(position_y, 0) as position_y, COALESCE(width, 80) as width, COALESCE(height, 80) as height, COALESCE(rotation, 0) as rotation
+           FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?) ORDER BY name`
+        ).bind(id, id).all()) as { results: any[] };
         tableResults = tables.results || [];
       } catch {
-        tableResults = [];
+        try {
+          const tables = (await db.prepare(
+            `SELECT id, CAST(table_number AS TEXT) as code, name, capacity, status, 0 as position_x, 0 as position_y, 80 as width, 80 as height, 0 as rotation
+             FROM cafe_tables WHERE zone = ? ORDER BY name`
+          ).bind(id).all()) as { results: any[] };
+          tableResults = tables.results || [];
+        } catch {
+          tableResults = [];
+        }
       }
     }
 
@@ -153,10 +161,13 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const id = crypto.randomUUID();
 
+    const locationId = body.locationId || 'default';
+    const sortOrder = body.sortOrder ?? body.displayOrder ?? 0;
+
     // Check slug uniqueness
     let existing: unknown = null;
     try {
-      existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ?').bind(body.slug, body.locationId).first();
+      existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = ?').bind(body.slug, locationId).first();
     } catch {
       existing = null;
     }
@@ -174,9 +185,9 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.slug,
         body.name,
         body.description || null,
-        body.sortOrder || 0,
+        sortOrder,
         body.isActive !== false ? 1 : 0,
-        body.locationId,
+        locationId,
         JSON.stringify(body.metadata || {}),
         now,
         now
@@ -249,7 +260,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (body.slug !== undefined) {
       if (!usingFallback) {
-        const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ? AND id != ?').bind(body.slug, body.locationId || existing.location_id, id).first();
+        const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.slug, body.locationId || existing.location_id || 'default', id).first();
         if (slugExists) {
           return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
         }
@@ -259,7 +270,8 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
     if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
     if (body.description !== undefined) { updates.push('description = ?'); params.push(body.description); }
-    if (body.sortOrder !== undefined) { updates.push('sort_order = ?'); params.push(body.sortOrder); }
+    const updSortOrder = body.sortOrder ?? body.displayOrder;
+    if (updSortOrder !== undefined) { updates.push('sort_order = ?'); params.push(updSortOrder); }
     if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
     if (body.locationId !== undefined) { updates.push('location_id = ?'); params.push(body.locationId); }
     if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
@@ -328,7 +340,11 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     try {
       tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
     } catch {
-      tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone = ?').bind(id).first().catch(() => null)) as { count: number } | null;
+      try {
+        tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
+      } catch {
+        tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone = ?').bind(id).first().catch(() => null)) as { count: number } | null;
+      }
     }
     if (tables && tables.count > 0) {
       return c.json({ success: false, error: 'Cannot delete zone with tables' }, 409);

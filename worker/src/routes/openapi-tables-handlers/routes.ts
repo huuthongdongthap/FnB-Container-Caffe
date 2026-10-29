@@ -12,8 +12,8 @@ openApiTablesRouter.use('/api/tables/*', requireAuth(['owner', 'manager', 'staff
 openApiTablesRouter.use('/api/table-zones', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']));
 openApiTablesRouter.use('/api/table-zones/*', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']));
 
-// Register sub-handlers
-registerTableCrudHandlers(openApiTablesRouter);
+// Register static /api/tables/zones handlers before dynamic /api/tables/:id handlers
 registerZoneCrudHandlers(openApiTablesRouter);
+registerTableCrudHandlers(openApiTablesRouter);
 
 export default openApiTablesRouter;

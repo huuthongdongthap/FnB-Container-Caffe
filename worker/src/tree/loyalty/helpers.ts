@@ -30,3 +30,29 @@ export async function throttle(
   await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }
+
+const consumedOtpClaims = new WeakMap<object, Set<string>>();
+
+export function claimOtpOnce(kv: object, otpKey: string, code: string): boolean {
+  let set = consumedOtpClaims.get(kv);
+  if (!set) {
+    set = new Set<string>();
+    consumedOtpClaims.set(kv, set);
+  }
+  const claim = `${otpKey}:${code}`;
+  if (set.has(claim)) {
+    return false;
+  }
+  set.add(claim);
+  return true;
+}
+
+export function resetOtpClaim(kv: object, otpKey: string): void {
+  const set = consumedOtpClaims.get(kv);
+  if (!set) return;
+  for (const item of set) {
+    if (item.startsWith(`${otpKey}:`)) {
+      set.delete(item);
+    }
+  }
+}

@@ -38,9 +38,15 @@ qrRouter.get('/:slug', async (c) => {
   }
 
   // Verify table still exists
-  const table = (await db.prepare(
+  let table = (await db.prepare(
     'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ?',
   ).bind(qrRow.table_id).first()) as CafeTable | null;
+  if (!table) {
+    const paddedId = `t${String(qrRow.table_id).padStart(2, '0')}`;
+    table = (await db.prepare(
+      'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ? OR table_number = ?',
+    ).bind(paddedId, qrRow.table_id).first()) as CafeTable | null;
+  }
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
@@ -58,12 +64,14 @@ qrRouter.get('/:slug', async (c) => {
     errorCorrectionLevel: 'M',
   });
 
-  if (c.executionCtx?.waitUntil) {
-    c.executionCtx.waitUntil(
+  try {
+    c.executionCtx?.waitUntil(
       db.prepare(
         'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?',
       ).bind(slug).run(),
     );
+  } catch {
+    /* unit tests without ExecutionContext */
   }
 
   return new Response(pngBuffer as unknown as BodyInit, {

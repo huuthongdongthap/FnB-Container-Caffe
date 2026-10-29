@@ -3,7 +3,8 @@ import { parseBookingTime } from './time-parser';
 
 interface CafeTableRow {
   id: string;
-  capacity: number;
+  capacity?: number;
+  seats?: number;
   zone: string;
   status: string;
 }
@@ -45,16 +46,16 @@ export async function createReservationFromBooking(
   let table: CafeTableRow | null = null;
   if (zone) {
     const { results: zoneResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE capacity >= ? AND status = \'Available\''
+      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND status = \'Available\''
     ).bind(guestCount).all();
     const available = (zoneResults || []) as unknown as CafeTableRow[];
-    table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity)[0] || null;
+    table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2))[0] || null;
   } else {
     const { results: tablesResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE capacity >= ? AND status = \'Available\''
+      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND status = \'Available\''
     ).bind(guestCount).all();
     const available = (tablesResults || []) as unknown as CafeTableRow[];
-    available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity);
+    available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2));
     table = available[0] || null;
   }
 
@@ -68,11 +69,12 @@ export async function createReservationFromBooking(
 
   const reservationId = `rsv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
   await db.prepare(
-    `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, cal_booking_uid, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')`
+    `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, cal_booking_uid, customer_email, reservation_time, special_requests, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')`
   ).bind(
     reservationId, table.id, attendee.name || '', attendee.phone || '', guestCount,
-    date, time, table.zone || '', '', payload.uid
+    date, time, table.zone || '', JSON.stringify(metadata), payload.uid,
+    attendee.email || null, payload.startTime || `${date}T${time}`, JSON.stringify(metadata)
   ).run();
 
   return {

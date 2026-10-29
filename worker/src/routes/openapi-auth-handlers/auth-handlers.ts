@@ -20,10 +20,17 @@ async function writeAuthAuditLog(
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
     } catch {
-      // Ignore audit log error
+      try {
+        await db.prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+      } catch {
+        // Ignore audit log error
+      }
     }
   }
 }
@@ -52,13 +59,13 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, body.name, body.email, body.phone || null, passwordHash,
-      'customer', body.locale || 'vi', 'bronze', 0, false, null, now, now
+      'customer', body.locale || 'vi', 'bronze', 0, 0, null, now, now
     ).run();
 
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, !!body.deviceFingerprint, body.deviceFingerprint || null, null, now, now).run();
+    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, body.deviceFingerprint ? 1 : 0, body.deviceFingerprint || null, null, now, now).run();
 
     await writeAuthAuditLog(db, id, 'register', 'user', id, JSON.stringify({ email: body.email }), now);
 
@@ -117,7 +124,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, isTrustedDevice, body.deviceFingerprint || null, null, now, now).run();
+    ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, isTrustedDevice ? 1 : 0, body.deviceFingerprint || null, null, now, now).run();
 
     await writeAuthAuditLog(db, user.id, 'login', 'session', sessionId, JSON.stringify({ rememberMe: body.rememberMe }), now);
 
@@ -265,7 +272,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, user!.id, accessToken, refreshToken, expiresAt, false, null, null, now, now).run();
+    ).bind(sessionId, user!.id, accessToken, refreshToken, expiresAt, 0, null, null, now, now).run();
 
     await writeAuthAuditLog(db, user!.id, 'verify_email', 'user', user!.id, JSON.stringify({}), now);
 

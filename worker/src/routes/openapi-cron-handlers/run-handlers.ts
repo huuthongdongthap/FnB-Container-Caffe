@@ -41,12 +41,20 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(`audit_${Date.now()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
     } catch {
+      const metaStr = JSON.stringify({ jobId: id, manual: true });
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, user.id, 'cron_job_trigger', 'cron_run', runId, 'cron_run', runId, metaStr, metaStr, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(user.id, user.id, 'cron_job_trigger', 'cron_run', runId, metaStr, now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 
@@ -98,12 +106,20 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(`audit_${Date.now()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
     } catch {
+      const metaStr = JSON.stringify({ originalRunId: id, jobId: run.job_id });
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(user.id, user.id, user.id, 'cron_run_retry', 'cron_run', newRunId, 'cron_run', newRunId, metaStr, metaStr, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(user.id, user.id, 'cron_run_retry', 'cron_run', newRunId, metaStr, now).run().catch(() => {});
+        } catch {
+          // Ignore audit log error
+        }
       }
     }
 

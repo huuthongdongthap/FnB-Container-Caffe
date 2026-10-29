@@ -154,9 +154,22 @@ export function TicketCard({
                     {item.modifier}
                   </span>
                 )}
+                {item.notes && (
+                  <p
+                    className="mt-1 text-xs italic text-[var(--aura-chrome-light,#dfaf7e)]"
+                    style={{ fontFamily: 'var(--aura-font-body)' }}
+                  >
+                    Ghi chú: {item.notes}
+                  </p>
+                )}
               </div>
             </div>
           ))}
+          {ticket.notes && (
+            <div className="mt-2 rounded border border-[var(--aura-chrome-light,#dfaf7e)]/30 bg-[var(--aura-chrome-light,#dfaf7e)]/10 px-3 py-2 text-xs italic text-[var(--aura-chrome-light,#dfaf7e)]">
+              Ghi chú đơn: {ticket.notes}
+            </div>
+          )}
         </div>
       </div>
 

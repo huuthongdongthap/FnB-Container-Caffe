@@ -91,7 +91,7 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
           tenantId = tenant?.id; tier = tenant?.tier;
         }
       } catch { /* Customer enrichment keeps its pre-existing optional contract. */ }
-      token = await generateJWT({ email, name: user.name, id: user.id, role: 'customer', tenantId, tier }, env.JWT_SECRET as string, env.JWT_EXPIRY_SECONDS as string);
+      token = await generateJWT({ email, name: user.name, id: user.id, role: 'customer', tenantId, tier, sessionId: crypto.randomUUID() }, env.JWT_SECRET as string, env.JWT_EXPIRY_SECONDS as string);
       sessionUser = { id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'customer', tenantId };
     }
 

@@ -62,6 +62,7 @@ export function CheckoutPage() {
       id: item.id,
       name: item.name,
       variant: item.modifiers?.join(' • ') || t('variantStandard'),
+      notes: item.notes,
       quantity: item.quantity,
       price: item.price,
       imageUrl: item.image || '',
@@ -85,9 +86,9 @@ export function CheckoutPage() {
     setPayosError(null);
     clearPaymentError();
 
-    // Parse numeric table number (1-12) from inputs like "Bàn 5", "5", "AURA-5", "DEMO-6678"
+    // Parse numeric table number (1-12) from inputs like "Bàn 5", "5", "01", "t01-indoor", "12-vip", "AURA-5"
     const rawTable = formData.tableNumber?.trim() || '';
-    const numMatch = rawTable.match(/\b([1-9]|1[0-2])\b/);
+    const numMatch = rawTable.match(/(?:^|\b|[tT])0*([1-9]|1[0-2])(?:\b|-|$)/);
     const validTableNumber = numMatch ? numMatch[1] : null;
 
     // Dine-in invariant: backend requires table_id to resolve to an actual cafe_tables table_number (1-12).
@@ -108,6 +109,7 @@ export function CheckoutPage() {
     const payload = {
       items: items.map((i) => {
         const baseProductId = (i.productId || i.id || '').trim();
+        const itemModifiers = Array.isArray(i.modifiers) && i.modifiers.length > 0 ? i.modifiers : undefined;
         return {
           id: i.id,
           product_id: baseProductId,
@@ -115,9 +117,10 @@ export function CheckoutPage() {
           name: i.name,
           price: i.price,
           quantity: i.quantity,
+          ...(itemModifiers ? { modifiers: itemModifiers } : {}),
           notes: [
             i.notes,
-            Array.isArray(i.modifiers) && i.modifiers.length > 0 ? `Tùy chọn: ${i.modifiers.join(', ')}` : '',
+            itemModifiers ? `Tùy chọn: ${itemModifiers.join(', ')}` : '',
           ].filter(Boolean).join(' | '),
         };
       }),

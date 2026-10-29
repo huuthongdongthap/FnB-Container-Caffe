@@ -21,9 +21,23 @@ export const READY_TO_SERVE_ITEM_IDS = new Set([
   'jc004', // Dừa trái (nguyên quả tươi)
   'od002', // Bình trà bắc (bình mộc nóng ngồi lâu)
   'bt001', // Nước suối đóng chai
-  'bt002', // Sting / Coca / Pepsi / 7UP / Ô long
   'bt003', // Redbull lon
 ]);
+
+/**
+ * Check if an item is the bundled soft-drink SKU (bt002: Sting / Coca / Pepsi / 7 UP / Ô long)
+ * that requires the customer to pick which drink they want.
+ */
+export function isBundledDrinkChoiceItem(item?: {
+  id?: string;
+  name?: string;
+} | null): boolean {
+  if (!item) return false;
+  const id = (item.id || '').trim().toLowerCase();
+  if (id === 'bt002') return true;
+  const name = (item.name || '').toLowerCase();
+  return name.includes('sting') && (name.includes('coca') || name.includes('pepsi'));
+}
 
 /**
  * Check if a menu item is a ready-to-serve / packaged product.
@@ -36,6 +50,10 @@ export function isReadyToServeItem(item?: {
   name?: string;
 } | null): boolean {
   if (!item) return false;
+
+  if (isBundledDrinkChoiceItem(item)) {
+    return false;
+  }
 
   const id = (item.id || '').trim().toLowerCase();
   if (READY_TO_SERVE_ITEM_IDS.has(id)) {

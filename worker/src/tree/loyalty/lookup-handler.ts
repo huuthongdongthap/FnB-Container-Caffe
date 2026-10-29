@@ -40,11 +40,9 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
         if (!isStaffRole(acctRole) || !POS_LOOKUP_ROLES.has(acctRole)) {
           return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
         }
-        const isHqOwner = acctRole === 'owner' && (!acctTenant || acctTenant === 'default' || acctTenant === 'hq');
-        if (!isHqOwner && acctTenant !== tenantId) {
+        if (acctTenant !== tenantId) {
           return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
         }
-        tenantId = isHqOwner ? tenantId : acctTenant;
       } else if (session.payload.role === 'customer') {
         callerCustomerId = String(session.payload.id || (session.payload as unknown as Record<string, unknown>).sub || '');
         if (!callerCustomerId) {

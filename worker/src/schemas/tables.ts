@@ -41,6 +41,11 @@ export const TableCreateSchema = z.object({
   width: z.number().int().positive().default(80),
   height: z.number().int().positive().default(80),
   rotation: z.number().int().min(0).max(360).default(0),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
+  dimensions: z.object({ width: z.number().positive().optional(), height: z.number().positive().optional(), rotation: z.number().min(0).max(360).optional() }).optional(),
+  isActive: z.boolean().optional(),
+  locationId: z.string().optional(),
+  qrCode: z.string().optional(),
   translations: z.array(TableTranslationSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableCreate');
@@ -56,6 +61,10 @@ export const TableUpdateSchema = z.object({
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   rotation: z.number().int().min(0).max(360).optional(),
+  position: z.object({ x: z.number().optional(), y: z.number().optional() }).optional(),
+  dimensions: z.object({ width: z.number().positive().optional(), height: z.number().positive().optional(), rotation: z.number().min(0).max(360).optional() }).optional(),
+  isActive: z.boolean().optional(),
+  locationId: z.string().optional(),
   translations: z.array(TableTranslationSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableUpdate');
@@ -92,6 +101,10 @@ export const TableZoneCreateSchema = z.object({
   description: z.string().max(500).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   displayOrder: z.number().int().nonnegative().default(0),
+  sortOrder: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+  locationId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableZoneCreate');
 
 export const TableZoneUpdateSchema = z.object({
@@ -100,6 +113,10 @@ export const TableZoneUpdateSchema = z.object({
   description: z.string().max(500).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   displayOrder: z.number().int().nonnegative().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+  locationId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableZoneUpdate');
 
 export const TableZoneResponseSchema = z.object({
