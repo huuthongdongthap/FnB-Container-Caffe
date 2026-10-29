@@ -701,11 +701,11 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 38,
-        downCount: 7,
-        missingDownCount: 31,
+        forwardCount: 45,
+        downCount: 10,
+        missingDownCount: 35,
         safeReversibleCount: 0,
-        unsafeDownCount: 7,
+        unsafeDownCount: 10,
         fileCoverageComplete: false,
         safeReversibilityComplete: false,
         complete: false,
@@ -757,7 +757,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 7/38 .down.sql files present (31 missing), 0/38 safely reversible without data-loss/schema-drift hazards (7 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 10/45 .down.sql files present (35 missing), 0/45 safely reversible without data-loss/schema-drift hazards (10 existing .down.sql flagged'
     );
   });
 });
@@ -775,9 +775,9 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(38);
-    expect(canonicalDir.downCount).toBe(7);
-    expect(canonicalDir.missingDownCount).toBe(31);
+    expect(canonicalDir.forwardCount).toBe(45);
+    expect(canonicalDir.downCount).toBe(10);
+    expect(canonicalDir.missingDownCount).toBe(35);
   });
 
   it('enforces fail-closed migration execution in deploy-cloudflare.sh, worker/scripts/apply-migrations.sh, and scripts/deploy-branded.sh (default deploy runs zero D1 commands; migration runner requires explicit forward migration selection)', () => {
