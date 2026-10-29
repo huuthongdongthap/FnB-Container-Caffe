@@ -6,6 +6,7 @@ import type { Env } from '../../types/env';
 import { log, verifySignature } from './helpers';
 import { sendOrderPaidNotifications } from './notifications';
 import { settlePayOS, type SettlementPayment } from './payos-settlement';
+import { writePaymentReviewMarker } from '../../../../packages/domain/payment/commands/payos-reconcile-lease';
 
 function safeWaitUntil(c: any, promise: Promise<any>): void {
   promise.catch(() => {});
@@ -29,12 +30,27 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
     if (!parsed.success) return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
     const data = payload.data as Record<string, unknown>;
     if (!await verifySignature(data, signature, c.env.PAYOS_CHECKSUM_KEY)) {
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        orderCode: String(data.orderCode ?? ''),
+        source: 'webhook',
+        stage: 'signature_verify',
+        errorCode: 'INVALID_SIGNATURE',
+        untrusted: true,
+      });
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
     const orderCode = String(data.orderCode);
     const payment = await db.prepare('SELECT id, order_id, status, amount, method FROM payments WHERE transaction_id = ?')
       .bind(orderCode).first<SettlementPayment>();
-    if (!payment) return ack('Unknown order, acknowledged');
+    if (!payment) {
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        orderCode,
+        source: 'webhook',
+        stage: 'payment_lookup',
+        errorCode: 'UNKNOWN_ORDER_CODE',
+      });
+      return ack('Unknown order, acknowledged');
+    }
     if (payment.method !== 'payos') return c.json({ error: 1, message: 'Payment method mismatch' }, 409);
     const order = await db.prepare('SELECT * FROM orders WHERE id = ?')
       .bind(payment.order_id).first<{ id: string; payment_status: string; payment_method: string; total?: number | null; total_amount?: number | null }>();
@@ -51,6 +67,14 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
       if (c.env.AUTH_KV) await c.env.AUTH_KV.put(`payment:stuck:${payment.order_id}`, JSON.stringify({
         orderId: payment.order_id, orderCode, dbAmount: payment.amount, webhookAmount: amount, detectedAt: now,
       }), { expirationTtl: 86400 * 7 }).catch(() => {});
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        paymentId: payment.id,
+        orderId: payment.order_id,
+        orderCode,
+        source: 'webhook',
+        stage: 'amount_check',
+        errorCode: 'AMOUNT_MISMATCH',
+      });
       return c.json({ error: 1, message: 'Amount mismatch' }, 400);
     }
     if (payment.status === 'refunded' || order.payment_status === 'refunded') return ack('Already processed');

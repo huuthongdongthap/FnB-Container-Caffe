@@ -25,7 +25,9 @@ export function paymentSqliteDB(options: { canonicalStaff?: boolean; authVersion
       ${options.authVersion === false ? '' : 'auth_version INTEGER DEFAULT 1,'}
       ${options.canonicalStaff ? '' : 'email TEXT, pin_hash TEXT,'}
       password_hash TEXT, created_at TEXT, updated_at TEXT);
-    CREATE TABLE staff_login_identities (email TEXT PRIMARY KEY, staff_id TEXT NOT NULL UNIQUE REFERENCES users(id));`);
+    CREATE TABLE staff_login_identities (email TEXT PRIMARY KEY, staff_id TEXT NOT NULL UNIQUE REFERENCES users(id));
+    CREATE TABLE payment_reconciliation_jobs (payment_id TEXT PRIMARY KEY, next_attempt_at TEXT NOT NULL,
+      lease_until TEXT, lease_owner TEXT, last_checked_at TEXT, last_outcome TEXT, attempts INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);`);
   function prepare(sql: string) {
     let args: any[] = [];
     const run = () => {

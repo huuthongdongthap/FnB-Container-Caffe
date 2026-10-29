@@ -269,6 +269,8 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
 
   const stuckList = await kv.list({ prefix: 'payment:stuck:' });
   const dlqList = await kv.list({ prefix: 'webhook:dlq:' });
+  const reviewList = await kv.list({ prefix: 'payment:review:' });
+  const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
 
   const stuck = await Promise.all(
     stuckList.keys.slice(0, 20).map(async(k) => {
@@ -298,6 +300,46 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
     })
   );
 
+  const reviews = await Promise.all(
+    reviewList.keys.slice(0, 20).map(async(k) => {
+      const raw = await kv.get(k.name);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const paymentId = typeof parsed.paymentId === 'string' ? parsed.paymentId : null;
+        let lastOutcome: string | null = null;
+        if (db && paymentId) {
+          try {
+            const job = await db.prepare('SELECT last_outcome FROM payment_reconciliation_jobs WHERE payment_id = ?')
+              .bind(paymentId).first<{ last_outcome: string | null }>();
+            lastOutcome = job?.last_outcome ?? null;
+          } catch {
+            // Optional table in partial mock environments
+          }
+        }
+        const reconcileStatus = lastOutcome === 'settled' || lastOutcome === 'already_settled'
+          ? 'reconciled'
+          : 'unprocessed';
+        return {
+          key: k.name,
+          correlationId: parsed.correlationId ?? null,
+          source: parsed.source ?? null,
+          stage: parsed.stage ?? null,
+          errorCode: parsed.errorCode ?? null,
+          timestamp: parsed.timestamp ?? null,
+          paymentId,
+          orderId: parsed.orderId ?? null,
+          orderCode: parsed.orderCode ?? null,
+          ...(parsed.untrusted ? { untrusted: true } : {}),
+          lastOutcome,
+          reconcileStatus,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
   return Response.json({
     stuck: (stuck.filter(Boolean) as Record<string, unknown>[]).map((s) =>
       isOwner
@@ -305,6 +347,7 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
         : { ...s, amount: '***', dbAmount: '***', webhookAmount: '***' }
     ),
     dlq: dlq.filter(Boolean),
-    total: stuckList.keys.length + dlqList.keys.length
+    reviews: reviews.filter(Boolean),
+    total: stuckList.keys.length + dlqList.keys.length + reviewList.keys.length
   });
 }

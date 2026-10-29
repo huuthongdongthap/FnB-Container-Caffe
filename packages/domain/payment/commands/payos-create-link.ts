@@ -35,7 +35,11 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       return c.json({ success: false, error: `Cannot pay for ${order.status} order` }, 409);
     }
     if (order.payment_status === 'paid' || order.payment_status === 'refunded') {
-      return c.json({ success: false, error: errMsg.already_paid[locale] }, 409);
+      return c.json({
+        success: false,
+        error: errMsg.already_paid[locale],
+        ...(order.payment_status === 'paid' ? { code: 'ORDER_ALREADY_PAID', orderId: order.id } : {}),
+      }, 409);
     }
     if (order.payment_method !== 'payos') {
       return c.json({ success: false, error: 'PayOS payment links are only available for PayOS orders' }, 409);
@@ -48,15 +52,21 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
     const { PAYOS_CLIENT_ID: clientId, PAYOS_API_KEY: apiKey, PAYOS_CHECKSUM_KEY: checksumKey } = c.env;
     if (!clientId || !apiKey || !checksumKey) return c.json({ success: false, error: errMsg.payos_not_configured[locale] }, 500);
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
-    const result = await getOrCreatePayOSAttempt({ db, orderId: order_id, amount, clientId, apiKey, checksumKey,
+    const result = await getOrCreatePayOSAttempt({ db, kv: c.env.AUTH_KV ?? null, orderId: order_id, amount, clientId, apiKey, checksumKey,
       description: (description || `Order #${order_id}`).slice(0, 25), buyerName: customer_name || 'Khách hàng',
       returnUrl: `${baseUrl}/order-success?order_id=${encodeURIComponent(order_id)}`,
       cancelUrl: `${baseUrl}/checkout?cancelled=true&order_id=${encodeURIComponent(order_id)}`,
     });
     if (result.ok === false) {
       if (result.status === 202) c.header('Retry-After', '2');
-      return c.json({ success: false, error: result.error, orderCode: result.payment?.transaction_id,
-        retryable: result.status === 202 || result.status === 502 }, result.status);
+      return c.json({
+        success: false,
+        error: result.error,
+        ...(result.code ? { code: result.code } : {}),
+        ...(result.orderId ? { orderId: result.orderId } : {}),
+        orderCode: result.payment?.transaction_id,
+        retryable: result.status === 202 || result.status === 502,
+      }, result.status);
     }
     const { payment, cached } = result;
     if (openApi) return c.json({ success: true, data: {

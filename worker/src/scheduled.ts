@@ -14,6 +14,7 @@ import {
   detectBirthdayCandidates,
   runCampaignTriggers,
   runSopReminders,
+  runPaymentReconciliation,
 } from './routes/cron';
 import {
   autoPostDailySpecials,
@@ -32,6 +33,7 @@ export async function handleScheduled(
   };
 
   safeWait(checkOverdueOrders(env as unknown as Record<string, unknown>));
+  safeWait(runPaymentReconciliation(env as unknown as Record<string, unknown>));
   safeWait(pruneOldMetrics(env.AURA_DB, 7));
   safeWait(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
   safeWait(processErpnextProductSync(env as unknown as Record<string, unknown>));

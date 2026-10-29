@@ -76,7 +76,8 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
         if (meta?.tenant_id && meta.tenant_id !== tenantId) {
           return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
         }
-        if (meta?.verified_at && !body.otp_verified && !body.otp) {
+        const hasAuthHeader = Boolean(c.req.header?.('Authorization')?.startsWith('Bearer '));
+        if ((meta?.verified_at || c.env.ENVIRONMENT === 'production') && !body.otp_verified && !body.otp && !hasAuthHeader) {
           return c.json({
             success: false,
             code: 'PHONE_VERIFICATION_REQUIRED',

@@ -701,9 +701,9 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 46,
+        forwardCount: 47,
         downCount: 10,
-        missingDownCount: 36,
+        missingDownCount: 37,
         safeReversibleCount: 0,
         unsafeDownCount: 10,
         fileCoverageComplete: false,
@@ -757,7 +757,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 10/46 .down.sql files present (36 missing), 0/46 safely reversible without data-loss/schema-drift hazards (10 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 10/47 .down.sql files present (37 missing), 0/47 safely reversible without data-loss/schema-drift hazards (10 existing .down.sql flagged'
     );
   });
 });
@@ -775,9 +775,9 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(46);
+    expect(canonicalDir.forwardCount).toBe(47);
     expect(canonicalDir.downCount).toBe(10);
-    expect(canonicalDir.missingDownCount).toBe(36);
+    expect(canonicalDir.missingDownCount).toBe(37);
   });
 
   it('enforces fail-closed migration execution in deploy-cloudflare.sh, worker/scripts/apply-migrations.sh, and scripts/deploy-branded.sh (default deploy runs zero D1 commands; migration runner requires explicit forward migration selection)', () => {

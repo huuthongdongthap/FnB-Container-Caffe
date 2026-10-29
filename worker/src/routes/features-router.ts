@@ -5,6 +5,7 @@ import { handleUpdateOrderStatus } from './orders-hono-handlers/kds-handlers';
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
 import { tenantMiddleware } from '../middleware/tenant';
 import { getAdminOrders, getStats } from '@aura/domain-order';
 import { paymentRouter, nowPaymentsIPN } from '@aura/domain-payment';
@@ -71,6 +72,7 @@ import { customerAssistantRouter } from './customer-assistant';
 import { zaloWebhookRouter } from './zalo-webhook';
 import { containerTelemetryRouter } from './container-telemetry';
 import { handleOverview } from './reports-handlers/grouped-sales-handlers';
+import { manualReconcilePayment } from './payment-reconcile-handlers/manual-reconcile';
 import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
@@ -109,6 +111,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     return deleteAdminCustomer(c.env, c.req.param('id'), user?.tenantId);
   });
   app.get('/api/admin/payments/stuck', requireAuth(['owner', 'manager', 'admin']), (c) => getStuckPayments(c.req.raw, c.env));
+  app.post('/api/admin/payments/:id/reconcile', requireAuth(['owner', 'admin', 'manager', 'cashier']), audit('payment_reconcile'), manualReconcilePayment);
   app.route('/api/admin/dindin', dindinRouter);
   app.route('/api/admin/sales', adminSalesRouter);
   app.route('/api/admin/metrics', adminMetrics);

@@ -18,5 +18,6 @@ export {
   syncMauticContacts,
   detectWinbackCandidates,
   detectBirthdayCandidates,
-  runSopReminders
+  runSopReminders,
+  runPaymentReconciliation,
 } from './cron-handlers';

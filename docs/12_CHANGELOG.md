@@ -4,6 +4,65 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 💳 PayOS Reconciliation, DLQ Auto-Recovery & Customer Phone Auth Hardening (2026-10-29)
+
+- **feat(payment-reconcile)** — Triển khai bộ đối soát thanh toán PayOS tự động và thủ công (`packages/domain/payment/commands/payos-provider-verify.ts`, `payos-reconcile-lease.ts`, `payos-reconcile.ts`, migration `20261029_02_payment_reconciliation_jobs.sql`). Xác minh chữ ký HMAC-SHA256 và đối chiếu `orderCode`, `amount`, `linkId`, `amountPaid`, `amountRemaining` trực tiếp với `GET /v2/payment-requests/{orderCode}` trước khi gọi `settlePayOS` (single-writer CAS).
+- **feat(payment-cron-admin)** — Bổ sung cron driver `runPaymentReconciliation` (`worker/src/routes/cron-handlers/payment-reconcile.ts`) chạy mỗi 5 phút với D1 CAS lease 90s + exponential backoff, cùng endpoint quản trị `POST /api/admin/payments/:id/reconcile` (`worker/src/routes/payment-reconcile-handlers/manual-reconcile.ts`) và danh sách `reviews` trong `GET /api/admin/payments/stuck`.
+- **fix(payment-attempt-recovery)** — Khi tạo lại link thanh toán (`packages/domain/payment/commands/payos-attempt.ts`, `payos-create-link.ts`), nếu giao dịch `pending` trước đó đã được thanh toán trên PayOS (`PAID`), hệ thống tự động đối soát tất toán và trả `409 ORDER_ALREADY_PAID` thay vì giữ trạng thái treo hoặc tạo link trùng.
+- **fix(loyalty-phone-auth)** — Chặn cấp JWT khách hàng không xác thực trên `POST /api/loyalty/auth/phone` (`worker/src/tree/loyalty/phone-auth-handler.ts`) khi tài khoản đã `verified_at` hoặc môi trường `production` mà thiếu OTP hoặc `Authorization: Bearer`.
+
+### 🍵 Digital Menu Hardening — Catalog Fail-Closed, Diacritic Search, Focus Trap & API Filtering (2026-10-29)
+
+- **fix(menu-page)** — `MenuPage` (`src/pages/menu.tsx`, `src/components/menu/menu-catalog-unavailable-state.tsx`)
+  không còn tự động thay bằng danh sách món mẫu khi API `/api/menu` trả catalog rỗng hoặc gặp
+  lỗi mạng/D1. Giao diện hiển thị trạng thái lỗi/trống tường minh (`role="status"`,
+  `aria-live="polite"`) kèm nút `Thử lại` (`refetch`), ngăn khách đặt nhầm món không có trong
+  catalog thực tế.
+- **fix(menu-search)** — Tìm kiếm món ở cả client (`src/components/stitch/use-stitch-menu-new.ts`)
+  và Worker (`worker/src/routes/customer-menu.ts`) chuẩn hoá Unicode NFD, lược dấu kết hợp,
+  chuyển `đ/Đ → d` và `trim()` khoảng trắng, giúp truy vấn không dấu (`"tra dao"`, `"da chanh"`,
+  `"ca phe sua"`) khớp chính xác với tên và mô tả tiếng Việt có dấu.
+- **fix(menu-a11y)** — `DrinkCustomizerModal` và hook `useDialogFocusTrap`
+  (`src/components/menu/use-dialog-focus-trap.ts`) tự động chuyển focus vào phần tử tương tác
+  đầu tiên khi mở, bẫy vòng lặp `Tab`/`Shift+Tab` theo đúng thứ tự DOM, đóng bằng `Escape` và
+  hoàn trả focus về nút kích hoạt khi đóng; bổ sung `aria-pressed` cho các chip tuỳ chọn đường/đá.
+- **feat(menu-api)** — `GET /api/menu` (`worker/src/routes/customer-menu.ts`) thực thi lọc theo
+  `available`, `include_unavailable`, `search` và cắt trang `limit`/`offset`, đồng thời giữ
+  `data.totalItems` và `pagination.total` phản ánh tổng số món khớp trước khi phân trang.
+- **fix(cache-headers)** — `_headers` giới hạn `Cache-Control: public, max-age=31536000, immutable`
+  cho `/menu/aura-drinks/*.webp` và `*.avif`, đồng thời đặt `public, max-age=0, must-revalidate`
+  cho `collection.json` và `preview.html`.
+- **chore(lint-deploy)** — Mở rộng `eslint.config.js` bao phủ `src/**/*.{ts,tsx}` và tách riêng
+  kiểm tra SHA sau deploy trong `deploy-cloudflare.sh` theo cờ `--pages-only` / `--worker-only`
+  (fail-closed khi lệch SHA).
+
+### SOP — thang kỷ luật vi phạm: đóng 5 lỗ hổng quyền hạn (2026-10-25)
+
+- **fix(sop-discipline)** — Nhân viên giờ tự giải trình được hồ sơ của mình:
+  `GET /api/sop/mobile/violations/:id` và `POST /api/sop/mobile/violations/:id/appeal`.
+  Endpoint appeal cũ nằm dưới `/api/sop/admin/*` nên chỉ owner/manager/admin gọi được —
+  quyền giải trình trong SOP 09 §5 chỉ tồn tại trên giấy. Điểm kiểm soát là
+  `violation.staffId === scope.actorId`: không ai giải trình hộ người khác, và hồ sơ
+  khác tenant trả 404 (không tiết lộ id tồn tại).
+- **fix(sop-discipline)** — `apply` không còn ghi đè mô tả vi phạm gốc. Trước đây
+  note người áp dụng viết thẳng vào `description`, xoá bằng chứng hành vi — đúng phần
+  owner cần đọc khi có appeal. Cột riêng `sanction_note` (migration
+  `20261025_01_sop_violation_sanction_note.sql`); `description` chỉ người ghi viết.
+- **fix(sop-discipline)** — Mức nghiêm trọng suy từ `category` phía server thay vì
+  nhận từ body. Trước đây recorder gõ `assets_finance` + không tick serious là ra
+  `written_warning` thay vì sa thải; giờ ba nhóm SOP 09 §2 (`assets_finance`, `secrets`,
+  `stimulants`) bỏ qua thang bậc bất kể recorder muốn ghi thế nào. `SERIOUS_CATEGORIES`
+  trước đó khai báo rồi không gọi.
+- **fix(sop-discipline)** — `manager` apply `termination` trả **403** thay vì **409**.
+  Cả hai đều là từ chối, nhưng chúng yêu cầu client làm hai việc khác nhau: 403 =
+  quyền không bao giờ có (ẩn nút), 409 = bước này hợp lệ nhưng hồ sơ chưa tới (refresh).
+  Gộp một mất khả năng phân biệt, và manager sẽ retry đơn sa thải mãi. Vì vậy role được
+  kiểm tra **trước** state.
+- **fix(sop-discipline)** — Ladder đếm đủ trạng thái. Bỏ qua `appealed` và `closed` khiến
+  đóng hồ sơ lần 1 xong lần 2 lại ra `written_warning` — thang reset mỗi khi hồ sơ được
+  đóng. Đóng hồ sơ là **kết thúc xử lý**, không xoá vi phạm: chỉ `recorded` (chưa xác nhận)
+  là không đếm. Có test riêng cho ca này — đây là lỗ hổng duy nhất không test cũ nào bắt.
+
 ### ⚡ Menu Image Payload Optimization — AVIF + Width Variants (2026-10-24)
 
 - **perf(menu-images)** — The 49 menu photographs shipped as 1200×900 masters totalling

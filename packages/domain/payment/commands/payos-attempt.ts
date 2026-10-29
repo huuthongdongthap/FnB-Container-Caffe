@@ -1,17 +1,19 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { buildPayOSSignature, generateOrderCode, PAYOS_API } from './payos-helpers';
 import { verifyPayOSSignature } from '../policies/payos-signature';
+import { buildCheckoutUrl, verifyPayOSPaymentRequest } from './payos-provider-verify';
+import { reconcilePayOSPayment } from './payos-reconcile';
 
 export interface PayOSAttempt {
   id: string; order_id: string; amount: number; transaction_id: string;
   payment_url: string | null; status: string; created_at: string; updated_at: string;
 }
 interface AttemptInput {
-  db: D1Database; orderId: string; amount: number; clientId: string; apiKey: string;
+  db: D1Database; kv?: KVNamespace | null; orderId: string; amount: number; clientId: string; apiKey: string;
   checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string;
 }
 type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean }
-  | { ok: false; status: 202 | 409 | 502; error: string; payment?: PayOSAttempt };
+  | { ok: false; status: 202 | 409 | 502; code?: string; orderId?: string; error: string; payment?: PayOSAttempt };
 const LEASE_MS = 30_000;
 
 /** A deterministic primary key plus a conditional INSERT serializes ALL local callers. */
@@ -54,6 +56,9 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
   const { payment } = reserved;
   if (payment.status !== 'pending' || !/^\d+$/.test(payment.transaction_id)
     || Number(payment.amount) !== input.amount) {
+    if (payment.status === 'completed') {
+      return { ok: false, status: 409, code: 'ORDER_ALREADY_PAID', orderId: input.orderId, error: 'Payment attempt is already completed', payment };
+    }
     return { ok: false, status: 409, error: 'Payment attempt is closed or requires reconciliation', payment };
   }
   if (payment.payment_url) return { ok: true, payment, cached: true };
@@ -66,19 +71,49 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
     return { ok: true, payment: { ...payment, payment_url: url }, cached: !reserved.owned };
   };
   const recover = async (): Promise<AttemptResult | null> => {
-    const res = await fetch(`${PAYOS_API}/${payment.transaction_id}`, { headers });
-    const result = await res.json() as { code?: string; signature?: string; data?: Record<string, unknown> };
-    if (!res.ok || result.code !== '00' || !result.data) return null;
-    if (!await verifyPayOSSignature(result.data, result.signature, input.checksumKey)) {
-      return { ok: false, status: 502, error: 'Invalid provider payment signature', payment };
+    const verified = await verifyPayOSPaymentRequest({
+      transactionId: payment.transaction_id,
+      expectedAmount: input.amount,
+      checksumKey: input.checksumKey,
+      clientId: input.clientId,
+      apiKey: input.apiKey,
+    });
+    if (!verified.ok) {
+      if (verified.reason === 'bad_signature') {
+        return { ok: false, status: 502, error: 'Invalid provider payment signature', payment };
+      }
+      if (verified.reason === 'mismatch') {
+        return { ok: false, status: 409, error: 'Provider payment requires reconciliation', payment };
+      }
+      return null;
     }
-    if (String(result.data.orderCode) !== payment.transaction_id || Number(result.data.amount) !== input.amount) {
-      return { ok: false, status: 409, error: 'Provider payment requires reconciliation', payment };
+    if (verified.status === 'PAID') {
+      const reconciled = await reconcilePayOSPayment({
+        db: input.db,
+        kv: input.kv,
+        paymentId: payment.id,
+        clientId: input.clientId,
+        apiKey: input.apiKey,
+        checksumKey: input.checksumKey,
+        source: 'create_link',
+        preVerified: verified,
+      });
+      if (reconciled.ok && (reconciled.outcome === 'settled' || reconciled.outcome === 'already_settled')) {
+        return {
+          ok: false,
+          status: 409,
+          code: 'ORDER_ALREADY_PAID',
+          orderId: input.orderId,
+          error: 'Provider payment is already paid; refresh the order',
+          payment: { ...payment, status: 'completed' },
+        };
+      }
+      return { ok: false, status: 409, error: reconciled.error || 'Provider payment requires reconciliation', payment };
     }
-    if (String(result.data.status).toUpperCase() !== 'PENDING') {
+    if (verified.status !== 'PENDING') {
       return { ok: false, status: 409, error: 'Provider payment is no longer payable; refresh the order', payment };
     }
-    const url = checkoutUrl(result.data, true);
+    const url = verified.checkoutUrl ?? buildCheckoutUrl({ id: verified.linkId }, true);
     return url ? saveUrl(url) : { ok: false, status: 502, error: 'Invalid provider checkout link', payment };
   };
   try {
