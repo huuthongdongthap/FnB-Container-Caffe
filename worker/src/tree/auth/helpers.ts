@@ -16,11 +16,13 @@ export async function findExistingOwner(env: {
   AUTH_KV: import('@cloudflare/workers-types').KVNamespace;
   AURA_DB?: import('@cloudflare/workers-types').D1Database;
 }) {
+  let d1QueriedSuccessfully = false;
   if (env.AURA_DB) {
     try {
       const dbOwner = await env.AURA_DB
         .prepare("SELECT id, name, created_at FROM users WHERE role = 'owner' AND is_active = 1 LIMIT 1")
         .first<{ id: string; name: string | null; created_at: string | null }>();
+      d1QueriedSuccessfully = true;
       if (dbOwner) {
         return { email: dbOwner.id, name: dbOwner.name || '', created_at: dbOwner.created_at || null };
       }
@@ -30,9 +32,12 @@ export async function findExistingOwner(env: {
   }
   let cursor: string | undefined;
   let pages = 0;
-  const MAX_PAGES = 20;
+  // When D1 is active and confirmed no owner in users, bound legacy KV fallback
+  // to a single small page so Cloudflare Worker subrequest limits cannot be exhausted.
+  const maxPages = d1QueriedSuccessfully ? 1 : 5;
+  const pageLimit = d1QueriedSuccessfully ? 100 : 200;
   do {
-    const opts: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: 1000 };
+    const opts: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: pageLimit };
     if (cursor) {
       opts.cursor = cursor;
     }
@@ -51,6 +56,6 @@ export async function findExistingOwner(env: {
     }
     cursor = page.list_complete ? undefined : (page as unknown as { cursor?: string }).cursor;
     pages += 1;
-  } while (cursor && pages < MAX_PAGES);
+  } while (cursor && pages < maxPages);
   return null;
 }

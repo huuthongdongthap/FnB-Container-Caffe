@@ -21,7 +21,8 @@ export const authEndpointsRouter = new Hono<{ Bindings: Env }>();
 const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
   try {
     if (c.env?.AUTH_KV) {
-      const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
+      const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+      const ip = c.req.header('cf-connecting-ip') || forwarded || 'unknown';
       const key = `rate:auth:${ip}`;
       const count = Number(await c.env.AUTH_KV.get(key) || 0);
       if (count >= 20) {

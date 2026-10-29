@@ -203,14 +203,8 @@ export default function MobileLogin() {
         return;
       }
       const trimmedDevice = deviceToken.trim();
-      const userJson = JSON.stringify(staffProfile);
       localStorage.setItem('aura_device_token', trimmedDevice);
-      localStorage.setItem('aura_auth_token', data.token);
-      localStorage.setItem('aura_user_data', userJson);
-      localStorage.setItem('mobile_device', trimmedDevice);
-      localStorage.setItem('mobile_token', data.token);
-      localStorage.setItem('mobile_user', userJson);
-      login(data.token, staffProfile);
+      await login(data.token, staffProfile);
       navigate('/mobile', { replace: true });
     } catch {
       setError('Không kết nối được máy chủ / Server connection error');

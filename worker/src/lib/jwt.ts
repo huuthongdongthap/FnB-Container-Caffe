@@ -219,6 +219,22 @@ export function getAuthToken(request: Request): string | null {
   return getExplicitToken(request) ?? getCookieToken(request);
 }
 
+/**
+ * Constant-time string comparison to avoid timing side-channels on secrets,
+ * verification codes, and password digests.
+ */
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  const maxLen = Math.max(aBytes.length, bBytes.length);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return diff === 0;
+}
+
 // ── Password hashing (PBKDF2 + legacy SHA-256) ──
 
 async function legacyHashPassword(password: string): Promise<string> {
@@ -271,15 +287,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
     );
     const computed = Array.from(new Uint8Array(bits))
       .map(b => b.toString(16).padStart(2, '0')).join('');
-    if (computed.length !== hashHex.length) {
-      return false;
-    }
-    let diff = 0;
-    for (let i = 0; i < computed.length; i++) {
-      diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);
-    }
-    return diff === 0;
+    return timingSafeEqualString(computed, hashHex);
   }
   const legacy = await legacyHashPassword(password);
-  return legacy === stored;
+  return timingSafeEqualString(legacy, stored);
 }

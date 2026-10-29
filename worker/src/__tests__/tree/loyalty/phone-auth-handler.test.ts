@@ -369,4 +369,73 @@ describe('handlePhoneAuth', () => {
       expect((result as { status: number }).status).toBe(400);
     });
   });
+
+  // ── Ownership proof verification on existing customer ─────────────────────
+
+  describe('existing customer ownership verification', () => {
+    const Q_META = 'SELECT tenant_id, verified_at FROM customers WHERE id = ?';
+
+    it('rejects forged otp_verified=true without valid KV OTP or JWT', async() => {
+      const { handlePhoneAuth } = await import('../../../tree/loyalty/phone-auth-handler');
+      const db = createMockDB();
+      setupExisting(db);
+      db.add(Q_META, { tenant_id: 'default', verified_at: '2026-10-01T00:00:00Z' });
+      const c = buildCtx({ phone: '0909123456', otp_verified: true }, db);
+
+      const result = await handlePhoneAuth(c);
+      expect((result as { status: number }).status).toBe(403);
+      expect((result as { body: { code: string } }).body.code).toBe('PHONE_VERIFICATION_REQUIRED');
+    });
+
+    it('rejects unverified otp string when AUTH_KV has no matching phone_otp', async() => {
+      const { handlePhoneAuth } = await import('../../../tree/loyalty/phone-auth-handler');
+      const db = createMockDB();
+      setupExisting(db);
+      db.add(Q_META, { tenant_id: 'default', verified_at: '2026-10-01T00:00:00Z' });
+      const c = buildCtx({ phone: '0909123456', otp: '000000' }, db);
+
+      const result = await handlePhoneAuth(c);
+      expect((result as { status: number }).status).toBe(403);
+      expect((result as { body: { code: string } }).body.code).toBe('PHONE_VERIFICATION_REQUIRED');
+    });
+
+    it('rejects forged Authorization Bearer header with invalid JWT', async() => {
+      const { handlePhoneAuth } = await import('../../../tree/loyalty/phone-auth-handler');
+      const db = createMockDB();
+      setupExisting(db);
+      db.add(Q_META, { tenant_id: 'default', verified_at: '2026-10-01T00:00:00Z' });
+      const c = buildCtx({ phone: '0909123456' }, db) as unknown as {
+        req: { json: () => Promise<unknown>; header: (name: string) => string | undefined };
+      };
+      c.req.header = (name: string) => (name === 'Authorization' ? 'Bearer forged-token' : '203.0.113.1');
+
+      const result = await handlePhoneAuth(c as never);
+      expect((result as { status: number }).status).toBe(403);
+      expect((result as { body: { code: string } }).body.code).toBe('PHONE_VERIFICATION_REQUIRED');
+    });
+
+    it('accepts valid one-time OTP from AUTH_KV and deletes it after verification', async() => {
+      const { handlePhoneAuth } = await import('../../../tree/loyalty/phone-auth-handler');
+      const db = createMockDB();
+      setupExisting(db);
+      db.add(Q_META, { tenant_id: 'default', verified_at: '2026-10-01T00:00:00Z' });
+      const deletedKeys: string[] = [];
+      const kv = {
+        ...makeKV(0),
+        get: async(key: string) => {
+          if (key === 'phone_otp:0909123456') return '654321';
+          if (key.includes('pa:')) return '0';
+          return null;
+        },
+        delete: async(key: string) => {
+          deletedKeys.push(key);
+        }
+      } as unknown as import('@cloudflare/workers-types').KVNamespace;
+      const c = buildCtx({ phone: '0909123456', otp: '654321' }, db, { kv });
+
+      const result = await handlePhoneAuth(c);
+      expect((result as { status: number }).status).toBe(200);
+      expect(deletedKeys).toContain('phone_otp:0909123456');
+    });
+  });
 });

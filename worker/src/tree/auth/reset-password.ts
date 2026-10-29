@@ -2,7 +2,7 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
-import { generateJWT, hashPassword } from '../../lib/jwt';
+import { generateJWT, hashPassword, timingSafeEqualString } from '../../lib/jwt';
 import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse } from '../../lib/staff-session';
 import { changeStaffPassword } from '../../lib/staff-password';
 import { findLoginUser } from '../../lib/staff-login-identity';
@@ -22,7 +22,8 @@ export async function resetPassword(request: Request, env: Record<string, unknow
     }
 
     const providedKey = request.headers.get('X-Reset-Key') || '';
-    if (providedKey !== env.RESET_KEY) {
+    const expectedKey = String(env.RESET_KEY || '');
+    if (!providedKey || !expectedKey || !timingSafeEqualString(providedKey, expectedKey)) {
       return errorResponse('Reset key không hợp lệ', 401);
     }
 

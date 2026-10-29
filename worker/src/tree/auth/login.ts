@@ -24,12 +24,35 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     const { email, password } = parsed.data;
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    const emailRateKey = `rl:login:email:${email.toLowerCase()}`;
+    let failedAttempts = 0;
+    try {
+      if (authKV?.get) {
+        failedAttempts = Number((await authKV.get(emailRateKey)) || 0);
+        if (failedAttempts >= 10) {
+          return errorResponse('Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau 5 phút.', 429);
+        }
+      }
+    } catch {
+      // Allow login check to proceed if KV rate-limit read is degraded
+    }
+
+    const recordEmailFailure = async () => {
+      try {
+        await authKV?.put?.(emailRateKey, String(failedAttempts + 1), { expirationTtl: 300 });
+      } catch {
+        // Ignore transient KV write failure
+      }
+    };
+
     const user = await findLoginUser(env as unknown as Env, email);
-    const failedPassword = () => {
+    const failedPassword = async () => {
+      await recordEmailFailure();
       ctx?.waitUntil?.(createMetricsCollector(env.AURA_DB as Env['AURA_DB']).recordMetric('login_failed', 1, { reason: 'wrong_password' }));
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
     };
     if (!user) {
+      await recordEmailFailure();
       const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
       const mc = createMetricsCollector(db);
       ctx?.waitUntil?.(mc.recordMetric('login_failed', 1, { reason: 'user_not_found' }));
@@ -74,6 +97,13 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
 
     user.last_login = new Date().toISOString();
     user.updated_at = new Date().toISOString();
+    if (failedAttempts > 0) {
+      try {
+        await authKV?.delete?.(emailRateKey);
+      } catch {
+        // Ignore transient cleanup failure
+      }
+    }
     if (user.role && user.role !== 'customer') await authKV.put(`user:${email}`, JSON.stringify(user)).catch(() => {});
     else await authKV.put(`user:${email}`, JSON.stringify(user));
 

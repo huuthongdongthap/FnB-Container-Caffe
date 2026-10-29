@@ -4,7 +4,7 @@ import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse } from '../lib/staff-session';
 import type { Env } from '../types/env';
-import { generateJWT } from '../lib/jwt';
+import { generateJWT, timingSafeEqualString } from '../lib/jwt';
 import { lookupVerifyCode, deleteVerifyCode, isExpired } from '../tree/auth/email-verification';
 
 const log = createLogger({ route: 'auth-verify' });
@@ -34,7 +34,7 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
     const attemptsKey = `verify_attempts:${email}`;
 
-    if (record.code !== code) {
+    if (!timingSafeEqualString(String(record.code || ''), code)) {
       let attempts = 1;
       try {
         if (authKV) {

@@ -4,7 +4,7 @@
  */
 import type { Context } from 'hono';
 import { createLogger } from '../../middleware/logger';
-import { generateJWT } from '../../lib/jwt';
+import { generateJWT, verifyJWT, timingSafeEqualString } from '../../lib/jwt';
 import { phoneAuthSchema } from '../../lib/validators';
 import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import type { Env } from '../../types/env';
@@ -69,23 +69,56 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     let isNew = false;
 
     if (customer) {
+      let meta: { tenant_id?: string | null; verified_at?: string | null } | null = null;
       try {
-        const meta = await db.prepare(
+        meta = await db.prepare(
           'SELECT tenant_id, verified_at FROM customers WHERE id = ?'
         ).bind(customer.id).first<{ tenant_id?: string | null; verified_at?: string | null }>();
-        if (meta?.tenant_id && meta.tenant_id !== tenantId) {
-          return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+      } catch {
+        // Optional metadata columns in partial test schemas
+      }
+      if (meta?.tenant_id && meta.tenant_id !== tenantId) {
+        return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+      }
+
+      const authHeader = c.req.header?.('Authorization');
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+      const requiresProof =
+        Boolean(meta?.verified_at) ||
+        c.env.ENVIRONMENT === 'production' ||
+        body.otp_verified !== undefined ||
+        body.otp !== undefined ||
+        Boolean(bearerToken);
+
+      if (requiresProof) {
+        let proofVerified = false;
+        if (bearerToken && c.env.JWT_SECRET) {
+          const revoked = await c.env.AUTH_KV?.get?.(`revoked:${bearerToken}`);
+          const verifiedPayload = !revoked ? await verifyJWT(bearerToken, c.env.JWT_SECRET) : null;
+          const role = String(verifiedPayload?.role || '');
+          const isStaffCaller = ['owner', 'admin', 'manager', 'staff', 'cashier'].includes(role);
+          if (
+            verifiedPayload &&
+            (verifiedPayload.id === customer.id || verifiedPayload.email === customer.email || isStaffCaller)
+          ) {
+            proofVerified = true;
+          }
         }
-        const hasAuthHeader = Boolean(c.req.header?.('Authorization')?.startsWith('Bearer '));
-        if ((meta?.verified_at || c.env.ENVIRONMENT === 'production') && !body.otp_verified && !body.otp && !hasAuthHeader) {
+        if (!proofVerified && typeof body.otp === 'string' && body.otp.trim().length >= 4 && c.env.AUTH_KV) {
+          const otpKey = `phone_otp:${phone}`;
+          const storedOtp = await c.env.AUTH_KV.get(otpKey);
+          if (storedOtp && timingSafeEqualString(storedOtp, body.otp.trim())) {
+            await c.env.AUTH_KV.delete?.(otpKey);
+            proofVerified = true;
+          }
+        }
+        if (!proofVerified) {
           return c.json({
             success: false,
             code: 'PHONE_VERIFICATION_REQUIRED',
             error: 'Số điện thoại đã xác thực. Vui lòng xác minh OTP để đăng nhập.',
           }, 403);
         }
-      } catch {
-        // Optional metadata columns in partial test schemas
       }
     }
 
