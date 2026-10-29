@@ -214,14 +214,14 @@ describe('requireAuth', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('allows query-param token on POST (SSE token parameter)', async() => {
+  it('allows query-param token on GET /stream (SSE token parameter)', async() => {
     const token = await staffToken();
     const c = mockHonoContext({
-      method: 'POST',
+      method: 'GET',
       headers: {},
     });
-    c.req.raw = new Request(`https://test.com?token=${encodeURIComponent(token)}`, {
-      method: 'POST',
+    c.req.raw = new Request(`https://test.com/stream?token=${encodeURIComponent(token)}`, {
+      method: 'GET',
     });
     const next = vi.fn();
     await requireAuth(['staff', 'owner'])(c, next);
@@ -248,10 +248,10 @@ describe('requireAuth', () => {
 });
 
 describe('optionalAuth', () => {
-  it('sets the user from a query-param token on GET', async() => {
+  it('sets the user from a query-param token on GET /stream', async() => {
     const token = await staffToken();
     const c = mockHonoContext({ method: 'GET' });
-    c.req.raw = new Request(`https://test.com?token=${encodeURIComponent(token)}`);
+    c.req.raw = new Request(`https://test.com/stream?token=${encodeURIComponent(token)}`);
     const next = vi.fn();
     await optionalAuth()(c, next);
     expect(c.set).toHaveBeenCalledWith('user', expect.objectContaining({ id: 'USR_2', role: 'staff' }));

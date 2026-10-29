@@ -10,8 +10,25 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 // Keep real token/cookie extraction; stub only cryptographic verification.
 vi.mock('../worker/src/lib/jwt.ts', async (importOriginal) => ({
   ...await importOriginal<typeof import('../worker/src/lib/jwt.ts')>(),
-  verifyJWT: vi.fn(async (token: string) => token === 'valid-token'
-    ? { email: 'test@test.com', id: 'USR_001', name: 'Test User', role: 'customer', exp: Math.floor(Date.now() / 1000) + 3600 } : null),
+  verifyJWT: vi.fn(async (token: string) => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    if (token === 'valid-token') {
+      return { email: 'test@test.com', id: 'USR_001', name: 'Test User', role: 'customer', exp };
+    }
+    if (token === 'staff-token') {
+      return {
+        email: 'staff@test.com',
+        id: 'STF_001',
+        name: 'Staff User',
+        role: 'staff',
+        authVersion: 1,
+        authTime: exp - 3600,
+        sessionType: 'staff-web',
+        exp,
+      };
+    }
+    return null;
+  }),
 }));
 
 import { customersRouter } from '../worker/src/routes/customers.ts';
@@ -27,6 +44,17 @@ function createMockD1(customers: Record<string, unknown>[] = []) {
           return stmt;
         }),
         first: vi.fn(async function () {
+          if (sql.includes('FROM users WHERE id = ?')) {
+            return {
+              id: 'STF_001',
+              email: 'staff@test.com',
+              name: 'Staff User',
+              role: 'staff',
+              tenant_id: 'default',
+              is_active: 1,
+              auth_version: 1,
+            };
+          }
           // /me endpoint — single customer lookup by id
           // SQL is: PROFILE_SQL + WHERE c.id = ?
           if (sql.includes('WHERE c.id = ?')) {
@@ -147,10 +175,12 @@ describe('Customer Routes', () => {
   });
 
   describe('GET /', () => {
+    const staffHeaders = { Authorization: 'Bearer staff-token' };
+
     test('returns paginated customer list', async () => {
       env.AURA_DB = createMockD1(sampleCustomers);
 
-      const res = await customersRouter.request('/', { method: 'GET' }, env);
+      const res = await customersRouter.request('/', { method: 'GET', headers: staffHeaders }, env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
       expect(body.success).toBe(true);
@@ -163,7 +193,7 @@ describe('Customer Routes', () => {
       // but we verify the route parses and passes the search param
       env.AURA_DB = createMockD1(sampleCustomers);
 
-      const res = await customersRouter.request('/?search=Alice', { method: 'GET' }, env);
+      const res = await customersRouter.request('/?search=Alice', { method: 'GET', headers: staffHeaders }, env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; pagination: { total: number } };
       expect(body.success).toBe(true);
@@ -172,7 +202,7 @@ describe('Customer Routes', () => {
     test('filters by tier', async () => {
       env.AURA_DB = createMockD1(sampleCustomers);
 
-      const res = await customersRouter.request('/?tier=gold', { method: 'GET' }, env);
+      const res = await customersRouter.request('/?tier=gold', { method: 'GET', headers: staffHeaders }, env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; data: any[] };
       expect(body.success).toBe(true);
@@ -181,7 +211,7 @@ describe('Customer Routes', () => {
     test('returns empty list with pagination metadata', async () => {
       env.AURA_DB = createMockD1([]);
 
-      const res = await customersRouter.request('/', { method: 'GET' }, env);
+      const res = await customersRouter.request('/', { method: 'GET', headers: staffHeaders }, env);
       expect(res.status).toBe(200);
       const body = await res.json() as { success: boolean; data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
       expect(body.success).toBe(true);

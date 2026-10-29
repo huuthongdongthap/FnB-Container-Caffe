@@ -11,10 +11,10 @@ let jwtPayload = { email: 'test@example.com', id: 'cust1', name: 'Test User', ro
 const mockVerifyJWT = vi.fn(() => Promise.resolve(jwtPayload));
 const mockGenerateJWT = vi.fn(() => 'fake-jwt-token');
 
-vi.mock('../worker/src/lib/jwt.ts', () => ({
+vi.mock('../worker/src/lib/jwt.ts', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../worker/src/lib/jwt.ts')>(),
   verifyJWT: mockVerifyJWT,
   generateJWT: mockGenerateJWT,
-  getAuthToken: vi.fn(() => null),
 }));
 
 // ── Default customer that satisfies the auth middleware ──
@@ -248,6 +248,7 @@ describe('GET /tiers', () => {
 
 describe('GET /lookup', () => {
   test('returns 200 with customer info', async () => {
+    jwtPayload = { email: 'test@lookup.com', id: 'cust2', name: 'Test', role: 'customer' };
     env.AURA_DB = createMockD1({
       customers: [
         defaultCustomer({ phone: '0900000000' }),
