@@ -31,6 +31,7 @@ export function DrinkOptionGroup({
             <button
               key={opt}
               type="button"
+              aria-pressed={isSelected}
               data-section={label}
               onClick={() => onChange(opt)}
               className={`py-2 px-3 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer ${

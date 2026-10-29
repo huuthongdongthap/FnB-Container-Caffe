@@ -13,7 +13,7 @@ import { StitchMenuNewCartFab } from './StitchMenuNew-cart-fab';
 import { GLASS_PANEL_STYLE_ID, GLASS_PANEL_CSS } from './StitchMenuNew-styles';
 
 export type { MenuItemData, StitchMenuNewProps } from './StitchMenuNew-types';
-import type { StitchMenuNewProps, MenuItemData } from './StitchMenuNew-types';
+import type { StitchMenuNewProps } from './StitchMenuNew-types';
 
 export function StitchMenuNew({
   items = DEFAULT_ITEMS,

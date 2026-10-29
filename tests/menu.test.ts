@@ -8,8 +8,47 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
 
   function getTable(sql: string): string {
     const from = sql.match(/\bFROM\s+(\w+)/i);
-    if (from) return from[1];
+    if (from) return from[1]!;
     return '';
+  }
+
+  function applyPredicates(rows: any[], sql: string, bindValues: any[]) {
+    let idx = 0;
+    let filtered = [...rows];
+
+    if (/\bWHERE\s+id\s*=\s*\?/i.test(sql)) {
+      const idVal = bindValues[idx++];
+      filtered = filtered.filter((row) => row.id === idVal);
+      return filtered;
+    }
+
+    if (/\bAND\s+(?:category|category_id)\s*=\s*\?/i.test(sql)) {
+      const catVal = bindValues[idx++];
+      filtered = filtered.filter((row) => (row.category ?? row.category_id) === catVal);
+    }
+
+    if (/\bAND\s+(?:available|is_available)\s*=\s*\?/i.test(sql)) {
+      const availVal = Number(bindValues[idx++]);
+      filtered = filtered.filter((row) => Number(row.available ?? row.is_available) === availVal);
+    }
+
+    if (/\bAND\s+\(name\s+LIKE\s+\?\s+OR\s+description\s+LIKE\s+\?\)/i.test(sql)) {
+      const namePattern = String(bindValues[idx++] ?? '').replace(/^%|%$/g, '').toLowerCase();
+      const descPattern = String(bindValues[idx++] ?? '').replace(/^%|%$/g, '').toLowerCase();
+      filtered = filtered.filter((row) => {
+        const name = String(row.name ?? '').toLowerCase();
+        const desc = String(row.description ?? '').toLowerCase();
+        return name.includes(namePattern) || desc.includes(descPattern);
+      });
+    }
+
+    if (/\bLIMIT\s+\?\s+OFFSET\s+\?/i.test(sql)) {
+      const limitVal = Number(bindValues[idx++]);
+      const offsetVal = Number(bindValues[idx++]);
+      filtered = filtered.slice(offsetVal, offsetVal + limitVal);
+    }
+
+    return filtered;
   }
 
   return {
@@ -17,14 +56,22 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
       const bindValues: any[] = [];
       const stmt: any = {
         _sql: sql,
-        bind: vi.fn((...vals: any[]) => { bindValues.push(...vals); return stmt; }),
+        bind: vi.fn((...vals: any[]) => {
+          bindValues.push(...vals);
+          return stmt;
+        }),
         first: vi.fn(async () => {
           const t = getTable(sql);
-          return (tables[t] || [])[0] || null;
+          const filtered = applyPredicates(tables[t] || [], sql, bindValues);
+          return filtered[0] || null;
         }),
         all: vi.fn(async () => {
           const t = getTable(sql);
-          return { results: [...(tables[t] || [])] };
+          const filtered = applyPredicates(tables[t] || [], sql, bindValues);
+          if (/\bCOUNT\(\*\)\s+as\s+total\b/i.test(sql)) {
+            return { results: [{ total: filtered.length }] };
+          }
+          return { results: filtered };
         }),
         run: vi.fn(async () => ({ success: true })),
       };
@@ -82,6 +129,8 @@ describe('getMenu', () => {
     const res = await getMenu(req, env);
     const body = await res.json();
     expect(body.success).toBe(true);
+    expect(body.items.map((item: any) => item.id)).toEqual(['m2']);
+    expect(body.pagination.total).toBe(1);
   });
 
   test('filters by search query', async () => {
@@ -96,6 +145,8 @@ describe('getMenu', () => {
     const res = await getMenu(req, env);
     const body = await res.json();
     expect(body.success).toBe(true);
+    expect(body.items.map((item: any) => item.id)).toEqual(['m2']);
+    expect(body.pagination.total).toBe(1);
   });
 
   test('returns 200 with available-only filter', async () => {
@@ -110,6 +161,29 @@ describe('getMenu', () => {
     const res = await getMenu(req, env);
     const body = await res.json();
     expect(body.success).toBe(true);
+    expect(body.items.map((item: any) => item.id)).toEqual(['m1']);
+    expect(body.pagination.total).toBe(1);
+  });
+
+  test('applies limit and offset pagination while preserving total count', async () => {
+    const env = { AURA_DB: createMockD1({
+      menu_items: [
+        { id: 'm1', name: 'Americano', price: 30000, category: 'Coffee', available: 1, tags: '[]' },
+        { id: 'm2', name: 'Espresso', price: 35000, category: 'Coffee', available: 1, tags: '[]' },
+        { id: 'm3', name: 'Latte', price: 45000, category: 'Coffee', available: 1, tags: '[]' },
+      ],
+    })};
+    const req = new Request('http://localhost/api/menu?limit=1&offset=1');
+
+    const res = await getMenu(req, env);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.items.map((item: any) => item.id)).toEqual(['m2']);
+    expect(body.pagination).toEqual({
+      total: 3,
+      limit: 1,
+      offset: 1,
+    });
   });
 });
 

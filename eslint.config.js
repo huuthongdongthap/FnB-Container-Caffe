@@ -114,18 +114,31 @@ export default [
       'prefer-promise-reject-errors': 'error',
     },
   },
-  // TypeScript for worker/src/**/*.ts
+  // TypeScript & TSX for worker/src/**/*.ts and src/**/*.{ts,tsx}
   {
-    files: ['worker/src/**/*.ts'],
+    files: ['worker/src/**/*.ts', 'src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      'react-hooks': {
+        rules: {
+          'exhaustive-deps': { create: () => ({}) },
+        },
+      },
+      '@next/next': {
+        rules: {
+          'no-img-element': { create: () => ({}) },
+        },
+      },
     },
     linterOptions: {
       reportUnusedDisableDirectives: 'off',

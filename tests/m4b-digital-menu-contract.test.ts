@@ -348,5 +348,53 @@ describe('M4-B Digital Menu: Contract & Security', () => {
       expect(body.success).toBe(false);
       expect(body.error).toMatch(/not found/i);
     });
+
+    it('filters GET /api/menu by Vietnamese diacritic-insensitive search and available params', async () => {
+      const { app } = await import('../worker/src/index');
+      const env = { AURA_DB: mockDb, AUTH_KV: { get: vi.fn(), put: vi.fn() } } as any;
+
+      const searchRes = await app.fetch(
+        new Request('https://api.auraspace.vn/api/menu?search=tra+dao'),
+        env,
+        mockCtx,
+      );
+      expect(searchRes.status).toBe(200);
+      const searchBody = (await searchRes.json()) as any;
+      expect(searchBody.items.map((item: any) => item.id)).toEqual(['prod_tra_dao']);
+      expect(searchBody.pagination.total).toBe(1);
+      expect(searchBody.data.totalItems).toBe(1);
+
+      const unavailRes = await app.fetch(
+        new Request('https://api.auraspace.vn/api/menu?available=false'),
+        env,
+        mockCtx,
+      );
+      expect(unavailRes.status).toBe(200);
+      const unavailBody = (await unavailRes.json()) as any;
+      expect(unavailBody.items.map((item: any) => item.id)).toEqual(['prod_matcha_out_of_stock']);
+      expect(unavailBody.pagination.total).toBe(1);
+    });
+
+    it('slices GET /api/menu results when limit and offset are provided while reporting pre-slice total', async () => {
+      const { app } = await import('../worker/src/index');
+      const env = { AURA_DB: mockDb, AUTH_KV: { get: vi.fn(), put: vi.fn() } } as any;
+
+      const res = await app.fetch(
+        new Request('https://api.auraspace.vn/api/menu?limit=1&offset=1'),
+        env,
+        mockCtx,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].id).toBe('prod_cafe_sua');
+      expect(body.data.categories.flatMap((c: any) => c.items)).toHaveLength(1);
+      expect(body.data.totalItems).toBe(3);
+      expect(body.pagination).toEqual({
+        total: 3,
+        limit: 1,
+        offset: 1,
+      });
+    });
   });
 });

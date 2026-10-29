@@ -353,3 +353,58 @@ describe('DrinkCustomizerModal — no state leaks between items', () => {
     expect(screen.getAllByText('29.000₫', { exact: false })).toHaveLength(2);
   });
 });
+
+describe('DrinkCustomizerModal — keyboard focus management', () => {
+  it('moves initial focus into the dialog, traps Tab and Shift+Tab inside, and restores focus to the trigger on close', async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <div>
+        <button type="button">Background Trigger</button>
+        <DrinkCustomizerModal item={baseItem} isOpen={false} onClose={onClose} onConfirm={() => {}} />
+      </div>,
+    );
+
+    const triggerBtn = screen.getByRole('button', { name: 'Background Trigger' });
+    triggerBtn.focus();
+    expect(document.activeElement).toBe(triggerBtn);
+
+    rerender(
+      <div>
+        <button type="button">Background Trigger</button>
+        <DrinkCustomizerModal item={baseItem} isOpen onClose={onClose} onConfirm={() => {}} />
+      </div>,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: 'Đóng bảng tùy chọn' });
+    const confirmBtn = screen.getByRole('button', { name: /Thêm vào giỏ/ });
+
+    // Initial focus moves to the first interactive control inside the dialog
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Shift+Tab from the first control wraps to the last control inside the dialog
+    await act(async () => {
+      await userEvent.tab({ shift: true });
+    });
+    expect(document.activeElement).toBe(confirmBtn);
+    expect(document.activeElement).not.toBe(triggerBtn);
+
+    // Tab from the last control wraps back to the first control inside the dialog
+    await act(async () => {
+      await userEvent.tab();
+    });
+    expect(document.activeElement).toBe(closeBtn);
+    expect(document.activeElement).not.toBe(triggerBtn);
+
+    // Closing the modal restores focus to the trigger button
+    rerender(
+      <div>
+        <button type="button">Background Trigger</button>
+        <DrinkCustomizerModal item={baseItem} isOpen={false} onClose={onClose} onConfirm={() => {}} />
+      </div>,
+    );
+    expect(document.activeElement).toBe(triggerBtn);
+  });
+});
+

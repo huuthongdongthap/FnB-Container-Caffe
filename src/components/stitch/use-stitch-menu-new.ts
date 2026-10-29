@@ -4,6 +4,15 @@ import type { MenuItemData } from './StitchMenuNew-types';
 
 const ADDED_TIMEOUT_MS = 2000;
 
+function normalizeVietnameseSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .trim();
+}
+
 export function useStitchMenuNew(items: MenuItemData[]) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,13 +21,14 @@ export function useStitchMenuNew(items: MenuItemData[]) {
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const { items: favIds, toggle: toggleFavorite, isFavorite } = useFavoritesStore();
+  const normalizedQuery = normalizeVietnameseSearch(searchQuery);
 
   const filteredItems = items.filter((item) => {
     const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
     const matchesSearch =
-      searchQuery === '' ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+      normalizedQuery === '' ||
+      normalizeVietnameseSearch(item.name).includes(normalizedQuery) ||
+      normalizeVietnameseSearch(item.description).includes(normalizedQuery);
     const matchesFavorites = !showFavoritesOnly || isFavorite(item.id);
     return matchesCategory && matchesSearch && matchesFavorites;
   });
@@ -55,9 +65,9 @@ export function useStitchMenuNew(items: MenuItemData[]) {
     };
   }, []);
 
-  const hasNoResults = searchQuery !== '' && filteredItems.length === 0;
+  const hasNoResults = normalizedQuery !== '' && filteredItems.length === 0;
   const hasNoItemsInCategory =
-    activeCategory !== 'all' && searchQuery === '' && filteredItems.length === 0;
+    activeCategory !== 'all' && normalizedQuery === '' && filteredItems.length === 0;
 
   return {
     activeCategory,

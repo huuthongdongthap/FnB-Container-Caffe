@@ -4,20 +4,28 @@
  */
 
 import { Hono } from 'hono';
-import { getCustomerMenu, getCustomerMenuItem } from '@aura/domain-catalog';
+import {
+  getCustomerMenu,
+  getCustomerMenuItem,
+  parseAvailabilityFilter,
+  type CustomerMenuCategory,
+  type CustomerMenuItem,
+} from '@aura/domain-catalog';
 import type { Env } from '../types/env';
 
 export const customerMenuRouter = new Hono<{ Bindings: Env }>();
 
-customerMenuRouter.get('/', async (c) => {
-  const db = c.env.AURA_DB;
-  const category = c.req.query('category');
-  const includeUnavailable = c.req.query('include_unavailable') === 'true';
-  const locale = c.req.query('locale') || 'vi-VN';
-  const channel = c.req.query('channel');
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .trim();
+}
 
-  const menu = await getCustomerMenu(db, { category, includeUnavailable, locale, channel, now: new Date() });
-  const allItems = menu.categories.flatMap((cat) => cat.items.map((item) => ({
+function toLegacyMenuDto(item: CustomerMenuItem) {
+  return {
     id: item.id,
     name: item.name,
     description: item.description ?? '',
@@ -28,16 +36,73 @@ customerMenuRouter.get('/', async (c) => {
     imageUrl: item.imageUrl ?? '',
     available: item.available,
     tags: item.tags,
-  })));
+  };
+}
+
+customerMenuRouter.get('/', async (c) => {
+  const db = c.env.AURA_DB;
+  const category = c.req.query('category');
+  const availableParam = c.req.query('available') ?? null;
+  const availabilityFilter = parseAvailabilityFilter(availableParam);
+  const includeUnavailable =
+    c.req.query('include_unavailable') === 'true' || availabilityFilter === 0;
+  const locale = c.req.query('locale') || 'vi-VN';
+  const channel = c.req.query('channel');
+  const normalizedSearch = normalizeSearchText(c.req.query('search') ?? '');
+
+  const rawLimit = Number(c.req.query('limit'));
+  const hasLimit = Number.isFinite(rawLimit) && rawLimit > 0;
+  const rawOffset = Number(c.req.query('offset'));
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+
+  const menu = await getCustomerMenu(db, {
+    category,
+    includeUnavailable,
+    locale,
+    channel,
+    now: new Date(),
+  });
+
+  const matchedItems = menu.categories.flatMap((cat) =>
+    cat.items.filter((item) => {
+      if (availabilityFilter === 1 && !item.available) return false;
+      if (availabilityFilter === 0 && item.available) return false;
+      if (normalizedSearch) {
+        const matchesName = normalizeSearchText(item.name).includes(normalizedSearch);
+        const matchesDesc = normalizeSearchText(item.description ?? '').includes(normalizedSearch);
+        if (!matchesName && !matchesDesc) return false;
+      }
+      return true;
+    }),
+  );
+
+  const totalMatched = matchedItems.length;
+  const limit = hasLimit ? Math.floor(rawLimit) : totalMatched;
+  const pagedItems =
+    hasLimit || offset > 0
+      ? matchedItems.slice(offset, hasLimit ? offset + limit : undefined)
+      : matchedItems;
+
+  const includedIds = new Set(pagedItems.map((item) => item.id));
+  const categories: CustomerMenuCategory[] = menu.categories
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter((item) => includedIds.has(item.id)),
+    }))
+    .filter((cat) => cat.items.length > 0);
 
   return c.json({
     success: true,
-    data: menu,
-    items: allItems,
+    data: {
+      ...menu,
+      categories,
+      totalItems: totalMatched,
+    },
+    items: pagedItems.map(toLegacyMenuDto),
     pagination: {
-      total: menu.totalItems,
-      limit: Number(c.req.query('limit')) || menu.totalItems,
-      offset: Number(c.req.query('offset')) || 0,
+      total: totalMatched,
+      limit,
+      offset,
     },
     meta: { locale: locale === 'en-US' ? 'en-US' : 'vi-VN' },
   });
@@ -52,17 +117,5 @@ customerMenuRouter.get('/:id', async (c) => {
   if (!item) {
     return c.json({ success: false, error: 'Menu item not found' }, 404);
   }
-  const normalizedItem = {
-    id: item.id,
-    name: item.name,
-    description: item.description ?? '',
-    price: item.priceCents,
-    priceCents: item.priceCents,
-    category: item.category,
-    image_url: item.imageUrl ?? '',
-    imageUrl: item.imageUrl ?? '',
-    available: item.available,
-    tags: item.tags,
-  };
-  return c.json({ success: true, data: item, item: normalizedItem });
+  return c.json({ success: true, data: item, item: toLegacyMenuDto(item) });
 });

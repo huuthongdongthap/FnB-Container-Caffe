@@ -205,75 +205,80 @@ fi
 # ── 3b. Post-deploy verification ──────────────────────────────────────────
 if [[ "$SKIP_VERIFY" == "false" ]]; then
   WORKER_URL="${DEPLOY_HEALTH_URL:-https://aura-space-worker.sadec-marketing-hub.workers.dev}"
+  PAGES_DOMAIN="${DEPLOY_PAGES_URL:-https://auraspace.cafe}"
   LOCAL_SHA=$(git rev-parse HEAD | cut -c1-8)
   MAX_RETRIES=3
   RETRY_DELAY=5
 
   echo ""
   echo "--- Post-deploy Verification ---"
-  echo "Worker URL: $WORKER_URL"
 
-  # Check 1: Health endpoint
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] Checking /api/health..."
-    HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$WORKER_URL/api/health" 2>/dev/null || echo "000")
-    if [[ "$HEALTH_STATUS" == "200" ]]; then
-      echo "  Health: OK (HTTP $HEALTH_STATUS)"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  Health: Got HTTP $HEALTH_STATUS, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  Health: FAILED after $MAX_RETRIES attempts (HTTP $HEALTH_STATUS)"
-      echo "ERROR: Health endpoint not healthy. Deploy may have failed."
-      exit 1
-    fi
-  done
+  if [[ "$PAGES_ONLY" == "false" ]]; then
+    echo "Worker URL: $WORKER_URL"
 
-  # Check 2: Version SHA match (worker)
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] Checking /api/version SHA match..."
-    VERSION_JSON=$(curl -s --max-time 5 "$WORKER_URL/api/version" 2>/dev/null || echo '{}')
-    LIVE_SHA=$(echo "$VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
+    # Check 1: Health endpoint
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] Checking /api/health..."
+      HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$WORKER_URL/api/health" 2>/dev/null || echo "000")
+      if [[ "$HEALTH_STATUS" == "200" ]]; then
+        echo "  Health: OK (HTTP $HEALTH_STATUS)"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  Health: Got HTTP $HEALTH_STATUS, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  Health: FAILED after $MAX_RETRIES attempts (HTTP $HEALTH_STATUS)"
+        echo "ERROR: Health endpoint not healthy. Deploy may have failed."
+        exit 1
+      fi
+    done
 
-    if [[ "$LIVE_SHA" == "$LOCAL_SHA" ]]; then
-      echo "  SHA Match: $LIVE_SHA == $LOCAL_SHA"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  SHA Mismatch: live=$LIVE_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  SHA MISMATCH after $MAX_RETRIES attempts: live=$LIVE_SHA local=$LOCAL_SHA"
-      echo "ERROR: Deployed version does not match local commit. Deploy may not have propagated."
-      exit 1
-    fi
-  done
+    # Check 2: Version SHA match (worker)
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] Checking /api/version SHA match..."
+      VERSION_JSON=$(curl -s --max-time 5 "$WORKER_URL/api/version" 2>/dev/null || echo '{}')
+      LIVE_SHA=$(echo "$VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
 
-  # Check 3: Custom domain (auraspace.cafe) version match
-  PAGES_DOMAIN="https://auraspace.cafe"
-  echo ""
-  echo "[Verify] Checking custom domain $PAGES_DOMAIN/version.json..."
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] ..."
-    PAGES_VERSION_JSON=$(curl -s --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo '{}')
-    PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha"[^,]*' | cut -d'"' -f4 || echo "MISSING")
-    PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo "000")
+      if [[ "$LIVE_SHA" == "$LOCAL_SHA" ]]; then
+        echo "  SHA Match: $LIVE_SHA == $LOCAL_SHA"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  SHA Mismatch: live=$LIVE_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  SHA MISMATCH after $MAX_RETRIES attempts: live=$LIVE_SHA local=$LOCAL_SHA"
+        echo "ERROR: Deployed version does not match local commit. Deploy may not have propagated."
+        exit 1
+      fi
+    done
+  fi
 
-    if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
-      echo "  Custom domain SHA Match: $PAGES_SHA == $LOCAL_SHA (HTTP $PAGES_HTTP)"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  Custom domain SHA Mismatch: pages=$PAGES_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$LOCAL_SHA (HTTP $PAGES_HTTP)"
-      echo "  WARNING: Custom domain may still serve cached content."
-      echo "  To force refresh: run 'bash scripts/deploy-fix.sh'"
-    fi
-  done
+  if [[ "$WORKER_ONLY" == "false" ]]; then
+    # Check 3: Custom domain (auraspace.cafe) version match
+    echo ""
+    echo "[Verify] Checking custom domain $PAGES_DOMAIN/version.json..."
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] ..."
+      PAGES_VERSION_JSON=$(curl -s --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo '{}')
+      PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha"[^,]*' | cut -d'"' -f4 || echo "MISSING")
+      PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo "000")
+
+      if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
+        echo "  Custom domain SHA Match: $PAGES_SHA == $LOCAL_SHA (HTTP $PAGES_HTTP)"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  Custom domain SHA Mismatch: pages=$PAGES_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$LOCAL_SHA (HTTP $PAGES_HTTP)"
+        echo "ERROR: Custom domain version does not match local commit. Run 'bash scripts/deploy-fix.sh' or investigate caching."
+        exit 1
+      fi
+    done
+  fi
 
   echo "--- Verification PASSED ---"
 else

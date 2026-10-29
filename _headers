@@ -16,11 +16,19 @@
 /public/images/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Menu drink photographs. Safe to cache immutably because the generated
-# variants encode their width and format in the filename (latte-800.avif), so
-# republishing an image changes its URL instead of leaving a stale copy served.
-/menu/aura-drinks/*
+# Menu drink photographs. Only image binaries (.webp, .avif) receive immutable
+# caching; metadata/preview documents in the same directory must revalidate.
+/menu/aura-drinks/*.webp
   Cache-Control: public, max-age=31536000, immutable
+
+/menu/aura-drinks/*.avif
+  Cache-Control: public, max-age=31536000, immutable
+
+/menu/aura-drinks/collection.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/menu/aura-drinks/preview.html
+  Cache-Control: public, max-age=0, must-revalidate
 
 /*.min.css
   Cache-Control: public, max-age=31536000, immutable

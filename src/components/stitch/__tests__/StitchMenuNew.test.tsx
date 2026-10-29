@@ -160,6 +160,46 @@ describe('StitchMenuNew', () => {
     expect(screen.getByText('Test Latte')).toBeTruthy();
   });
 
+  it('matches Vietnamese drink names with or without diacritics, đ, and surrounding whitespace', () => {
+    const vnItems: MenuItemData[] = [
+      {
+        id: 'te006',
+        name: 'Trà đào',
+        description: 'Trà ủ lạnh kết hợp đào miếng giòn',
+        price: '30.000₫',
+        imageSrc: '/menu/aura-drinks/tra-dao.webp',
+        imageAlt: 'Trà đào',
+        category: 'tea',
+      },
+      {
+        id: 'jc001',
+        name: 'Đá chanh',
+        description: 'Chanh tươi vắt mát lạnh',
+        price: '20.000₫',
+        imageSrc: '/menu/aura-drinks/da-chanh.webp',
+        imageAlt: 'Đá chanh',
+        category: 'juice',
+      },
+    ];
+    renderWithProviders(<StitchMenuNew items={vnItems} />);
+    const searchInput = screen.getByPlaceholderText('Search our craft...');
+
+    fireEvent.change(searchInput, { target: { value: 'tra dao' } });
+    expect(screen.getByText('Trà đào')).toBeInTheDocument();
+    expect(screen.queryByText('Đá chanh')).toBeNull();
+
+    fireEvent.change(searchInput, { target: { value: '  Trà Đào  ' } });
+    expect(screen.getByText('Trà đào')).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: 'da chanh' } });
+    expect(screen.getByText('Đá chanh')).toBeInTheDocument();
+    expect(screen.queryByText('Trà đào')).toBeNull();
+
+    fireEvent.change(searchInput, { target: { value: '   ' } });
+    expect(screen.getByText('Trà đào')).toBeInTheDocument();
+    expect(screen.getByText('Đá chanh')).toBeInTheDocument();
+  });
+
   it('renders brand name in nav', () => {
     renderWithProviders(<StitchMenuNew brandName="MY BRAND" />);
     const brandElements = screen.getAllByText('MY BRAND');

@@ -7,13 +7,15 @@ import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/components/ui/toast';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { StitchMenuNewSkeleton } from '@/components/stitch/StitchMenuNew-skeleton';
-import { DEFAULT_ITEMS } from '@/components/stitch/StitchMenuNew-data';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { CartDrawer } from '@/components/order/cart-drawer';
 import { RecommendationSection } from '@/components/menu/recommendation-section';
 import { DrinkCustomizerModal } from '@/components/menu/DrinkCustomizerModal';
+import {
+  MenuCatalogUnavailableState,
+  MenuTableBanner,
+} from '@/components/menu/menu-catalog-unavailable-state';
 import { isReadyToServeItem } from '@/lib/menu-customization';
-import { MapPin, UtensilsCrossed, AlertCircle } from 'lucide-react';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
 
 function transformToStitchItem(item: CustomerMenuItem): MenuItemData {
@@ -60,18 +62,16 @@ export function MenuPage() {
     clearCart,
   } = useCart();
 
-  const { data: menu, isLoading, error } = useCustomerMenu({
+  const { data: menu, isLoading, error, refetch } = useCustomerMenu({
     locale: i18n.language?.startsWith('en') ? 'en-US' : 'vi-VN',
   });
 
-  /* Transform domain catalog → Stitch format with safe fallback to DEFAULT_ITEMS */
   const stitchItems: MenuItemData[] = useMemo(() => {
-    if (menu && menu.categories && menu.categories.length > 0) {
-      const items = flattenMenu(menu).map(transformToStitchItem);
-      if (items.length > 0) return items;
-    }
-    return DEFAULT_ITEMS;
+    if (!menu?.categories?.length) return [];
+    return flattenMenu(menu).map(transformToStitchItem);
   }, [menu]);
+
+  const isCatalogUnavailable = Boolean(error) || stitchItems.length === 0;
 
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
 
@@ -142,32 +142,17 @@ export function MenuPage() {
 
       <LandingNav />
 
-      {/* Table Notification Banner if customer is dining in */}
-      {tableNumber && (
-        <aside
-          aria-label="Thông tin bàn phục vụ"
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-3xl px-4 pointer-events-none"
-        >
-          <div className="pointer-events-auto flex items-center justify-between gap-3 px-5 py-2.5 rounded-full bg-[var(--aura-noir-bright)]/90 border border-[var(--aura-chrome-mid)]/50 backdrop-blur-md shadow-2xl text-xs sm:text-sm text-[var(--aura-chrome-bright)]">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-[var(--aura-forest-light)] animate-pulse" />
-              <UtensilsCrossed className="w-4 h-4 text-[var(--aura-chrome-mid)]" />
-              <span>
-                Quý khách đang gọi món tại <strong className="text-white font-semibold underline decoration-[var(--aura-chrome-mid)]">Bàn {tableNumber}</strong>
-              </span>
-            </div>
-            <a
-              href="/order"
-              className="text-[11px] font-semibold text-[var(--aura-chrome-mid)] hover:text-white uppercase tracking-wider"
-            >
-              Đổi bàn
-            </a>
-          </div>
-        </aside>
-      )}
+      {tableNumber && <MenuTableBanner tableNumber={tableNumber} />}
 
       {isLoading ? (
         <StitchMenuNewSkeleton />
+      ) : isCatalogUnavailable ? (
+        <MenuCatalogUnavailableState
+          hasError={Boolean(error)}
+          onRetry={() => {
+            void refetch();
+          }}
+        />
       ) : (
         <StitchMenuNew
           items={stitchItems}
@@ -178,7 +163,7 @@ export function MenuPage() {
         >
           <div className="mt-12">
             <RecommendationSection
-              excludeIds={new Set(cartItems.map((i) => i.id))}
+              excludeIds={new Set(cartItems.map((i) => i.productId || i.id))}
             />
           </div>
         </StitchMenuNew>

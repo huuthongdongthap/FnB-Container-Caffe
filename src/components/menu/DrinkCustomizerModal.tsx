@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew-types';
 import { buildDrinkOptions } from '@/lib/menu-option-rules';
 import { DrinkModalHeader } from './DrinkModalHeader';
 import { DrinkOptionGroup } from './DrinkOptionGroup';
 import { DrinkNotesSection } from './DrinkNotesSection';
+import { useDialogFocusTrap } from './use-dialog-focus-trap';
 
 interface DrinkCustomizerModalProps {
   item: MenuItemData | null;
@@ -46,12 +47,14 @@ export function DrinkCustomizerModal({
 }: DrinkCustomizerModalProps) {
   // ── All hooks MUST be called unconditionally (Rules of Hooks) ──
   const noteInputId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [sweetness, setSweetness] = useState('');
   const [ice, setIce] = useState('');
   const [notes, setNotes] = useState('');
   const [quantity, setQuantity] = useState(1);
 
   const plan = item ? buildDrinkOptions(item) : null;
+  const isModalVisible = Boolean(isOpen && item && plan && !plan.bypass);
 
   useEffect(() => {
     if (!item) return;
@@ -62,19 +65,10 @@ export function DrinkCustomizerModal({
     setQuantity(1);
   }, [item?.id, isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  useDialogFocusTrap(dialogRef, isModalVisible, onClose);
 
   // Guard: render nothing when closed, no item selected, or the item is served as-is.
-  if (!isOpen || !item || !plan || plan.bypass) return null;
+  if (!isModalVisible || !item || !plan) return null;
 
   const basePrice = parseInt(item.price.replace(/\D/g, ''), 10) || 25000;
   const totalPrice = basePrice * quantity;
@@ -118,6 +112,8 @@ export function DrinkCustomizerModal({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="drink-customizer-title"

@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -170,6 +170,18 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
     expect(readyValidation.missing).toEqual([]);
     expect(readyValidation.present).toEqual([...REQUIRED_STAGING_CREDENTIALS]);
     expect(JSON.stringify(readyValidation)).not.toContain('staging-mock-secret-value');
+  });
+
+  // ── 8. Target-Scoped Post-Deploy Verification in deploy-cloudflare.sh ─────
+  it('scopes Worker and Pages post-deploy SHA checks to the deployed target and fails closed on mismatch', () => {
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const deployScript = readFileSync(resolve(currentDir, '../../../../deploy-cloudflare.sh'), 'utf8');
+
+    expect(deployScript).toContain('if [[ "$PAGES_ONLY" == "false" ]]; then');
+    expect(deployScript).toContain('if [[ "$WORKER_ONLY" == "false" ]]; then');
+    expect(deployScript).toMatch(
+      /Custom domain SHA DISCREPANCY after \$MAX_RETRIES attempts[\s\S]*?exit 1/,
+    );
   });
 });
 

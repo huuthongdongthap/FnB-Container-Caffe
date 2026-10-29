@@ -6,7 +6,6 @@
  * Compact horizontal scroll layout matching Aura Cafe design system.
  */
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
@@ -19,7 +18,6 @@ interface RecommendationSectionProps {
 }
 
 export function RecommendationSection({ excludeIds = new Set() }: RecommendationSectionProps) {
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const orderHistory = useOrderStore((s) => s.orderHistory);
   const menuItems = useMenuStore((s) => s.items);

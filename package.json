@@ -10,8 +10,8 @@
     "apps/*"
   ],
   "scripts": {
-    "lint": "eslint worker/src/ --ext .ts",
-    "lint:fix": "eslint worker/src/ --ext .ts --fix",
+    "lint": "eslint worker/src/ src/",
+    "lint:fix": "eslint worker/src/ src/ --fix",
     "lint:migrations": "node scripts/lint-d1-migrations.mjs",
     "verify:gates": "node scripts/verify-staging-gates.mjs",
     "typecheck": "tsc --noEmit",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isReadyToServeItem, READY_TO_SERVE_CATEGORIES, READY_TO_SERVE_ITEM_IDS } from '../menu-customization';
+import { isReadyToServeItem } from '../menu-customization';
 
 describe('Menu Customization Rules - isReadyToServeItem', () => {
   describe('Bottled and Canned Beverages', () => {

@@ -68,4 +68,17 @@ describe('resolveMenuDrinkImage', () => {
     expect(resolveMenuDrinkImage('new-product', '/menu/cappuccino.jpg')).toBe('/menu/cappuccino.jpg');
     expect(resolveMenuDrinkImage('tc001', '/menu/custom-photo.jpg')).toBe('/menu/custom-photo.jpg');
   });
+
+  it('scopes immutable caching in _headers to drink image binaries and revalidates metadata files', () => {
+    const headersFile = readFileSync('_headers', 'utf8');
+    expect(headersFile).not.toMatch(/^\/menu\/aura-drinks\/\*\s*$/m);
+    expect(headersFile).toContain('/menu/aura-drinks/*.webp');
+    expect(headersFile).toContain('/menu/aura-drinks/*.avif');
+    expect(headersFile).toMatch(
+      /\/menu\/aura-drinks\/collection\.json\s+Cache-Control:\s*public,\s*max-age=0,\s*must-revalidate/,
+    );
+    expect(headersFile).toMatch(
+      /\/menu\/aura-drinks\/preview\.html\s+Cache-Control:\s*public,\s*max-age=0,\s*must-revalidate/,
+    );
+  });
 });
