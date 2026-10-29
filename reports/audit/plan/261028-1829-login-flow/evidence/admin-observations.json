@@ -1,0 +1,11 @@
+[
+  {
+    "id": "LOGIN-03",
+    "uiStatus": "error",
+    "navigatedToAdmin": false,
+    "previousUserRetained": false,
+    "errorRecorded": true,
+    "apiBehavior": "Rejected invalid credentials",
+    "expected": "Show error; do not navigate as a successful new login"
+  }
+]

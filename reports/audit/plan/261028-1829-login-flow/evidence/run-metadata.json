@@ -1,0 +1,38 @@
+{
+  "goal": "deep check luồng đăng nhập",
+  "regression": {
+    "command": "npx --no-install vitest run worker/src/__tests__/integrations/staff-session-lifecycle.test.ts worker/src/__tests__/integrations/staff-session-revocation.test.ts worker/src/__tests__/routes/customer-auth-promotions-waves.test.ts src/hooks/__tests__/use-mobile-auth.test.tsx src/hooks/__tests__/kds-stream.test.ts src/lib/__tests__/private-session-cache.test.ts src/hooks/stores/__tests__/use-auth-store.test.ts src/components/auth/__tests__/ProtectedRoute.test.tsx src/components/auth/__tests__/AuthProvider.test.tsx src/lib/__tests__/api-client-auth.test.ts tests/mobile-service-worker-auth.test.ts --reporter=json --outputFile=reports/audit/plan/261028-1829-login-flow/evidence/regression-results.json --silent",
+    "reported_exit_code": 0,
+    "tests_passed": 93,
+    "tests_failed": 0,
+    "test_files": 10
+  },
+  "probes": {
+    "initial_command": "npx --no-install vitest run --config reports/audit/plan/261028-1829-login-flow/audit-probes.config.mjs --reporter=json --outputFile=reports/audit/plan/261028-1829-login-flow/evidence/probe-results.json --silent",
+    "reported_exit_code": 0,
+    "security_acceptance_failures": 0,
+    "authoritative_results": [
+      "probe-results.json: backend-login.audit.test.ts + admin-login.audit.test.tsx (3/3 PASS)",
+      "admin-probe-results.json: admin-login.audit.test.tsx"
+    ],
+    "initial_harness_issue": "Resolved; all 3 acceptance probes pass post-remediation",
+    "authoritative_verdicts": {
+      "LOGIN-01": "PASS: status=403, tokenIssued=false for existing synthetic customer without cryptographic proof",
+      "LOGIN-02": "PASS: status=401, privateProfileReturned=false for anonymous lookup",
+      "LOGIN-03": "PASS: uiStatus=error, navigatedToAdmin=false, previousUserRetained=false on invalid credentials"
+    }
+  },
+  "boundaries": {
+    "product_code_changed": true,
+    "real_customer_data": false,
+    "cloud_calls": true,
+    "deployed_runtime_tested": true,
+    "browser_tested": true,
+    "fixture_scope": "Synthetic bootstrap SQLite through real app router + live Cloudflare Worker (b0872e0f) and Pages (6cccd38e) verification"
+  },
+  "execution_notes": {
+    "native_mekong_recipe_exit": 1,
+    "local_dag_exit": 0,
+    "local_dag_verifies": "planning artifacts only; not authentication control acceptance"
+  }
+}

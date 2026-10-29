@@ -1,0 +1,157 @@
+{
+  "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer",
+  "constraints": [
+    "Read-only product source",
+    "Synthetic local tests only",
+    "Preserve dirty tree",
+    "No cloud/remote migration/deploy/real credentials/send/payment",
+    "No code remediation in audit-plan"
+  ],
+  "risk_method": "Impact x likelihood, ordinal 1..5; qualitative audit prioritization, not calibrated probabilities",
+  "capacity_is_assumption": true,
+  "test_budget_minutes": 420,
+  "peer_review_minutes": 30,
+  "report_minutes": 30,
+  "total_capacity_minutes": 480,
+  "risk_universe": [
+    {
+      "id": "AUTH-01",
+      "title": "Phone-only customer session issuance",
+      "impact": 5,
+      "likelihood": 5,
+      "minutes": 60,
+      "required": true,
+      "role": "Backend/auth",
+      "evidence": "LOGIN-01 app + bootstrap SQLite: HTTP 200, tokenIssued=true for existing synthetic customer",
+      "status": "CONFIRMED_LOCAL_CONTROL_FAIL",
+      "scope": "Separate contact capture from credential proof; verify customer session ownership and link to KM eligibility"
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Anonymous loyalty profile and wallet lookup",
+      "impact": 4,
+      "likelihood": 5,
+      "minutes": 30,
+      "required": true,
+      "role": "Backend/privacy",
+      "evidence": "LOGIN-02 app + bootstrap SQLite: HTTP 200, privateProfileReturned=true",
+      "status": "CONFIRMED_LOCAL_CONTROL_FAIL",
+      "scope": "Anonymous/self/POS role and concrete-store response boundaries"
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Failed new Admin login reported as success using previous user",
+      "impact": 4,
+      "likelihood": 4,
+      "minutes": 45,
+      "required": true,
+      "role": "Frontend/auth",
+      "evidence": "LOGIN-03 real Admin page + store, rejected API boundary: success, /admin navigation, previous user retained",
+      "status": "CONFIRMED_LOCAL_CLIENT_FAIL_NOT_BACKEND_BYPASS",
+      "scope": "Attempt result must match submitted credentials; stale user state cannot serve as a new login acknowledgement"
+    },
+    {
+      "id": "AUTH-04",
+      "title": "Staff web/mobile/KDS lifecycle and durable revocation",
+      "impact": 5,
+      "likelihood": 2,
+      "minutes": 45,
+      "required": true,
+      "role": "Backend/auth",
+      "evidence": "Current 92-test regression includes Staff lifecycle/revocation and mobile/stream unit tests",
+      "status": "REGRESSION_COVERED_WITH_RUNTIME_LIMITS",
+      "scope": "D1 authority; role/tenant/device/version; 8h cap; refresh races; HTTP and SSE aliases"
+    },
+    {
+      "id": "AUTH-05",
+      "title": "Provisioning and release schema for login identities",
+      "impact": 5,
+      "likelihood": 3,
+      "minutes": 45,
+      "required": true,
+      "role": "Data/release",
+      "evidence": "Source requires users.auth_version/password_hash/staff_login_identities; deployed schema not probed",
+      "status": "DEPLOYED_STATE_UNKNOWN",
+      "scope": "Bootstrap/legacy KV import and directory mapping, offline migration rehearsal, explicit staging gate"
+    },
+    {
+      "id": "AUTH-06",
+      "title": "Browser cookie/Bearer, hydration and cross-origin behavior",
+      "impact": 4,
+      "likelihood": 3,
+      "minutes": 60,
+      "required": true,
+      "role": "Frontend/integration",
+      "evidence": "Client/session tests pass; no current real-browser/Safari/deployed proxy run",
+      "status": "BROWSER_EVIDENCE_MISSING",
+      "scope": "Fresh login, reload, expired cookie, CSRF, CORS, Safari policy, dev proxy /mobile route"
+    },
+    {
+      "id": "AUTH-07",
+      "title": "Abuse controls, password recovery and logout failure behavior",
+      "impact": 4,
+      "likelihood": 3,
+      "minutes": 45,
+      "required": true,
+      "role": "Backend/auth",
+      "evidence": "Rate counter is KV read/write with degraded fail-open; forgot-password aliases RESET_KEY-protected reset handler; no dedicated probes this run",
+      "status": "SOURCE_FINDING_POLICY_AND_RUNTIME_OPEN",
+      "scope": "Throttling/concurrency, reset proof/operator recovery, logout KV outage, customer token invalidation"
+    },
+    {
+      "id": "AUTH-08",
+      "title": "Alternate transports and endpoint/role dispatch",
+      "impact": 5,
+      "likelihood": 3,
+      "minutes": 45,
+      "required": true,
+      "role": "Backend/realtime",
+      "evidence": "SSE has rechecks; raw realtime forwarding and duplicate auth mounts require dispatch-level tracing",
+      "status": "COVERAGE_GAP_NOT_CONFIRMED_EXPLOIT",
+      "scope": "App-owned route vs isolated router, realtime/DO/WebSocket if reachable, direct API permission per role"
+    },
+    {
+      "id": "AUTH-09",
+      "title": "Customer canonical ID, role and private state across sessions",
+      "impact": 4,
+      "likelihood": 4,
+      "minutes": 45,
+      "required": true,
+      "role": "Frontend/identity",
+      "evidence": "Phone flow writes only token; loyalty/referral persist globally; customer session can require missing KV profile",
+      "status": "SOURCE_CONFIRMED_INTEGRATION_GAP",
+      "scope": "Token/user/customer mapping, email/phone assurance, A-to-B state and response isolation"
+    },
+    {
+      "id": "AUTH-10",
+      "title": "Exhaustive demo-mode and build-mode matrix",
+      "impact": 3,
+      "likelihood": 2,
+      "minutes": 60,
+      "required": false,
+      "role": "Frontend/build",
+      "evidence": "Guest Admin UI restricted to DEV/test; no production backend bypass established",
+      "status": "LOWER_PRIORITY_DEPTH_DEFERRED",
+      "scope": "Additional build-mode combinations; basic production no-demo check remains in AUTH-06"
+    },
+    {
+      "id": "AUTH-11",
+      "title": "Long-duration login/stream performance soak",
+      "impact": 3,
+      "likelihood": 2,
+      "minutes": 120,
+      "required": false,
+      "role": "Performance",
+      "evidence": "No measured load or capacity incident in this request",
+      "status": "DEFERRED_CAPACITY_UNKNOWN",
+      "scope": "Long-run churn, memory, multiple-device load; no claimed throughput or production capacity"
+    }
+  ],
+  "pipeline_flags_are_recipe_metadata": [
+    "risk-rank --annual",
+    "select-audits --budget-constrained",
+    "allocate-resources --team-capacity"
+  ],
+  "scope_note": "--annual is retained recipe metadata; selected work is the requested bounded login audit, not a company-wide annual audit",
+  "execution_mode": "Existing DAGScheduler with local evidence adapters after native Mekong cook returned exit 1"
+}

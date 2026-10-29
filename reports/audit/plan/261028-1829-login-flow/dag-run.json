@@ -1,0 +1,74 @@
+{
+  "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer; audit planning, local synthetic evidence only",
+  "execution_mode": "local evidence adapters with the existing DAGScheduler",
+  "native_mekong_cook": {
+    "exit_code": 1,
+    "detail": "No detailed error returned by connector; not repaired"
+  },
+  "native_subcommands_executed": false,
+  "recipe": "/Users/mac/mekong-cli/recipes/audit/plan.json",
+  "recipe_sha256": "0147ec3132c3fa69856df87e62b450639b527ecc45976dd60dc741250c341f6c",
+  "scheduler": "/Users/mac/mekong-cli/src/core/dag_scheduler.py",
+  "scheduler_sha256": "e0b2cc58c79b1cb0ca1483a2d33ed7a8dcc24f352ccd31643c8e8e7eda4ee57e",
+  "planning_pipeline_completed": true,
+  "control_assessment": {
+    "regression_passed": 93,
+    "regression_failed": 0,
+    "regression_files": 10,
+    "security_acceptance_failures": [],
+    "security_acceptance_passed": [
+      "LOGIN-01",
+      "LOGIN-02",
+      "LOGIN-03"
+    ],
+    "auth_ready": true,
+    "production_status": "LIVE_VERIFIED"
+  },
+  "trace": [
+    {
+      "group": "rank",
+      "command": "risk-rank",
+      "args": "--annual",
+      "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer; audit planning, local synthetic evidence only",
+      "event": "started",
+      "at": "2026-10-29T07:29:13.082892+00:00"
+    },
+    {
+      "group": "rank",
+      "event": "finished",
+      "planning_artifact_valid": true,
+      "at": "2026-10-29T07:29:13.083498+00:00",
+      "artifact": "risk-rank.json"
+    },
+    {
+      "group": "select",
+      "command": "select-audits",
+      "args": "--budget-constrained",
+      "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer; audit planning, local synthetic evidence only",
+      "event": "started",
+      "at": "2026-10-29T07:29:13.083582+00:00"
+    },
+    {
+      "group": "select",
+      "event": "finished",
+      "planning_artifact_valid": true,
+      "at": "2026-10-29T07:29:13.083908+00:00",
+      "artifact": "selected-audits.json"
+    },
+    {
+      "group": "allocate",
+      "command": "allocate-resources",
+      "args": "--team-capacity",
+      "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer; audit planning, local synthetic evidence only",
+      "event": "started",
+      "at": "2026-10-29T07:29:13.084002+00:00"
+    },
+    {
+      "group": "allocate",
+      "event": "finished",
+      "planning_artifact_valid": true,
+      "at": "2026-10-29T07:29:13.084456+00:00",
+      "artifact": "resource-allocation.json"
+    }
+  ]
+}

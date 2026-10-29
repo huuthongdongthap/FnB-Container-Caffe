@@ -1,0 +1,19 @@
+[
+  {
+    "id": "LOGIN-01",
+    "status": 403,
+    "tokenIssued": false,
+    "matchesExistingSyntheticCustomer": false,
+    "credentialsProvided": [
+      "phone"
+    ],
+    "expected": "No account token without proof of ownership"
+  },
+  {
+    "id": "LOGIN-02",
+    "status": 401,
+    "privateProfileReturned": false,
+    "fieldsReturned": [],
+    "expected": "No private profile or balance for anonymous caller"
+  }
+]

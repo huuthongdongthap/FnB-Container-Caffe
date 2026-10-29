@@ -118,14 +118,14 @@ describe('GenerateQRPage', () => {
 
   it('renders zone filter with all zones', async () => {
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByLabelText('Zone:')).toBeTruthy(),
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText('Zone:')).toBeTruthy();
+      expect(screen.getByRole('option', { name: 'indoor' })).toBeTruthy();
+      expect(screen.getByRole('option', { name: 'outdoor' })).toBeTruthy();
+    });
     const select = screen.getByLabelText('Zone:') as HTMLSelectElement;
     expect(select.value).toBe('all');
     expect(screen.getByRole('option', { name: 'All zones' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'indoor' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'outdoor' })).toBeTruthy();
   });
 
   it('filters tables by zone when selection changes', async () => {

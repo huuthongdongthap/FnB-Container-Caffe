@@ -1,0 +1,77 @@
+{
+  "goal": "deep check luồng đăng nhập Admin, KDS, Staff/mobile và customer; audit planning, local synthetic evidence only",
+  "assignments_are_role_proposals_not_actual_staff_bookings": true,
+  "allocations": [
+    {
+      "id": "AUTH-01",
+      "title": "Phone-only customer session issuance",
+      "role": "Backend/auth",
+      "minutes": 60
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Anonymous loyalty profile and wallet lookup",
+      "role": "Backend/privacy",
+      "minutes": 30
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Failed new Admin login reported as success using previous user",
+      "role": "Frontend/auth",
+      "minutes": 45
+    },
+    {
+      "id": "AUTH-09",
+      "title": "Customer canonical ID, role and private state across sessions",
+      "role": "Frontend/identity",
+      "minutes": 45
+    },
+    {
+      "id": "AUTH-05",
+      "title": "Provisioning and release schema for login identities",
+      "role": "Data/release",
+      "minutes": 45
+    },
+    {
+      "id": "AUTH-08",
+      "title": "Alternate transports and endpoint/role dispatch",
+      "role": "Backend/realtime",
+      "minutes": 45
+    },
+    {
+      "id": "AUTH-06",
+      "title": "Browser cookie/Bearer, hydration and cross-origin behavior",
+      "role": "Frontend/integration",
+      "minutes": 60
+    },
+    {
+      "id": "AUTH-07",
+      "title": "Abuse controls, password recovery and logout failure behavior",
+      "role": "Backend/auth",
+      "minutes": 45
+    },
+    {
+      "id": "AUTH-04",
+      "title": "Staff web/mobile/KDS lifecycle and durable revocation",
+      "role": "Backend/auth",
+      "minutes": 45
+    }
+  ],
+  "peer_review_minutes": 30,
+  "report_minutes": 30,
+  "total_person_minutes": 480,
+  "remaining_blockers": [],
+  "evidence": {
+    "regression_passed": 93,
+    "regression_failed": 0,
+    "regression_files": 10,
+    "security_acceptance_failures": [],
+    "security_acceptance_passed": [
+      "LOGIN-01",
+      "LOGIN-02",
+      "LOGIN-03"
+    ],
+    "auth_ready": true,
+    "production_status": "LIVE_VERIFIED"
+  }
+}
