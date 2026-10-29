@@ -43,6 +43,19 @@ npx wrangler rollback <VERSION_ID> --config worker/wrangler.toml --message "Emer
 ### Rollback Pages Frontend (`fnb-caffe-container`)
 > **Note:** Wrangler's `pages` command suite (`wrangler pages deployment list|create|tail`) does not provide a native `wrangler pages rollback` subcommand. Roll back via the Cloudflare Pages REST API or Cloudflare Dashboard (`Workers & Pages -> fnb-caffe-container -> Deployments -> Rollback to this deployment`).
 
+The checked-in helper supports all three targets from any working directory:
+
+```bash
+bash scripts/deploy-rollback.sh --target pages <PAGES_DEPLOYMENT_UUID>
+bash scripts/deploy-rollback.sh --target worker <WORKER_VERSION_UUID>
+bash scripts/deploy-rollback.sh --target d1 <UNIX_OR_RFC3339_TIMESTAMP> [DATABASE_NAME]
+bash scripts/deploy-rollback.sh --target d1 <D1_BOOKMARK> [DATABASE_NAME]
+```
+
+Pages requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (legacy `CF_ACCOUNT_ID` / `CF_API_TOKEN` also work). Set `CLOUDFLARE_PAGES_PROJECT` to override `fnb-caffe-container`. The helper uses POST to the Pages rollback REST endpoint and rejects failed or mismatched deployment confirmations. Worker and D1 commands use the repository's absolute `worker/wrangler.toml` path; the D1 database defaults to `fnb-caffe-db`.
+
+An invocation without arguments only lists Pages deployments. An unknown target or invalid identifier fails before any rollback command. D1 restore overwrites the selected database; obtain explicit operational approval and a recovery bookmark before invoking it. A successful command is not health or version verification: perform the target-specific checks below after an approved rollback.
+
 ```bash
 curl -X POST \
   "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/fnb-caffe-container/deployments/${DEPLOYMENT_ID}/rollback" \

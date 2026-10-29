@@ -149,6 +149,63 @@ npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/YYYYMMDD_NN_d
 
 ---
 
+## 5b. Rollback (3-Tier / Chinh Sach Rollback 3 Tang)
+
+Chinh sach rollback chinh thuc la **Option B1 — 3-tier rollback** — KHONG dua vao
+cac file `.down.sql`. 30/37 migration hien tai chua co `.down.sql`, va 7 file co san
+bi đanh dau nguy hiem mat du lieu. Viec tu che `.down.sql` co `DROP TABLE` se pha huy
+du lieu live, vi vay khong hang thu 3 rollback qua down-migration.
+(Official rollback policy is **Option B1 — 3-tier rollback**, deliberately NOT based
+on `.down.sql` files. 30/37 migrations lack a `.down.sql` and the 7 that exist are
+flagged hazardous (table-drop data-loss risk). Fabricating `DROP TABLE` down-migrations
+would destroy live data, so tier 3 is never a down-migration.)
+
+### Tang 1 — Cloudflare Pages (Frontend) / Tier 1
+
+Rollback deployment cu nhat qua Pages Rollback API:
+
+```bash
+curl -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/fnb-caffe-container/deployments/${DEPLOYMENT_ID}/rollback" \
+  -H "Authorization: Bearer ${CF_API_TOKEN}"
+```
+
+Lay `DEPLOYMENT_ID` tu Cloudflare Dashboard > Workers & Pages > `fnb-caffe-container` >
+Deployments. (Get `DEPLOYMENT_ID` from the Cloudflare Dashboard deployments list.)
+
+### Tang 2 — Cloudflare Worker (API) / Tier 2
+
+```bash
+npx wrangler rollback <VERSION_ID> --config worker/wrangler.toml
+```
+
+Lay `<VERSION_ID>` tu `npx wrangler deployments list --config worker/wrangler.toml`.
+
+### Tang 3 — Cloudflare D1 `fnb-caffe-db` / Tier 3
+
+Uu tien phuc hoi du lieu bang point-in-time recovery (PITR):
+
+```bash
+npx wrangler d1 time-travel restore fnb-caffe-db --bookmark="<BOOKMARK_ID>"
+```
+
+Neu schema thay doi (khong phai data loss), viet **forward-fix SQL** migration moi thay vi
+down-migration. Down-migration chi la phuong sap cuoi cung va phai duoc owner phe duyet
+truc tiep.
+(Recover data first via PITR. If a schema change needs reverting, write a new
+forward-fix migration rather than a down-migration. A down-migration is a last
+resort requiring explicit owner approval.)
+
+### Quy tac bao mat / Safety Rules
+
+- **KHONG** tu dong rollback D1 trong script deploy. (Never auto-rollback D1 in deploy scripts.)
+- **KHONG** chay `deploy-cloudflare.sh --migration-file` khi đang rollback.
+  (Do not apply a forward migration while rolling back.)
+- Xac nhan sau rollback: `GET /api/health` va `GET /api/version` (kiem tra `shortSha`).
+  (Verify after rollback via `/api/health` and `/api/version`.)
+
+---
+
 ## 6. Cau Hinh Moi Truong / Environment Config
 
 ### Variables (set in `wrangler.toml` hoac / or Cloudflare Dashboard)
@@ -191,4 +248,4 @@ Cloudflare Workers da duoc cau hinh CORS cho phep preview URL:
 
 ---
 
-**Tai lieu cap nhat / Doc updated:** 2026-07-02
+**Tai lieu cap nhat / Doc updated:** 2026-10-21

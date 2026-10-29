@@ -154,7 +154,7 @@ Khách hàng đăng ký miễn phí bằng Số điện thoại và tự động
 ## 7. Khuyến Nghị Chiến Lược Dành Cho Chủ Quán
 Để tối đa hóa doanh thu và biên lợi nhuận ròng trong thời gian khai trương, chủ quán nên áp dụng các chiến thuật vận hành sau:
 
-* 💡 **Upselling (Bán thêm món kèm):** Huấn luyện staff tư vấn khách hàng mua thêm topping (trân châu, thạch, kem phô mai) hoặc nâng size ly nước. Topping có biên lợi nhuận cực cao (COGS chỉ ~15%), giúp bù đắp hoàn toàn chi phí giảm giá của Voucher.
+* 💡 **Upselling (Bán thêm món kèm):** Huấn luyện staff tư vấn khách mua thêm món khác hoặc lên món đắt hơn trong cùng nhóm. App khách tự order **không** còn lựa chọn topping hay size ly (đã gỡ vì giá server thu không khớp giá hiển thị), nên upselling bằng combo hoặc gợi ý món, không phải modifier. Muốn bán lại topping/size có tính tiền phải làm đồng bộ cả DB modifier lẫn checkout — xem `docs/05_TASKS/menu.md`.
 * 📦 **Combo Khai Trương:** Thiết kế các combo gồm "1 Đồ uống đặc sắc + 1 Bánh ngọt" với mức giá hấp dẫn (ví dụ: combo 79.000đ). Combo giúp đẩy giá trị đơn trung bình (AOV) lên cao, làm giảm tỷ trọng chi phí cố định của voucher trên mỗi bill.
 * 🚫 **Ràng buộc điều kiện Voucher:** Cài đặt Voucher khai trương chỉ áp dụng cho hóa đơn tối thiểu từ 50.000đ hoặc 80.000đ. Tránh trường hợp đơn quá nhỏ (ví dụ đơn 20.000đ giảm 10.000đ) làm tăng tỷ lệ chi phí vốn trên đơn đó.
 * 🥤 **Giới hạn danh mục món đổi quà:** Khi khách tích đủ điểm đổi nước miễn phí, chỉ cho phép đổi các món nước tiêu chuẩn (trà trái cây, cà phê đen, cà phê sữa) có chi phí sản xuất thấp. Giới hạn đổi các món đặc biệt có nguyên liệu đắt đỏ.

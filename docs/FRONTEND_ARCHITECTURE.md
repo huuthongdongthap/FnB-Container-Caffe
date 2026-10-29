@@ -84,7 +84,7 @@ Tuân thủ cấu trúc Atomic Design:
    - `Skeleton`: Trạng thái shimmer loading chuẩn xác kích thước.
    - `Toast`: Hệ thống thông báo nổi (success, error, warning, info) qua `ToastProvider`.
 2. **Molecules:**
-   - Bộ đếm số lượng món, ô tìm kiếm món ăn, thẻ chọn mức đường/đá/topping.
+   - Bộ đếm số lượng món, ô tìm kiếm món ăn, thẻ chọn mức đường/đá (chỉ hiện nhóm lựa chọn áp dụng được cho từng món — xem [`menu-option-rules.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/lib/menu-option-rules.ts)).
 3. **Organisms / Templates ([src/components/stitch/](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/components/stitch)):**
    - Các màn hình tích hợp hoàn chỉnh: `StitchCheckoutNew`, `StitchHeader`, `StitchLandingNew`, `KitchenDisplaySystem`.
 
@@ -94,7 +94,7 @@ Hệ thống phân tách rành mạch giữa **Server State** và **Client State
 | State Domain | Công nghệ | File nguồn | Mô tả nghiệp vụ |
 | :--- | :--- | :--- | :--- |
 | **Menu & Danh mục** | React Query | [`use-menu.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/use-menu.ts) | Cache thực đơn 10 nhóm đồ uống, tự động đồng bộ khi quán cập nhật |
-| **Giỏ hàng (Cart)** | Zustand | [`use-cart-store.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/stores/use-cart-store.ts) | Lưu trữ các món, phân loại biến thể (nóng/đá, size, topping), tính subtotal |
+| **Giỏ hàng (Cart)** | Zustand | [`use-cart-store.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/stores/use-cart-store.ts) | Lưu trữ các món kèm lựa chọn đường/đá/ghi chú (không có surcharge — giá giỏ = giá thực đơn), tính subtotal |
 | **Đặt hàng & Offline** | Zustand | [`use-order-store.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/stores/use-order-store.ts) | Xử lý tạo đơn, hàng đợi offline IndexedDB, tự động đẩy đơn khi có mạng |
 | **Thanh toán (Payment)** | Zustand | [`use-payment-store.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/stores/use-payment-store.ts) | Sinh link PayOS VietQR, cơ chế retry 3 lần, kiểm tra webhook thanh toán |
 | **Ví Aura & Thành viên** | Zustand | [`use-loyalty-store.ts`](file:///Users/mac/mekong-cli/FnB-Container-Caffe/src/hooks/stores/use-loyalty-store.ts) | Quản lý 4 hạng thẻ, số dư ví hoàn tiền, lịch sử chi tiêu, tỷ lệ nhân điểm |

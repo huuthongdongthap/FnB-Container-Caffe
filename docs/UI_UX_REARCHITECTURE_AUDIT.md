@@ -5,6 +5,8 @@
 > **Phạm vi kiểm tra:** Toàn bộ Frontend SPA (`src/App.tsx`, `src/routes/`, `src/components/`, `src/pages/`, `src/styles/`, `src/locales/`)  
 > **Phương pháp:** Audit tĩnh mã nguồn, đối chiếu Git lịch sử tháng 5–6/2026 (BAZI v5.0/v5.1, Menu 10 nhóm 45 món, Brand Assets), kiểm tra đụng độ layout DOM runtime.
 
+> **Cập nhật 2026-10-23 — đã làm, nhưng không giữ Size/Topping.** Modal tuỳ chỉnh đã tồn tại và chỉ hiện lựa chọn phù hợp từng món (`src/lib/menu-option-rules.ts`). Size và Topping đã bị gỡ khỏi modal vì giá thu thực tế không khớp giá hiển thị (xem `docs/12_CHANGELOG.md` mục "Beverage Customizer Simplification"). Mọi tính toán lại bán size/topping có tính tiền cần đồng bộ cả DB modifier lẫn checkout.
+
 ---
 
 ## 1. TỔNG QUAN ĐÁNH GIÁ & CÁC CON SỐ BIẾT NÓI

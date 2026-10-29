@@ -5,6 +5,8 @@
 **Phiên bản ứng dụng:** AURA CAFE v2.1.1 (React 19 + TypeScript + Vite 8 + Tailwind CSS v4 + M3 Design System)  
 **Vị trí lưu trữ báo cáo:** `/Users/mac/mekong-cli/FnB-Container-Caffe/docs/UX_UI_AUDIT_REPORT.md`
 
+> **Cập nhật 2026-10-23 — một phần khuyến nghị trong báo cáo này đã được làm rồi thu hồi.** Báo cáo yêu cầu thêm Modal tùy chọn với Size (Vừa/Lớn), Mức đường, Mức đá và Topping. Modal tuỳ chỉnh đã được xây (`src/components/menu/DrinkCustomizerModal.tsx`) và rule layer chỉ hiện nhóm lựa chọn áp dụng được cho từng món (`src/lib/menu-option-rules.ts`), nhưng **Size và Topping sau đó bị gỡ bỏ hoàn toàn**: server-authoritative pricing bỏ qua giá client khi product row đã có trong DB nên khách thấy 34.000₫ mà server thu 29.000₫, và modifier id không có trong `modifier_choices` bị HTTP 400. Nên khuyến nghị "bổ sung topping/size tính tiền" **không** còn đúng như mô tả; chi tiết và điều kiện để làm lại ở `docs/05_TASKS/menu.md`. Phần Mức đường / Mức đá vẫn đúng và đã có.
+
 ---
 
 ## 1. BẢNG TỔNG HỢP SỐ LƯỢNG ISSUE THEO DANH MỤC & ĐỘ ƯU TIÊN
