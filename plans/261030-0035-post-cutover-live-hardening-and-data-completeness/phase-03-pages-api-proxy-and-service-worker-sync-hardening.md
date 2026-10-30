@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: P0 (Prevent silent offline order loss in PWA Service Worker & fix relative `/api/*` requests on `auraspace.cafe`)
-- **Current Status**: Pending
+- **Current Status**: Done (Local Build Verified)
 - **Description**: `public/_redirects` currently routes `/api/*` to `/* /index.html 200` (`text/html`), causing `public/sw.js` `syncPendingOrders()` (`fetch('/api/orders/sync')`) to receive `200 OK` HTML and delete queued offline orders from IndexedDB without syncing them to the Worker.
 
 ## Key Insights
@@ -37,8 +37,8 @@
    - Check `const contentType = response.headers.get('content-type') || '';` and require `response.ok && contentType.includes('application/json')` before deleting `order.id` from IndexedDB.
 
 ## Todo List
-- [ ] Add `/api/*` Worker rule in `public/_redirects`
-- [ ] Harden `syncPendingOrders()` in `public/sw.js` with JSON content-type verification
+- [x] Add `/api/*` Worker rule in `public/_redirects`
+- [x] Harden `syncOrders()` / `retryQueuedRequests()` in `public/sw.js` with JSON content-type verification
 
 ## Success Criteria
 - `curl -sI https://auraspace.cafe/api/health` does not return `text/html` SPA `index.html`.

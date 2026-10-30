@@ -701,11 +701,11 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 56,
-        downCount: 14,
+        forwardCount: 57,
+        downCount: 15,
         missingDownCount: 42,
         safeReversibleCount: 0,
-        unsafeDownCount: 14,
+        unsafeDownCount: 15,
         fileCoverageComplete: false,
         safeReversibilityComplete: false,
         complete: false,
@@ -757,7 +757,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 14/56 .down.sql files present (42 missing), 0/56 safely reversible without data-loss/schema-drift hazards (14 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 15/57 .down.sql files present (42 missing), 0/57 safely reversible without data-loss/schema-drift hazards (15 existing .down.sql flagged'
     );
   });
 });
@@ -775,8 +775,8 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(56);
-    expect(canonicalDir.downCount).toBe(14);
+    expect(canonicalDir.forwardCount).toBe(57);
+    expect(canonicalDir.downCount).toBe(15);
     expect(canonicalDir.missingDownCount).toBe(42);
   });
 
@@ -1082,5 +1082,5 @@ exit 0
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 });

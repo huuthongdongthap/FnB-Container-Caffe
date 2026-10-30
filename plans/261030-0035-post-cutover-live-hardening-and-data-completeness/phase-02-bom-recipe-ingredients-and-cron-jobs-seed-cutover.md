@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: P1 (Inventory BOM referential integrity & Admin Cron visibility)
-- **Current Status**: Pending
+- **Current Status**: Done (Local Replica & Build Verified)
 - **Description**: Populate `recipe_ingredients` from existing `recipe_items JOIN recipes` (`46` rows) so `/api/v1/inventory/ingredients/:id` `DELETE` guards work against live BOM data, and seed the 5 canonical scheduled jobs into `cron_jobs`.
 
 ## Key Insights
@@ -39,9 +39,9 @@
 4. Create the paired `.down.sql` that removes the seeded rows idempotently.
 
 ## Todo List
-- [ ] Add `recipe_ingredients` backfill from `recipe_items JOIN recipes`
-- [ ] Add `cron_jobs` canonical seed rows
-- [ ] Verify migration against the 126-table production D1 replica in Vitest
+- [x] Add `recipe_ingredients` backfill from `recipe_items JOIN recipes`
+- [x] Add `cron_jobs` canonical seed rows
+- [x] Verify migration against the 126-table production D1 replica in Vitest (`46` `recipe_ingredients`, `5` `cron_jobs`, `409` delete guard on `ing_coffee_bean`)
 
 ## Success Criteria
 - `SELECT COUNT(*) FROM recipe_ingredients` equals `46` on the production replica.

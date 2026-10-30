@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: P1 (Eliminate unnecessary failing D1 queries to non-existent `shifts` table on shift close/reconciliation)
-- **Current Status**: Pending
+- **Current Status**: Done (Local Replica & Staging Gate Verified)
 - **Description**: `cash-reconciliation-policy.ts:36-50` (`getShiftWindow`) currently queries `SELECT clock_in, clock_out FROM shifts WHERE id = ?` before `staff_shifts`. Because production D1 uses `staff_shifts` (and has no `shifts` table), every shift reconciliation triggers two caught D1 `no such table: shifts` errors before reading `staff_shifts`.
 
 ## Key Insights
@@ -33,8 +33,8 @@
 2. Run shift domain and worker integration tests to verify zero regressions.
 
 ## Todo List
-- [ ] Reorder `getShiftWindow()` in `packages/domain/shift/src/policies/cash-reconciliation-policy.ts`
-- [ ] Run shift unit and integration tests
+- [x] Reorder `getShiftWindow()` in `packages/domain/shift/src/policies/cash-reconciliation-policy.ts`
+- [x] Align `worker/src/__tests__/routes/web-payment-and-staging-gates.test.ts` migration counts (`57` forward, `15` down) and run shift unit and integration tests
 
 ## Success Criteria
 - `getShiftWindow()` hits `staff_shifts` on the first query in production D1 without throwing on `shifts`.

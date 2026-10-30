@@ -1380,6 +1380,9 @@ CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_orde
 CREATE TABLE IF NOT EXISTS recipes (
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
+  item_id TEXT,
+  ingredient_id TEXT,
+  quantity REAL DEFAULT 0,
   name TEXT,
   instructions TEXT,
   created_at TEXT DEFAULT (datetime('now')),
@@ -1692,7 +1695,9 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_customer
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id TEXT PRIMARY KEY,
   recipe_id TEXT NOT NULL,
+  product_id TEXT,
   ingredient_id TEXT NOT NULL,
+  item_id TEXT,
   quantity REAL NOT NULL DEFAULT 0,
   unit TEXT DEFAULT 'g',
   waste_percentage REAL DEFAULT 0,

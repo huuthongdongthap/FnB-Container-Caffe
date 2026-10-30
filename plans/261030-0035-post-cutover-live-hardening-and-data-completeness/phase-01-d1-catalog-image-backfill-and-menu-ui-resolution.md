@@ -7,7 +7,7 @@
 
 ## Overview
 - **Priority**: P0 (Customer-facing `/menu` packshots & `/api/menu`, `/api/v1/menu` payload completeness)
-- **Current Status**: Pending
+- **Current Status**: Done (Local Replica & Build Verified)
 - **Description**: Live D1 `products` and `menu_items` have `image_url IS NULL` across all 49 items (`bt001`..`yg004`), and `src/pages/menu.tsx` does not invoke `resolveMenuDrinkImage(item.id, item.imageUrl)`.
 
 ## Key Insights
@@ -34,9 +34,9 @@
 2. Add idempotent `UPDATE products SET image_url = CASE id ... END` and `UPDATE menu_items SET image_url = CASE id ... END` statements for all 49 drink IDs (`bt001`..`yg004` + `yo001`..`yo004`) in `worker/db/migrations/20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql`.
 
 ## Todo List
-- [ ] Wire `resolveMenuDrinkImage` in `src/pages/menu.tsx`
-- [ ] Author 49-SKU image backfill SQL in `20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql`
-- [ ] Add unit/integration test coverage verifying `withImages === 49`
+- [x] Wire `resolveMenuDrinkImage` in `src/pages/menu.tsx`
+- [x] Author 49-SKU image backfill SQL in `20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql`
+- [x] Add unit/integration test coverage verifying `withImages === 49` and `/api/menu` `imageUrl` resolution
 
 ## Success Criteria
 - `GET /api/menu` returns `imageUrl: "/menu/aura-drinks/<slug>.webp"` for all 49 items (`withImages: 49`).

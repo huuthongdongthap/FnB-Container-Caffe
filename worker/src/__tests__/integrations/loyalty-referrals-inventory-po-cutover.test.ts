@@ -386,15 +386,20 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     const cronJobsBody = (await cronJobsRes.json()) as { data: { jobs: Array<{ id: string }> } };
     expect(cronJobsBody.data.jobs).toHaveLength(5);
 
-    const reconRes = await reconcileShiftCash({ AURA_DB: db as never }, {
-      shiftId: openedShift.shift!.id,
-      locationId: 'loc_sadec_flagship',
-      staffId: 'USR_owner01',
-      openingFloat: 500000,
-      denominations: [{ denomination: 500000, count: 1, subtotal: 500000 }],
-      varianceReason: 'Balanced shift',
-    });
-    expect(reconRes.shiftId).toBe(openedShift.shift!.id);
-    expect(reconRes.status).toBe('balanced');
+    const reconRes = await reconcileShiftCash(
+      { AURA_DB: db as never },
+      {
+        shift_id: openedShift.shift!.id,
+        opening_float: 500000,
+        denominations: {
+          denominations: [{ denomination: 500000, count: 1 }],
+          total_amount: 500000,
+        },
+        notes: 'Balanced shift',
+      },
+      'USR_owner01'
+    );
+    expect(reconRes.shift_id).toBe(openedShift.shift!.id);
+    expect(reconRes.variance_status).toBe('balanced');
   });
 });

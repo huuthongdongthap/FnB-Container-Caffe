@@ -6,8 +6,8 @@
 
 ## Overview
 - **Priority**: P0 (Production Verification & Release Closeout)
-- **Current Status**: Pending
-- **Description**: Validate all changes locally (migration linter, full replica test, frontend build), apply `20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql` to remote D1 `fnb-caffe-db`, redeploy Cloudflare Pages (`fnb-caffe-container` / `auraspace.cafe`), verify live endpoints, and commit/push to `origin/main`.
+- **Current Status**: Completed (Live Production Verified)
+- **Description**: Validate all changes locally (migration linter, full replica test, frontend build), apply `20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql` to remote D1 `fnb-caffe-db`, redeploy Cloudflare Pages (`fnb-caffe-container` / `auraspace.cafe`) and Worker (`aura-space-worker`), verify live endpoints, and commit/push to `origin/main`.
 
 ## Key Insights
 - Remote D1 `fnb-caffe-db` (`97ae7a5f-fc4d-460d-b019-8535332bd81f`) is at `126` tables. Applying `20261030_01` is a pure data backfill (`UPDATE products`, `UPDATE menu_items`, `INSERT OR IGNORE INTO recipe_ingredients`, `INSERT OR IGNORE INTO cron_jobs`) with zero destructive DDL.
@@ -35,11 +35,11 @@
 5. Commit and push cleanly to `origin/main`.
 
 ## Todo List
-- [ ] Extend replica cutover test with `20261030_01` up/down verification
-- [ ] Apply `20261030_01` to remote D1 `fnb-caffe-db`
-- [ ] Redeploy Worker (`aura-space-worker`) & Pages (`fnb-caffe-container`)
-- [ ] Verify live `/api/menu` (`withImages: 49/49`), `/api/v1/menu`, and `auraspace.cafe`
-- [ ] Commit and push to `origin/main`
+- [x] Extend replica cutover test with `20261030_01` up/down verification (`49` drink images, `46` `recipe_ingredients`, `5` `cron_jobs`, `409` delete guard, `reconcileShiftCash` on `staff_shifts`)
+- [x] Apply `20261030_01` to remote D1 `fnb-caffe-db` (`49` images, `46` `recipe_ingredients`, `5` `cron_jobs`)
+- [x] Redeploy Worker (`aura-space-worker`, `93ce6c69-65b8-4f01-a9c3-03c300689f6d`) & Pages (`fnb-caffe-container`, `151bdd07`)
+- [x] Verify live `/api/menu` (`withImages: 49/49`), `/api/v1/menu` (`withImages: 49/49`), and `auraspace.cafe/api/health` (`307` → `200 OK` JSON)
+- [x] Commit and push to `origin/main` (`3083c95`)
 
 ## Success Criteria
 - Live `GET /api/menu` returns `items: 49, withImages: 49`.
