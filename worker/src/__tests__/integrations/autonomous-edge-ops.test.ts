@@ -345,8 +345,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
         message: { text: 'Cho mình xin pass wifi' }
       };
 
+      const unsignedReq = await authRequest('POST', '/api/webhooks/zalo', undefined, 'default', zaloPayload);
+      const unsignedRes = await app.fetch(unsignedReq, mockEnv);
+      expect(unsignedRes.status).toBe(503);
+
       const req = await authRequest('POST', '/api/webhooks/zalo', undefined, 'default', zaloPayload);
-      const res = await app.fetch(req, mockEnv);
+      const res = await app.fetch(req, { ...mockEnv, ENVIRONMENT: 'test' });
       expect(res.status).toBe(200);
       const json = await res.json() as any;
       expect(json.success).toBe(true);
@@ -356,8 +360,12 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
 
     it('handles dev simulation endpoint successfully', async () => {
       const simPayload = { text: 'Menu có món gì đặc sản?' };
+      const unauthDefaultReq = await authRequest('POST', '/api/webhooks/zalo/simulate', undefined, 'default', simPayload);
+      const unauthDefaultRes = await app.fetch(unauthDefaultReq, mockEnv);
+      expect(unauthDefaultRes.status).toBe(401);
+
       const req = await authRequest('POST', '/api/webhooks/zalo/simulate', undefined, 'default', simPayload);
-      const res = await app.fetch(req, mockEnv);
+      const res = await app.fetch(req, { ...mockEnv, ENVIRONMENT: 'development' });
       expect(res.status).toBe(200);
       const json = await res.json() as any;
       expect(json.success).toBe(true);
