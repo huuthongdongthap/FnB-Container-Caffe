@@ -167,13 +167,25 @@ export function createHARouter() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
+      const allowUnsignedDev = !isProd && (
+        c.env?.ENVIRONMENT === 'development' ||
+        c.env?.ENVIRONMENT === 'test' ||
+        (c.env as Record<string, unknown>)?.HA_MOCK === 'true'
+      );
       const secret = (c.env.HA_WEBHOOK_SECRET ?? c.env.HA_TOKEN ?? '') as string;
-      if (isProd && !secret) {
+      if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'HA webhook secret not configured' }, 503);
       }
       if (secret) {
         const token = c.req.header('x-ha-token') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? c.req.query('token');
-        if (!token || token !== secret) {
+        const enc = new TextEncoder();
+        const aBytes = enc.encode(token ?? '');
+        const bBytes = enc.encode(secret);
+        let diff = aBytes.length === bBytes.length ? 0 : 1;
+        if (diff === 0) {
+          for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+        }
+        if (!token || diff !== 0) {
           return c.json({ error: 'Unauthorized HA token' }, 401);
         }
       }

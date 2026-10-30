@@ -102,13 +102,18 @@ zaloWebhookRouter.post('/', async (c) => {
   const envRecord = (c.env || {}) as unknown as Record<string, unknown>;
   const zaloSecret = (envRecord.ZALO_OA_SECRET || envRecord.ZALO_APP_SECRET) as string | undefined;
   const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
+  const allowUnsignedDev = !isProd && (
+    envRecord.ALLOW_UNSIGNED_ZALO_WEBHOOK === 'true' ||
+    c.env?.ENVIRONMENT === 'development' ||
+    c.env?.ENVIRONMENT === 'test'
+  );
   const signatureHeader = c.req.header('X-ZaloOA-Signature') || c.req.header('x-zalooa-signature');
 
-  if (isProd && !zaloSecret) {
-    return c.json({ success: false, error: 'Zalo webhook secret is not configured' }, 503);
-  }
-
-  if (zaloSecret && (isProd || signatureHeader)) {
+  if (!zaloSecret) {
+    if (!allowUnsignedDev) {
+      return c.json({ success: false, error: 'Zalo webhook secret is not configured' }, 503);
+    }
+  } else {
     if (!signatureHeader) {
       return c.json({ success: false, error: 'Missing Zalo webhook signature' }, 401);
     }
@@ -169,22 +174,17 @@ zaloWebhookRouter.post('/', async (c) => {
 
   return c.json({
     success: true,
-    data: {
-      user_id: sender?.id,
-      received_text: userText,
-      reply: result.reply,
-      intent: result.intent,
-      engine: result.engine
-    }
+    data: { user_id: sender?.id, received_text: userText, reply: result.reply, intent: result.intent, engine: result.engine }
   });
 });
 
-// POST /api/webhooks/zalo/simulate — Dev/Test simulation (requires staff auth in production)
+// POST /api/webhooks/zalo/simulate — Dev/Test simulation (requires staff auth outside explicit dev/test)
 zaloWebhookRouter.post(
   '/simulate',
   async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-    if (isProd || c.req.header('Authorization')) {
+    const isExplicitDev = !isProd && (c.env?.ENVIRONMENT === 'development' || c.env?.ENVIRONMENT === 'test');
+    if (!isExplicitDev || c.req.header('Authorization')) {
       return requireAuth(['owner', 'manager', 'staff', 'admin'])(c, next);
     }
     return next();
@@ -201,15 +201,10 @@ zaloWebhookRouter.post(
         phone: body.phone,
         channel: 'zalo'
       });
-
       return c.json({
         success: true,
         simulation: true,
-        data: {
-          reply: result.reply,
-          intent: result.intent,
-          engine: result.engine
-        }
+        data: { reply: result.reply, intent: result.intent, engine: result.engine }
       });
     } catch (err) {
       log.error('Zalo simulation error:', { message: (err as Error).message });

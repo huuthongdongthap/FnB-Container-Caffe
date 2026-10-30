@@ -94,13 +94,25 @@ export function createTIRoutes() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
+      const allowUnsignedDev = !isProd && (
+        c.env?.ENVIRONMENT === 'development' ||
+        c.env?.ENVIRONMENT === 'test' ||
+        (c.env as Record<string, unknown>)?.TASTYIGNITER_SYNC_ENABLED === 'false'
+      );
       const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
-      if (isProd && !secret) {
+      if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
       }
       if (secret) {
         const sig = c.req.header('x-tastyigniter-signature') ?? c.req.query('secret') ?? c.req.query('token');
-        if (!sig || sig !== secret) {
+        const enc = new TextEncoder();
+        const aBytes = enc.encode(sig ?? '');
+        const bBytes = enc.encode(secret);
+        let diff = aBytes.length === bBytes.length ? 0 : 1;
+        if (diff === 0) {
+          for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+        }
+        if (!sig || diff !== 0) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
       }

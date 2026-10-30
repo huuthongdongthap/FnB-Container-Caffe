@@ -219,6 +219,26 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       );
       expect(unsignedNowPayments.status).toBe(500);
 
+      const unsignedZalo = await app.fetch(
+        new Request('http://localhost/api/webhooks/zalo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_name: 'user_send_text', message: { text: 'Hi' } }),
+        }),
+        { ...env, ENVIRONMENT: undefined, ZALO_OA_SECRET: undefined, ZALO_APP_SECRET: undefined }
+      );
+      expect(unsignedZalo.status).toBe(503);
+
+      const unauthZaloSimulate = await app.fetch(
+        new Request('http://localhost/api/webhooks/zalo/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: 'Hi' }),
+        }),
+        { ...env, ENVIRONMENT: undefined }
+      );
+      expect(unauthZaloSimulate.status).toBe(401);
+
       sql.exec(`
         INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
           VALUES('kitchen-b','Kitchen B','kitchen','store-b',1,1,'2026-10-30T00:00:00Z');

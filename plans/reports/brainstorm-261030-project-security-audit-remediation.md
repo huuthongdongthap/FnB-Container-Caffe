@@ -55,5 +55,16 @@
 - **Vite dev server loopback binding** (`vite.config.js`):
   - Bind `server.host` to `process.env.VITE_DEV_HOST || '127.0.0.1'`.
 
+### 4. Deep-Hardening & Cross-Surface Convergence
+- **Cross-surface KDS prepaid delivery gate** (`packages/domain/kitchen/commands/kitchen-stations.ts`):
+  - Exclude unpaid delivery orders from `/api/kitchen-stations/:id/tickets` and block `/api/kitchen-stations/tickets/:orderId/items/:itemId/start` (`409`) until `payment_status === 'paid'`.
+- **Domain-wide Zod collection upper bounds** (`worker/src/lib/validators/*`, `worker/src/schemas/*`, `worker/src/routes/*`, `packages/domain/*`):
+  - Enforce explicit `.max(...)` bounds across all array-accepting request schemas (`order.ts`, `orders.ts`, `common.ts`, `purchase-orders.ts`, `erpnext.ts`, `mixpost.ts`, `promotions/models.ts`, `tables.ts`, `sop-admin.ts`, `push.ts`, `subscription.ts`, `marketing.ts`, `loyalty/models.ts`, `ingredients.ts`, `cron/models.ts`, `split-orders.ts`, `categories.ts`, `products.ts`, `ai-barista.ts`, `dynamic-pricing.ts`, `tastyigniter.ts`).
+- **Fail-closed tenant fallbacks, webhooks, test-harness gating & realtime confinement**:
+  - Fail-closed tenant exception paths in `profile-handlers.ts`, `lookup-handler.ts`, and `customer-handlers.ts`.
+  - Explicit test-harness environment gating (`ENVIRONMENT=development|test` or `ALLOW_PLAYWRIGHT_TEST_HEADER=true`) for `x-playwright-test` in `auth.ts` and `rate-limit.ts`.
+  - Fail-closed webhook signature & secret verification across `nowpayments-ipn.ts`, `zalo-webhook.ts` (including `/simulate` auth gate), `homeassistant/index.ts`, `tastyigniter.ts`, and `pretix/hmac-validator.ts`.
+  - Default-tenant confinement on `/api/realtime/kitchen` in `worker/src/index.ts`, canonical Worker `Content-Security-Policy` in `worker/src/middleware/security-headers.ts`, and recipient PII masking in `worker/src/lib/email.ts`.
+
 ## Unresolved Questions
 - None. All findings are reproducible in local harness with unambiguous domain fixes.

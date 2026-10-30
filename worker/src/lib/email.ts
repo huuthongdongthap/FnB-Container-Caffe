@@ -21,11 +21,20 @@ export interface EmailEnv {
   EMAIL_FROM_NAME?: string;
 }
 
+function maskRecipient(email: string): string {
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0) return '***';
+  const local = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+  return `${local[0]}***@${domain}`;
+}
+
 export async function sendEmail(env: EmailEnv, opts: SendEmailOpts): Promise<boolean> {
   const { to, subject, html, text } = opts;
+  const maskedTo = to ? maskRecipient(to) : '';
 
   if (!env.SENDGRID_API_KEY) {
-    log.warn('SENDGRID_API_KEY not configured — skipping email', { to, subject });
+    log.warn('SENDGRID_API_KEY not configured — skipping email', { to: maskedTo });
     return false;
   }
 
@@ -65,16 +74,16 @@ export async function sendEmail(env: EmailEnv, opts: SendEmailOpts): Promise<boo
     clearTimeout(timeout);
 
     if (response.ok) {
-      log.info('email_sent', { to, subject });
+      log.info('email_sent', { to: maskedTo });
       return true;
     }
 
     const body = await response.text();
-    log.error('sendgrid_error', { status: response.status, body: body.slice(0, 200), to, subject });
+    log.error('sendgrid_error', { status: response.status, body: body.slice(0, 200), to: maskedTo });
     return false;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    log.error('sendgrid_network_error', { message, to, subject });
+    log.error('sendgrid_network_error', { message, to: maskedTo });
     return false;
   }
 }
