@@ -164,4 +164,30 @@ describe('Shift / Staff / POS Contract', () => {
     expect(mgrClose.ok).toBe(true);
     expect(mgrClose.shift?.status).toBe('closed');
   });
+
+  it('11. fail-closed numeric & role guards: rejects NaN/non-positive amounts and allows supervisor shift ops', async () => {
+    const db = createMockDb();
+    const nanOpen = await openCanonicalShift(db as any, {
+      staffId: 'usr_sup_1', staffName: 'Giám sát 1', role: 'supervisor', openingCash: Number.NaN,
+    });
+    expect(nanOpen.ok).toBe(false);
+    expect(nanOpen.error).toBe('invalid_opening_cash');
+
+    const supOpen = await openCanonicalShift(db as any, {
+      staffId: 'usr_sup_1', staffName: 'Giám sát 1', role: 'supervisor', openingCash: 300000,
+    });
+    expect(supOpen.ok).toBe(true);
+
+    const negSale = await recordShiftSale(db as any, {
+      shiftId: supOpen.shift!.id, orderId: 'ord_neg', amount: -50000, paymentMethod: 'cash',
+    });
+    expect(negSale.ok).toBe(false);
+    expect(negSale.error).toBe('invalid_sale_amount');
+
+    const nanClose = await closeCanonicalShift(db as any, {
+      shiftId: supOpen.shift!.id, closedByStaffId: 'usr_sup_1', closedByRole: 'supervisor', actualCash: -10,
+    });
+    expect(nanClose.ok).toBe(false);
+    expect(nanClose.error).toBe('invalid_actual_cash');
+  });
 });

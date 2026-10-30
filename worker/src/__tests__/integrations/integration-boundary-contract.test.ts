@@ -124,4 +124,45 @@ describe('Canonical Integration Boundary Contract', () => {
     expect(syncRes.reconciliationRequired).toBe(true);
     expect(syncRes.retryable).toBe(true);
   });
+
+  it('11. fail-closed webhook boundary: rejects blank secretKey, empty/array rawPayload, blank idempotencyKey, and propagates upstream HTTP status', async () => {
+    const seen = new Set<string>();
+
+    const blankSecret = verifyWebhookBoundary(
+      { provider: 'payos', rawPayload: { orderCode: 10 }, signature: 'sig_', secretKey: '   ' },
+      seen
+    );
+    expect(blankSecret.valid).toBe(false);
+    expect(blankSecret.reason).toBe('invalid_signature');
+
+    const emptyObjPayload = verifyWebhookBoundary(
+      { provider: 'payos', rawPayload: {} },
+      seen
+    );
+    expect(emptyObjPayload.valid).toBe(false);
+    expect(emptyObjPayload.reason).toBe('malformed_payload');
+
+    const arrayPayload = verifyWebhookBoundary(
+      { provider: 'payos', rawPayload: [{ orderCode: 10 }] as any },
+      seen
+    );
+    expect(arrayPayload.valid).toBe(false);
+    expect(arrayPayload.reason).toBe('malformed_payload');
+
+    const blankIdemp = verifyWebhookBoundary(
+      { provider: 'payos', rawPayload: { orderCode: 10 }, idempotencyKey: '   ' },
+      seen
+    );
+    expect(blankIdemp.valid).toBe(false);
+    expect(blankIdemp.reason).toBe('invalid_idempotency_key');
+
+    const upstream401 = await executeExternalIntegration('erpnext', 'push_invoice', async () => {
+      const err: any = new Error('Invalid API credentials');
+      err.status = 401;
+      throw err;
+    });
+    expect(upstream401.ok).toBe(false);
+    expect(upstream401.errorType).toBe('auth_failure');
+    expect(upstream401.retryable).toBe(false);
+  });
 });

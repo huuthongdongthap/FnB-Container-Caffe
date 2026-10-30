@@ -79,6 +79,29 @@ export function evaluateReleaseGates(
     };
   }
 
+  const normalizedSha = typeof versionSha === 'string' ? versionSha.trim() : '';
+  if (!normalizedSha || normalizedSha.toLowerCase() === 'unknown') {
+    return {
+      allowed: false,
+      targetEnvironment: targetEnv,
+      timestamp: new Date().toISOString(),
+      versionSha,
+      checks,
+      blockingFailure: 'Release gate blocked: valid commit versionSha is required.'
+    };
+  }
+
+  if (!Array.isArray(checks) || checks.length === 0) {
+    return {
+      allowed: false,
+      targetEnvironment: targetEnv,
+      timestamp: new Date().toISOString(),
+      versionSha,
+      checks: checks ?? [],
+      blockingFailure: 'Release gate blocked: at least one release gate check must be executed.'
+    };
+  }
+
   const failedCheck = checks.find((c) => !c.passed);
   if (!allChecksPassed && failedCheck) {
     return {
@@ -112,6 +135,7 @@ export function validateMigrationSequence(migrationFilenames: string[]): {
   const entries: D1MigrationEntry[] = [];
   const migrationPattern = /^(\d{8})_(\d{2})_([a-z0-9_]+?)(\.down)?\.sql$/;
 
+  const seenVersions = new Set<string>();
   let lastVersion = '';
 
   for (const filename of migrationFilenames) {
@@ -125,8 +149,17 @@ export function validateMigrationSequence(migrationFilenames: string[]): {
     const version = `${date}_${seq}`;
 
     if (isDown) {
+      const expectedForward = `${date}_${seq}_${slug}.sql`;
+      if (!migrationFilenames.includes(expectedForward)) {
+        errors.push(`Orphan down-migration without matching forward migration: ${filename}`);
+      }
       continue; // Down-migration handled as companion
     }
+
+    if (seenVersions.has(version)) {
+      errors.push(`Duplicate migration version prefix: ${filename} (version ${version})`);
+    }
+    seenVersions.add(version);
 
     if (lastVersion && version < lastVersion) {
       errors.push(`Migration out of chronological order: ${filename} (version ${version} < ${lastVersion})`);
@@ -159,13 +192,16 @@ export function evaluateSmokeTests(results: SmokeTestProbeResult[]): {
   passedCount: number;
   totalCount: number;
   failedWorkflows: string[];
+  degradedWorkflows: string[];
 } {
   const failed = results.filter((r) => r.status === 'failed');
+  const degraded = results.filter((r) => r.status === 'degraded');
   return {
-    healthy: failed.length === 0,
+    healthy: results.length > 0 && failed.length === 0,
     passedCount: results.filter((r) => r.status === 'passed').length,
     totalCount: results.length,
-    failedWorkflows: failed.map((f) => f.workflow)
+    failedWorkflows: failed.map((f) => f.workflow),
+    degradedWorkflows: degraded.map((d) => d.workflow)
   };
 }
 

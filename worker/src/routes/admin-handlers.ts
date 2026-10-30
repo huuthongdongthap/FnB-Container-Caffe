@@ -55,9 +55,10 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
     results = queryRes.results || [];
     const totalRow = await db.prepare(canonicalCountQuery).bind(...params).first<{ total: number }>();
     total = totalRow?.total ?? 0;
-  } catch {
-    const legacyClauses: string[] = [];
-    const legacyParams: unknown[] = [];
+  } catch (err) {
+    const missingTenantCol = /no such column:\s*(?:c\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
+    const legacyClauses: string[] = missingTenantCol ? [] : ["COALESCE(NULLIF(tenant_id, ''), 'default') = ?"];
+    const legacyParams: unknown[] = missingTenantCol ? [] : [tenantId];
     if (search) {
       legacyClauses.push('(name LIKE ? OR phone LIKE ? OR email LIKE ?)');
       const like = `%${search}%`;
@@ -204,7 +205,8 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
     }
     canonicalParams.push(id, tenantId);
     await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...canonicalParams).run();
-  } catch {
+  } catch (err) {
+    const missingTenantCol = /no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err));
     try {
       const canonicalUpdates = [...baseUpdates];
       const canonicalParams = [...baseParams];
@@ -212,17 +214,28 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         canonicalUpdates.push('loyalty_tier = ?');
         canonicalParams.push(tierValue);
       }
-      canonicalParams.push(id);
-      await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
-    } catch {
+      if (missingTenantCol) {
+        canonicalParams.push(id);
+        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+      } else {
+        canonicalParams.push(id, tenantId);
+        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...canonicalParams).run();
+      }
+    } catch (innerErr) {
+      const innerMissingTenant = missingTenantCol || /no such column:\s*tenant_id/i.test(innerErr instanceof Error ? innerErr.message : String(innerErr));
       const legacyUpdates = [...baseUpdates];
       const legacyParams = [...baseParams];
       if (tierValue) {
         legacyUpdates.push('tier = ?');
         legacyParams.push(tierValue);
       }
-      legacyParams.push(id);
-      await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
+      if (innerMissingTenant) {
+        legacyParams.push(id);
+        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
+      } else {
+        legacyParams.push(id, tenantId);
+        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...legacyParams).run();
+      }
     }
   }
   return Response.json({ success: true, id });
@@ -233,7 +246,10 @@ export async function deleteAdminCustomer(env: Record<string, unknown>, id: stri
   const tenantId = resolveEnvTenant(env, effectiveTenantId);
   try {
     await db.prepare("DELETE FROM customers WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(id, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+      throw err;
+    }
     await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run();
   }
   return Response.json({ success: true, id });

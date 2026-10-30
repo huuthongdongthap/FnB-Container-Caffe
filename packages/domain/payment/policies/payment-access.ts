@@ -1,7 +1,7 @@
 import { getTenantId, isHQSuperAdmin } from 'worker/src/middleware/tenant';
 
 export const FINANCIAL_ROLES = ['owner', 'manager', 'admin', 'cashier'];
-const PAYMENT_ROLES = [...FINANCIAL_ROLES, 'staff', 'waiter'];
+const PAYMENT_ROLES = [...FINANCIAL_ROLES, 'supervisor', 'staff', 'waiter'];
 
 export interface PaymentOrderIdentity {
   tenant_id?: string | null;

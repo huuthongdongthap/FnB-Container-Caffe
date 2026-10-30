@@ -54,10 +54,10 @@ export function happyHourDiscountFor(
       const applyTo = (w.apply_to || 'all').toLowerCase();
       if (applyTo === 'product_id' || applyTo === 'product' || applyTo === 'products') {
         const ids = parseApplyIds(w.apply_ids);
-        if (ids.length > 0 && (!context?.productId || !ids.includes(context.productId))) return false;
+        if (ids.length === 0 || !context?.productId || !ids.includes(context.productId)) return false;
       } else if (applyTo === 'category_id' || applyTo === 'category' || applyTo === 'categories') {
         const ids = parseApplyIds(w.apply_ids);
-        if (ids.length > 0 && (!context?.categoryId || !ids.includes(context.categoryId))) return false;
+        if (ids.length === 0 || !context?.categoryId || !ids.includes(context.categoryId)) return false;
       }
       return true;
     })
@@ -129,7 +129,8 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
   } = input;
 
   // 1. Base product price (integer VND cents >= 0)
-  let effectivePrice = Math.max(0, Math.floor(Number(basePriceCents) || 0));
+  const rawBase = Number(basePriceCents);
+  let effectivePrice = Number.isFinite(rawBase) ? Math.max(0, Math.floor(rawBase)) : 0;
 
   // 2. Channel delta (positive surcharge or negative discount)
   const normChannel = normalizeChannel(channel);
@@ -137,11 +138,13 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
     channelDeltas[normChannel] ??
     (normChannel === 'online' ? channelDeltas.delivery : (normChannel === 'delivery' ? channelDeltas.online : 0)) ??
     0;
-  effectivePrice += Math.round(Number(delta) || 0);
+  const rawDelta = Number(delta);
+  effectivePrice += Number.isFinite(rawDelta) ? Math.round(rawDelta) : 0;
 
   // 3. Modifier deltas (sum of validated modifier price deltas)
   for (const choice of modifierChoices) {
-    effectivePrice += Math.round(Number(choice.price_delta) || 0);
+    const modDelta = Number(choice.price_delta);
+    effectivePrice += Number.isFinite(modDelta) ? Math.round(modDelta) : 0;
   }
 
   // 4. Time rule (Happy Hour active window)
@@ -150,11 +153,13 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
     categoryId: input.categoryId,
   });
   if (hh) {
-    const rawRate = Number(hh.discount_rate) || 0;
-    // Supports both 0..1 (e.g. 0.2 = 20%) and percentage 1..100 (e.g. 10 = 10%)
-    const discountMultiplier = rawRate <= 1 && rawRate > 0 ? rawRate : rawRate / 100;
-    const discountAmount = Math.floor(effectivePrice * discountMultiplier);
-    effectivePrice -= discountAmount;
+    const rawRate = Number(hh.discount_rate);
+    if (Number.isFinite(rawRate) && rawRate > 0) {
+      // Supports both 0..1 (e.g. 0.2 = 20%) and percentage 1..100 (e.g. 10 = 10%), clamped to [0, 1]
+      const discountMultiplier = Math.min(1, rawRate <= 1 ? rawRate : rawRate / 100);
+      const discountAmount = Math.floor(effectivePrice * discountMultiplier);
+      effectivePrice -= discountAmount;
+    }
   }
 
   // 5. Final sell price: integer money value clamped to >= 0

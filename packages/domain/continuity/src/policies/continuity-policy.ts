@@ -69,14 +69,37 @@ export const CANONICAL_STORAGE_CONTINUITY: Record<string, StorageResourceContinu
   }
 };
 
+const SAFE_CONTINUITY_IDENTIFIER_REGEX = /^[a-zA-Z0-9._-]+$/;
+const HEX_CHECKSUM_REGEX = /^[0-9a-fA-F]{16,64}$/;
+
 export function validateBackupManifest(manifest: BackupManifest): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!manifest.backupId) errors.push('Missing backupId');
-  if (!manifest.timestamp) errors.push('Missing timestamp');
-  if (!manifest.checksumSha256 || manifest.checksumSha256.length < 16) {
+  if (!manifest.backupId || !manifest.backupId.trim()) {
+    errors.push('Missing backupId');
+  } else if (!SAFE_CONTINUITY_IDENTIFIER_REGEX.test(manifest.backupId)) {
+    errors.push('Invalid backupId format: only alphanumeric, dot, underscore, and hyphen are allowed');
+  }
+  if (manifest.databaseId !== undefined) {
+    if (!manifest.databaseId.trim() || !SAFE_CONTINUITY_IDENTIFIER_REGEX.test(manifest.databaseId)) {
+      errors.push('Invalid databaseId format: only alphanumeric, dot, underscore, and hyphen are allowed');
+    }
+  }
+  if (!manifest.timestamp || !manifest.timestamp.trim()) errors.push('Missing timestamp');
+  if (!manifest.checksumSha256 || !HEX_CHECKSUM_REGEX.test(manifest.checksumSha256)) {
     errors.push('Invalid checksum SHA-256');
   }
-  if (manifest.tablesCount <= 0) errors.push('Tables count must be greater than zero');
+  if (!Number.isInteger(manifest.tablesCount) || manifest.tablesCount <= 0) {
+    errors.push('Tables count must be greater than zero');
+  }
+  if (!manifest.recordsCount || typeof manifest.recordsCount !== 'object') {
+    errors.push('Missing recordsCount map');
+  } else {
+    for (const [table, count] of Object.entries(manifest.recordsCount)) {
+      if (!Number.isInteger(count) || count < 0) {
+        errors.push(`Invalid record count for table ${table}: must be a non-negative integer`);
+      }
+    }
+  }
   return { valid: errors.length === 0, errors };
 }
 
@@ -85,6 +108,13 @@ export function generateRestorationPlan(
   manifest: BackupManifest,
   targetEnv: RestorationPlan['targetEnvironment'] = 'isolated_test'
 ): RestorationPlan {
+  const manifestValidation = validateBackupManifest(manifest);
+  if (!manifestValidation.valid) {
+    throw new Error(
+      `Cannot generate restoration plan from invalid backup manifest: ${manifestValidation.errors.join('; ')}`
+    );
+  }
+
   const steps = [
     {
       stepNumber: 1,
@@ -133,7 +163,16 @@ export function verifyReferentialInvariants(sample: {
   duplicateTransactionsCount: number;
 }): ContinuityValidationResult {
   const errors: string[] = [];
+  const hasNegativeCounts =
+    sample.ordersCount < 0 ||
+    sample.orderItemsCount < 0 ||
+    sample.paymentsCount < 0 ||
+    sample.unlinkedItemsCount < 0 ||
+    sample.duplicateTransactionsCount < 0;
 
+  if (hasNegativeCounts) {
+    errors.push('Invalid negative record count in continuity sample');
+  }
   if (sample.unlinkedItemsCount > 0) {
     errors.push(`Detected ${sample.unlinkedItemsCount} orphan order_items missing valid order_id`);
   }
@@ -143,13 +182,16 @@ export function verifyReferentialInvariants(sample: {
   if (sample.ordersCount > 0 && sample.orderItemsCount === 0) {
     errors.push('Inconsistent dataset: orders exist but order_items count is zero');
   }
+  if (sample.ordersCount === 0 && sample.paymentsCount > 0) {
+    errors.push(`Detected ${sample.paymentsCount} orphan payments with zero parent orders`);
+  }
 
   return {
     healthy: errors.length === 0,
     schemaValid: errors.length === 0,
-    foreignKeyIntegrity: sample.unlinkedItemsCount === 0,
+    foreignKeyIntegrity: sample.unlinkedItemsCount === 0 && !(sample.ordersCount === 0 && sample.paymentsCount > 0),
     duplicateProtectionActive: sample.duplicateTransactionsCount === 0,
-    recordCountMatches: sample.ordersCount >= 0,
+    recordCountMatches: !hasNegativeCounts,
     errors
   };
 }

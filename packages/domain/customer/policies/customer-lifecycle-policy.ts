@@ -151,6 +151,9 @@ export async function mergeCustomerProfiles(
   }
 
   try {
+    const priRow = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(primaryCustomerId).first<{ id: string }>();
+    if (!priRow) return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Primary customer not found' };
+
     const secRow = await db.prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?').bind(secondaryCustomerId).first<any>();
     if (!secRow) return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Secondary customer not found' };
 

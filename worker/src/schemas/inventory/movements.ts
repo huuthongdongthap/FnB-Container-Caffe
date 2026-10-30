@@ -9,6 +9,19 @@ import {
   ReferenceSchema,
 } from '../common';
 
+export const StockMovementRefTypeEnum = z.enum([
+  'purchase',
+  'sale',
+  'adjustment',
+  'transfer',
+  'waste',
+  'production',
+  'order',
+  'purchase_order',
+  'manual',
+  'audit',
+]);
+
 export const StockMovementSchema = z.object({
   id: z.string().min(1),
   ingredientId: z.string().min(1),
@@ -17,7 +30,7 @@ export const StockMovementSchema = z.object({
   quantity: z.number(),
   unitCost: MoneySchema.nullable(),
   referenceId: z.string().min(1).nullable(),
-  referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).nullable(),
+  referenceType: StockMovementRefTypeEnum.nullable(),
   notes: z.string().max(500).optional(),
   performedBy: z.string().min(1).nullable(),
   createdAt: DateTimeSchema,
@@ -29,7 +42,7 @@ export const StockMovementCreateSchema = z.object({
   quantity: z.number(),
   unitCost: MoneySchema.optional(),
   referenceId: z.string().min(1).optional(),
-  referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).optional(),
+  referenceType: StockMovementRefTypeEnum.optional(),
   notes: z.string().max(500).optional(),
 }).openapi('StockMovementCreate');
 

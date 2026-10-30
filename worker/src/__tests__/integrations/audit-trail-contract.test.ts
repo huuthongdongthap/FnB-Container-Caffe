@@ -186,4 +186,30 @@ describe('Audit Trail & Operational Event Contract', () => {
     expect(out.record.entity_type).toBe('tenant');
     expect(out.record.status).toBe('success');
   });
+
+  it('11. reason field redaction: scrubs accidental JWT or card PAN strings embedded in payload.reason', async () => {
+    const db = createMockDb();
+    const actor: AuditActor = { id: 'staff_09', role: 'staff' };
+    const jwtReason = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozG5q';
+    const res = await writeCanonicalAuditLog(db as any, {
+      actor,
+      action: 'auth.rejected',
+      resourceType: 'session',
+      outcome: 'rejected',
+      reason: jwtReason,
+    });
+    expect(res.ok).toBe(true);
+    const parsedDetails = JSON.parse(db.getRows()[0].details);
+    expect(parsedDetails.reason).toBe('[JWT_REDACTED]');
+
+    const cardRes = await writeCanonicalAuditLog(db as any, {
+      actor,
+      action: 'payment.failed',
+      resourceType: 'payment',
+      outcome: 'failure',
+      reason: '4532015012345678',
+    });
+    expect(cardRes.ok).toBe(true);
+    expect(JSON.parse(db.getRows()[1].details).reason).toBe('**** **** **** 5678');
+  });
 });

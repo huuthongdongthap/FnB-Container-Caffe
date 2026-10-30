@@ -116,3 +116,54 @@ UPDATE tier_configs
 SET multiplier = COALESCE(points_multiplier, 1.0),
     benefits = COALESCE(perks, '[]'),
     display_name_vi = COALESCE(display_name_vi, tier_name);
+
+-- 8. Reconcile seed rows across paired loyalty_rewards/rewards and loyalty_tier_configs/tier_configs
+INSERT OR IGNORE INTO loyalty_rewards (
+  id, name, description, points_cost, points_required,
+  type, reward_type, value, reward_value,
+  min_tier, max_redemptions, stock, image_url, is_active, created_at, updated_at
+)
+SELECT
+  id,
+  COALESCE(name, title),
+  description,
+  COALESCE(points_cost, point_cost, 100),
+  COALESCE(points_cost, point_cost, 100),
+  CASE
+    WHEN COALESCE(type, discount_type) IN ('percent', 'discount_percent') THEN 'discount_percent'
+    WHEN COALESCE(type, discount_type) IN ('fixed', 'discount_fixed') THEN 'discount_fixed'
+    ELSE COALESCE(type, discount_type, 'voucher')
+  END,
+  CASE
+    WHEN COALESCE(reward_type, type, discount_type) IN ('percent', 'discount_percent') THEN 'discount_percent'
+    WHEN COALESCE(reward_type, type, discount_type) IN ('fixed', 'discount_fixed') THEN 'discount_fixed'
+    ELSE COALESCE(reward_type, type, discount_type, 'voucher')
+  END,
+  COALESCE(value, discount_value, 0),
+  CAST(COALESCE(reward_value, value, discount_value, 0) AS TEXT),
+  COALESCE(min_tier, 'bronze'),
+  CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock ELSE NULL END,
+  stock,
+  image_url,
+  COALESCE(is_active, 1),
+  COALESCE(created_at, datetime('now')),
+  COALESCE(updated_at, created_at, datetime('now'))
+FROM rewards;
+
+INSERT OR IGNORE INTO loyalty_tier_configs (
+  tier, name, min_points, point_multiplier, points_multiplier,
+  discount_percent, birthday_bonus, benefits, color, updated_at
+)
+SELECT
+  tier,
+  COALESCE(display_name_vi, tier_name, tier),
+  COALESCE(min_points, 0),
+  COALESCE(point_multiplier, points_multiplier, multiplier, 1.0),
+  COALESCE(points_multiplier, point_multiplier, multiplier, 1.0),
+  ROUND(COALESCE(cashback_rate, 0) * 100, 1),
+  COALESCE(birthday_discount, 500),
+  COALESCE(benefits, perks, '[]'),
+  COALESCE(color, '#CD7F32'),
+  COALESCE(updated_at, datetime('now'))
+FROM tier_configs;
+

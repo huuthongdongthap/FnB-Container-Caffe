@@ -95,15 +95,18 @@ loyaltyRouter.get('/points', async(c) => {
     ).bind(cust.id, limit, offset).all();
     results = res.results || [];
   } catch {
+    results = [];
+  }
+  if (results.length === 0) {
     try {
       const res = await c.env.AURA_DB.prepare(
-        'SELECT id, customer_id, points AS points_change, type AS reason, balance_after, description, created_at FROM loyalty_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      ).bind(cust.id, limit, offset).all();
+        'SELECT id, customer_id, points AS points_change, type AS reason, balance_after, description, created_at FROM loyalty_transactions WHERE customer_id = ? OR account_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+      ).bind(cust.id, `la_${cust.id}`, limit, offset).all();
       results = res.results || [];
     } catch {
       const res = await c.env.AURA_DB.prepare(
         'SELECT id, customer_id, points AS points_change, type AS reason, description, created_at FROM loyalty_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      ).bind(cust.id, limit, offset).all();
+      ).bind(cust.id, limit, offset).all().catch(() => ({ results: [] }));
       results = res.results || [];
     }
   }
@@ -161,6 +164,9 @@ loyaltyRouter.get('/rewards', async(c) => {
     const res = await db.prepare('SELECT * FROM rewards ORDER BY point_cost ASC').all<{ id: string; title: string; point_cost: number }>();
     allRewards = res.results || [];
   } catch {
+    allRewards = [];
+  }
+  if (allRewards.length === 0) {
     try {
       const res = await db.prepare(
         'SELECT id, name AS title, points_cost AS point_cost, description, type AS discount_type, value AS discount_value, is_active FROM loyalty_rewards WHERE is_active = 1 ORDER BY points_cost ASC'
@@ -194,9 +200,12 @@ loyaltyRouter.post('/redeem', async(c) => {
   try {
     reward = await db.prepare('SELECT * FROM rewards WHERE id = ?').bind(reward_id).first<{ id: string; title: string; point_cost: number }>();
   } catch {
+    reward = null;
+  }
+  if (!reward) {
     reward = await db.prepare(
       'SELECT id, name AS title, points_cost AS point_cost FROM loyalty_rewards WHERE id = ? AND is_active = 1'
-    ).bind(reward_id).first<{ id: string; title: string; point_cost: number }>();
+    ).bind(reward_id).first<{ id: string; title: string; point_cost: number }>().catch(() => null);
   }
   if (!reward) {
     return c.json({ success: false, error: 'Reward not found' }, 404);
@@ -214,35 +223,45 @@ loyaltyRouter.post('/redeem', async(c) => {
   } catch {
     await db.prepare('UPDATE customers SET loyalty_points = ? WHERE id = ?').bind(newPts, cust.id).run();
   }
+  await db.prepare(
+    'UPDATE loyalty_accounts SET current_points = ?, last_activity_at = ?, updated_at = ? WHERE customer_id = ? OR id = ?'
+  ).bind(newPts, now, now, cust.id, `la_${cust.id}`).run().catch(() => {});
+
   const logId = genId('ptl_');
   try {
     await db.prepare(
       'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(logId, cust.id, -reward.point_cost, 'redeem', newPts, `D?i: ${reward.title}`, now).run();
   } catch {
-    try {
-      await db.prepare(
-        'INSERT INTO loyalty_transactions (id, customer_id, points, type, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(logId, cust.id, -reward.point_cost, 'redeem', newPts, `D?i: ${reward.title}`, now).run();
-    } catch {
-      await db.prepare(
-        'INSERT INTO loyalty_transactions (id, customer_id, points, type, description, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(logId, cust.id, -reward.point_cost, 'redeem', `D?i: ${reward.title}`, now).run();
-    }
+    // Ignore when loyalty_point_logs is absent
+  }
+  try {
+    await db.prepare(
+      'INSERT OR IGNORE INTO loyalty_transactions (id, account_id, customer_id, points, type, reason, balance_after, description, reward_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(logId, `la_${cust.id}`, cust.id, -reward.point_cost, 'redeem', 'redeem', newPts, `D?i: ${reward.title}`, reward_id, now).run();
+  } catch {
+    await db.prepare(
+      'INSERT OR IGNORE INTO loyalty_transactions (id, customer_id, points, type, description, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(logId, cust.id, -reward.point_cost, 'redeem', `D?i: ${reward.title}`, now).run().catch(() => {});
   }
 
   const code = `${reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
   const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+  const redemptionId = genId('uwr_');
 
   try {
     await db.prepare(
-      'INSERT INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(genId('uwr_'), cust.id, reward_id, code, 'active', expiresAt, now).run();
+      `INSERT INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, created_at)
+       SELECT ?, ?, ?, ?, 'active', ?, ?
+       WHERE EXISTS (SELECT 1 FROM rewards WHERE id = ?)`
+    ).bind(redemptionId, cust.id, reward_id, code, expiresAt, now, reward_id).run();
   } catch {
-    await db.prepare(
-      'INSERT INTO loyalty_redemptions (id, customer_id, reward_id, points_spent, status, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(genId('uwr_'), cust.id, reward_id, reward.point_cost, 'active', now).run();
+    // Ignore when user_rewards is absent
   }
+  await db.prepare(
+    `INSERT OR IGNORE INTO loyalty_redemptions (id, customer_id, reward_id, code, points_spent, status, expires_at, redeemed_at, created_at)
+     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
+  ).bind(redemptionId, cust.id, reward_id, code, reward.point_cost, expiresAt, now, now).run().catch(() => {});
 
   return c.json({
     success: true,
@@ -255,19 +274,22 @@ loyaltyRouter.get('/my-rewards', async(c) => {
   let results: unknown[] = [];
   try {
     const res = await c.env.AURA_DB.prepare(
-      'SELECT ur.*, r.title, r.discount_type, r.discount_value FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id WHERE ur.customer_id = ? ORDER BY ur.created_at DESC LIMIT 20'
+      'SELECT ur.*, COALESCE(r.title, lr.name) AS title, COALESCE(r.discount_type, lr.type) AS discount_type, COALESCE(r.discount_value, lr.value) AS discount_value FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id LEFT JOIN loyalty_rewards lr ON ur.reward_id = lr.id WHERE ur.customer_id = ? ORDER BY ur.created_at DESC LIMIT 20'
     ).bind(cust.id).all();
     results = res.results || [];
   } catch {
+    results = [];
+  }
+  if (results.length === 0) {
     try {
       const res = await c.env.AURA_DB.prepare(
-        'SELECT lr.*, r.name AS title, r.type AS discount_type, r.value AS discount_value FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r ON lr.reward_id = r.id WHERE lr.customer_id = ? ORDER BY lr.created_at DESC LIMIT 20'
+        'SELECT lr.*, COALESCE(r.name, rw.title) AS title, COALESCE(r.type, rw.discount_type) AS discount_type, COALESCE(r.value, rw.discount_value) AS discount_value FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r ON lr.reward_id = r.id LEFT JOIN rewards rw ON lr.reward_id = rw.id WHERE lr.customer_id = ? ORDER BY lr.created_at DESC LIMIT 20'
       ).bind(cust.id).all();
       results = res.results || [];
     } catch {
       const res = await c.env.AURA_DB.prepare(
         'SELECT lr.*, r.name AS title, r.reward_type AS discount_type, r.reward_value AS discount_value FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r ON lr.reward_id = r.id WHERE lr.customer_id = ? ORDER BY lr.created_at DESC LIMIT 20'
-      ).bind(cust.id).all();
+      ).bind(cust.id).all().catch(() => ({ results: [] }));
       results = res.results || [];
     }
   }

@@ -10,6 +10,14 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
+import { getTenantId } from '../middleware/tenant';
+
+function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (!row) return false;
+  if (!('tenant_id' in row) || row.tenant_id === undefined) return true;
+  const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
 
 export interface FloorPlanTable {
   id: string;
@@ -35,6 +43,7 @@ floorPlanRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'wa
 // GET /api/floor-plan — live floor plan with active session linkage
 floorPlanRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const zone = c.req.query('zone');
   const status = c.req.query('status');
 
@@ -73,12 +82,20 @@ floorPlanRouter.get('/', async (c) => {
       const res = await stmt.all<Record<string, unknown>>();
       results = res.results || [];
     } catch {
-      const tablesOnlyQuery = `SELECT t.* FROM cafe_tables t WHERE 1=1${filterSql}${orderSql}`;
-      const stmt = params.length ? db.prepare(tablesOnlyQuery).bind(...params) : db.prepare(tablesOnlyQuery);
-      const res = await stmt.all<Record<string, unknown>>();
-      results = res.results || [];
+      try {
+        const tablesOnlyQuery = `SELECT t.* FROM cafe_tables t WHERE 1=1${filterSql}${orderSql}`;
+        const stmt = params.length ? db.prepare(tablesOnlyQuery).bind(...params) : db.prepare(tablesOnlyQuery);
+        const res = await stmt.all<Record<string, unknown>>();
+        results = res.results || [];
+      } catch {
+        const minimalQuery = 'SELECT t.* FROM cafe_tables t ORDER BY t.table_number';
+        const res = await db.prepare(minimalQuery).all<Record<string, unknown>>();
+        results = res.results || [];
+      }
     }
   }
+
+  results = results.filter((r) => matchesTenantRow(r, tenantId));
 
   const tables: FloorPlanTable[] = results.map((r) => {
     const hasSession = r.session_id != null;
@@ -116,9 +133,20 @@ floorPlanRouter.get('/', async (c) => {
 // GET /api/floor-plan/summary — aggregate counts only (lightweight poll)
 floorPlanRouter.get('/summary', async (c) => {
   const db = c.env.AURA_DB;
-  const rows = await db.prepare(
-    'SELECT status, COUNT(*) AS c FROM cafe_tables GROUP BY status'
-  ).all<{ status: string; c: number }>();
+  const tenantId = getTenantId(c);
+  let rows: { results: { status: string; c: number }[] };
+  try {
+    rows = await db.prepare(
+      'SELECT status, COUNT(*) AS c FROM cafe_tables WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) GROUP BY status'
+    ).bind(tenantId, tenantId).all<{ status: string; c: number }>();
+  } catch (err) {
+    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+      throw err;
+    }
+    rows = await db.prepare(
+      'SELECT status, COUNT(*) AS c FROM cafe_tables GROUP BY status'
+    ).all<{ status: string; c: number }>();
+  }
   const counts: Record<string, number> = {};
   for (const r of rows.results) counts[r.status] = Number(r.c);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -128,12 +156,13 @@ floorPlanRouter.get('/summary', async (c) => {
 // POST /api/floor-plan/:id/no-show — mark table overdue and schedule auto-release
 floorPlanRouter.post('/:id/no-show', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;
   const timeoutMinutes = Number(body.timeout_minutes ?? 30);
 
   const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!table) return c.json({ success: false, error: 'Table not found' }, 404);
+  if (!matchesTenantRow(table, tenantId)) return c.json({ success: false, error: 'Table not found' }, 404);
 
   const now = new Date().toISOString();
   try {
@@ -184,9 +213,10 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
 // POST /api/floor-plan/:id/release — force-free a table (staff override)
 floorPlanRouter.post('/:id/release', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!table) return c.json({ success: false, error: 'Table not found' }, 404);
+  if (!matchesTenantRow(table, tenantId)) return c.json({ success: false, error: 'Table not found' }, 404);
 
   const now = new Date().toISOString();
   await db.prepare(

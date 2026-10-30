@@ -76,10 +76,11 @@ export async function executeHealthCheckProbe(
   const start = Date.now();
   const now = new Date().toISOString();
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Health probe for ${name} timed out after ${timeoutMs}ms`)), timeoutMs)
-    );
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Health probe for ${name} timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
     await Promise.race([probeFn(), timeoutPromise]);
     const latencyMs = Date.now() - start;
 
@@ -102,5 +103,9 @@ export async function executeHealthCheckProbe(
       error: err?.message || 'Health probe failed',
       lastCheckedAt: now
     };
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   }
 }

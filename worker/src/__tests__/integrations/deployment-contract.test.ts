@@ -11,9 +11,28 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { generateConfig } from '../../../../setup/aura-deploy/src/template/generate';
+import {
+  toDomainSlug,
+  isValidDomainSlug,
+  validateDomainSlug,
+  validateWizardAnswers,
+  validateDeployTarget,
+} from '../../../../setup/aura-deploy/src/wizard/validators';
+import { getQuestions } from '../../../../setup/aura-deploy/src/wizard/questions';
+import {
+  validateGeneratedArtifacts,
+  deployToCloudflare,
+} from '../../../../setup/aura-deploy/src/deploy/cloudflare';
+import {
+  checkApiHealth,
+  checkVersionParity,
+  checkBranding,
+} from '../../../../setup/aura-deploy/src/commands/verify-checks';
 import {
   ENVIRONMENTS,
   REQUIRED_STAGING_CREDENTIALS,
@@ -22,6 +41,7 @@ import {
   validateStagingCredentials,
   evaluateSmokeTests,
   executeSmokeProbe,
+  verifyDeploymentVersionParity,
   CANONICAL_SMOKE_PROBES
 } from '@aura/domain-deployment';
 import type { ReleaseGateCheck, SmokeTestProbeResult } from '@aura/domain-deployment';
@@ -72,6 +92,18 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
     const result = evaluateReleaseGates('staging', 'def5678', checksWithFailedTest);
     expect(result.allowed).toBe(false);
     expect(result.blockingFailure).toContain('Release gate failed: Unit Tests');
+
+    // Empty check suite must fail closed (NOT_RUN is never PASS)
+    const emptyGates = evaluateReleaseGates('staging', 'def5678', []);
+    expect(emptyGates.allowed).toBe(false);
+    expect(emptyGates.blockingFailure).toContain('at least one release gate check');
+
+    // Unknown or blank versionSha must fail closed
+    const unknownSha = evaluateReleaseGates('staging', 'unknown', [
+      { id: '1', name: 'Unit Tests', category: 'test', passed: true, durationMs: 1200 },
+    ]);
+    expect(unknownSha.allowed).toBe(false);
+    expect(unknownSha.blockingFailure).toContain('valid commit versionSha is required');
   });
 
   // ── 4. Migration Ordering & Validation ────────────────────────────────────
@@ -101,6 +133,18 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
     const invalid = validateMigrationSequence(outOfOrder);
     expect(invalid.valid).toBe(false);
     expect(invalid.errors[0]).toContain('chronological order');
+
+    // Duplicate version prefix test
+    const duplicateVersion = ['20261003_01_users.sql', '20261003_01_roles.sql'];
+    const duplicateInvalid = validateMigrationSequence(duplicateVersion);
+    expect(duplicateInvalid.valid).toBe(false);
+    expect(duplicateInvalid.errors[0]).toContain('Duplicate migration version prefix');
+
+    // Orphan down-migration test
+    const orphanDown = ['20261001_01_init.sql', '20261005_01_ghost.down.sql'];
+    const orphanInvalid = validateMigrationSequence(orphanDown);
+    expect(orphanInvalid.valid).toBe(false);
+    expect(orphanInvalid.errors[0]).toContain('Orphan down-migration without matching forward migration');
 
     // Live repository worker/db/migrations directory validation
     const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -142,6 +186,11 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
     expect(evaluation.passedCount).toBe(2);
     expect(evaluation.totalCount).toBe(3);
     expect(evaluation.failedWorkflows).toContain('Cafe Tables');
+
+    // Empty probe results must fail closed (NOT_RUN is never healthy)
+    const emptyEvaluation = evaluateSmokeTests([]);
+    expect(emptyEvaluation.healthy).toBe(false);
+    expect(emptyEvaluation.totalCount).toBe(0);
   });
 
   // ── 6. Secret Exclusion Invariant ─────────────────────────────────────────
@@ -172,16 +221,270 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
     expect(JSON.stringify(readyValidation)).not.toContain('staging-mock-secret-value');
   });
 
-  // ── 8. Target-Scoped Post-Deploy Verification in deploy-cloudflare.sh ─────
-  it('scopes Worker and Pages post-deploy SHA checks to the deployed target and fails closed on mismatch', () => {
+  // ── 8. Target-Scoped Post-Deploy Verification Across All Deploy Entrypoints ─
+  it('scopes Worker and Pages post-deploy SHA checks to the deployed target and fails closed across deploy scripts and CI', async () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
-    const deployScript = readFileSync(resolve(currentDir, '../../../../deploy-cloudflare.sh'), 'utf8');
+    const repoRoot = resolve(currentDir, '../../../..');
+    const deployScript = readFileSync(resolve(repoRoot, 'deploy-cloudflare.sh'), 'utf8');
+    const brandedScript = readFileSync(resolve(repoRoot, 'scripts/deploy-branded.sh'), 'utf8');
+    const fixScript = readFileSync(resolve(repoRoot, 'scripts/deploy-fix.sh'), 'utf8');
+    const githubWorkflow = readFileSync(resolve(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
+    const auraDeployCmd = readFileSync(resolve(repoRoot, 'setup/aura-deploy/src/commands/deploy.ts'), 'utf8');
 
-    expect(deployScript).toContain('if [[ "$PAGES_ONLY" == "false" ]]; then');
-    expect(deployScript).toContain('if [[ "$WORKER_ONLY" == "false" ]]; then');
-    expect(deployScript).toMatch(
-      /Custom domain SHA DISCREPANCY after \$MAX_RETRIES attempts[\s\S]*?exit 1/,
+    for (const script of [deployScript, brandedScript]) {
+      expect(script).toContain('if [[ "$PAGES_ONLY" == "false" ]]; then');
+      expect(script).toContain('if [[ "$WORKER_ONLY" == "false" ]]; then');
+      expect(script).toMatch(/Health: FAILED after \$MAX_RETRIES attempts[\s\S]*?exit 1/);
+      expect(script).toMatch(/SHA MISMATCH after \$MAX_RETRIES attempts[\s\S]*?exit 1/);
+      expect(script).toMatch(/Custom domain SHA DISCREPANCY after \$MAX_RETRIES attempts[\s\S]*?exit 1/);
+    }
+
+    expect(fixScript).toMatch(/Custom domain SHA DISCREPANCY after \$MAX_RETRIES attempts[\s\S]*?exit 1/);
+    expect(githubWorkflow).toContain('cat > dist/version.json << VERSIONEOF');
+    expect(githubWorkflow).toContain('"deployScript": "github-actions-deploy-pages"');
+    expect(auraDeployCmd).toContain("writeFileSync(resolve(distDir, 'version.json')");
+    expect(auraDeployCmd).toMatch(/if \(!workerDeployOk\) \{\s*console\.error[\s\S]*?process\.exit\(1\)/);
+
+    const tempOut = mkdtempSync(join(tmpdir(), 'aura-template-test-'));
+    try {
+      const paths = await generateConfig(
+        {
+          cafeName: 'Aura "Industrial" \\ Cafe',
+          domainSlug: 'aura-industrial',
+          primaryColor: '#D4A574',
+          tagline: 'Specialty "Container" \\ Coffee',
+          adminEmail: 'ops@auraspace.cafe',
+          adminPassword: 'p@ss"word\\123',
+        },
+        tempOut,
+      );
+      const parsedBrand = JSON.parse(readFileSync(paths.brandJson, 'utf8'));
+      expect(parsedBrand.brand.name).toBe('Aura "Industrial" \\ Cafe');
+      expect(parsedBrand.brand.tagline).toBe('Specialty "Container" \\ Coffee');
+
+      const wranglerToml = readFileSync(paths.wranglerToml, 'utf8');
+      expect(wranglerToml).toContain('binding = "AURA_DB"');
+      expect(wranglerToml).toContain('binding = "AUTH_KV"');
+      expect(wranglerToml).toContain('name = "ORDER_BROADCASTER"');
+      expect(wranglerToml).toContain('compatibility_flags = ["nodejs_compat"]');
+    } finally {
+      rmSync(tempOut, { recursive: true, force: true });
+    }
+  });
+
+  // ── 9. Post-Deploy Smoke Payload, Version Parity & aura-deploy verify Fail-Closed ─
+  it('rejects HTML SPA fallbacks, detects Pages/Worker SHA drift, and enforces fail-closed health and version checks', async () => {
+    const healthProbe = CANONICAL_SMOKE_PROBES.find((p) => p.path === '/api/health')!;
+    const readyProbe = CANONICAL_SMOKE_PROBES.find((p) => p.path === '/api/health?ready=1')!;
+    const versionProbe = CANONICAL_SMOKE_PROBES.find((p) => p.path === '/api/version')!;
+
+    // 1. HTML SPA fallback on /api/health -> failed
+    const htmlFallbackFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      text: async () => '<!doctype html><html><body>SPA Fallback</body></html>',
+    });
+    const htmlResult = await executeSmokeProbe(
+      'https://auraspace.cafe',
+      healthProbe,
+      htmlFallbackFetch as unknown as typeof fetch,
     );
+    expect(htmlResult.status).toBe('failed');
+    expect(htmlResult.error).toContain('non-JSON or HTML fallback');
+
+    // 2. Degraded readiness payload -> degraded
+    const degradedFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      text: async () => JSON.stringify({ status: 'degraded', readiness: true }),
+    });
+    const degradedResult = await executeSmokeProbe(
+      'https://auraspace.cafe',
+      readyProbe,
+      degradedFetch as unknown as typeof fetch,
+    );
+    expect(degradedResult.status).toBe('degraded');
+    const evalDegraded = evaluateSmokeTests([degradedResult]);
+    expect(evalDegraded.degradedWorkflows).toContain('System Deep Readiness');
+
+    // 3. Version probe with expectedSha mismatch -> failed
+    const shaFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      text: async () => JSON.stringify({ shortSha: 'deadbeef', fullSha: 'deadbeef12345678' }),
+    });
+    const mismatchResult = await executeSmokeProbe(
+      'https://auraspace.cafe',
+      versionProbe,
+      shaFetch as unknown as typeof fetch,
+      { expectedSha: 'cafebabe99887766' },
+    );
+    expect(mismatchResult.status).toBe('failed');
+    expect(mismatchResult.error).toContain('SHA mismatch');
+
+    const matchResult = await executeSmokeProbe(
+      'https://auraspace.cafe',
+      versionProbe,
+      shaFetch as unknown as typeof fetch,
+      { expectedSha: 'deadbeef12345678' },
+    );
+    expect(matchResult.status).toBe('passed');
+
+    // 4. verifyDeploymentVersionParity detects split-brain Pages vs Worker SHA drift
+    const driftFetch = vi.fn().mockImplementation(async (url: string) => ({
+      status: 200,
+      text: async () =>
+        url.endsWith('/version.json')
+          ? JSON.stringify({ sha: '1111222233334444', shortSha: '11112222' })
+          : JSON.stringify({ fullSha: '9999888877776666', shortSha: '99998888' }),
+    }));
+    const driftParity = await verifyDeploymentVersionParity(
+      'https://auraspace.cafe',
+      undefined,
+      driftFetch as unknown as typeof fetch,
+    );
+    expect(driftParity.matches).toBe(false);
+    expect(driftParity.error).toContain('Pages/Worker SHA drift detected');
+
+    const syncedFetch = vi.fn().mockImplementation(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ sha: 'fab0904011223344', fullSha: 'fab0904011223344', shortSha: 'fab09040' }),
+    }));
+    const syncedParity = await verifyDeploymentVersionParity(
+      'https://auraspace.cafe',
+      'fab0904011223344',
+      syncedFetch as unknown as typeof fetch,
+    );
+    expect(syncedParity.matches).toBe(true);
+    expect(syncedParity.pagesSha).toBe('fab09040');
+    expect(syncedParity.workerSha).toBe('fab09040');
+
+    // 5. setup/aura-deploy verify helpers fail closed on HTML health and SHA drift
+    const htmlHealthCheck = await checkApiHealth('auraspace.cafe', async () => ({
+      status: 200,
+      body: '<!doctype html><html></html>',
+    }));
+    expect(htmlHealthCheck.status).toBe('FAIL');
+
+    const okHealthCheck = await checkApiHealth('auraspace.cafe', async () => ({
+      status: 200,
+      body: JSON.stringify({ status: 'ok', d1: 'connected' }),
+    }));
+    expect(okHealthCheck.status).toBe('PASS');
+
+    const parityFailCheck = await checkVersionParity('auraspace.cafe', 'fab09040', async (url) => ({
+      status: 200,
+      body: url.endsWith('/version.json')
+        ? JSON.stringify({ shortSha: 'fab09040' })
+        : JSON.stringify({ shortSha: '1deddb64' }),
+    }));
+    expect(parityFailCheck.status).toBe('FAIL');
+    expect(parityFailCheck.detail).toContain('Pages/Worker SHA mismatch');
+
+    const parityPassCheck = await checkVersionParity('auraspace.cafe', 'fab0904011223344', async () => ({
+      status: 200,
+      body: JSON.stringify({ sha: 'fab0904011223344', shortSha: 'fab09040' }),
+    }));
+    expect(parityPassCheck.status).toBe('PASS');
+
+    const brandPassCheck = await checkBranding('auraspace.cafe', 'AURA CAFE', async () => ({
+      status: 200,
+      body: '<html><title>AURA CAFE — Sa Dec</title></html>',
+    }));
+    expect(brandPassCheck.status).toBe('PASS');
+
+    // 6. Verify smoke-saas.sh fail-closed version contract
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = resolve(currentDir, '../../../..');
+    const smokeSaasScript = readFileSync(resolve(repoRoot, 'scripts/smoke-saas.sh'), 'utf8');
+    expect(smokeSaasScript).not.toContain('pass "version (no sha)"');
+    expect(smokeSaasScript).toContain('fail "version-invalid-sha: $VER"');
+    expect(smokeSaasScript).toContain('fail "version-sha-mismatch: expected $EXPECTED_SHORT, got $SHORT_SHA"');
+  });
+
+  // ── 10. aura-deploy Wizard, Template Guard, Cloudflare Preflight & Deploy Target Validation ─
+  it('validates hyphenated domain slugs, rejects invalid wizard answers and missing artifacts, and guards deploy targets', async () => {
+    expect(toDomainSlug('AURA CAFE — Sa Đéc 2')).toBe('aura-cafe-sa-dec-2');
+    expect(isValidDomainSlug('aura-industrial')).toBe(true);
+    expect(isValidDomainSlug('sadec-2')).toBe(true);
+    expect(isValidDomainSlug('ab')).toBe(false);
+    expect(isValidDomainSlug('-leading')).toBe(false);
+    expect(isValidDomainSlug('trailing-')).toBe(false);
+    expect(isValidDomainSlug('double--hyphen')).toBe(false);
+    expect(isValidDomainSlug('../evil')).toBe(false);
+    expect(validateDomainSlug('my_cafe!')).toContain('lowercase alphanumeric');
+
+    const slugQuestion = getQuestions().find((q) => q.name === 'domainSlug')!;
+    expect(slugQuestion.transform?.('', { cafeName: 'AURA Space — Đéc' })).toBe('aura-space-dec');
+    // Transform must not strip invalid characters before validate runs
+    const transformedInvalid = slugQuestion.transform?.('../evil_slug', { cafeName: 'Aura' }) ?? '';
+    expect(slugQuestion.validate(transformedInvalid)).not.toBeNull();
+
+    const invalidErrors = validateWizardAnswers({
+      cafeName: '',
+      domainSlug: '../evil',
+      primaryColor: 'not-a-color',
+      tagline: 'x'.repeat(101),
+      adminEmail: 'invalid-email',
+      adminPassword: 'short',
+    });
+    expect(Object.keys(invalidErrors)).toEqual([
+      'cafeName',
+      'domainSlug',
+      'primaryColor',
+      'tagline',
+      'adminEmail',
+      'adminPassword',
+    ]);
+
+    const tempOut = mkdtempSync(join(tmpdir(), 'aura-preflight-test-'));
+    try {
+      await expect(
+        generateConfig(
+          {
+            cafeName: 'Aura Cafe',
+            domainSlug: '../bad-slug',
+            primaryColor: '#D4A574',
+            tagline: 'Specialty Coffee',
+            adminEmail: 'ops@auraspace.cafe',
+            adminPassword: 'strongpassword123',
+          },
+          tempOut,
+        ),
+      ).rejects.toThrow(/Invalid wizard answers for config generation/);
+
+      const validAnswers = {
+        cafeName: 'Aura Sa Dec',
+        domainSlug: 'aura-sadec',
+        primaryColor: '#D4A574',
+        tagline: 'Specialty Container Coffee',
+        adminEmail: 'ops@auraspace.cafe',
+        adminPassword: 'strongpassword123',
+      };
+      const generated = await generateConfig(validAnswers, tempOut);
+
+      const validCheck = validateGeneratedArtifacts(generated, validAnswers);
+      expect(validCheck.valid).toBe(true);
+      expect(validCheck.errors).toEqual([]);
+
+      const cfResult = await deployToCloudflare(generated, validAnswers, () => true);
+      expect(cfResult).toEqual({
+        projectName: 'aura-cafe-aura-sadec',
+        pagesUrl: 'https://aura-sadec.pages.dev',
+        apiUrl: 'https://aura-sadec.pages.dev/api',
+      });
+
+      await expect(
+        deployToCloudflare(
+          { ...generated, brandJson: join(tempOut, 'missing-brand.json') },
+          validAnswers,
+          () => false,
+        ),
+      ).rejects.toThrow(/brandJson does not exist/);
+    } finally {
+      rmSync(tempOut, { recursive: true, force: true });
+    }
+
+    expect(validateDeployTarget('aura-sadec', 'aura-cafe-aura-sadec').valid).toBe(true);
+    expect(validateDeployTarget('aura-sadec; rm -rf /', 'aura-cafe').valid).toBe(false);
+    expect(validateDeployTarget('aura-sadec', 'bad_project; whoami').valid).toBe(false);
   });
 });
 

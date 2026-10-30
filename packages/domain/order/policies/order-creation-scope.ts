@@ -9,7 +9,7 @@ export class OrderCreationError extends Error {
   constructor(message: string, readonly status: 400 | 401 | 403 | 404 | 409 | 503, readonly code?: string) { super(message); }
 }
 
-const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef']);
+const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper']);
 
 /** Public checkout belongs to this deployment's flagship store. No public store mapping exists yet. */
 export async function resolveOrderCreationScope(

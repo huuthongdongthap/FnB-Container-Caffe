@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { timingSafeEqual } from '@aura/domain-security';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
@@ -30,12 +31,13 @@ containerTelemetryRouter.post(
   async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production' || (c.env as Record<string, unknown>)?.NODE_ENV === 'production';
     const providedSecret = c.req.header('x-edge-telemetry-secret') || c.req.header('x-webhook-secret');
-    const expectedSecret = ((c.env as Record<string, unknown>)?.EDGE_TELEMETRY_SECRET as string | undefined) || c.env?.WEBHOOK_SECRET;
+    const rawExpected = ((c.env as Record<string, unknown>)?.EDGE_TELEMETRY_SECRET ?? c.env?.WEBHOOK_SECRET);
+    const expectedSecret = typeof rawExpected === 'string' && rawExpected.length > 0 ? rawExpected : undefined;
 
-    if (providedSecret && expectedSecret && providedSecret === expectedSecret) {
+    if (providedSecret && expectedSecret && await timingSafeEqual(providedSecret, expectedSecret)) {
       return next();
     }
-    if (isProd || c.req.header('Authorization') || providedSecret) {
+    if (isProd || Boolean(expectedSecret) || c.req.header('Authorization') || providedSecret) {
       return requireAuth(['owner', 'admin', 'manager', 'staff'])(c, next);
     }
     return next();

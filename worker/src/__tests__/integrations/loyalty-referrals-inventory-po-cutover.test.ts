@@ -569,6 +569,164 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
       { ...env, CAL_WEBHOOK_SECRET: env.CAL_WEBHOOK_SECRET || 'test-cal-secret' }
     );
     expect(calWebhookRes.status).toBe(200);
+
+    // 12. Loyalty & Inventory Dual-Table Unification Verification (zero SQL errors)
+    const cust1Auth = { Authorization: `Bearer ${cust1Token}`, 'Content-Type': 'application/json' };
+    const custAccountRes = await app.request('/api/loyalty/account', { headers: cust1Auth }, env);
+    expect(custAccountRes.status).toBe(200);
+    const custAccountBody = (await custAccountRes.json()) as { data: { currentPoints: number } };
+    expect(custAccountBody.data.currentPoints).toBe(500);
+
+    const adjustRes = await app.request(
+      '/api/loyalty/admin/adjust-points',
+      {
+        method: 'POST',
+        headers: ownerAuth,
+        body: JSON.stringify({
+          customerId: 'cust_01',
+          points: 250,
+          reason: 'VIP milestone bonus',
+          idempotencyKey: 'idem_adj_unify_01',
+        }),
+      },
+      env
+    );
+    expect(adjustRes.status).toBe(200);
+    const custAfterAdjust = sqlite.prepare(`SELECT loyalty_points FROM customers WHERE id = 'cust_01'`).get() as { loyalty_points: number };
+    const acctAfterAdjust = sqlite.prepare(`SELECT current_points FROM loyalty_accounts WHERE customer_id = 'cust_01'`).get() as { current_points: number };
+    expect(custAfterAdjust.loyalty_points).toBe(750);
+    expect(acctAfterAdjust.current_points).toBe(750);
+
+    const rewardsListRes = await app.request('/api/loyalty/rewards', { headers: cust1Auth }, env);
+    expect(rewardsListRes.status).toBe(200);
+    const rewardsListBody = (await rewardsListRes.json()) as { data: { rewards: Array<{ id: string }> } };
+    expect(rewardsListBody.data.rewards.map((r) => r.id)).toEqual(
+      expect.arrayContaining(['rw_disc_20k', 'rw_cf_free', 'rw_disc_15pct'])
+    );
+
+    const createRewardRes = await app.request(
+      '/api/loyalty/rewards',
+      {
+        method: 'POST',
+        headers: ownerAuth,
+        body: JSON.stringify({
+          name: 'Voucher Matcha 30K',
+          description: 'Giảm 30K cho Matcha Latte',
+          pointsCost: 250,
+          type: 'voucher',
+          value: 30000,
+          isActive: true,
+        }),
+      },
+      env
+    );
+    expect(createRewardRes.status).toBe(201);
+    const createdRewardBody = (await createRewardRes.json()) as { data: { id: string } };
+    const legacyRewardMirror = sqlite.prepare(`SELECT id, point_cost FROM rewards WHERE id = ?`).get(createdRewardBody.data.id) as { id: string; point_cost: number } | undefined;
+    expect(legacyRewardMirror?.point_cost).toBe(250);
+
+    const redeemRes = await app.request(
+      '/api/loyalty/rewards/redeem',
+      {
+        method: 'POST',
+        headers: cust1Auth,
+        body: JSON.stringify({
+          rewardId: 'rw_disc_20k',
+          idempotencyKey: 'idem_redeem_unify_01',
+        }),
+      },
+      env
+    );
+    expect(redeemRes.status).toBe(200);
+    const custAfterRedeem = sqlite.prepare(`SELECT loyalty_points FROM customers WHERE id = 'cust_01'`).get() as { loyalty_points: number };
+    const acctAfterRedeem = sqlite.prepare(`SELECT current_points FROM loyalty_accounts WHERE customer_id = 'cust_01'`).get() as { current_points: number };
+    expect(custAfterRedeem.loyalty_points).toBe(550);
+    expect(acctAfterRedeem.current_points).toBe(550);
+    const userRewardMirror = sqlite.prepare(`SELECT reward_id, status FROM user_rewards WHERE customer_id = 'cust_01' AND reward_id = 'rw_disc_20k'`).get() as { reward_id: string; status: string } | undefined;
+    expect(userRewardMirror?.status).toBe('active');
+    const pointLogMirror = sqlite.prepare(`SELECT COUNT(*) AS cnt FROM loyalty_point_logs WHERE customer_id = 'cust_01'`).get() as { cnt: number };
+    expect(pointLogMirror.cnt).toBeGreaterThanOrEqual(2);
+
+    const patchTierRes = await app.request(
+      '/api/loyalty/tiers/silver',
+      {
+        method: 'PATCH',
+        headers: ownerAuth,
+        body: JSON.stringify({ minPoints: 450, pointMultiplier: 1.25 }),
+      },
+      env
+    );
+    expect(patchTierRes.status).toBe(200);
+    const tierCfgMirror = sqlite.prepare(`SELECT min_points FROM tier_configs WHERE tier = 'silver'`).get() as { min_points: number };
+    const loyaltyTierMirror = sqlite.prepare(`SELECT min_points FROM loyalty_tiers WHERE tier_name = 'silver'`).get() as { min_points: number };
+    expect(tierCfgMirror.min_points).toBe(450);
+    expect(loyaltyTierMirror.min_points).toBe(450);
+
+    const createIngRes = await app.request(
+      '/api/inventory/ingredients',
+      {
+        method: 'POST',
+        headers: ownerAuth,
+        body: JSON.stringify({
+          name: 'Bột Cacao Nguyên Chất',
+          sku: 'ING-CACAO-01',
+          category: 'powder',
+          unit: 'g',
+          costPerUnit: 420,
+          currentStock: 2000,
+          minStock: 200,
+          maxStock: 5000,
+          isActive: true,
+        }),
+      },
+      env
+    );
+    expect(createIngRes.status).toBe(201);
+    const createdIngBody = (await createIngRes.json()) as { data: { id: string } };
+    const invItemMirror = sqlite.prepare(`SELECT id, sku, current_stock, cost_per_unit FROM inventory_items WHERE id = ?`).get(createdIngBody.data.id) as {
+      id: string;
+      sku: string;
+      current_stock: number;
+      cost_per_unit: number;
+    } | undefined;
+    expect(invItemMirror?.sku).toBe('ING-CACAO-01');
+    expect(invItemMirror?.current_stock).toBe(2000);
+    expect(invItemMirror?.cost_per_unit).toBe(420);
+
+    const createMovRes = await app.request(
+      '/api/inventory/movements',
+      {
+        method: 'POST',
+        headers: ownerAuth,
+        body: JSON.stringify({
+          ingredientId: createdIngBody.data.id,
+          type: 'out',
+          quantity: -140,
+          referenceType: 'order',
+          referenceId: 'ord_guest_01',
+          notes: 'Barista usage',
+        }),
+      },
+      env
+    );
+    expect(createMovRes.status).toBe(201);
+    const invItemAfterMov = sqlite.prepare(`SELECT current_stock FROM inventory_items WHERE id = ?`).get(createdIngBody.data.id) as { current_stock: number };
+    const invTxMirror = sqlite.prepare(`SELECT type, quantity, reference_type FROM inventory_transactions WHERE item_id = ?`).get(createdIngBody.data.id) as {
+      type: string;
+      quantity: number;
+      reference_type: string;
+    } | undefined;
+    expect(invItemAfterMov.current_stock).toBe(1860);
+    expect(invTxMirror?.type).toBe('out');
+    expect(invTxMirror?.quantity).toBe(-140);
+    expect(invTxMirror?.reference_type).toBe('order');
+
+    const runRateRes = await app.request('/api/inventory/forecasting/run-rate?days=7', { headers: ownerAuth }, env);
+    expect(runRateRes.status).toBe(200);
+    const runRateBody = (await runRateRes.json()) as { data: Array<{ id: string; daily_run_rate: number }> };
+    const cacaoForecast = runRateBody.data.find((it) => it.id === createdIngBody.data.id);
+    expect(cacaoForecast?.daily_run_rate).toBe(20);
+
     expect(sqlErrors).toEqual([]);
   });
 });

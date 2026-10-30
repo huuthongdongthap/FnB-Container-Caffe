@@ -19,6 +19,7 @@ export function canStaffOperateShift(role: StaffRole): boolean {
     roleStr === 'owner' ||
     roleStr === 'admin' ||
     roleStr === 'manager' ||
+    roleStr === 'supervisor' ||
     roleStr === 'staff' ||
     roleStr === 'cashier' ||
     roleStr === 'barista' ||
@@ -34,7 +35,10 @@ export async function openCanonicalShift(
   if (!canStaffOperateShift(input.role)) {
     return { ok: false, error: 'unauthorized_role' };
   }
-  if (typeof input.openingCash !== 'number' || input.openingCash < 0) {
+  if (!input.staffId || typeof input.staffId !== 'string' || !input.staffId.trim()) {
+    return { ok: false, error: 'invalid_staff_id' };
+  }
+  if (typeof input.openingCash !== 'number' || !Number.isFinite(input.openingCash) || input.openingCash < 0) {
     return { ok: false, error: 'invalid_opening_cash' };
   }
 
@@ -132,6 +136,9 @@ export async function recordShiftSale(
   db: D1Database,
   input: PosSaleInput
 ): Promise<{ ok: boolean; alreadyRecorded?: boolean; error?: string }> {
+  if (typeof input.amount !== 'number' || !Number.isFinite(input.amount) || input.amount <= 0) {
+    return { ok: false, error: 'invalid_sale_amount' };
+  }
   let shift: ShiftRecord | null = null;
   try {
     shift = await db.prepare(
@@ -177,6 +184,9 @@ export async function closeCanonicalShift(
   db: D1Database,
   input: CloseShiftInput
 ): Promise<{ ok: boolean; shift?: ShiftRecord; variance?: number; error?: string }> {
+  if (typeof input.actualCash !== 'number' || !Number.isFinite(input.actualCash) || input.actualCash < 0) {
+    return { ok: false, error: 'invalid_actual_cash' };
+  }
   let shift: ShiftRecord | null = null;
   try {
     shift = await db.prepare(

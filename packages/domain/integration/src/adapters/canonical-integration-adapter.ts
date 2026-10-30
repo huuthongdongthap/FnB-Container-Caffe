@@ -46,7 +46,8 @@ export async function executeExternalIntegration<T = unknown>(
   } catch (err: any) {
     clearTimeout(timer);
     const isTimeout = err?.name === 'AbortError' || String(err?.message || '').toLowerCase().includes('timeout');
-    const classification = classifyIntegrationError(isTimeout ? 504 : 500, err?.message);
+    const upstreamStatus = isTimeout ? 504 : (err?.status ?? err?.statusCode ?? 500);
+    const classification = classifyIntegrationError(upstreamStatus, err?.message);
 
     return {
       ok: false,

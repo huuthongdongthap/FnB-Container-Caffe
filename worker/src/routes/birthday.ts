@@ -6,6 +6,7 @@
 import { Hono } from 'hono';
 import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
 import { requireAuth } from '../middleware/auth';
+import { getTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 
 
@@ -17,27 +18,32 @@ type BirthdayCustomerRow = {
   phone?: string;
   birthday?: string | null;
   date_of_birth?: string | null;
+  tenant_id?: string | null;
 };
 
 async function findBirthdayCustomer(
   db: Env['AURA_DB'],
-  by: { id?: string; phone?: string }
+  by: { id?: string; phone?: string },
+  tenantId = 'default'
 ): Promise<{ id: string; name: string; phone: string; birthday: string } | null> {
   const col = by.id ? 'id' : 'phone';
   const val = by.id ?? by.phone ?? '';
   let row: BirthdayCustomerRow | null = null;
   try {
     row = await db
-      .prepare(`SELECT id, name, phone, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
+      .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
       .bind(val)
       .first<BirthdayCustomerRow>();
   } catch {
     row = await db
-      .prepare(`SELECT id, name, phone, birthday FROM customers WHERE ${col} = ?`)
+      .prepare(`SELECT * FROM customers WHERE ${col} = ?`)
       .bind(val)
       .first<BirthdayCustomerRow>();
   }
   if (!row) return null;
+  if ('tenant_id' in row && row.tenant_id !== undefined && (row.tenant_id || 'default') !== tenantId) {
+    return null;
+  }
   const resolvedBirthday = row.birthday ?? row.date_of_birth ?? '';
   return {
     id: row.id,
@@ -107,9 +113,11 @@ birthdayRouter.get('/check', async(c) => {
   }
 
   try {
+    const tenantId = getTenantId(c);
     const customer = await findBirthdayCustomer(
       db,
-      customerId ? { id: customerId } : { phone: phone || '' }
+      customerId ? { id: customerId } : { phone: phone || '' },
+      tenantId
     );
 
     if (!customer || !customer.birthday) {
@@ -191,16 +199,30 @@ birthdayRouter.get('/check', async(c) => {
 });
 
 // POST /api/birthday/redeem — redeem birthday discount
-birthdayRouter.post('/redeem', async(c) => {
+birthdayRouter.post(
+  '/redeem',
+  async (c, next) => {
+    const isProd = c.env?.ENVIRONMENT === 'production';
+    if ((isProd && c.env?.JWT_SECRET) || c.req.header('Authorization')) {
+      return requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier', 'customer'])(c, next);
+    }
+    await next();
+  },
+  async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = redeemBirthdaySchema.safeParse(body);
   if (!parsed.success) {
     return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
+  const user = c.get('user' as any) as { id?: string; role?: string } | undefined;
+  if (user?.role === 'customer' && user.id && user.id !== data.customer_id) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
 
-  const customer = await findBirthdayCustomer(db, { id: data.customer_id });
+  const customer = await findBirthdayCustomer(db, { id: data.customer_id }, tenantId);
 
   if (!customer || !customer.birthday) {
     return c.json({ success: false, error: 'Customer not found or no birthday' }, 404);

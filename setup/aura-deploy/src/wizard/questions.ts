@@ -1,4 +1,11 @@
-import { validateRequired, validateEmail, validateHexColor, validatePassword } from './validators.js';
+import {
+  validateRequired,
+  validateEmail,
+  validateHexColor,
+  validatePassword,
+  validateDomainSlug,
+  toDomainSlug,
+} from './validators.js';
 
 export interface Question {
   name: string;
@@ -21,21 +28,11 @@ export function getQuestions(): Question[] {
       message: 'Domain slug (auto-suggested from cafe name)',
       transform(value: string, answers: Record<string, string>): string {
         if (!value || value.trim().length === 0) {
-          return (answers.cafeName || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '');
+          return toDomainSlug(answers.cafeName || '');
         }
-        return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return value.trim().toLowerCase();
       },
-      validate(value: string): string | null {
-        if (!value || value.trim().length === 0) {
-          return 'Domain slug is required';
-        }
-        if (!/^[a-z0-9]+$/.test(value)) {
-          return 'Only lowercase alphanumeric characters allowed';
-        }
-        return null;
-      },
+      validate: validateDomainSlug,
     },
     {
       name: 'primaryColor',

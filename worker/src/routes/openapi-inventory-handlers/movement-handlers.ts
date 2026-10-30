@@ -3,6 +3,31 @@ import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
 
+function mapToCanonicalTxType(type: string, quantity: number): string {
+  if (type === 'in' || type === 'out' || type === 'waste' || type === 'reserve' || type === 'release') {
+    return type;
+  }
+  if (type === 'adjustment' || type === 'adjust') {
+    return 'adjust';
+  }
+  if (type === 'transfer') {
+    return quantity < 0 ? 'out' : 'in';
+  }
+  return quantity >= 0 ? 'in' : 'adjust';
+}
+
+function mapToCanonicalRefType(refType?: string | null): string | null {
+  if (!refType) return null;
+  if (refType === 'order' || refType === 'purchase' || refType === 'adjustment' || refType === 'waste_report' || refType === 'sync') {
+    return refType;
+  }
+  if (refType === 'sale') return 'order';
+  if (refType === 'purchase_order') return 'purchase';
+  if (refType === 'waste') return 'waste_report';
+  if (refType === 'manual' || refType === 'audit' || refType === 'transfer' || refType === 'production') return 'adjustment';
+  return null;
+}
+
 export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/movements - List stock movements
   app.openapi(InventoryRoutes.movements.list as any, async (c: any) => {
@@ -44,20 +69,18 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       total = countResult?.total || 0;
     } catch {
       usingCanonical = true;
-      const canonicalWhere = whereClause.replace(/ingredient_id/g, 'item_id');
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM inventory_transactions ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
-      total = countResult?.total || 0;
     }
 
-    if (!usingCanonical) {
+    if (!usingCanonical && total > 0) {
       try {
         const aliasWhere = whereClause
           ? whereClause.replace(/ingredient_id/g, 'sm.ingredient_id').replace(/created_at/g, 'sm.created_at').replace(/\btype =/g, 'sm.type =')
           : '';
         const items = (await db.prepare(
-          `SELECT sm.*, i.name as ingredient_name, i.sku as ingredient_sku, i.unit as ingredient_unit
+          `SELECT sm.*, COALESCE(i.name, ii.name) as ingredient_name, COALESCE(i.sku, ii.sku, ii.id) as ingredient_sku, COALESCE(i.unit, ii.unit) as ingredient_unit
            FROM stock_movements sm
            LEFT JOIN ingredients i ON sm.ingredient_id = i.id
+           LEFT JOIN inventory_items ii ON sm.ingredient_id = ii.id
            ${aliasWhere}
            ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
         ).bind(...params, limit, offset).all()) as { results: any[] };
@@ -72,21 +95,30 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           itemsResults = [];
         }
       }
-    } else {
-      try {
-        const aliasWhere = whereClause
-          ? whereClause.replace(/ingredient_id/g, 'sm.item_id').replace(/created_at/g, 'sm.created_at').replace(/\btype =/g, 'sm.type =')
-          : '';
-        const items = (await db.prepare(
-          `SELECT sm.*, sm.item_id as ingredient_id, sm.reason as notes, sm.performed_by as created_by, i.name as ingredient_name, i.id as ingredient_sku, i.unit as ingredient_unit
-           FROM inventory_transactions sm
-           LEFT JOIN inventory_items i ON sm.item_id = i.id
-           ${aliasWhere}
-           ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
-        ).bind(...params, limit, offset).all()) as { results: any[] };
-        itemsResults = items.results || [];
-      } catch {
-        itemsResults = [];
+    }
+
+    if (usingCanonical || itemsResults.length === 0) {
+      const canonicalParams = params.map((p) => (p === 'adjustment' ? 'adjust' : p));
+      const canonicalWhere = whereClause.replace(/ingredient_id/g, 'item_id');
+      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM inventory_transactions ${canonicalWhere}`).bind(...canonicalParams).first().catch(() => null)) as { total: number } | null;
+      const fallbackTotal = countResult?.total || 0;
+      if (usingCanonical || fallbackTotal > 0) {
+        total = fallbackTotal;
+        try {
+          const aliasWhere = whereClause
+            ? whereClause.replace(/ingredient_id/g, 'sm.item_id').replace(/created_at/g, 'sm.created_at').replace(/\btype =/g, 'sm.type =')
+            : '';
+          const items = (await db.prepare(
+            `SELECT sm.*, sm.item_id as ingredient_id, CASE WHEN sm.type = 'adjust' THEN 'adjustment' ELSE sm.type END as type, i.name as ingredient_name, COALESCE(i.sku, i.id) as ingredient_sku, i.unit as ingredient_unit
+             FROM inventory_transactions sm
+             LEFT JOIN inventory_items i ON sm.item_id = i.id
+             ${aliasWhere}
+             ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
+          ).bind(...canonicalParams, limit, offset).all()) as { results: any[] };
+          itemsResults = items.results || [];
+        } catch {
+          itemsResults = [];
+        }
       }
     }
 
@@ -110,7 +142,12 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(body.ingredientId).first();
     } catch {
       usingCanonical = true;
-      ingredient = await db.prepare('SELECT * FROM inventory_items WHERE id = ?').bind(body.ingredientId).first();
+    }
+    if (!ingredient) {
+      ingredient = await db.prepare('SELECT * FROM inventory_items WHERE id = ?').bind(body.ingredientId).first().catch(() => null);
+      if (ingredient) {
+        usingCanonical = true;
+      }
     }
     if (!ingredient) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
@@ -123,6 +160,8 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const id = `mov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const canonicalTxType = mapToCanonicalTxType(body.type, body.quantity);
+    const canonicalRefType = mapToCanonicalRefType(body.referenceType);
 
     if (!usingCanonical) {
       await db.prepare(
@@ -142,21 +181,40 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
       await db.prepare('UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?')
         .bind(newStock, now, body.ingredientId).run();
-    } else {
-      const txType = body.quantity >= 0 ? 'restock' : 'adjustment';
+
+      await db.prepare('UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?')
+        .bind(newStock, now, body.ingredientId).run().catch(() => {});
+
       await db.prepare(
-        `INSERT INTO inventory_transactions (id, item_id, type, quantity, previous_stock, new_stock, unit_cost, reason, performed_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT OR IGNORE INTO inventory_transactions (
+          id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
       ).bind(
         id,
         body.ingredientId,
-        txType,
+        canonicalTxType,
         body.quantity,
-        previousStock,
-        newStock,
-        ingredient.unit_cost || 0,
+        canonicalRefType,
+        body.referenceId || null,
         body.notes || body.type || null,
-        user.id,
+        now,
+        body.ingredientId
+      ).run().catch(() => {});
+    } else {
+      await db.prepare(
+        `INSERT INTO inventory_transactions (
+          id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.ingredientId,
+        canonicalTxType,
+        body.quantity,
+        canonicalRefType,
+        body.referenceId || null,
+        body.notes || body.type || null,
         now
       ).run();
 
@@ -164,18 +222,18 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         .bind(newStock, now, body.ingredientId).run();
     }
 
+    const metaStr = JSON.stringify(body);
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'stock_movement_create', 'stock_movement', id, JSON.stringify(body), now).run();
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(user.id, user.id, user.id, 'stock_movement_create', 'stock_movement', id, 'stock_movement', id, metaStr, metaStr, now).run();
     } catch {
-      const metaStr = JSON.stringify(body);
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, user.id, 'stock_movement_create', 'stock_movement', id, 'stock_movement', id, metaStr, metaStr, now).run();
+          `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(`audit_${Date.now()}`, user.id, 'stock_movement_create', 'stock_movement', id, metaStr, now).run();
       } catch {
         try {
           await db.prepare(
@@ -191,7 +249,7 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!usingCanonical) {
       movement = await db.prepare('SELECT * FROM stock_movements WHERE id = ?').bind(id).first();
     } else {
-      movement = await db.prepare('SELECT *, item_id as ingredient_id, reason as notes, performed_by as created_by FROM inventory_transactions WHERE id = ?').bind(id).first();
+      movement = await db.prepare('SELECT *, item_id as ingredient_id FROM inventory_transactions WHERE id = ?').bind(id).first();
     }
     return c.json({ success: true, data: movement }, 201);
   });

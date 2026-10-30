@@ -34,6 +34,10 @@ export async function createCanonicalPurchaseOrder(
     createdBy?: string;
   }
 ) {
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error('Purchase order requires at least one item');
+  }
+
   const supplier = await db.prepare(
     'SELECT id, name FROM suppliers WHERE id = ? AND is_active = 1'
   ).bind(input.supplierId).first<{ id: string; name: string }>();
@@ -50,6 +54,12 @@ export async function createCanonicalPurchaseOrder(
   const processedItems = [];
 
   for (const item of input.items) {
+    if (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+      throw new Error(`Invalid item quantity for ingredient ${item.ingredientId}`);
+    }
+    if (item.unitPrice !== undefined && (typeof item.unitPrice !== 'number' || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
+      throw new Error(`Invalid unit price for ingredient ${item.ingredientId}`);
+    }
     const ing = await db.prepare(
       'SELECT id, cost_per_unit FROM ingredients WHERE id = ?'
     ).bind(item.ingredientId).first<{ id: string; cost_per_unit: number }>();
@@ -98,6 +108,7 @@ export async function receivePurchaseOrder(
 
   if (!po) return { ok: false, error: 'purchase_order_not_found' };
   if (po.status === 'cancelled') return { ok: false, error: 'cancelled_purchase_order' };
+  if (!Array.isArray(items) || items.length === 0) return { ok: false, error: 'invalid_received_items' };
 
   // 1. Idempotency Guard
   if (options?.receiptId) {
@@ -107,6 +118,10 @@ export async function receivePurchaseOrder(
     if (existing) {
       return { ok: true, alreadyReceived: true, status: po.status as any, receivedItems: [] };
     }
+  }
+
+  if (po.status === 'received') {
+    return { ok: false, error: 'already_fully_received' };
   }
 
   const poiRows = await db.prepare(
@@ -120,7 +135,9 @@ export async function receivePurchaseOrder(
   for (const rcv of items) {
     const matching = poItems.find(p => p.ingredient_id === rcv.ingredientId);
     if (!matching) return { ok: false, error: 'supplier_item_mismatch' };
-    if (rcv.receivedQuantity <= 0) return { ok: false, error: 'invalid_received_quantity' };
+    if (typeof rcv.receivedQuantity !== 'number' || !Number.isFinite(rcv.receivedQuantity) || rcv.receivedQuantity <= 0) {
+      return { ok: false, error: 'invalid_received_quantity' };
+    }
   }
 
   // 3. Increment Stock & Record Immutable Movement

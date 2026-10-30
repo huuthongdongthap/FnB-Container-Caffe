@@ -51,6 +51,9 @@ export async function reverseAccrual(
   input: ReversalInput,
 ): Promise<ReversalResult> {
   const { orderId, customerId, refundAmountVnd } = input;
+  if (typeof refundAmountVnd !== 'number' || !Number.isFinite(refundAmountVnd) || refundAmountVnd <= 0) {
+    return { ok: false, reason: 'no_points_to_reverse' };
+  }
 
   // ── Idempotency: skip if reversal already exists ──
   try {

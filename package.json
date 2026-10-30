@@ -10,13 +10,13 @@
     "apps/*"
   ],
   "scripts": {
-    "lint": "eslint worker/src/ src/ packages/ --max-warnings=0",
-    "lint:fix": "eslint worker/src/ src/ packages/ --fix",
+    "lint": "eslint worker/src/ src/ packages/ setup/aura-deploy/src/ --max-warnings=0",
+    "lint:fix": "eslint worker/src/ src/ packages/ setup/aura-deploy/src/ --fix",
     "lint:migrations": "node scripts/lint-d1-migrations.mjs",
     "verify:gates": "node scripts/verify-staging-gates.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:worker": "tsc --project worker/tsconfig.json --noEmit",
-    "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit",
+    "typecheck:all": "tsc --noEmit && tsc --project worker/tsconfig.json --noEmit && tsc --project setup/aura-deploy/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:local-flow": "node scripts/local-payment-flow/run.mjs",

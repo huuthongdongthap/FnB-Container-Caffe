@@ -45,6 +45,7 @@ export async function findCustomerByIdentifier(
 const PRIVILEGED_STAFF_ROLES = [
   'owner',
   'manager',
+  'supervisor',
   'staff',
   'admin',
   'cashier',
@@ -52,6 +53,7 @@ const PRIVILEGED_STAFF_ROLES = [
   'kitchen',
   'barista',
   'chef',
+  'shipper',
 ];
 
 export async function resolveServerOrderOwnership(

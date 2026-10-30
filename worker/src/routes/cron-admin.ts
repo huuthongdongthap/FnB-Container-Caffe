@@ -6,6 +6,7 @@
  */
 
 import type { Hono } from 'hono';
+import { timingSafeEqual } from '@aura/domain-security';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
@@ -17,16 +18,19 @@ import { sendCashbackExpiryWarnings } from './cron';
 
 const log = createLogger({ route: 'cron-admin' });
 
-function checkCronSecret(c: {
+async function checkCronSecret(c: {
   env: Env;
   req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
-}): boolean {
+}): Promise<boolean> {
 
   if (!c.env.CRON_SECRET) {
     return false;
   } // not configured — fail-closed
   const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
-  return secret === c.env.CRON_SECRET;
+  if (!secret) {
+    return false;
+  }
+  return timingSafeEqual(secret, c.env.CRON_SECRET);
 }
 
 async function sendTelegram(
@@ -50,7 +54,7 @@ async function sendTelegram(
 export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── Cron: Alert dispatch (protected by shared secret) ──
   app.get('/cron/alerts', async(c) => {
-    if (!checkCronSecret(c)) {
+    if (!(await checkCronSecret(c))) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     const fired = await createAlertDispatcher(c.env.AURA_DB).dispatchAlerts((msg, sev) =>
@@ -61,7 +65,7 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   // ── Cron: Daily digest (triggered hourly, dispatched only at 21:00 ICT) ──
   app.get('/cron/digest', async(c) => {
-    if (!checkCronSecret(c)) {
+    if (!(await checkCronSecret(c))) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     const ictHour = parseInt(

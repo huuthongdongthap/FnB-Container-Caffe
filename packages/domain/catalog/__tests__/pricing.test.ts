@@ -329,4 +329,51 @@ describe('happyHourDiscountFor — regression guard', () => {
     const atStart = new Date('2026-09-16T14:00:00');
     expect(happyHourDiscountFor([window_()], atStart)?.id).toBe('hh1');
   });
+
+  test('fails closed when product- or category-scoped window has empty apply_ids', () => {
+    expect(
+      happyHourDiscountFor(
+        [window_({ apply_to: 'product', apply_ids: '' })],
+        WEDNESDAY_INSIDE,
+        { productId: 'prod-1', categoryId: 'cat-1' },
+      ),
+    ).toBeNull();
+    expect(
+      happyHourDiscountFor(
+        [window_({ apply_to: 'category', apply_ids: null })],
+        WEDNESDAY_INSIDE,
+        { productId: 'prod-1', categoryId: 'cat-1' },
+      ),
+    ).toBeNull();
+  });
+
+  test('ignores negative discount_rate and clamps >100% discount_rate or non-finite inputs', () => {
+    const negativeRatePrice = resolveItemPrice({
+      basePriceCents: 10000,
+      channel: 'dine_in',
+      modifierChoices: [],
+      happyHourWindows: [window_({ discount_rate: -25 })],
+      now: WEDNESDAY_INSIDE,
+    });
+    expect(negativeRatePrice).toBe(10000);
+
+    const overHundredPrice = resolveItemPrice({
+      basePriceCents: 10000,
+      channel: 'dine_in',
+      modifierChoices: [],
+      happyHourWindows: [window_({ discount_rate: 150 })],
+      now: WEDNESDAY_INSIDE,
+    });
+    expect(overHundredPrice).toBe(0);
+
+    const nonFinitePrice = resolveItemPrice({
+      basePriceCents: Number.POSITIVE_INFINITY,
+      channel: 'dine_in',
+      modifierChoices: [modifier('inf', Number.POSITIVE_INFINITY)],
+      happyHourWindows: [],
+      now: WEDNESDAY_INSIDE,
+      channelDeltas: { dine_in: Number.NaN },
+    });
+    expect(nonFinitePrice).toBe(0);
+  });
 });

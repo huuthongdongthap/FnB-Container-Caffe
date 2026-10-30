@@ -182,4 +182,25 @@ describe('Observability & Reliability Contract — Canonical Invariants', () => 
     expect(sanitized.user.name).toBe('Nguyen Van A');
     expect(sanitized.payment.amount).toBe(55000);
   });
+
+  it('rejects all-zero W3C traceparent IDs, fails closed on empty dependencies health evaluation, and handles Date/cyclic/JWT trace payloads', () => {
+    expect(parseTraceparent('00-00000000000000000000000000000000-00f067aa0ba902b7-01')).toBeNull();
+    expect(parseTraceparent('00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01')).toBeNull();
+
+    const emptyHealth = evaluateSystemHealth({}, 1000, 'abc1234');
+    expect(emptyHealth.status).toBe('unhealthy');
+    expect(emptyHealth.readiness).toBe(false);
+
+    const now = new Date('2026-10-30T10:00:00.000Z');
+    const cyclic: any = {
+      occurredAt: now,
+      rawBearer: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEifQ.sig123',
+    };
+    cyclic.self = cyclic;
+
+    const clean = sanitizeTracePayload(cyclic) as any;
+    expect(clean.occurredAt).toBeInstanceOf(Date);
+    expect(clean.rawBearer).toBe('[REDACTED]');
+    expect(clean.self).toBe('[CIRCULAR]');
+  });
 });

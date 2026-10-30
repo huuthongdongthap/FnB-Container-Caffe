@@ -217,4 +217,31 @@ describe('Security & Data Protection Contract — Canonical Invariants', () => {
     expect(out.cvv).toBe('[REDACTED]');
     expect(out.self).toBe('[CIRCULAR]');
   });
+
+  it('fails closed on missing/unrecognized userRole, supervisor inventory access, and empty threat findings', () => {
+    const missingRoleWithUserId = validateAccessControl(
+      { userId: 'cust-no-role' },
+      { resourceType: 'order', resourceId: 'ord-999', ownerId: 'other-cust' }
+    );
+    expect(missingRoleWithUserId.allowed).toBe(false);
+    expect(missingRoleWithUserId.code).toBe('UNAUTHENTICATED');
+
+    const unrecognizedRole = validateAccessControl(
+      { userId: 'u-bad', userRole: 'contractor' as any },
+      { resourceType: 'order', resourceId: 'ord-999', ownerId: 'other-cust' }
+    );
+    expect(unrecognizedRole.allowed).toBe(false);
+    expect(unrecognizedRole.code).toBe('FORBIDDEN_ROLE');
+
+    const supervisorInventory = validateAccessControl(
+      { userId: 'sup-1', userRole: 'supervisor', userTenantId: 'unit-1' },
+      { resourceType: 'inventory', resourceId: 'inv-1', tenantId: 'unit-1' }
+    );
+    expect(supervisorInventory.allowed).toBe(true);
+    expect(supervisorInventory.code).toBe('ALLOWED');
+
+    const emptyPosture = evaluateThreatPosture([]);
+    expect(emptyPosture.healthy).toBe(false);
+    expect(emptyPosture.totalFindings).toBe(0);
+  });
 });

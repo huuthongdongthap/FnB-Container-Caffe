@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SopViolation } from '../model/sop-types';
+import { sopScope, SopAccessError } from '../commands/sop-access';
 import {
   appealViolation,
   applySanction,
@@ -191,5 +192,23 @@ describe('escalationLevel', () => {
 
   it('reports 3 for a serious breach', () => {
     expect(escalationLevel(0, true)).toBe(3);
+  });
+
+  it('clamps negative or NaN priorCountInMonth to first offence', () => {
+    expect(nextDisciplineStep({ priorCountInMonth: -1, isSerious: false })).toBe('written_warning');
+    expect(nextDisciplineStep({ priorCountInMonth: Number.NaN, isSerious: false })).toBe('written_warning');
+    expect(escalationLevel(-5, false)).toBe(1);
+  });
+});
+
+describe('sopScope role & tenant guards', () => {
+  it('rejects non-staff roles and wildcard tenants while allowing supervisor and shipper', () => {
+    expect(() => sopScope({} as never, { id: 'cust-1', role: 'customer' } as never)).toThrow(SopAccessError);
+    expect(() => sopScope({} as never, { id: 'stf-1', role: 'staff', tenantId: '*' } as never)).toThrow(SopAccessError);
+    const supScope = sopScope({} as never, { id: 'sup-1', role: 'supervisor', tenantId: 'cafe-a' } as never);
+    expect(supScope.actorRole).toBe('supervisor');
+    expect(supScope.tenantId).toBe('cafe-a');
+    const shipScope = sopScope({} as never, { id: 'shp-1', role: 'shipper', tenantId: 'cafe-a' } as never);
+    expect(shipScope.actorRole).toBe('shipper');
   });
 });

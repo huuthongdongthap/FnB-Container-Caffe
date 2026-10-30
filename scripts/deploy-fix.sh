@@ -19,9 +19,10 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_NAME="fnb-caffe-container"
 DIST_DIR="$PROJECT_DIR/dist"
 BRANCH="main"
-CUSTOM_DOMAIN="auraspace.cafe"
-MAX_RETRIES=5
-RETRY_DELAY=5
+CUSTOM_DOMAIN="${DEPLOY_PAGES_DOMAIN:-auraspace.cafe}"
+CUSTOM_DOMAIN_URL="${DEPLOY_PAGES_URL:-https://$CUSTOM_DOMAIN}"
+MAX_RETRIES="${DEPLOY_VERIFY_RETRIES:-5}"
+RETRY_DELAY="${DEPLOY_VERIFY_RETRY_DELAY:-5}"
 KEEP_LATEST=3
 
 SKIP_BUILD=false
@@ -109,11 +110,15 @@ fi
 
 # Generate cache-busting version.json
 echo ""
+echo "  Copying static SEO and signage assets to dist..."
+mkdir -p "$DIST_DIR"
+cp "$PROJECT_DIR/robots.txt" "$PROJECT_DIR/sitemap.xml" "$DIST_DIR/" 2>/dev/null || true
+mkdir -p "$DIST_DIR/signage" && cp -r "$PROJECT_DIR"/signage-widgets/*.html "$DIST_DIR/signage/" 2>/dev/null || true
+
 echo "  Generating cache-busting version.json..."
 GIT_COMMIT_SHA_FULL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_COMMIT_SHORT=$(echo "$GIT_COMMIT_SHA_FULL" | cut -c1-8)
 BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-mkdir -p "$DIST_DIR"
 cat > "$DIST_DIR/version.json" << VERSIONEOF
 {
   "sha": "$GIT_COMMIT_SHA_FULL",
@@ -137,11 +142,11 @@ echo "  Expected SHA: $GIT_COMMIT_SHORT"
 
 VERIFIED=false
 for i in $(seq 1 $MAX_RETRIES); do
-  echo "  [Attempt $i/$MAX_RETRIES] Checking https://$CUSTOM_DOMAIN/version.json..."
+  echo "  [Attempt $i/$MAX_RETRIES] Checking $CUSTOM_DOMAIN_URL/version.json..."
 
-  PAGES_VERSION_JSON=$(curl -s --max-time 5 "https://$CUSTOM_DOMAIN/version.json" 2>/dev/null || echo '{}')
-  PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
-  PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://$CUSTOM_DOMAIN/version.json" 2>/dev/null || echo "000")
+  PAGES_VERSION_JSON=$(curl -s --max-time 5 "$CUSTOM_DOMAIN_URL/version.json" 2>/dev/null || echo '{}')
+  PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha"[^,]*' | cut -d'"' -f4 || echo "MISSING")
+  PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$CUSTOM_DOMAIN_URL/version.json" 2>/dev/null || echo "000")
 
   echo "    HTTP $PAGES_HTTP | SHA: $PAGES_SHA"
 
@@ -162,8 +167,8 @@ echo "============================================"
 if [[ "$VERIFIED" == "true" ]]; then
   echo "  DEPLOY FIX COMPLETE — Custom domain updated."
 else
-  echo "  DEPLOY FIX PARTIAL — Build + deploy succeeded, but custom domain"
-  echo "  still shows old content. Try one of:"
+  echo "  DEPLOY FIX FAILED — Build + deploy ran, but custom domain"
+  echo "  still shows old content after $MAX_RETRIES attempts. Try one of:"
   echo ""
   echo "  1. Purge Cloudflare cache manually:"
   echo "     Dashboard -> auraspace.cafe -> Caching -> Purge Everything"
@@ -176,6 +181,10 @@ else
   echo ""
   echo "  Deployed SHA: $GIT_COMMIT_SHORT"
   echo "  Live Pages SHA: $PAGES_SHA"
+  echo "============================================"
+  echo ""
+  echo "ERROR: Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$GIT_COMMIT_SHORT (HTTP $PAGES_HTTP)" >&2
+  exit 1
 fi
 echo "============================================"
 echo ""

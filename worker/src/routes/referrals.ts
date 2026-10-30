@@ -5,12 +5,40 @@
  */
 
 import { Hono } from 'hono';
+import { resolvePilotStore } from '../lib/pilot-store';
 import { referralApplySchema } from '../lib/validators';
 import { authCustomer } from '../tree/loyalty/auth-middleware';
 import type { Env } from '../types/env';
 import type { Customer, ReferralCode } from '../types/models';
 
 export const referralRouter = new Hono<{ Bindings: Env }>();
+
+function getTenantId(c: { env: Env; get: (k: string) => unknown }): string {
+  const user = c.get('user') as { tenantId?: string } | undefined;
+  if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
+  try {
+    return resolvePilotStore(c.env);
+  } catch {
+    return 'default';
+  }
+}
+
+function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const r = row as Record<string, unknown>;
+  if (r.tenant_id === undefined) {
+    return tenantId === 'default';
+  }
+  const rowTenant = typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
+
+function maskPhone(phone: unknown): string | null {
+  if (typeof phone !== 'string' || !phone.trim()) return null;
+  const trimmed = phone.trim();
+  if (trimmed.length <= 6) return '***';
+  return `${trimmed.slice(0, 3)}****${trimmed.slice(-3)}`;
+}
 
 function genId(prefix: string): string {
   const bytes = new Uint8Array(4);
@@ -102,14 +130,20 @@ referralRouter.post('/apply', async(c) => {
     return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
   }
 
+  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
+  let referrer: { id: string; tenant_id?: string | null } | null = null;
+  try {
+    referrer = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string; tenant_id?: string | null }>();
+  } catch {
+    referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string }>();
+  }
+  if (!referrer || !matchesTenantRow(referrer, tenantId)) {
+    return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
+  }
+
   const existing = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string }>();
   if (existing) {
     return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
-  }
-
-  const referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string }>();
-  if (!referrer) {
-    return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
   }
 
   const REFERRER_CASHBACK_VND = 10000;
@@ -188,7 +222,10 @@ referralRouter.get('/stats', async(c) => {
       total_cashback_earned_vnd: cashbackEarned[0]?.total || 0,
       total_points_earned_legacy: rc?.total_points_earned || 0,
       code_usage: rc?.times_used || 0,
-      recent_referrals: recentRefs || []
+      recent_referrals: ((recentRefs || []) as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        referred_phone: maskPhone(row.referred_phone)
+      }))
     }
   });
 });

@@ -13,12 +13,14 @@ import type { AuthUser } from 'worker/src/middleware/auth';
 export const SOP_ROLES = [
   'owner',
   'manager',
+  'supervisor',
   'staff',
   'waiter',
   'cashier',
   'kitchen',
   'barista',
   'chef',
+  'shipper',
   'admin',
 ] as const;
 
@@ -55,9 +57,16 @@ function sessionTenantId(user: AuthUser | undefined): string {
 export function sopScope(env: Env, user: AuthUser | undefined): SopScope {
   if (!user?.id) throw new SopAccessError('Staff authentication required', 401);
 
+  const role = String(user.role ?? '');
+  if (!(SOP_ROLES as readonly string[]).includes(role)) {
+    throw new SopAccessError('Staff role required', 403);
+  }
+
   const configured = (env as { SOP_TENANT_ID?: string }).SOP_TENANT_ID?.trim();
   const tenantId = configured && configured.length > 0 ? configured : sessionTenantId(user);
-  const role = String(user.role ?? '');
+  if (tenantId === '*') {
+    throw new SopAccessError('Invalid tenant scope', 403);
+  }
 
   return {
     env,

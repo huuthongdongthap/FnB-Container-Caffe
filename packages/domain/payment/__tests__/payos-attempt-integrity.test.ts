@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canonicalPayOSData, verifyPayOSSignature } from '../policies/payos-signature';
+import { validatePayOSAccess } from '../commands/payos-helpers';
 import { getOrCreatePayOSAttempt } from '../commands/payos-attempt';
 import { paymentSqliteDB, signedPayOSResponse, payosCheckoutResponse } from '../../../../worker/src/__tests__/helpers/payment-sqlite-db';
 
@@ -139,6 +140,16 @@ describe('PayOS durable attempt invariant (real SQLite)', () => {
     const signed = await signedPayOSResponse(data, 'local-checksum').json() as { signature: string };
     expect(await verifyPayOSSignature(data, signed.signature, 'local-checksum')).toBe(true);
     expect(await verifyPayOSSignature({ ...data, transactions: [...data.transactions].reverse() }, signed.signature, 'local-checksum')).toBe(false);
+    expect(await verifyPayOSSignature(data, signed.signature, '')).toBe(false);
+    expect(await verifyPayOSSignature(data, signed.signature, '   ')).toBe(false);
+  });
+
+  it('validatePayOSAccess blocks unauthenticated guests from customer-owned orders and permits supervisor', () => {
+    const ownedOrder = { id: 'ord-cust-1', total: 45000, payment_status: 'unpaid', customer_id: 'cust-123' };
+    expect(validatePayOSAccess(ownedOrder, null)).toEqual({ allowed: false, reason: 'forbidden' });
+    expect(validatePayOSAccess(ownedOrder, 'cust-other', 'customer')).toEqual({ allowed: false, reason: 'forbidden' });
+    expect(validatePayOSAccess(ownedOrder, 'cust-123', 'customer')).toEqual({ allowed: true });
+    expect(validatePayOSAccess(ownedOrder, null, 'supervisor')).toEqual({ allowed: true });
   });
 
   it('accepts successful reservations and URL writes when D1 includes trigger changes', async () => {

@@ -188,4 +188,31 @@ describe('Canonical Notification Contract', () => {
     expect(sanitized.secret_code).toBe('[REDACTED]');
     expect(sanitized.loop).toBe('[CIRCULAR]');
   });
+
+  it('12. fail-closed marketing consent and callback verification: rejects undefined marketing consent, blank secretKey, and blank idempotencyKey', () => {
+    const missingConsent = evaluateChannelEligibility(
+      'email',
+      { email: 'promo@example.com' },
+      { isMarketing: true }
+    );
+    expect(missingConsent.eligible).toBe(false);
+    expect(missingConsent.reason).toBe('customer_opted_out_or_missing_consent');
+
+    const seen = new Set<string>();
+    const blankSecretCallback = verifyAndDeduplicateCallback(
+      { provider: 'resend', providerMessageId: 'm2', idempotencyKey: 'cb_2', status: 'delivered', signature: 'sig_' },
+      seen,
+      '   '
+    );
+    expect(blankSecretCallback.valid).toBe(false);
+    expect(blankSecretCallback.reason).toBe('invalid_callback_signature');
+
+    const blankIdempotencyCallback = verifyAndDeduplicateCallback(
+      { provider: 'resend', providerMessageId: 'm3', idempotencyKey: '  ', status: 'delivered', signature: 'sig_valid_secret' },
+      seen,
+      'valid_secret'
+    );
+    expect(blankIdempotencyCallback.valid).toBe(false);
+    expect(blankIdempotencyCallback.reason).toBe('missing_idempotency_key');
+  });
 });

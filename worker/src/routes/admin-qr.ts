@@ -6,10 +6,19 @@
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { requireAuth } from '../middleware/auth';
+import { getTenantId } from '../middleware/tenant';
 import { bulkGenerateSlugs } from '../tree/qr/generator';
 import { signQRUrl } from '../tree/qr/signer';
 import type { Env } from '../types/env';
 import type { CafeTable, QrCodeRow } from '@aura/domain-table';
+
+function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const rec = row as Record<string, unknown>;
+  if (!('tenant_id' in rec) || rec.tenant_id === undefined) return true;
+  const rowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() ? rec.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
 
 export const adminQRRouter = new Hono<{ Bindings: Env }>();
 
@@ -33,10 +42,21 @@ adminQRRouter.get('/tables', async(c) => {
       ? `https://${host}`
       : `https://${host}`;
 
-  // Fetch all tables
-  const { results: tables } = await db
-    .prepare('SELECT * FROM cafe_tables ORDER BY zone, table_number')
-    .all<CafeTable>();
+  // Fetch all tables scoped to current tenant
+  const tenantId = getTenantId(c);
+  let allTables: CafeTable[] = [];
+  try {
+    const res = await db
+      .prepare('SELECT * FROM cafe_tables ORDER BY zone, table_number')
+      .all<CafeTable>();
+    allTables = res.results || [];
+  } catch {
+    const res = await db
+      .prepare('SELECT * FROM cafe_tables ORDER BY table_number')
+      .all<CafeTable>();
+    allTables = res.results || [];
+  }
+  const tables = allTables.filter((t) => matchesTenantRow(t, tenantId));
 
   // Fetch existing QR codes
   let qrRows: QrCodeRow[] = [];
@@ -93,17 +113,26 @@ adminQRRouter.get('/tables', async(c) => {
   return c.json({ success: true, data: tableList });
 });
 
-// ── POST /api/admin/qr/regenerate — clear + re-generate all slugs ──
+// ── POST /api/admin/qr/regenerate — clear + re-generate tenant slugs ──
 adminQRRouter.post('/regenerate', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+  const { results: allTables } = await db
+    .prepare('SELECT * FROM cafe_tables')
+    .all<CafeTable>();
+  const tables = (allTables || []).filter((t) => matchesTenantRow(t, tenantId));
+  const hasForeignTables = (allTables || []).length !== tables.length;
   try {
-    await db.prepare('DELETE FROM table_qr_codes').run();
+    if (hasForeignTables) {
+      for (const t of tables) {
+        await db.prepare('DELETE FROM table_qr_codes WHERE table_id = ?').bind(t.id).run();
+      }
+    } else {
+      await db.prepare('DELETE FROM table_qr_codes').run();
+    }
   } catch {
     // ignore if table_qr_codes is missing
   }
-  const { results: tables } = await db
-    .prepare('SELECT * FROM cafe_tables')
-    .all<CafeTable>();
   await bulkGenerateSlugs(db, tables);
   return c.json({ success: true, message: 'All QR codes regenerated' });
 });
@@ -111,6 +140,7 @@ adminQRRouter.post('/regenerate', async(c) => {
 // ── GET /api/admin/qr/:slug/download — PNG download ──────────────
 adminQRRouter.get('/:slug/download', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
     return c.json({ success: false, error: 'Not configured' }, 503);
@@ -131,6 +161,14 @@ adminQRRouter.get('/:slug/download', async(c) => {
   const qrRow = qrRowRaw as { table_id: number | string } | null;
   if (!qrRow) {
     return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  try {
+    const tbl = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(qrRow.table_id).first();
+    if (tbl && !matchesTenantRow(tbl, tenantId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+  } catch {
+    // optional cafe_tables verification
   }
 
   const host = c.req.header('host') || 'localhost:3000';
@@ -177,15 +215,16 @@ adminQRRouter.get('/:slug/png', async(c) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 
-  // Verify table still exists
+  // Verify table still exists and belongs to current tenant
+  const tenantId = getTenantId(c);
   const tableRow = await db
     .prepare(
-      'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ?'
+      'SELECT * FROM cafe_tables WHERE id = ?'
     )
     .bind(qrRow.table_id)
     .first<CafeTable>();
   const table = (tableRow ?? null);
-  if (!table) {
+  if (!table || !matchesTenantRow(table, tenantId)) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
 

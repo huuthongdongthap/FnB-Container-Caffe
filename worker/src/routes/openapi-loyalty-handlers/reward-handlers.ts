@@ -2,52 +2,70 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
-
-async function writeRewardAuditLog(
-  db: any,
-  userId: string,
-  action: string,
-  entityId: string,
-  metadata: string,
-  now: string
-): Promise<void> {
-  try {
-    await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'loyalty_reward', entityId, metadata, now).run();
-  } catch {
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, userId, action, 'loyalty_reward', entityId, 'loyalty_reward', entityId, metadata, metadata, now).run();
-    } catch {
-      try {
-        await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, action, 'loyalty_reward', entityId, metadata, now).run().catch(() => {});
-      } catch {
-        // Ignore audit log error
-      }
-    }
-  }
-}
+import {
+  getLoyaltyAccountWithFallback,
+  recordLoyaltyTransactionDualWrite,
+  syncLoyaltyAccountAndCustomerBalance,
+  writeLoyaltyAuditLog,
+} from './loyalty-db-helpers';
 
 function mapRewardRow(r: any) {
   return {
     ...r,
-    type: r.type ?? r.reward_type,
-    value: r.value ?? r.reward_value,
-    pointsCost: r.points_cost,
-    maxRedemptions: r.max_redemptions ?? r.stock ?? null,
+    name: r.name ?? r.title,
+    type: r.type ?? r.reward_type ?? r.discount_type ?? 'voucher',
+    value: r.value ?? r.reward_value ?? r.discount_value ?? 0,
+    pointsCost: r.points_cost ?? r.point_cost ?? 100,
+    maxRedemptions: r.max_redemptions ?? (r.stock !== undefined && r.stock > 0 ? r.stock : null),
     currentRedemptions: r.current_redemptions ?? r.redeemed_count ?? 0,
     validFrom: r.valid_from ?? null,
     validTo: r.valid_to ?? null,
-    isActive: r.is_active,
+    isActive: r.is_active ?? 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? r.created_at,
   };
+}
+
+async function findRewardByIdWithFallback(db: any, id: string): Promise<{ reward: any | null; fromRewardsTable: boolean }> {
+  let reward: any = null;
+  try {
+    reward = await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first();
+  } catch {
+    reward = null;
+  }
+  if (reward) {
+    return { reward, fromRewardsTable: false };
+  }
+
+  try {
+    const legacy = await db.prepare(
+      `SELECT
+        id,
+        COALESCE(name, title) as name,
+        description,
+        COALESCE(points_cost, point_cost, 100) as points_cost,
+        COALESCE(type, discount_type, 'voucher') as type,
+        COALESCE(reward_type, discount_type, 'voucher') as reward_type,
+        COALESCE(value, discount_value, 0) as value,
+        CAST(COALESCE(reward_value, discount_value, 0) AS TEXT) as reward_value,
+        CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock ELSE NULL END as max_redemptions,
+        stock,
+        0 as current_redemptions,
+        0 as redeemed_count,
+        image_url,
+        COALESCE(is_active, 1) as is_active,
+        created_at,
+        COALESCE(updated_at, created_at) as updated_at
+      FROM rewards WHERE id = ?`
+    ).bind(id).first();
+    if (legacy) {
+      return { reward: legacy, fromRewardsTable: true };
+    }
+  } catch {
+    // Ignore when rewards table is absent
+  }
+
+  return { reward: null, fromRewardsTable: false };
 }
 
 export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
@@ -94,6 +112,24 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       rewardResults = rewards.results || [];
     }
 
+    if (rewardResults.length === 0 && !query.type) {
+      try {
+        const activeFilter = query.isActive !== undefined ? 'WHERE is_active = ?' : '';
+        const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
+        const fallbackCount = (await db.prepare(`SELECT COUNT(*) as total FROM rewards ${activeFilter}`).bind(...activeParams).first()) as { total: number } | null;
+        total = fallbackCount?.total || 0;
+        if (total > 0) {
+          const fallbackRewards = (await db.prepare(
+            `SELECT id, COALESCE(name, title) as name, description, COALESCE(points_cost, point_cost, 100) as points_cost, COALESCE(type, discount_type, 'voucher') as type, COALESCE(value, discount_value, 0) as value, CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock ELSE NULL END as max_redemptions, 0 as current_redemptions, image_url, COALESCE(is_active, 1) as is_active, created_at, COALESCE(updated_at, created_at) as updated_at
+             FROM rewards ${activeFilter} ORDER BY COALESCE(points_cost, point_cost, 100) ASC LIMIT ? OFFSET ?`
+          ).bind(...activeParams, limit, offset).all()) as { results: any[] };
+          rewardResults = fallbackRewards.results || [];
+        }
+      } catch {
+        // Ignore when rewards table is absent
+      }
+    }
+
     return c.json({
       success: true,
       data: {
@@ -108,7 +144,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
 
-    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
+    const { reward } = await findRewardByIdWithFallback(db, id);
 
     if (!reward) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
@@ -131,6 +167,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
+    const isActiveInt = body.isActive !== false ? 1 : 0;
 
     try {
       await db.prepare(
@@ -147,7 +184,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         0,
         body.validFrom || null,
         body.validTo || null,
-        body.isActive !== false ? 1 : 0,
+        isActiveInt,
         body.imageUrl || null,
         body.terms || null,
         now,
@@ -165,14 +202,44 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.type,
         String(body.value ?? ''),
         body.maxRedemptions ?? null,
-        body.isActive !== false ? 1 : 0,
+        isActiveInt,
         now
       ).run();
     }
 
-    await writeRewardAuditLog(db, user.id, 'loyalty_reward_create', id, JSON.stringify(body), now);
+    try {
+      await db.prepare(
+        `INSERT OR IGNORE INTO rewards (
+          id, title, name, description, point_cost, points_cost,
+          discount_type, discount_value, type, value, reward_type, reward_value,
+          min_tier, stock, image_url, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'bronze', ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.name,
+        body.description || null,
+        body.pointsCost,
+        body.pointsCost,
+        body.type,
+        Math.round(Number(body.value || 0)),
+        body.type,
+        Number(body.value || 0),
+        body.type,
+        Number(body.value || 0),
+        body.maxRedemptions ?? -1,
+        body.imageUrl || null,
+        isActiveInt,
+        now,
+        now
+      ).run();
+    } catch {
+      // Ignore when rewards table is absent
+    }
 
-    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
+    await writeLoyaltyAuditLog(db, user.id, 'loyalty_reward_create', 'loyalty_reward', id, JSON.stringify(body), now);
+
+    const { reward } = await findRewardByIdWithFallback(db, id);
 
     return c.json({
       success: true,
@@ -191,7 +258,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
+    const { reward: existing } = await findRewardByIdWithFallback(db, id);
     if (!existing) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
@@ -200,38 +267,52 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const params: (string | number | boolean)[] = [];
     const canonicalUpdates: string[] = [];
     const canonicalParams: (string | number | boolean)[] = [];
+    const rewardsTableUpdates: string[] = [];
+    const rewardsTableParams: (string | number | boolean)[] = [];
 
     if (body.name !== undefined) {
       updates.push('name = ?'); params.push(body.name);
       canonicalUpdates.push('name = ?'); canonicalParams.push(body.name);
+      rewardsTableUpdates.push('title = ?', 'name = ?'); rewardsTableParams.push(body.name, body.name);
     }
     if (body.description !== undefined) {
       updates.push('description = ?'); params.push(body.description);
       canonicalUpdates.push('description = ?'); canonicalParams.push(body.description);
+      rewardsTableUpdates.push('description = ?'); rewardsTableParams.push(body.description);
     }
     if (body.pointsCost !== undefined) {
       updates.push('points_cost = ?'); params.push(body.pointsCost);
       canonicalUpdates.push('points_cost = ?'); canonicalParams.push(body.pointsCost);
+      rewardsTableUpdates.push('point_cost = ?', 'points_cost = ?'); rewardsTableParams.push(body.pointsCost, body.pointsCost);
     }
     if (body.type !== undefined) {
       updates.push('type = ?'); params.push(body.type);
       canonicalUpdates.push('reward_type = ?'); canonicalParams.push(body.type);
+      rewardsTableUpdates.push('discount_type = ?', 'type = ?', 'reward_type = ?'); rewardsTableParams.push(body.type, body.type, body.type);
     }
     if (body.value !== undefined) {
       updates.push('value = ?'); params.push(body.value);
       canonicalUpdates.push('reward_value = ?'); canonicalParams.push(String(body.value));
+      rewardsTableUpdates.push('discount_value = ?', 'value = ?', 'reward_value = ?');
+      rewardsTableParams.push(Math.round(Number(body.value)), Number(body.value), Number(body.value));
     }
     if (body.maxRedemptions !== undefined) {
       updates.push('max_redemptions = ?'); params.push(body.maxRedemptions);
       canonicalUpdates.push('stock = ?'); canonicalParams.push(body.maxRedemptions);
+      rewardsTableUpdates.push('stock = ?'); rewardsTableParams.push(body.maxRedemptions);
     }
     if (body.validFrom !== undefined) { updates.push('valid_from = ?'); params.push(body.validFrom); }
     if (body.validTo !== undefined) { updates.push('valid_to = ?'); params.push(body.validTo); }
     if (body.isActive !== undefined) {
-      updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0);
-      canonicalUpdates.push('is_active = ?'); canonicalParams.push(body.isActive ? 1 : 0);
+      const isActiveInt = body.isActive ? 1 : 0;
+      updates.push('is_active = ?'); params.push(isActiveInt);
+      canonicalUpdates.push('is_active = ?'); canonicalParams.push(isActiveInt);
+      rewardsTableUpdates.push('is_active = ?'); rewardsTableParams.push(isActiveInt);
     }
-    if (body.imageUrl !== undefined) { updates.push('image_url = ?'); params.push(body.imageUrl); }
+    if (body.imageUrl !== undefined) {
+      updates.push('image_url = ?'); params.push(body.imageUrl);
+      rewardsTableUpdates.push('image_url = ?'); rewardsTableParams.push(body.imageUrl);
+    }
     if (body.terms !== undefined) { updates.push('terms = ?'); params.push(body.terms); }
 
     if (updates.length === 0) {
@@ -250,9 +331,15 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    await writeRewardAuditLog(db, user.id, 'loyalty_reward_update', id, JSON.stringify(body), now);
+    if (rewardsTableUpdates.length > 0) {
+      rewardsTableUpdates.push('updated_at = ?');
+      rewardsTableParams.push(now, id);
+      await db.prepare(`UPDATE rewards SET ${rewardsTableUpdates.join(', ')} WHERE id = ?`).bind(...rewardsTableParams).run().catch(() => {});
+    }
 
-    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
+    await writeLoyaltyAuditLog(db, user.id, 'loyalty_reward_update', 'loyalty_reward', id, JSON.stringify(body), now);
+
+    const { reward } = await findRewardByIdWithFallback(db, id);
 
     return c.json({
       success: true,
@@ -268,7 +355,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const id = body.rewardId || c.req.param?.('id');
     const now = new Date().toISOString();
 
-    const reward = (await db.prepare('SELECT * FROM loyalty_rewards WHERE id = ?').bind(id).first()) as any;
+    const { reward } = await findRewardByIdWithFallback(db, id);
     if (!reward) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
@@ -277,16 +364,8 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Reward is not active' }, 400);
     }
 
-    let account: any = null;
-    let usingCanonicalAccount = false;
-    try {
-      account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-        .bind(user.customerId || user.id).first();
-    } catch {
-      usingCanonicalAccount = true;
-      account = await db.prepare('SELECT *, id as customer_id, loyalty_points as current_points FROM customers WHERE id = ?')
-        .bind(user.customerId || user.id).first().catch(() => null);
-    }
+    const customerLookupId = String(user.customerId || user.id);
+    const { account } = await getLoyaltyAccountWithFallback(db, customerLookupId, now);
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
@@ -294,10 +373,11 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
     const currentRedemptions = Number(reward.current_redemptions ?? reward.redeemed_count ?? 0);
-    const maxRedemptions = reward.max_redemptions ?? reward.stock ?? null;
+    const maxRedemptions = reward.max_redemptions ?? (reward.stock !== undefined && reward.stock > 0 ? reward.stock : null);
+    const pointsCost = Number(reward.points_cost ?? reward.point_cost ?? 100);
 
     // Always verify customer has sufficient points to redeem the reward
-    if (currentPoints < reward.points_cost) {
+    if (currentPoints < pointsCost) {
       return c.json({ success: false, error: 'Insufficient points' }, 400);
     }
 
@@ -326,41 +406,76 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const transactionId = crypto.randomUUID();
-    const pointsChange = -reward.points_cost;
+    const pointsChange = -pointsCost;
+    const newBalance = currentPoints + pointsChange;
+    const accountId = String(account.id);
+    const customerId = String(account.customer_id ?? customerLookupId);
+    const rewardName = String(reward.name ?? reward.title ?? id);
+
+    await recordLoyaltyTransactionDualWrite(db, {
+      txId: transactionId,
+      accountId,
+      customerId,
+      type: 'redeem',
+      points: pointsChange,
+      balanceAfter: newBalance,
+      orderId: body.orderId || null,
+      rewardId: id,
+      description: `Redeemed: ${rewardName}`,
+      reason: `Redeemed: ${rewardName}`,
+      idempotencyKey: body.idempotencyKey ?? null,
+      now,
+    });
+
+    await syncLoyaltyAccountAndCustomerBalance(db, {
+      accountId,
+      customerId,
+      newBalance,
+      now,
+    });
 
     try {
       await db.prepare(
-        `INSERT INTO loyalty_transactions (id, account_id, type, points, balance_after, order_id, reward_id, description, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(transactionId, account.id, 'redeem', pointsChange, currentPoints + pointsChange, body.orderId || null, id, `Redeemed: ${reward.name}`, body.idempotencyKey ?? null, now).run();
+        'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1 WHERE id = ?'
+      ).bind(id).run();
     } catch {
       await db.prepare(
-        `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, reason, balance_after, created_at)
-         VALUES (?, ?, ?, ?, 'redeem', ?, ?, ?)`
-      ).bind(transactionId, account.id, body.orderId || null, pointsChange, `Redeemed: ${reward.name}`, currentPoints + pointsChange, now).run();
+        'UPDATE loyalty_rewards SET redeemed_count = COALESCE(redeemed_count, 0) + 1 WHERE id = ?'
+      ).bind(id).run();
     }
 
-    if (!usingCanonicalAccount) {
+    const voucherCode = `RWD-${Date.now().toString(36).toUpperCase()}`;
+    const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+    try {
       await db.prepare(
-        'UPDATE loyalty_accounts SET current_points = current_points + ?, last_activity_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(pointsChange, now, now, account.id).run();
-    } else {
-      await db.prepare(
-        'UPDATE customers SET loyalty_points = loyalty_points + ?, updated_at = ? WHERE id = ?'
-      ).bind(pointsChange, now, account.id).run();
+        `INSERT OR IGNORE INTO loyalty_redemptions (
+          id, customer_id, reward_id, code, points_spent, order_id, status, expires_at, redeemed_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`
+      ).bind(`lrd_${transactionId}`, customerId, id, voucherCode, pointsCost, body.orderId || null, expiresAt, now, now).run();
+    } catch {
+      // Ignore when loyalty_redemptions is absent in older migration snapshots
     }
 
     try {
       await db.prepare(
-        'UPDATE loyalty_rewards SET current_redemptions = current_redemptions + 1 WHERE id = ?'
-      ).bind(id).run();
+        `INSERT OR IGNORE INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, created_at)
+         SELECT ?, ?, ?, ?, 'active', ?, ?
+         WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)
+           AND EXISTS (SELECT 1 FROM rewards WHERE id = ?)`
+      ).bind(`uwr_${transactionId}`, customerId, id, voucherCode, expiresAt, now, customerId, id).run();
     } catch {
-      await db.prepare(
-        'UPDATE loyalty_rewards SET redeemed_count = redeemed_count + 1 WHERE id = ?'
-      ).bind(id).run();
+      // Ignore when user_rewards is absent
     }
 
-    await writeRewardAuditLog(db, user.id, 'loyalty_reward_redeem', id, JSON.stringify({ points: pointsChange, accountId: account.id }), now);
+    await writeLoyaltyAuditLog(
+      db,
+      user.id,
+      'loyalty_reward_redeem',
+      'loyalty_reward',
+      id,
+      JSON.stringify({ points: pointsChange, accountId: account.id }),
+      now
+    );
 
     return c.json({
       success: true,
@@ -370,7 +485,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           ...mapRewardRow(reward),
           currentRedemptions: currentRedemptions + 1,
         },
-        newBalance: currentPoints + pointsChange,
+        newBalance,
         expiresAt: null,
       },
     });

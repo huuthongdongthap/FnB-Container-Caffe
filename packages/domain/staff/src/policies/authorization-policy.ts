@@ -14,12 +14,14 @@ import type {
 export type RoleType =
   | 'guest'
   | 'customer'
+  | 'shipper'
   | 'waiter'
   | 'staff'
   | 'barista'
   | 'kitchen'
   | 'chef'
   | 'cashier'
+  | 'supervisor'
   | 'manager'
   | 'admin'
   | 'owner';
@@ -27,12 +29,14 @@ export type RoleType =
 export const ROLE_HIERARCHY: Record<RoleType, number> = {
   guest: 0,
   customer: 10,
+  shipper: 20,
   waiter: 20,
   kitchen: 30,
   barista: 30,
   chef: 30,
   cashier: 30,
   staff: 30,
+  supervisor: 40,
   manager: 50,
   admin: 90,
   owner: 100,
@@ -51,6 +55,12 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
     reservation: ['read', 'create', 'update'],
     order: ['read', 'create', 'update'],
     payment: ['create'],
+  },
+  shipper: {
+    catalog: ['read'],
+    table: ['read'],
+    order: ['read', 'update'],
+    payment: ['read', 'create'],
   },
   waiter: {
     catalog: ['read'],
@@ -94,6 +104,16 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
     shift: ['read', 'create', 'operate', 'update'],
     inventory: ['read'],
     payment: ['read', 'create'],
+  },
+  supervisor: {
+    catalog: ['read', 'create', 'update', 'operate'],
+    table: ['read', 'create', 'update', 'operate'],
+    order: ['read', 'create', 'update', 'operate'],
+    reservation: ['read', 'create', 'update', 'operate'],
+    shift: ['read', 'create', 'update', 'operate'],
+    inventory: ['read', 'create', 'update', 'operate'],
+    payment: ['read', 'create', 'update', 'operate'],
+    staff: ['read'],
   },
   manager: {
     catalog: ['read', 'create', 'update', 'delete', 'operate'],
@@ -212,7 +232,14 @@ export function authorizeAction(
 
     if (resource.type === 'order') {
       if (action === 'create') return { allowed: true };
-      if (!resource.ownerId || resource.ownerId === currentActor.id) {
+      if (action !== 'read' && action !== 'update') {
+        return {
+          allowed: false,
+          code: 'unauthorized_role',
+          reason: `Customer role is not authorized to perform ${action} on ${resource.type}`,
+        };
+      }
+      if (!resource.ownerId || (Boolean(currentActor.id) && resource.ownerId === currentActor.id)) {
         return { allowed: true };
       }
       return {
@@ -229,7 +256,20 @@ export function authorizeAction(
     };
   }
 
-  // 5. Waiter Access Boundaries
+  // 5. Waiter & Shipper Access Boundaries
+  if (role === 'shipper') {
+    if (resource.type === 'table' && action === 'read') return { allowed: true };
+    if (resource.type === 'order' && ['read', 'update'].includes(action)) return { allowed: true };
+    if (resource.type === 'payment' && ['read', 'create'].includes(action)) return { allowed: true };
+    if (resource.type === 'catalog' && action === 'read') return { allowed: true };
+
+    return {
+      allowed: false,
+      code: 'unauthorized_role',
+      reason: `Shipper role is not authorized to perform ${action} on ${resource.type}`,
+    };
+  }
+
   if (role === 'waiter') {
     if (resource.type === 'table' && ['read', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'order' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
@@ -265,7 +305,20 @@ export function authorizeAction(
     };
   }
 
-  // 7. Manager Boundaries
+  // 7. Supervisor & Manager Boundaries
+  if (roleStr === 'supervisor') {
+    if (['table', 'order', 'reservation', 'shift', 'inventory', 'catalog', 'payment'].includes(resource.type) && action !== 'delete' && action !== 'admin') {
+      return { allowed: true };
+    }
+    if (resource.type === 'staff' && action === 'read') return { allowed: true };
+
+    return {
+      allowed: false,
+      code: 'unauthorized_role',
+      reason: `Supervisor role is not authorized to perform ${action} on ${resource.type}`,
+    };
+  }
+
   if (roleStr === 'manager') {
     if (['table', 'order', 'reservation', 'shift', 'inventory', 'catalog'].includes(resource.type)) {
       return { allowed: true };

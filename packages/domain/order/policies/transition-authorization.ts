@@ -121,12 +121,14 @@ function deny(role: ActorRole, from: string, to: string): TransitionResult {
 const ROLE_ALIASES: Record<string, ActorRole> = {
   system: 'admin',
   owner: 'admin',
+  supervisor: 'manager',
   waiter: 'staff',
   cashier: 'staff',
   barista: 'kitchen',
   chef: 'kitchen',
   driver: 'rider',
   delivery: 'rider',
+  shipper: 'rider',
 };
 
 /**

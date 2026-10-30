@@ -258,6 +258,28 @@ describe('applyAccrual', () => {
       expect(res.tierUpgraded).toBe(true);
     }
   });
+
+  it('clamps net cashback to 0 when cashbackUsed exceeds order total', async () => {
+    const db = createMockDB({
+      [sqlMatch('FROM orders WHERE id')]: [{ id: 'ord_1', total: 50_000, cashback_used: 80_000 }],
+      [sqlMatch('cashback_transactions WHERE order_id')]: [],
+      [sqlMatch('FROM customers WHERE id')]: [{
+        id: 'cus_1', loyalty_points: 10, lifetime_points: 10, loyalty_tier: 'bronze',
+      }],
+      [sqlMatch('FROM cashback_wallets WHERE customer_id')]: [{ id: 'wal_1', balance: 20_000 }],
+    });
+    const res = await applyAccrual(db, BASE_POLICY, {
+      orderId: 'ord_1',
+      customerId: 'cus_1',
+      orderTotalVnd: 50_000,
+      cashbackUsedVnd: 80_000,
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.cashback).toBe(0);
+      expect(res.walletBalance).toBe(20_000);
+    }
+  });
 });
 
 describe('reverseAccrual', () => {
@@ -334,6 +356,30 @@ describe('reverseAccrual', () => {
       expect(res.tierDowngraded).toBe(true);
       expect(res.newTier).toBe('bronze');
     }
+  });
+
+  it('rejects non-positive or NaN refund amounts without deducting points', async () => {
+    const db = createMockDB({});
+    const zeroRes = await reverseAccrual(db, BASE_POLICY, {
+      orderId: 'ord_1',
+      customerId: 'cus_1',
+      refundAmountVnd: 0,
+    });
+    expect(zeroRes).toEqual({ ok: false, reason: 'no_points_to_reverse' });
+
+    const negRes = await reverseAccrual(db, BASE_POLICY, {
+      orderId: 'ord_1',
+      customerId: 'cus_1',
+      refundAmountVnd: -10_000,
+    });
+    expect(negRes).toEqual({ ok: false, reason: 'no_points_to_reverse' });
+
+    const nanRes = await reverseAccrual(db, BASE_POLICY, {
+      orderId: 'ord_1',
+      customerId: 'cus_1',
+      refundAmountVnd: Number.NaN,
+    });
+    expect(nanRes).toEqual({ ok: false, reason: 'no_points_to_reverse' });
   });
 });
 

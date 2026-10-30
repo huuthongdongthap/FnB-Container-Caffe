@@ -6,12 +6,14 @@ export type StaffRole =
   | 'owner'
   | 'admin'
   | 'manager'
+  | 'supervisor'
   | 'staff'
   | 'barista'
   | 'chef'
   | 'kitchen'
   | 'cashier'
-  | 'waiter';
+  | 'waiter'
+  | 'shipper';
 
 export const STAFF_ROLES: readonly StaffRole[] = [
   'owner',
@@ -24,12 +26,14 @@ export const ROLE_LABELS: Record<StaffRole, { vi: string; en: string }> = {
   owner: { vi: 'Chủ', en: 'Owner' },
   admin: { vi: 'Quản trị', en: 'Admin' },
   manager: { vi: 'Quản lý', en: 'Manager' },
+  supervisor: { vi: 'Giám sát', en: 'Supervisor' },
   staff: { vi: 'Bếp', en: 'Kitchen' },
   barista: { vi: 'Pha chế', en: 'Barista' },
   chef: { vi: 'Đầu bếp', en: 'Chef' },
   kitchen: { vi: 'Bếp', en: 'Kitchen' },
   cashier: { vi: 'Thu ngân', en: 'Cashier' },
   waiter: { vi: 'Phục vụ', en: 'Waiter' },
+  shipper: { vi: 'Giao hàng', en: 'Shipper' },
 };
 
 export const ROLE_PERMISSIONS: Record<StaffRole, string[]> = {
@@ -40,6 +44,13 @@ export const ROLE_PERMISSIONS: Record<StaffRole, string[]> = {
     'tables:view', 'tables:update',
     'orders:view', 'orders:create', 'orders:update',
     'staff:view', 'staff:manage',
+    'analytics:view', 'payments:view',
+  ],
+  supervisor: [
+    'kds:view', 'kds:update',
+    'tables:view', 'tables:update',
+    'orders:view', 'orders:create', 'orders:update',
+    'staff:view',
     'analytics:view', 'payments:view',
   ],
   staff: [
@@ -66,6 +77,10 @@ export const ROLE_PERMISSIONS: Record<StaffRole, string[]> = {
   waiter: [
     'orders:view', 'orders:create', 'orders:update',
     'tables:view', 'tables:update',
+  ],
+  shipper: [
+    'orders:view', 'orders:update',
+    'payments:view',
   ],
 };
 

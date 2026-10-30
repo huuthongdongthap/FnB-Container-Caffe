@@ -183,4 +183,20 @@ describe('Purchasing / Supplier Contract', () => {
     expect(payload.tax_id).toBe('0312345678');
     expect(payload.supplier_type).toBe('Company');
   });
+
+  it('10. terminal PO & empty/negative item guards: rejects receiving on already received PO or empty items', async () => {
+    const db = seedDb();
+    await expect(createCanonicalPurchaseOrder(db as any, { supplierId: 'sup_viva', items: [] })).rejects.toThrow();
+
+    const po = await createCanonicalPurchaseOrder(db as any, {
+      supplierId: 'sup_viva', items: [{ ingredientId: 'ing_beans', quantity: 5, unitPrice: 110000 }],
+    });
+    await receivePurchaseOrder(db as any, po.id, [{ ingredientId: 'ing_beans', receivedQuantity: 5 }]);
+    expect(db.purchase_orders[0].status).toBe('received');
+
+    const overRcv = await receivePurchaseOrder(db as any, po.id, [{ ingredientId: 'ing_beans', receivedQuantity: 2 }]);
+    expect(overRcv.ok).toBe(false);
+    expect(overRcv.error).toBe('already_fully_received');
+    expect(db.ingredients[0].current_stock).toBe(55);
+  });
 });

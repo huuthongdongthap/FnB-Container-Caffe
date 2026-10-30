@@ -162,10 +162,14 @@ export async function calculateOrderSnapshot(
     });
   }
 
-  const shippingFee = Math.max(0, Number(input.shipping_fee || 0) || 0);
-  const discount = Math.max(0, Number(input.discount || 0) || 0);
-  const serviceFee = Math.max(0, Number(input.service_fee || 0) || 0);
-  const tipAmount = Math.max(0, Number(input.tip_amount || 0) || 0);
+  const safeFee = (val: unknown): number => {
+    const n = Number(val);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+  const shippingFee = safeFee(input.shipping_fee);
+  const discount = safeFee(input.discount);
+  const serviceFee = safeFee(input.service_fee);
+  const tipAmount = safeFee(input.tip_amount);
   const total = Math.max(0, subtotal + shippingFee - discount + serviceFee + tipAmount);
 
   return {

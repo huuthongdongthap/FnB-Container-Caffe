@@ -174,4 +174,30 @@ describe('POST /api/payment/create-link - Guest Checkout & Authorization', () =>
     expect(body.success).toBe(true);
     expect(body.checkoutUrl).toBe('https://pay.payos.vn/web/camel-case-url');
   });
+
+  it('returns 403 when unauthenticated guest requests payment link for a registered customer order', async () => {
+    const env = createMockEnv({
+      _order: {
+        id: 'ORD_OWNED_01',
+        total: 65000,
+        payment_method: 'payos',
+        payment_status: 'unpaid',
+        customer_id: 'cust_registered_01',
+        is_cod: 0,
+      },
+    });
+
+    const req = new Request('https://test.aura/create-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: 'ORD_OWNED_01',
+      }),
+    });
+
+    const res = await paymentRouter.fetch(req, env);
+    expect(res.status).toBe(403);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.success).toBe(false);
+  });
 });

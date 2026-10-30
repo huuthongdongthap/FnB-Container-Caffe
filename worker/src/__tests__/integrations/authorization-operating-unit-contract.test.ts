@@ -123,4 +123,23 @@ describe('Authorization & Operating Unit Contract', () => {
     expect(authorizeAction(hqOwner, anyTenantResource, 'read').allowed).toBe(true);
     expect(authorizeAction(hqOwner, anyTenantResource, 'admin').allowed).toBe(true);
   });
+
+  it('10. customer order action restriction & supervisor/shipper RBAC boundaries', () => {
+    const customer: ActorContext = { id: 'cust_01', role: 'customer' };
+    const ownOrder: ResourceContext = { type: 'order', id: 'ord_01', ownerId: 'cust_01' };
+
+    expect(authorizeAction(customer, ownOrder, 'delete').allowed).toBe(false);
+    expect(authorizeAction(customer, ownOrder, 'delete').code).toBe('unauthorized_role');
+    expect(authorizeAction(customer, ownOrder, 'admin').allowed).toBe(false);
+
+    const supervisor: ActorContext = { id: 'sup_01', role: 'supervisor', tenantId: 'sadec' };
+    const shipper: ActorContext = { id: 'ship_01', role: 'shipper', tenantId: 'sadec' };
+    const invRes: ResourceContext = { type: 'inventory', tenantId: 'sadec' };
+    const orderRes: ResourceContext = { type: 'order', tenantId: 'sadec' };
+
+    expect(authorizeAction(supervisor, invRes, 'update').allowed).toBe(true);
+    expect(authorizeAction(supervisor, invRes, 'delete').allowed).toBe(false);
+    expect(authorizeAction(shipper, orderRes, 'update').allowed).toBe(true);
+    expect(authorizeAction(shipper, invRes, 'read').allowed).toBe(false);
+  });
 });

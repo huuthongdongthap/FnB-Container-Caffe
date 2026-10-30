@@ -19,11 +19,22 @@ export async function createCanonicalReservation(
   db: D1Database,
   input: CreateReservationPolicyInput
 ): Promise<{ ok: boolean; reservation?: CanonicalReservation; error?: string }> {
+  if (!input.date || typeof input.date !== 'string' || !input.date.trim() || !input.time || typeof input.time !== 'string' || !input.time.trim()) {
+    return { ok: false, error: 'invalid_reservation_datetime' };
+  }
+  if (input.guestCount !== undefined && (typeof input.guestCount !== 'number' || !Number.isFinite(input.guestCount) || input.guestCount <= 0)) {
+    return { ok: false, error: 'invalid_guest_count' };
+  }
+
   const tableCheck = await validateOrderTable(db, input.tableId);
   if (!tableCheck.ok || !tableCheck.table) {
     return { ok: false, error: 'table_not_found' };
   }
   const table = tableCheck.table;
+
+  if (input.guestCount !== undefined && typeof table.capacity === 'number' && table.capacity > 0 && input.guestCount > table.capacity) {
+    return { ok: false, error: 'capacity_exceeded' };
+  }
 
   if (input.zone && table.zone && input.zone !== table.zone) {
     return { ok: false, error: 'cross_operating_unit_mismatch' };
@@ -151,6 +162,9 @@ export async function seatTable(
 
     if (!foundRsv) {
       return { ok: false, error: 'reservation_not_found' };
+    }
+    if (foundRsv.status === 'cancelled' || foundRsv.status === 'completed' || foundRsv.status === 'no_show') {
+      return { ok: false, error: 'invalid_reservation_status' };
     }
     if (foundRsv.table_id !== table.id && foundRsv.table_id !== String(table.table_number)) {
       return { ok: false, error: 'table_reservation_mismatch' };

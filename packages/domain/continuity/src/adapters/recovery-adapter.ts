@@ -4,6 +4,7 @@
  */
 
 import type { BackupManifest } from '../model/continuity-types';
+import { validateBackupManifest } from '../policies/continuity-policy';
 
 export async function computeContentHash(content: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -17,9 +18,17 @@ export async function computeContentHash(content: string): Promise<string> {
 export function evaluateBackupIntegrity(
   manifest: BackupManifest,
   actualContentHash: string,
-  actualTableCount: number
+  actualTableCount: number,
+  actualRecordsCount?: Record<string, number>
 ): { valid: boolean; error?: string } {
-  if (manifest.checksumSha256.toLowerCase() !== actualContentHash.toLowerCase()) {
+  const manifestCheck = validateBackupManifest(manifest);
+  if (!manifestCheck.valid) {
+    return {
+      valid: false,
+      error: `Invalid backup manifest: ${manifestCheck.errors.join('; ')}`
+    };
+  }
+  if (!actualContentHash || manifest.checksumSha256.toLowerCase() !== actualContentHash.toLowerCase()) {
     return {
       valid: false,
       error: `Checksum mismatch: expected ${manifest.checksumSha256}, received ${actualContentHash}`
@@ -30,6 +39,17 @@ export function evaluateBackupIntegrity(
       valid: false,
       error: `Table count mismatch: manifest expected ${manifest.tablesCount}, found ${actualTableCount}`
     };
+  }
+  if (actualRecordsCount) {
+    for (const [table, expectedCount] of Object.entries(manifest.recordsCount)) {
+      const actualCount = actualRecordsCount[table];
+      if (actualCount !== expectedCount) {
+        return {
+          valid: false,
+          error: `Record count mismatch for table ${table}: manifest expected ${expectedCount}, found ${actualCount ?? 'missing'}`
+        };
+      }
+    }
   }
   return { valid: true };
 }

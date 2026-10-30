@@ -11,14 +11,32 @@ import type {
   SecurityAuditSummary
 } from '../model/security-types';
 
+const STAFF_ROLES = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'supervisor',
+  'staff',
+  'waiter',
+  'cashier',
+  'kitchen',
+  'barista',
+  'chef',
+  'shipper',
+]);
+
+const CUSTOMER_ROLES = new Set(['customer', 'guest']);
+
 export function validateAccessControl(
   auth: AccessControlContext,
   target: ResourceAccessTarget
 ): AccessDecision {
-  const isStaffRole = ['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef'].includes(auth.userRole || '');
+  const role = typeof auth.userRole === 'string' ? auth.userRole.trim() : '';
+  const isStaffRole = STAFF_ROLES.has(role);
+  const isCustomerRole = CUSTOMER_ROLES.has(role);
 
   // 1. Unauthenticated Check
-  if (!auth.userId && !auth.userRole) {
+  if (!auth.userId && !role) {
     if (target.resourceType === 'order' && !target.ownerId) {
       // Anonymous / Guest Order Creation is permissible
       return { allowed: true, code: 'ALLOWED' };
@@ -31,8 +49,24 @@ export function validateAccessControl(
   }
 
   // 2. Super-Admin Cross-Unit Override
-  if (auth.isSuperAdmin || (auth.userRole === 'owner' && (!auth.userTenantId || auth.userTenantId === 'default' || auth.userTenantId === 'hq'))) {
+  if (auth.isSuperAdmin || (role === 'owner' && (!auth.userTenantId || auth.userTenantId === 'default' || auth.userTenantId === 'hq'))) {
     return { allowed: true, code: 'ALLOWED' };
+  }
+
+  if (!role) {
+    return {
+      allowed: false,
+      code: 'UNAUTHENTICATED',
+      reason: 'Authenticated user role is required to access resource'
+    };
+  }
+
+  if (!isStaffRole && !isCustomerRole) {
+    return {
+      allowed: false,
+      code: 'FORBIDDEN_ROLE',
+      reason: 'Unrecognized or unauthorized user role'
+    };
   }
 
   // 3. Multi-Tenant Scoping (Tenant Isolation)
@@ -55,13 +89,20 @@ export function validateAccessControl(
     }
   }
 
-  // 5. Customer IDOR Protection
-  if (auth.userRole === 'customer' || auth.userRole === 'guest') {
+  // 5. Non-Staff IDOR Protection
+  if (!isStaffRole) {
     if (target.ownerId && target.ownerId !== auth.userId) {
       return {
         allowed: false,
         code: 'FORBIDDEN_IDOR',
         reason: 'Customers are strictly prohibited from accessing another customer resources'
+      };
+    }
+    if (target.resourceType === 'customer' && (!target.ownerId || !auth.userId)) {
+      return {
+        allowed: false,
+        code: 'FORBIDDEN_IDOR',
+        reason: 'Customer profile access requires matching owner identity'
       };
     }
   }
@@ -70,16 +111,17 @@ export function validateAccessControl(
 }
 
 export function evaluateThreatPosture(findings: ThreatModelItem[]): SecurityAuditSummary {
-  const unmitigated = findings.filter((f) => f.status === 'pending');
+  const safeFindings = Array.isArray(findings) ? findings : [];
+  const unmitigated = safeFindings.filter((f) => f.status === 'pending');
   const criticalOrHighUnmitigated = unmitigated.filter(
     (f) => f.severity === 'CRITICAL' || f.severity === 'HIGH'
   );
 
   return {
-    healthy: criticalOrHighUnmitigated.length === 0,
-    totalFindings: findings.length,
-    mitigatedFindings: findings.filter((f) => f.status === 'mitigated').length,
+    healthy: safeFindings.length > 0 && criticalOrHighUnmitigated.length === 0,
+    totalFindings: safeFindings.length,
+    mitigatedFindings: safeFindings.filter((f) => f.status === 'mitigated').length,
     unresolvedBlockers: criticalOrHighUnmitigated.length,
-    items: findings
+    items: safeFindings
   };
 }

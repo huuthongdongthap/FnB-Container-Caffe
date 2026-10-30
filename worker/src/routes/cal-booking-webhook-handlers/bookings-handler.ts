@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 import { type BookingRecord } from './types';
 
@@ -10,6 +11,7 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/cal-booking-webhook/bookings — list bookings (staff/manager/owner only)
   router.get('/bookings', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']), async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const status = c.req.query('status');
     const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10) || 50, 1), 200);
 
@@ -25,8 +27,8 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
 
     try {
       let canonicalQuery =
-        'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || \'T\' || time) AS start_time, COALESCE(reservation_time, date || \'T\' || time) AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE 1=1';
-      const canonicalParams: unknown[] = [];
+        'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || \'T\' || time) AS start_time, COALESCE(reservation_time, date || \'T\' || time) AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL))';
+      const canonicalParams: unknown[] = [tenantId, tenantId];
       if (status) {
         canonicalQuery += ' AND status = ?';
         canonicalParams.push(status);
@@ -37,20 +39,20 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: true, data: results || [] });
     } catch {
       try {
-        const { results } = await db.prepare(query).bind(...params).all<BookingRecord>();
+        let fallbackQuery =
+          'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL))';
+        const fallbackParams: unknown[] = [tenantId, tenantId];
+        if (status) {
+          fallbackQuery += ' AND status = ?';
+          fallbackParams.push(status);
+        }
+        fallbackQuery += ' ORDER BY created_at DESC LIMIT ?';
+        fallbackParams.push(limit);
+        const { results } = await db.prepare(fallbackQuery).bind(...fallbackParams).all<BookingRecord>();
         return c.json({ success: true, data: results || [] });
       } catch {
         try {
-          let fallbackQuery =
-            'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE 1=1';
-          const fallbackParams: unknown[] = [];
-          if (status) {
-            fallbackQuery += ' AND status = ?';
-            fallbackParams.push(status);
-          }
-          fallbackQuery += ' ORDER BY created_at DESC LIMIT ?';
-          fallbackParams.push(limit);
-          const { results } = await db.prepare(fallbackQuery).bind(...fallbackParams).all<BookingRecord>();
+          const { results } = await db.prepare(query).bind(...params).all<BookingRecord>();
           return c.json({ success: true, data: results || [] });
         } catch (e: unknown) {
           log.error('Bookings list error:', { message: e instanceof Error ? e.message : String(e) });

@@ -2,6 +2,12 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
+import {
+  getLoyaltyAccountWithFallback,
+  recordLoyaltyTransactionDualWrite,
+  syncLoyaltyAccountAndCustomerBalance,
+  writeLoyaltyAuditLog,
+} from './loyalty-db-helpers';
 
 export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/loyalty/admin/adjust-points - Adjust customer points (admin)
@@ -28,16 +34,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Duplicate adjustment request' }, 409);
     }
 
-    let account: any = null;
-    let usingCanonical = false;
-    try {
-      account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?')
-        .bind(body.customerId).first();
-    } catch {
-      usingCanonical = true;
-      account = await db.prepare('SELECT *, id as customer_id, loyalty_points as current_points FROM customers WHERE id = ?')
-        .bind(body.customerId).first().catch(() => null);
-    }
+    const { account } = await getLoyaltyAccountWithFallback(db, body.customerId, now);
 
     if (!account) {
       return c.json({ success: false, error: 'Loyalty account not found for customer' }, 404);
@@ -50,51 +47,40 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const transactionId = crypto.randomUUID();
+    const accountId = String(account.id);
+    const customerId = String(account.customer_id ?? body.customerId);
 
-    try {
-      await db.prepare(
-        `INSERT INTO loyalty_transactions (id, account_id, type, points, balance_after, description, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(transactionId, account.id, 'adjust', body.points, newBalance, body.reason, body.idempotencyKey ?? null, now).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO loyalty_transactions (id, customer_id, points, type, reason, balance_after, created_by, created_at)
-         VALUES (?, ?, ?, 'adjust', ?, ?, ?, ?)`
-      ).bind(transactionId, account.id, body.points, body.reason, newBalance, user.id, now).run();
-    }
+    await recordLoyaltyTransactionDualWrite(db, {
+      txId: transactionId,
+      accountId,
+      customerId,
+      type: 'adjust',
+      points: body.points,
+      balanceAfter: newBalance,
+      description: body.reason,
+      reason: body.reason,
+      idempotencyKey: body.idempotencyKey ?? null,
+      createdBy: user.id,
+      now,
+    });
 
-    if (!usingCanonical) {
-      await db.prepare(
-        'UPDATE loyalty_accounts SET current_points = ?, lifetime_points = lifetime_points + ?, last_activity_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(newBalance, Math.max(0, body.points), now, now, account.id).run();
-    } else {
-      await db.prepare(
-        'UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?'
-      ).bind(newBalance, now, account.id).run();
-    }
+    await syncLoyaltyAccountAndCustomerBalance(db, {
+      accountId,
+      customerId,
+      newBalance,
+      lifetimeDelta: Math.max(0, body.points),
+      now,
+    });
 
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'loyalty_points_adjust', 'loyalty_account', account.id, JSON.stringify({ points: body.points, reason: body.reason }), now).run();
-    } catch {
-      const metaStr = JSON.stringify({ points: body.points, reason: body.reason });
-      try {
-        await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, user.id, 'loyalty_points_adjust', 'loyalty_account', account.id, 'loyalty_account', account.id, metaStr, metaStr, now).run();
-      } catch {
-        try {
-          await db.prepare(
-            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(user.id, user.id, 'loyalty_points_adjust', 'loyalty_account', account.id, metaStr, now).run().catch(() => {});
-        } catch {
-          // Ignore audit log error
-        }
-      }
-    }
+    await writeLoyaltyAuditLog(
+      db,
+      user.id,
+      'loyalty_points_adjust',
+      'loyalty_account',
+      accountId,
+      JSON.stringify({ points: body.points, reason: body.reason }),
+      now
+    );
 
     const transaction = (await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first()) as any;
 
@@ -142,6 +128,23 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let accountResults: any[] = [];
     try {
+      await db.prepare(
+        `INSERT OR IGNORE INTO loyalty_accounts (
+          id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
+        )
+        SELECT
+          'la_' || id,
+          id,
+          COALESCE(loyalty_points, 0),
+          COALESCE(lifetime_points, loyalty_points, 0),
+          COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+          COALESCE(visit_count, 0),
+          COALESCE(total_spent, 0),
+          COALESCE(updated_at, created_at, datetime('now')),
+          COALESCE(created_at, datetime('now')),
+          COALESCE(updated_at, datetime('now'))
+        FROM customers`
+      ).run();
       const accounts = (await db.prepare(
         `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
       ).bind(...params, limit, offset).all()) as { results: any[] };
@@ -201,15 +204,10 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let byTier: any = { results: [] };
 
     try {
-      // Get total members
       totalMembers = await db.prepare('SELECT COUNT(*) as total FROM loyalty_accounts').first();
-
-      // Get active members (had activity in last 30 days)
       activeMembers = await db.prepare(
         'SELECT COUNT(*) as total FROM loyalty_accounts WHERE last_activity_at >= datetime(\'now\', \'-30 days\')'
       ).first();
-
-      // Get total points issued/redeemed/expired
       pointsStats = await db.prepare(
         `SELECT
           SUM(CASE WHEN points > 0 THEN points ELSE 0 END) as total_issued,
@@ -217,8 +215,6 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           SUM(CASE WHEN type = 'expire' THEN -points ELSE 0 END) as total_expired
          FROM loyalty_transactions`
       ).first();
-
-      // Get by tier breakdown
       byTier = await db.prepare(
         'SELECT tier, COUNT(*) as count, AVG(current_points) as avg_points FROM loyalty_accounts GROUP BY tier'
       ).all();
@@ -247,12 +243,9 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       };
     });
 
-    // Calculate redemption rate
     const totalIssued = pointsStats?.total_issued || 0;
     const totalRedeemed = pointsStats?.total_redeemed || 0;
     const redemptionRate = totalIssued > 0 ? (totalRedeemed / totalIssued) * 100 : 0;
-
-    // Average points per member
     const avgPointsPerMember = (totalMembers?.total || 0) > 0 ? totalIssued / totalMembers.total : 0;
 
     return c.json({

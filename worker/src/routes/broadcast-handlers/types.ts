@@ -3,6 +3,7 @@ export interface BroadcastCustomer {
   name: string | null;
   phone: string | null;
   email: string | null;
+  tenant_id?: string | null;
 }
 
 /**

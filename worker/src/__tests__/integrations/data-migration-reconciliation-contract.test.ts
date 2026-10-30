@@ -134,5 +134,40 @@ describe('Data Migration & Reconciliation — Canonical Contract Invariants', ()
     expect(errorReport.orphansDetected.length).toBeGreaterThan(0);
     expect(errorReport.duplicatesDetected.length).toBeGreaterThan(0);
     expect(errorReport.tenantIsolationPassed).toBe(false);
+
+    // Orphan payments, non-positive snapshot price, blank transactionId, and catalog price drift
+    const snapshotAndPriceDriftDataset = {
+      orders: [{ id: 'ord_1', totalAmount: 50000, tenantId: 'default' }],
+      orderItems: [{ id: 'item_1', orderId: 'ord_1', totalPrice: 0 }],
+      payments: [
+        { id: 'pay_orphan', orderId: 'ord_missing', amount: 50000, transactionId: 'TXN_ORPHAN' },
+        { id: 'pay_blank', orderId: 'ord_1', amount: 0, transactionId: '   ' }
+      ],
+      products: [{ id: 'prod_1', price: 50000 }],
+      menuItems: [{ id: 'prod_1', price: 45000 }]
+    };
+
+    const driftReport = runReconciliationDryRun(snapshotAndPriceDriftDataset);
+    expect(driftReport.overallStatus).toBe('FAILED');
+    expect(driftReport.snapshotIntegrityPreserved).toBe(false);
+    expect(driftReport.foreignKeyIntegrityPassed).toBe(false);
+    expect(driftReport.orphansDetected).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          parentTable: 'orders',
+          childTable: 'payments',
+          orphanCount: 1,
+          orphanIds: ['pay_orphan']
+        })
+      ])
+    );
+    expect(driftReport.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('non-positive or invalid snapshot totalPrice'),
+        expect.stringContaining('orphan payments missing valid orders'),
+        expect.stringContaining('missing transaction_id or non-positive amount'),
+        expect.stringContaining('price drift against canonical products')
+      ])
+    );
   });
 });

@@ -83,9 +83,10 @@ export async function applyAccrual(
     return { ok: false, reason: 'order_not_found' };
   }
 
-  const total = order.total ?? (order as { total_amount?: number }).total_amount ?? orderTotalVnd;
-  const cashbackUsed = input.cashbackUsedVnd ?? order?.cashback_used ?? 0;
-  if (total < MIN_ORDER_TO_EARN) {
+  const total = Number(order.total ?? (order as { total_amount?: number }).total_amount ?? orderTotalVnd);
+  const rawCashbackUsed = Number(input.cashbackUsedVnd ?? order?.cashback_used ?? 0);
+  const cashbackUsed = Number.isFinite(rawCashbackUsed) && rawCashbackUsed > 0 ? rawCashbackUsed : 0;
+  if (!Number.isFinite(total) || total < MIN_ORDER_TO_EARN) {
     return { ok: false, reason: 'below_min_order' };
   }
 
@@ -137,7 +138,8 @@ export async function applyAccrual(
   const maxCap = policy.maxCapPerTx;
 
   const baseRate = tier.cashbackRate;
-  const rawCashback = Math.round((total - cashbackUsed) * baseRate * multiplier);
+  const netEligibleTotal = Math.max(0, total - cashbackUsed);
+  const rawCashback = Math.max(0, Math.round(netEligibleTotal * baseRate * multiplier));
   const cashback = Math.min(rawCashback, maxCap);
 
   const points = Math.floor((total / 10_000) * (tier.pointMultiplier || 1));

@@ -7,12 +7,14 @@ export type RoleType =
   | 'owner'
   | 'admin'
   | 'manager'
+  | 'supervisor'
   | 'staff'
   | 'barista'
   | 'chef'
   | 'kitchen'
   | 'cashier'
   | 'waiter'
+  | 'shipper'
   | 'customer'
   | 'guest';
 export type ResourceType = 'staff' | 'shift' | 'table' | 'order' | 'payment' | 'inventory' | 'reservation' | 'catalog';

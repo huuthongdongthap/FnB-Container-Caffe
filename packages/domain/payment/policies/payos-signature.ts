@@ -21,6 +21,7 @@ export async function signPayOSData(data: Record<string, unknown>, checksumKey: 
 
 export async function verifyPayOSSignature(data: Record<string, unknown>, signature: unknown, checksumKey: string): Promise<boolean> {
   if (typeof signature !== 'string' || !/^[a-fA-F0-9]{64}$/.test(signature)) return false;
+  if (typeof checksumKey !== 'string' || !checksumKey.trim()) return false;
   const computed = await signPayOSData(data, checksumKey);
   const normalized = signature.toLowerCase();
   let difference = 0;

@@ -170,4 +170,24 @@ describe('Customer / CRM Canonical Model Contract', () => {
     expect(reassignedOrder?.customer_id).toBe('cust_a');
     expect(reassignedOrder?.items).toBe(originalItems);
   });
+
+  it('8. fail-closed profile merge & supervisor/shipper staff role parity', async () => {
+    const db = createMockDb();
+    db.customers.push({ id: 'cust_sec_only', loyalty_points: 50, lifetime_points: 50, name: 'Secondary Only' });
+    db.orders.push({ id: 'ORD_SEC_ONLY', customer_id: 'cust_sec_only', total: 50000 });
+
+    const missingPrimaryRes = await mergeCustomerProfiles({
+      db: db as any,
+      primaryCustomerId: 'cust_missing_primary',
+      secondaryCustomerId: 'cust_sec_only',
+      reason: 'Invalid primary target',
+    });
+    expect(missingPrimaryRes.ok).toBe(false);
+    expect(missingPrimaryRes.error).toBe('Primary customer not found');
+    expect(db.customers.find(c => c.id === 'cust_sec_only')?.loyalty_points).toBe(50);
+    expect(db.orders[0].customer_id).toBe('cust_sec_only');
+
+    expect(canAccessOrder({ id: 'sup_1', role: 'supervisor' }, { id: 'ORD_1', customer_id: 'cust_sec_only' }).allowed).toBe(true);
+    expect(canAccessOrder({ id: 'shp_1', role: 'shipper' }, { id: 'ORD_1', customer_id: 'cust_sec_only' }).allowed).toBe(true);
+  });
 });

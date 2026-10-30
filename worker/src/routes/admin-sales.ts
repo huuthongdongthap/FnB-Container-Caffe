@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
+import { getTenantId } from '../middleware/tenant';
 
 const VALID_RANGES = ['24h', '7d', '30d'] as const;
 type Range = typeof VALID_RANGES[number];
@@ -47,13 +48,14 @@ function formatDate(d: Date): string {
 }
 
 /**
- * Escape a CSV field per RFC 4180.
+ * Escape a CSV field per RFC 4180 and neutralize spreadsheet formula triggers.
  */
 function escapeCsv(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 export const adminSalesRouter = new Hono<{ Bindings: Env }>();
@@ -83,15 +85,34 @@ adminSalesRouter.get('/csv', async(c) => {
   }
 
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
+  const tenantId = getTenantId(c);
 
-  const { results } = await db.prepare(`
-    SELECT id, customer_name, items, total, payment_method, status, created_at
-    FROM orders
-    WHERE status != 'cancelled'
-      AND created_at >= ? || ' 00:00:00'
-      AND created_at <= ? || ' 23:59:59'
-    ORDER BY created_at ASC
-  `).bind(startDate, endDate).all<SalesCsvRow>();
+  let results: SalesCsvRow[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT id, customer_name, items, total, payment_method, status, created_at
+      FROM orders
+      WHERE (tenant_id = ? OR (? = 'default' AND tenant_id IS NULL))
+        AND status != 'cancelled'
+        AND created_at >= ? || ' 00:00:00'
+        AND created_at <= ? || ' 23:59:59'
+      ORDER BY created_at ASC
+    `).bind(tenantId, tenantId, startDate, endDate).all<SalesCsvRow>();
+    results = res.results;
+  } catch (err) {
+    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+      throw err;
+    }
+    const res = await db.prepare(`
+      SELECT id, customer_name, items, total, payment_method, status, created_at
+      FROM orders
+      WHERE status != 'cancelled'
+        AND created_at >= ? || ' 00:00:00'
+        AND created_at <= ? || ' 23:59:59'
+      ORDER BY created_at ASC
+    `).bind(startDate, endDate).all<SalesCsvRow>();
+    results = res.results;
+  }
 
   const rows = results || [];
 

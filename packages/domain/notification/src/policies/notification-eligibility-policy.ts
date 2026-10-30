@@ -17,7 +17,7 @@ export function evaluateChannelEligibility(
   recipient: RecipientInfo,
   options?: { isMarketing?: boolean; hasConsent?: boolean }
 ): EligibilityResult {
-  if (options?.isMarketing && options.hasConsent === false) {
+  if (options?.isMarketing && options.hasConsent !== true) {
     return { eligible: false, reason: 'customer_opted_out_or_missing_consent' };
   }
 

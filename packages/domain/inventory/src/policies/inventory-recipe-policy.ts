@@ -110,7 +110,10 @@ export async function calculateOrderConsumption(
   let realizedRevenue = 0;
 
   for (const item of orderItems) {
-    if (typeof item.sellingPrice === 'number') {
+    if (!item || typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+      continue;
+    }
+    if (typeof item.sellingPrice === 'number' && Number.isFinite(item.sellingPrice) && item.sellingPrice >= 0) {
       realizedRevenue += item.sellingPrice * item.quantity;
     }
     const recipe = await getCanonicalRecipe(db, item.productId);
@@ -150,6 +153,12 @@ export async function deductOrderStock(
   orderItems: Array<{ productId: string; quantity: number }>,
   options?: { allowNegative?: boolean }
 ): Promise<StockDeductionResult> {
+  if (!orderId || typeof orderId !== 'string' || !orderId.trim()) {
+    return { ok: false, alreadyDeducted: false, depletions: [], error: 'invalid_order_id' };
+  }
+  if (!Array.isArray(orderItems) || orderItems.some(i => !i || typeof i.quantity !== 'number' || !Number.isFinite(i.quantity) || i.quantity <= 0)) {
+    return { ok: false, alreadyDeducted: false, depletions: [], error: 'invalid_order_items' };
+  }
   // 1. Idempotency Guard
   const existing = await db.prepare(
     `SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' LIMIT 1`

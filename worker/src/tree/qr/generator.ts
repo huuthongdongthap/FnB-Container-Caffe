@@ -12,9 +12,9 @@ import type { CafeTable } from '@aura/domain-table';
  * Normalizes Vietnamese diacritics so "Khu vực VIP" → "khu-vuc-vip".
  * Examples: T01 + indoor → t01-indoor, VIP01 + private → vip01-private, 1 + Khu vực VIP → 1-khu-vuc-vip
  */
-export function generateSlug(tableNumber: number | string, zone: string): string {
+export function generateSlug(tableNumber: number | string, zone?: string | null): string {
   const num = String(tableNumber).toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const normalized = zone
+  const normalized = String(zone || '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '') // strip combining diacritical marks
     .toLowerCase()

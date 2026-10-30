@@ -94,19 +94,39 @@ export function sanitizeIntegrationSecrets(data: unknown, seen = new WeakSet()):
   return sanitized;
 }
 
+function constantTimeStringMatch(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  const maxLen = Math.max(bufA.length, bufB.length);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (bufA[i] ?? 0) ^ (bufB[i] ?? 0);
+  }
+  return diff === 0;
+}
+
 export function verifyWebhookSignature(signature: string | undefined, secretKey?: string): boolean {
-  if (!secretKey) return true;
-  if (!signature || signature !== `sig_${secretKey}` || signature.length < 8) {
+  if (secretKey === undefined) return true;
+  if (typeof secretKey !== 'string' || secretKey.trim() === '') {
     return false;
   }
-  return true;
+  if (!signature || typeof signature !== 'string' || signature.length < 8) {
+    return false;
+  }
+  return constantTimeStringMatch(signature, `sig_${secretKey}`);
 }
 
 export function verifyWebhookBoundary(
   input: WebhookVerificationInput,
   processedKeys: Set<string>
 ): { valid: boolean; deduplicated: boolean; reason?: string } {
-  if (!input.rawPayload || typeof input.rawPayload !== 'object') {
+  if (
+    !input.rawPayload ||
+    typeof input.rawPayload !== 'object' ||
+    Array.isArray(input.rawPayload) ||
+    Object.keys(input.rawPayload as Record<string, unknown>).length === 0
+  ) {
     return { valid: false, deduplicated: false, reason: 'malformed_payload' };
   }
 
@@ -114,7 +134,10 @@ export function verifyWebhookBoundary(
     return { valid: false, deduplicated: false, reason: 'invalid_signature' };
   }
 
-  if (input.idempotencyKey) {
+  if (input.idempotencyKey !== undefined) {
+    if (typeof input.idempotencyKey !== 'string' || input.idempotencyKey.trim() === '') {
+      return { valid: false, deduplicated: false, reason: 'invalid_idempotency_key' };
+    }
     if (processedKeys.has(input.idempotencyKey)) {
       return { valid: true, deduplicated: true, reason: 'duplicate_callback' };
     }

@@ -14,22 +14,32 @@ import type {
 
 const REDACTED_KEYS = /^(password|token|secret|authorization|api_key|apikey|checksum|signature|credit_card|cvv|phone|email|customer_phone|customer_email)$/i;
 const REDACTED = '[REDACTED]';
+const JWT_VALUE_REGEX = /^eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$/;
 
-export function sanitizeTracePayload(value: unknown, depth = 0): unknown {
+export function sanitizeTracePayload(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (depth > 4) return '[DEPTH_LIMIT]';
+  if (value instanceof Date) return new Date(value.getTime());
   if (Array.isArray(value)) {
-    return value.slice(0, 20).map((item) => sanitizeTracePayload(item, depth + 1));
+    if (seen.has(value)) return '[CIRCULAR]';
+    seen.add(value);
+    const mapped = value.slice(0, 20).map((item) => sanitizeTracePayload(item, depth + 1, seen));
+    seen.delete(value);
+    return mapped;
   }
   if (value && typeof value === 'object') {
+    if (seen.has(value)) return '[CIRCULAR]';
+    seen.add(value);
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = REDACTED_KEYS.test(k) ? REDACTED : sanitizeTracePayload(v, depth + 1);
+      out[k] = REDACTED_KEYS.test(k) ? REDACTED : sanitizeTracePayload(v, depth + 1, seen);
     }
+    seen.delete(value);
     return out;
   }
   if (typeof value === 'string') {
     if (/^0\d{9}$/.test(value)) return REDACTED; // VN phone pattern
     if (/^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(value)) return REDACTED;
+    if (JWT_VALUE_REGEX.test(value)) return REDACTED;
   }
   return value;
 }
@@ -114,9 +124,14 @@ export function parseTraceparent(header?: string | null): { traceId: string; spa
   if (!header || typeof header !== 'string') return null;
   const match = header.trim().match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i);
   if (!match) return null;
+  const traceId = match[1].toLowerCase();
+  const spanId = match[2].toLowerCase();
+  if (/^0+$/.test(traceId) || /^0+$/.test(spanId)) {
+    return null;
+  }
   return {
-    traceId: match[1].toLowerCase(),
-    spanId: match[2].toLowerCase(),
+    traceId,
+    spanId,
     sampled: match[3] === '01'
   };
 }
@@ -131,11 +146,26 @@ export function evaluateSystemHealth(
   uptimeMs: number,
   version: string
 ): SystemHealthReport {
+  const safeDependencies = dependencies || {};
+  const depEntries = Object.values(safeDependencies);
+
+  if (depEntries.length === 0) {
+    return {
+      status: 'unhealthy',
+      version,
+      uptimeMs,
+      timestamp: new Date().toISOString(),
+      liveness: true,
+      readiness: false,
+      dependencies: safeDependencies
+    };
+  }
+
   let hasCriticalUnhealthy = false;
   let hasAnyDegraded = false;
   let hasAnyUnhealthy = false;
 
-  for (const dep of Object.values(dependencies)) {
+  for (const dep of depEntries) {
     if (dep.status === 'unhealthy') {
       hasAnyUnhealthy = true;
       if (dep.critical) hasCriticalUnhealthy = true;
@@ -157,6 +187,6 @@ export function evaluateSystemHealth(
     timestamp: new Date().toISOString(),
     liveness: true, // Worker is executing
     readiness: !hasCriticalUnhealthy,
-    dependencies
+    dependencies: safeDependencies
   };
 }

@@ -121,7 +121,7 @@ export function runReconciliationDryRun(
   const orphansDetected: OrphanRecordResult[] = [];
   const duplicatesDetected: DuplicateRecordResult[] = [];
 
-  // 1. Order -> OrderItems orphan check
+  // 1. Order -> OrderItems orphan & snapshot integrity check
   const orderIds = new Set(dataset.orders.map(o => o.id));
   const orderItemOrphans = detectOrphans(
     orderIds,
@@ -134,7 +134,33 @@ export function runReconciliationDryRun(
     errors.push(`Detected ${orderItemOrphans.orphanCount} orphan order_items missing valid orders`);
   }
 
-  // 2. Duplicate payment transactions check
+  const invalidSnapshotItems = dataset.orderItems.filter(
+    i => !Number.isFinite(i.totalPrice) || i.totalPrice <= 0
+  );
+  const snapshotIntegrityPreserved = invalidSnapshotItems.length === 0;
+  if (!snapshotIntegrityPreserved) {
+    errors.push(`Detected ${invalidSnapshotItems.length} order_items with non-positive or invalid snapshot totalPrice`);
+  }
+
+  // 2. Payments -> Orders orphan, duplicate transaction_id, and amount/key check
+  const paymentOrphans = detectOrphans(
+    orderIds,
+    dataset.payments.map(p => ({ id: p.id, parentId: p.orderId })),
+    'orders',
+    'payments'
+  );
+  if (paymentOrphans.orphanCount > 0) {
+    orphansDetected.push(paymentOrphans);
+    errors.push(`Detected ${paymentOrphans.orphanCount} orphan payments missing valid orders`);
+  }
+
+  const invalidPayments = dataset.payments.filter(
+    p => !p.transactionId || !p.transactionId.trim() || !Number.isFinite(p.amount) || p.amount <= 0
+  );
+  if (invalidPayments.length > 0) {
+    errors.push(`Detected ${invalidPayments.length} payments with missing transaction_id or non-positive amount`);
+  }
+
   const paymentDupes = detectDuplicates(
     dataset.payments,
     p => p.transactionId,
@@ -146,12 +172,19 @@ export function runReconciliationDryRun(
     errors.push(`Detected ${paymentDupes.duplicateCount} duplicate payment transaction_ids`);
   }
 
-  // 3. Product -> MenuItem alignment check
-  const productIds = new Set(dataset.products.map(p => p.id));
-  const unprojectedMenuItems = dataset.menuItems.filter(m => !productIds.has(m.id));
+  // 3. Product -> MenuItem alignment & price drift check
+  const productPriceById = new Map(dataset.products.map(p => [p.id, p.price]));
+  const unprojectedMenuItems = dataset.menuItems.filter(m => !productPriceById.has(m.id));
   if (unprojectedMenuItems.length > 0) {
     errors.push(`Found ${unprojectedMenuItems.length} menu_items with no matching canonical product`);
   }
+  const priceDriftedMenuItems = dataset.menuItems.filter(
+    m => productPriceById.has(m.id) && productPriceById.get(m.id) !== m.price
+  );
+  if (priceDriftedMenuItems.length > 0) {
+    errors.push(`Found ${priceDriftedMenuItems.length} menu_items with price drift against canonical products`);
+  }
+  const catalogInvalidCount = unprojectedMenuItems.length + priceDriftedMenuItems.length;
 
   // 4. Tenant isolation check
   const unassignedTenants = dataset.orders.filter(o => !o.tenantId || o.tenantId.trim() === '');
@@ -161,6 +194,7 @@ export function runReconciliationDryRun(
   }
 
   const foreignKeyIntegrityPassed = orphansDetected.length === 0;
+  const orderItemsInvalidCount = orderItemOrphans.orphanCount + invalidSnapshotItems.length;
   const overallStatus = errors.length === 0 ? 'PASSED' : 'FAILED';
 
   return {
@@ -180,22 +214,22 @@ export function runReconciliationDryRun(
         entityName: 'order_items',
         sourceCount: dataset.orderItems.length,
         targetCount: dataset.orderItems.length,
-        validCount: dataset.orderItems.length - orderItemOrphans.orphanCount,
-        invalidCount: orderItemOrphans.orphanCount,
-        status: orderItemOrphans.orphanCount === 0 ? 'ALIGNED' : 'CORRUPTED'
+        validCount: Math.max(0, dataset.orderItems.length - orderItemsInvalidCount),
+        invalidCount: orderItemsInvalidCount,
+        status: orderItemsInvalidCount === 0 ? 'ALIGNED' : 'CORRUPTED'
       },
       {
         entityName: 'products_to_menu_items',
         sourceCount: dataset.products.length,
         targetCount: dataset.menuItems.length,
-        validCount: dataset.products.length,
-        invalidCount: unprojectedMenuItems.length,
-        status: unprojectedMenuItems.length === 0 ? 'ALIGNED' : 'REQUIRES_MIGRATION'
+        validCount: Math.max(0, dataset.menuItems.length - catalogInvalidCount),
+        invalidCount: catalogInvalidCount,
+        status: catalogInvalidCount === 0 ? 'ALIGNED' : 'REQUIRES_MIGRATION'
       }
     ],
     orphansDetected,
     duplicatesDetected,
-    snapshotIntegrityPreserved: true,
+    snapshotIntegrityPreserved,
     foreignKeyIntegrityPassed,
     tenantIsolationPassed,
     overallStatus,

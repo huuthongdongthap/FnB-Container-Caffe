@@ -42,7 +42,8 @@ export interface DisciplineInput {
  */
 export function nextDisciplineStep(input: DisciplineInput): SopDisciplineStep {
   if (input.isSerious) return 'termination';
-  const index = Math.min(input.priorCountInMonth + 1, LADDER.length - 1);
+  const safePrior = Number.isFinite(input.priorCountInMonth) ? Math.max(0, Math.floor(input.priorCountInMonth)) : 0;
+  const index = Math.min(safePrior + 1, LADDER.length - 1);
   return LADDER[index];
 }
 

@@ -40,26 +40,32 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
     `).bind(tenantId).all<InventoryRow>();
     items = res.results || [];
   } catch {
+    items = [];
+  }
+  if (items.length === 0) {
     try {
       const res = await db.prepare(`
-        SELECT id, sku, name, current_stock, min_stock, unit
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit
         FROM inventory_items
-        WHERE active = 1
-        ORDER BY sku ASC
+        WHERE COALESCE(active, is_active, 1) = 1
+        ORDER BY COALESCE(sku, id) ASC
       `).all<InventoryRow>();
       items = res.results || [];
     } catch {
-      try {
-        const res = await db.prepare(`
-          SELECT id, id AS sku, name, current_stock, min_stock, unit
-          FROM ingredients
-          WHERE is_active = 1
-          ORDER BY id ASC
-        `).all<InventoryRow>();
-        items = res.results || [];
-      } catch {
-        items = [];
-      }
+      items = [];
+    }
+  }
+  if (items.length === 0) {
+    try {
+      const res = await db.prepare(`
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit
+        FROM ingredients
+        WHERE is_active = 1
+        ORDER BY id ASC
+      `).all<InventoryRow>();
+      items = res.results || [];
+    } catch {
+      items = [];
     }
   }
 
@@ -185,22 +191,28 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
     `).bind(tenantId).all<InventoryRow>();
     items = res.results || [];
   } catch {
+    items = [];
+  }
+  if (items.length === 0) {
     try {
       const res = await db.prepare(`
-        SELECT id, sku, name, current_stock, min_stock
-        FROM inventory_items WHERE active = 1
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock
+        FROM inventory_items WHERE COALESCE(active, is_active, 1) = 1
       `).all<InventoryRow>();
       items = res.results || [];
     } catch {
-      try {
-        const res = await db.prepare(`
-          SELECT id, id AS sku, name, current_stock, min_stock
-          FROM ingredients WHERE is_active = 1
-        `).all<InventoryRow>();
-        items = res.results || [];
-      } catch {
-        items = [];
-      }
+      items = [];
+    }
+  }
+  if (items.length === 0) {
+    try {
+      const res = await db.prepare(`
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock
+        FROM ingredients WHERE is_active = 1
+      `).all<InventoryRow>();
+      items = res.results || [];
+    } catch {
+      items = [];
     }
   }
 

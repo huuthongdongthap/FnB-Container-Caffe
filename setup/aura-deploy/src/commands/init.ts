@@ -32,7 +32,7 @@ export async function initCommand(): Promise<void> {
         // Handle Ctrl+C gracefully
         console.log(chalk.red('\n  Setup cancelled.'));
         rl.close();
-        process.exit(0);
+        return process.exit(0);
       }
 
       // Apply value (use default when input is empty)
@@ -85,13 +85,13 @@ export async function initCommand(): Promise<void> {
   } catch {
     console.log(chalk.red('\n  Setup cancelled.'));
     rl2.close();
-    process.exit(0);
+    return process.exit(0);
   }
   rl2.close();
 
   if (confirmRaw.toLowerCase() === 'n' || confirmRaw.toLowerCase() === 'no') {
     console.log(chalk.red('\n  Setup cancelled. No files were written.\n'));
-    process.exit(0);
+    return process.exit(0);
   }
 
   console.log(chalk.green('\n  Generating configuration...\n'));

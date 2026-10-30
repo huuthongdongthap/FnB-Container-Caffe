@@ -316,4 +316,20 @@ describe('Inventory / Recipe Contract', () => {
     expect(txQuantities).toContain(-18);
     expect(txQuantities).toContain(-10);
   });
+
+  it('12. negative/non-finite item quantity & blank orderId fail closed without inflating stock', async () => {
+    const db = createMockDb();
+    db.recipes.push({ id: 'rec_matcha', product_id: 'prod_matcha' });
+    db.ingredients.push({ id: 'ing_matcha', name: 'Matcha Uji', cost_per_unit: 1000, current_stock: 100 });
+    db.recipe_items.push({ id: 'ri_m', recipe_id: 'rec_matcha', ingredient_id: 'ing_matcha', quantity: 10, unit: 'g' });
+
+    const blankOrder = await deductOrderStock(db as any, '   ', [{ productId: 'prod_matcha', quantity: 1 }]);
+    expect(blankOrder.ok).toBe(false);
+    expect(blankOrder.error).toBe('invalid_order_id');
+
+    const negQty = await deductOrderStock(db as any, 'ORD_NEG_1', [{ productId: 'prod_matcha', quantity: -5 }]);
+    expect(negQty.ok).toBe(false);
+    expect(negQty.error).toBe('invalid_order_items');
+    expect(db.ingredients[0].current_stock).toBe(100);
+  });
 });

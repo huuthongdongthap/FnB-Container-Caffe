@@ -10,7 +10,7 @@ import type {
   AuditFailurePolicy,
   CanonicalAuditRecord,
 } from '../model/audit-types';
-import { redactSensitiveData } from './audit-redaction-policy';
+import { redactSensitiveData, redactSensitiveValue } from './audit-redaction-policy';
 
 export function calculateSafeDiff(
   before?: Record<string, unknown> | null,
@@ -53,10 +53,11 @@ export function buildCanonicalAuditRecord(payload: AuditPayload): CanonicalAudit
   } : null;
 
   const safeMetadata = payload.metadata ? (redactSensitiveData(payload.metadata) as Record<string, unknown>) : {};
+  const safeReason = payload.reason ? String(redactSensitiveValue(payload.reason)) : null;
 
   const detailsObj = {
     outcome: status,
-    reason: payload.reason || null,
+    reason: safeReason,
     correlationId,
     tenantId,
     operatingUnitId,

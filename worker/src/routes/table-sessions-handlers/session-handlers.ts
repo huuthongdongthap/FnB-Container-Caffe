@@ -1,10 +1,28 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import {
   type TableSession,
   SESSION_STATUSES,
   makeSessionId
 } from './types';
+
+function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (!row) return false;
+  if (!('tenant_id' in row) || row.tenant_id === undefined) return true;
+  const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
+
+async function isTableAccessibleByTenant(db: D1Database, tableId: string, tenantId: string): Promise<boolean> {
+  try {
+    const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(tableId).first<Record<string, unknown>>();
+    if (!table) return true;
+    return matchesTenantRow(table, tenantId);
+  } catch {
+    return true;
+  }
+}
 
 export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/table-sessions — list sessions, filterable by table / status
@@ -41,12 +59,27 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
         results = [];
       }
     }
+    const tenantId = getTenantId(c);
+    try {
+      const tablesRes = await db.prepare('SELECT * FROM cafe_tables').all<Record<string, unknown>>();
+      const foreignTableIds = new Set(
+        (tablesRes.results || [])
+          .filter((t) => !matchesTenantRow(t, tenantId))
+          .map((t) => String(t.id))
+      );
+      if (foreignTableIds.size > 0) {
+        results = results.filter((s) => !foreignTableIds.has(String(s.table_id)));
+      }
+    } catch {
+      // Optional cafe_tables table
+    }
     return c.json({ success: true, data: results });
   });
 
   // GET /api/table-sessions/:id
   router.get('/:id', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const id = c.req.param('id');
     let session: TableSession | null = null;
     try {
@@ -56,7 +89,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     } catch {
       session = null;
     }
-    if (!session) {
+    if (!session || !(await isTableAccessibleByTenant(db, session.table_id, tenantId))) {
       return c.json({ success: false, error: 'Session not found' }, 404);
     }
     return c.json({ success: true, data: session });
@@ -87,11 +120,12 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
       );
     }
 
-    // Verify the table exists.
+    // Verify the table exists and belongs to the current tenant.
+    const tenantId = getTenantId(c);
     const table = await db.prepare(
-      'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ?'
-    ).bind(tableId).first<{ id: string; table_number: number; zone: string; status: string }>();
-    if (!table) {
+      'SELECT * FROM cafe_tables WHERE id = ?'
+    ).bind(tableId).first<Record<string, unknown>>();
+    if (!matchesTenantRow(table, tenantId)) {
       return c.json({ success: false, error: 'Table not found' }, 404);
     }
 
@@ -157,6 +191,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
   // PATCH /api/table-sessions/:id — transition status (active -> ordering -> paid -> closed)
   router.patch('/:id', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const id = c.req.param('id');
     const body = await c.req.json() as Record<string, unknown>;
 
@@ -168,7 +203,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     } catch {
       session = null;
     }
-    if (!session) {
+    if (!session || !(await isTableAccessibleByTenant(db, session.table_id, tenantId))) {
       return c.json({ success: false, error: 'Session not found' }, 404);
     }
 

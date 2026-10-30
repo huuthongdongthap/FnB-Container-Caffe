@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { canTransition, isTerminal } from '@aura/domain-order';
+import { canTransition, isTerminal, toActorRole, canActorTransition, calculateOrderSnapshot } from '@aura/domain-order';
 import { Hono } from 'hono';
 import { handleOpenApiUpdateOrder } from '../../routes/openapi-orders-handlers/order-write-handlers';
 import { paymentRouter } from '@aura/domain-payment';
@@ -152,5 +152,25 @@ describe('Order State Machine Lifecycle Contract', () => {
     const body = await res.json() as { success: boolean; error: string };
     expect(body.success).toBe(false);
     expect(body.error).toContain('Cannot pay for cancelled order');
+  });
+
+  it('maps supervisor to manager and shipper to rider in transition authorization and sanitizes non-finite snapshot fees', async () => {
+    expect(toActorRole('supervisor')).toBe('manager');
+    expect(toActorRole('shipper')).toBe('rider');
+    expect(canActorTransition(toActorRole('supervisor'), 'confirmed', 'cancelled').ok).toBe(true);
+    expect(canActorTransition(toActorRole('shipper'), 'ready', 'delivered').ok).toBe(true);
+
+    const snap = await calculateOrderSnapshot(null, {
+      items: [{ id: 'p1', name: 'Latte', price: 35000, quantity: 1 }],
+      shipping_fee: Number.POSITIVE_INFINITY,
+      discount: Number.NaN,
+      service_fee: -5000,
+      tip_amount: 5000.9,
+    });
+    expect(snap.shipping_fee).toBe(0);
+    expect(snap.discount).toBe(0);
+    expect(snap.service_fee).toBe(0);
+    expect(snap.tip_amount).toBe(5000);
+    expect(snap.total).toBe(40000);
   });
 });

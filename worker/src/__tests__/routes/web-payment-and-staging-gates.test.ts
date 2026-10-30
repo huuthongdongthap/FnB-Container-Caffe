@@ -617,6 +617,37 @@ exit 0
       );
       expect(argCalls[0]).toContain('Authorization: Bearer mock-token-for-gate-test');
       expect(argCalls.some((line) => /^wrangler (?:rollback|d1)\b/.test(line))).toBe(false);
+
+      // 3. With --dry-run across pages, worker, and d1 targets: validates arguments & config and exits 0 with zero external calls
+      const workerDir = join(tempDir, 'worker');
+      mkdirSync(workerDir, { recursive: true });
+      writeFileSync(join(workerDir, 'wrangler.toml'), 'name = "fnb-caffe-worker"\n');
+
+      writeFileSync(logFile, '');
+      const dryPagesOut = execFileSync('bash', [rollbackCopy, '--dry-run', deploymentId], {
+        cwd: tempDir,
+        env,
+        stdio: 'pipe',
+      }).toString();
+      expect(dryPagesOut).toContain(`[DRY RUN] Validated rollback target=pages id=${deploymentId}`);
+
+      const dryWorkerOut = execFileSync(
+        'bash',
+        [rollbackCopy, '--target', 'worker', '--dry-run', deploymentId],
+        { cwd: tempDir, env, stdio: 'pipe' },
+      ).toString();
+      expect(dryWorkerOut).toContain(`[DRY RUN] Validated rollback target=worker id=${deploymentId}`);
+
+      const d1Timestamp = '2026-10-30T12:00:00Z';
+      const dryD1Out = execFileSync(
+        'bash',
+        [rollbackCopy, '--dry-run', '--target', 'd1', d1Timestamp, 'fnb-caffe-db'],
+        { cwd: tempDir, env, stdio: 'pipe' },
+      ).toString();
+      expect(dryD1Out).toContain(`[DRY RUN] Validated rollback target=d1 id=${d1Timestamp}`);
+
+      const dryRunCalls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
+      expect(dryRunCalls).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -810,6 +841,10 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
         resolve(REPO_ROOT, 'scripts/deploy-branded.sh'),
         join(scriptsDir, 'deploy-branded.sh')
       );
+      copyFileSync(
+        resolve(REPO_ROOT, 'scripts/deploy-fix.sh'),
+        join(scriptsDir, 'deploy-fix.sh')
+      );
 
       // Minimal config files required by deploy-branded.sh so it runs non-interactively
       writeFileSync(join(tempRoot, '.env'), 'NODE_ENV=test\n');
@@ -883,6 +918,40 @@ exit 0
         '#!/usr/bin/env bash\necho "a8190d5af9b374e40d7e7df833616be1f123b49f"\nexit 0\n'
       );
       chmodSync(join(mockBinDir, 'git'), 0o755);
+
+      const mockCurlScript = `#!/usr/bin/env bash
+URL="\${@: -1}"
+WANT_CODE=false
+for arg in "$@"; do
+  if [[ "$arg" == *"http_code"* ]]; then
+    WANT_CODE=true
+  fi
+done
+if [[ "$URL" == *"/api/health" ]]; then
+  if [[ "$WANT_CODE" == "true" ]]; then
+    printf '%s' "\${MOCK_HEALTH_CODE:-200}"
+  else
+    printf '{"ok":true}'
+  fi
+  exit 0
+fi
+if [[ "$URL" == *"/api/version" ]]; then
+  printf '{"shortSha":"%s"}' "\${MOCK_WORKER_SHA:-a8190d5a}"
+  exit 0
+fi
+if [[ "$URL" == *"/version.json" ]]; then
+  if [[ "$WANT_CODE" == "true" ]]; then
+    printf '%s' "\${MOCK_PAGES_CODE:-200}"
+  else
+    printf '{\\n  "shortSha": "%s"\\n}' "\${MOCK_PAGES_SHA:-a8190d5a}"
+  fi
+  exit 0
+fi
+printf '{}'
+exit 0
+`;
+      writeFileSync(join(mockBinDir, 'curl'), mockCurlScript);
+      chmodSync(join(mockBinDir, 'curl'), 0o755);
 
       const baseEnv = {
         ...process.env,
@@ -1079,6 +1148,105 @@ exit 0
       const brandedExecuted = readInvocations(brandedExplicitLog);
       expect(brandedExecuted).toHaveLength(1);
       expect(brandedExecuted[0]).toContain('worker/db/migrations/20261001_01_init.sql');
+
+      // 7. Offline post-deploy verification in scripts/deploy-branded.sh and scripts/deploy-fix.sh:
+      //    passes when SHA matches HEAD (a8190d5a) and fails closed (non-zero exit) on health/SHA mismatch
+      execFileSync(
+        'bash',
+        [join(scriptsDir, 'deploy-branded.sh'), 'test-client', 'test.example.com', '--skip-tests'],
+        {
+          cwd: tempRoot,
+          env: {
+            ...baseEnv,
+            MOCK_WRANGLER_LOG: brandedExplicitLog,
+            DEPLOY_VERIFY_RETRIES: '1',
+            DEPLOY_VERIFY_RETRY_DELAY: '0',
+            MOCK_HEALTH_CODE: '200',
+            MOCK_WORKER_SHA: 'a8190d5a',
+            MOCK_PAGES_SHA: 'a8190d5a',
+          },
+        }
+      );
+      const brandedVersionJson = JSON.parse(readFileSync(join(distDir, 'version.json'), 'utf8'));
+      expect(brandedVersionJson.shortSha).toBe('a8190d5a');
+      expect(brandedVersionJson.deployScript).toBe('deploy-branded.sh');
+
+      expect(() =>
+        execFileSync(
+          'bash',
+          [
+            join(scriptsDir, 'deploy-branded.sh'),
+            'test-client',
+            'test.example.com',
+            '--worker-only',
+            '--skip-tests',
+          ],
+          {
+            cwd: tempRoot,
+            env: {
+              ...baseEnv,
+              MOCK_WRANGLER_LOG: brandedExplicitLog,
+              DEPLOY_VERIFY_RETRIES: '1',
+              DEPLOY_VERIFY_RETRY_DELAY: '0',
+              MOCK_HEALTH_CODE: '200',
+              MOCK_WORKER_SHA: 'deadbeef',
+            },
+            stdio: 'pipe',
+          }
+        )
+      ).toThrow();
+
+      expect(() =>
+        execFileSync(
+          'bash',
+          [
+            join(scriptsDir, 'deploy-branded.sh'),
+            'test-client',
+            'test.example.com',
+            '--pages-only',
+            '--skip-tests',
+          ],
+          {
+            cwd: tempRoot,
+            env: {
+              ...baseEnv,
+              MOCK_WRANGLER_LOG: brandedExplicitLog,
+              DEPLOY_VERIFY_RETRIES: '1',
+              DEPLOY_VERIFY_RETRY_DELAY: '0',
+              MOCK_PAGES_SHA: 'stale123',
+            },
+            stdio: 'pipe',
+          }
+        )
+      ).toThrow();
+
+      execFileSync('bash', [join(scriptsDir, 'deploy-fix.sh'), '--skip-build', '--skip-cleanup'], {
+        cwd: tempRoot,
+        env: {
+          ...baseEnv,
+          MOCK_WRANGLER_LOG: brandedExplicitLog,
+          DEPLOY_VERIFY_RETRIES: '1',
+          DEPLOY_VERIFY_RETRY_DELAY: '0',
+          MOCK_PAGES_SHA: 'a8190d5a',
+        },
+      });
+      const fixVersionJson = JSON.parse(readFileSync(join(distDir, 'version.json'), 'utf8'));
+      expect(fixVersionJson.shortSha).toBe('a8190d5a');
+      expect(fixVersionJson.deployScript).toBe('deploy-fix.sh');
+
+      expect(() =>
+        execFileSync('bash', [join(scriptsDir, 'deploy-fix.sh'), '--skip-build', '--skip-cleanup'], {
+          cwd: tempRoot,
+          env: {
+            ...baseEnv,
+            MOCK_WRANGLER_LOG: brandedExplicitLog,
+            DEPLOY_VERIFY_RETRIES: '1',
+            DEPLOY_VERIFY_RETRY_DELAY: '0',
+            MOCK_PAGES_SHA: 'stale999',
+          },
+          stdio: 'pipe',
+        })
+      ).toThrow();
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }

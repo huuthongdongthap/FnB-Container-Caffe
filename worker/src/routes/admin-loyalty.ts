@@ -6,6 +6,24 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
+import { getTenantId } from '../middleware/tenant';
+
+function escapeCsvCell(val: unknown, alwaysQuote = false): string {
+  const raw = String(val ?? '');
+  const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  if (alwaysQuote || safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
+
+function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const rec = row as Record<string, unknown>;
+  if (!('tenant_id' in rec) || rec.tenant_id === undefined) return true;
+  const rowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() ? rec.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
 
 interface LoyaltyWidget {
   title: string;
@@ -192,12 +210,13 @@ adminLoyaltyRouter.get('/tiers', async(c) => {
 // GET /api/admin-loyalty/top-customers — top 20 by spend
 adminLoyaltyRouter.get('/top-customers', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const limit = parseInt(c.req.query('limit') || '20', 10);
 
   let results: TopCustomer[] = [];
   try {
     const res = await db.prepare(`
-      SELECT c.id, c.name, c.phone, c.loyalty_tier as tier,
+      SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
              COALESCE(cw.total_spent, 0) as total_spent,
              (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') as visit_count
       FROM customers c
@@ -205,13 +224,13 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
       ORDER BY total_spent DESC
       LIMIT ?
     `).bind(limit).all<TopCustomer>();
-    results = res.results || [];
+    results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
   } catch {
     try {
       const res = await db.prepare(
-        'SELECT id, name, phone, tier, total_spent, visit_count FROM customers ORDER BY total_spent DESC LIMIT ?'
+        'SELECT * FROM customers ORDER BY total_spent DESC LIMIT ?'
       ).bind(limit).all<TopCustomer>();
-      results = res.results || [];
+      results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
     } catch {
       results = [];
     }
@@ -223,23 +242,22 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
 // GET /api/admin-loyalty/export — CSV export
 adminLoyaltyRouter.get('/export', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
 
   let results: CustomerExportRow[] = [];
   try {
     const res = await db.prepare(
-      'SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at FROM customers ORDER BY created_at DESC'
+      'SELECT *, date_of_birth AS birthday, loyalty_tier AS tier FROM customers ORDER BY created_at DESC'
     ).all<CustomerExportRow>();
     if (res.results && res.results.length > 0) {
       results = res.results;
     } else {
       const liveRes = await db.prepare(`
-        SELECT c.id, c.name, c.phone, c.email,
-               c.date_of_birth AS birthday,
+        SELECT c.*, c.date_of_birth AS birthday,
                c.loyalty_tier AS tier,
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
-               c.created_at
+               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
         ORDER BY c.created_at DESC
@@ -249,13 +267,11 @@ adminLoyaltyRouter.get('/export', async(c) => {
   } catch {
     try {
       const liveRes = await db.prepare(`
-        SELECT c.id, c.name, c.phone, c.email,
-               c.date_of_birth AS birthday,
+        SELECT c.*, c.date_of_birth AS birthday,
                c.loyalty_tier AS tier,
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
-               c.created_at
+               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
         ORDER BY c.created_at DESC
@@ -264,19 +280,17 @@ adminLoyaltyRouter.get('/export', async(c) => {
     } catch {
       try {
         const res = await db.prepare(
-          'SELECT id, name, phone, email, birthday, tier, cashback_balance, total_spent, visit_count, created_at FROM customers ORDER BY created_at DESC'
+          'SELECT * FROM customers ORDER BY created_at DESC'
         ).all<CustomerExportRow>();
         results = res.results || [];
       } catch {
         try {
           const canonicalRes = await db.prepare(`
-            SELECT c.id, c.name, c.phone, c.email,
-                   '' AS birthday,
+            SELECT c.*, '' AS birthday,
                    c.loyalty_tier AS tier,
                    COALESCE(cw.balance, 0) AS cashback_balance,
                    COALESCE(cw.total_spent, 0) AS total_spent,
-                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count,
-                   c.created_at
+                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count
             FROM customers c
             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
             ORDER BY c.created_at DESC
@@ -289,21 +303,23 @@ adminLoyaltyRouter.get('/export', async(c) => {
     }
   }
 
+  results = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+
   const headers = ['ID', 'Name', 'Phone', 'Email', 'Birthday', 'Tier', 'Cashback', 'Total Spent', 'Visits', 'Created'];
   const csvRows = [headers.join(',')];
 
-  for (const row of results || []) {
+  for (const row of results) {
     csvRows.push([
-      row.id,
-      `"${(row.name || '').replace(/"/g, '""')}"`,
-      row.phone || '',
-      row.email || '',
-      row.birthday || '',
-      row.tier || '',
+      escapeCsvCell(row.id),
+      escapeCsvCell(row.name || '', true),
+      escapeCsvCell(row.phone || ''),
+      escapeCsvCell(row.email || ''),
+      escapeCsvCell(row.birthday || ''),
+      escapeCsvCell(row.tier || ''),
       row.cashback_balance || 0,
       row.total_spent || 0,
       row.visit_count || 0,
-      row.created_at || ''
+      escapeCsvCell(row.created_at || '')
     ].join(','));
   }
 

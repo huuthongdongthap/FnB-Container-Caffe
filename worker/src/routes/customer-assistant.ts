@@ -50,22 +50,28 @@ export async function processCustomerQuery(
     if (extractedId) {
       try {
         orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR ? = \'default\' OR tenant_id IS NULL) AND (id = ? OR id LIKE ?) LIMIT 1'
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (id = ? OR id LIKE ?) LIMIT 1'
         ).bind(tenantId, tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>();
-      } catch {
-        orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (id = ? OR id LIKE ?) LIMIT 1'
-        ).bind(extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        orderRow = /no such column:\s*tenant_id/i.test(msg)
+          ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (id = ? OR id LIKE ?) LIMIT 1')
+              .bind(extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null)
+          : await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (id = ? OR id LIKE ?) LIMIT 1')
+              .bind(tenantId, tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null);
       }
     } else if (data.phone) {
       try {
         orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR ? = \'default\' OR tenant_id IS NULL) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
+          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
         ).bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>();
-      } catch {
-        orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
-        ).bind(data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        orderRow = /no such column:\s*tenant_id/i.test(msg)
+          ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1')
+              .bind(data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
+          : await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1')
+              .bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
       }
     }
 
@@ -85,36 +91,25 @@ export async function processCustomerQuery(
           `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
            FROM orders o
            LEFT JOIN cafe_tables t ON o.table_id = t.id
-           WHERE (o.tenant_id = ? OR ? = 'default' OR o.tenant_id IS NULL)
+           WHERE (o.tenant_id = ? OR (? = 'default' AND o.tenant_id IS NULL))
              AND (o.table_number = ? OR t.table_number = ? OR o.table_id = ?)
              AND o.status NOT IN ('completed', 'cancelled')
            ORDER BY o.created_at DESC
            LIMIT 1`
         ).bind(tenantId, tenantId, tbl, tbl, tbl).first<{ id: string; total: number; status: string }>();
-      } catch {
-        try {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/no such column:\s*(?:o\.)?tenant_id/i.test(msg)) {
           activeOrder = await db.prepare(
-            `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
-             FROM orders o
-             WHERE (o.table_number = ? OR o.table_id = ?)
-               AND o.status NOT IN ('completed', 'cancelled')
-             ORDER BY o.created_at DESC
-             LIMIT 1`
-          ).bind(tbl, tbl).first<{ id: string; total: number; status: string }>();
-        } catch {
-          try {
-            activeOrder = await db.prepare(
-              `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
-               FROM orders o
-               LEFT JOIN cafe_tables t ON o.table_id = t.id
-               WHERE (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
-                 AND o.status NOT IN ('completed', 'cancelled')
-               ORDER BY o.created_at DESC
-               LIMIT 1`
-            ).bind(String(tbl), tbl).first<{ id: string; total: number; status: string }>();
-          } catch {
-            activeOrder = null;
-          }
+            `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
+             WHERE (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?) AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
+          ).bind(String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null);
+        } else {
+          activeOrder = await db.prepare(
+            `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
+             WHERE (o.tenant_id = ? OR (? = 'default' AND o.tenant_id IS NULL)) AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
+               AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
+          ).bind(tenantId, tenantId, String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null);
         }
       }
       if (activeOrder) {
@@ -128,9 +123,17 @@ export async function processCustomerQuery(
   } else if (q.includes('điểm') || q.includes('hạng') || q.includes('tích điểm')) {
     intent = 'loyalty_points';
     if (data.phone) {
-      const cust = await db.prepare(
-        'SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? LIMIT 1'
-      ).bind(data.phone).first<{ name: string; loyalty_points: number; loyalty_tier: string }>();
+      let cust: { name: string; loyalty_points: number; loyalty_tier: string } | null = null;
+      try {
+        cust = await db.prepare(
+          'SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? AND (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) LIMIT 1'
+        ).bind(data.phone, tenantId, tenantId).first<{ name: string; loyalty_points: number; loyalty_tier: string }>();
+      } catch (err) {
+        if (/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+          cust = await db.prepare('SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? LIMIT 1')
+            .bind(data.phone).first<{ name: string; loyalty_points: number; loyalty_tier: string }>().catch(() => null);
+        }
+      }
       if (cust) {
         reply = `Chào ${cust.name || 'bạn'}, bạn đang có ${cust.loyalty_points || 0} điểm tích lũy (Hạng: ${(cust.loyalty_tier || 'bronze').toUpperCase()}).`;
       } else {

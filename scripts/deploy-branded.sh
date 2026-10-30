@@ -21,6 +21,8 @@ Arguments:
   domain         Custom domain for this instance (e.g. "auraspace.cafe")
 
 Options:
+  --worker-only                Deploy only the Cloudflare Worker
+  --pages-only                 Deploy only Cloudflare Pages
   --skip-tests                 Skip test gate before deploy
   --skip-migrations            Explicitly skip D1 migrations (default behavior)
   --migration-file <name.sql>  Explicitly apply a single forward migration from worker/db/migrations/
@@ -37,6 +39,8 @@ EOF
 # ── Parse arguments ────────────────────────────────────────────────────────
 CLIENT_NAME=""
 DOMAIN=""
+WORKER_ONLY=false
+PAGES_ONLY=false
 SKIP_TESTS=false
 SKIP_MIGRATIONS=false
 SKIP_VERIFY=false
@@ -107,6 +111,14 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       show_help
       ;;
+    --worker-only)
+      WORKER_ONLY=true
+      shift
+      ;;
+    --pages-only)
+      PAGES_ONLY=true
+      shift
+      ;;
     --skip-tests)
       SKIP_TESTS=true
       shift
@@ -157,6 +169,11 @@ if [[ -z "$CLIENT_NAME" || -z "$DOMAIN" ]]; then
   echo "ERROR: Missing required arguments <client-name> and <domain>"
   echo ""
   show_help
+fi
+
+if [[ "$WORKER_ONLY" == "true" && "$PAGES_ONLY" == "true" ]]; then
+  echo "ERROR: Cannot combine --worker-only and --pages-only." >&2
+  exit 1
 fi
 
 if [[ "$REQUESTED_BULK_MIGRATIONS" == "true" && ${#MIGRATION_FILES[@]} -eq 0 ]]; then
@@ -258,47 +275,52 @@ else
 fi
 
 # ── 4. Deploy worker ────────────────────────────────────────────────────
-echo ""
-echo "[4/6] Deploying Cloudflare Worker..."
-cd "$WORKER_DIR"
-GIT_COMMIT_SHA=$(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "unknown")
+if [[ "$PAGES_ONLY" == "false" ]]; then
+  echo ""
+  echo "[4/6] Deploying Cloudflare Worker..."
+  cd "$WORKER_DIR"
+  GIT_COMMIT_SHA=$(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "unknown")
 
-# Temporarily patch wrangler.toml with branded vars
-WRANGLER_CONFIG="$WORKER_DIR/wrangler.toml"
-WRANGLER_BACKUP="$WORKER_DIR/wrangler.toml.bak"
-cp "$WRANGLER_CONFIG" "$WRANGLER_BACKUP"
+  # Temporarily patch wrangler.toml with branded vars
+  WRANGLER_CONFIG="$WORKER_DIR/wrangler.toml"
+  WRANGLER_BACKUP="$WORKER_DIR/wrangler.toml.bak"
+  cp "$WRANGLER_CONFIG" "$WRANGLER_BACKUP"
 
-# Update worker name, CORS_ORIGIN, and project references in wrangler.toml
-# This is a minimal substitution; for full customization, maintain per-client configs.
-sed -i.tmp "s/^name = \".*\"/name = \"${PROJECT_NAME}\"/" "$WRANGLER_CONFIG"
-rm -f "${WRANGLER_CONFIG}.tmp"
-if grep -q '^CORS_ORIGIN' "$WRANGLER_CONFIG"; then
-  sed -i.tmp "s|^CORS_ORIGIN = \".*\"|CORS_ORIGIN = \"${CORS_ORIGIN}\"|" "$WRANGLER_CONFIG"
+  # Update worker name, CORS_ORIGIN, and project references in wrangler.toml
+  # This is a minimal substitution; for full customization, maintain per-client configs.
+  sed -i.tmp "s/^name = \".*\"/name = \"${PROJECT_NAME}\"/" "$WRANGLER_CONFIG"
   rm -f "${WRANGLER_CONFIG}.tmp"
+  if grep -q '^CORS_ORIGIN' "$WRANGLER_CONFIG"; then
+    sed -i.tmp "s|^CORS_ORIGIN = \".*\"|CORS_ORIGIN = \"${CORS_ORIGIN}\"|" "$WRANGLER_CONFIG"
+    rm -f "${WRANGLER_CONFIG}.tmp"
+  fi
+
+  # Deploy
+  echo "  Deploying worker: ${PROJECT_NAME}..."
+  npx wrangler deploy --config wrangler.toml \
+    --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
+
+  # Restore original wrangler.toml
+  mv "$WRANGLER_BACKUP" "$WRANGLER_CONFIG"
+  cd "$PROJECT_DIR"
+  echo "  OK"
 fi
 
-# Deploy
-echo "  Deploying worker: ${PROJECT_NAME}..."
-npx wrangler deploy --config wrangler.toml \
-  --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
-
-# Restore original wrangler.toml
-mv "$WRANGLER_BACKUP" "$WRANGLER_CONFIG"
-cd "$PROJECT_DIR"
-echo "  OK"
-
 # ── 5. Build + Deploy frontend to Pages ─────────────────────────────────
-echo ""
-echo "[5/6] Building and deploying frontend to Cloudflare Pages..."
-npx vite build --mode production 2>&1 | tail -5
+if [[ "$WORKER_ONLY" == "false" ]]; then
+  echo ""
+  echo "[5/6] Building and deploying frontend to Cloudflare Pages..."
+  npx vite build --mode production 2>&1 | tail -5
 
-cp -r assets dist/ 2>/dev/null || true
+  cp robots.txt sitemap.xml dist/ 2>/dev/null || true
+  mkdir -p dist/signage && cp -r signage-widgets/*.html dist/signage/ 2>/dev/null || true
+  cp -r assets dist/ 2>/dev/null || true
 
-# ── Cache-busting: generate version.json that Cloudflare sees as a new file ──
-GIT_COMMIT_SHA_FULL=$(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "unknown")
-GIT_COMMIT_SHORT=$(echo "$GIT_COMMIT_SHA_FULL" | cut -c1-8)
-BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > dist/version.json << VERSIONEOF
+  # ── Cache-busting: generate version.json that Cloudflare sees as a new file ──
+  GIT_COMMIT_SHA_FULL=$(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "unknown")
+  GIT_COMMIT_SHORT=$(echo "$GIT_COMMIT_SHA_FULL" | cut -c1-8)
+  BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  cat > dist/version.json << VERSIONEOF
 {
   "sha": "$GIT_COMMIT_SHA_FULL",
   "shortSha": "$GIT_COMMIT_SHORT",
@@ -307,13 +329,14 @@ cat > dist/version.json << VERSIONEOF
   "deployScript": "deploy-branded.sh"
 }
 VERSIONEOF
-echo "  Cache-busting version.json written: $GIT_COMMIT_SHORT @ $BUILD_TIMESTAMP"
+  echo "  Cache-busting version.json written: $GIT_COMMIT_SHORT @ $BUILD_TIMESTAMP"
 
-npx wrangler pages deploy dist \
-  --project-name="$PROJECT_NAME" \
-  --branch=main 2>&1 | tail -5
+  npx wrangler pages deploy dist \
+    --project-name="$PROJECT_NAME" \
+    --branch=main 2>&1 | tail -5
 
-echo "  OK"
+  echo "  OK"
+fi
 
 # ── 6. (Optional) D1 Migrations (Fail-closed: explicit --migration-file only) ─
 if [[ ${#MIGRATION_FILES[@]} -gt 0 ]]; then
@@ -332,77 +355,85 @@ fi
 
 # ── Post-deploy verification ─────────────────────────────────────────────
 if [[ "$SKIP_VERIFY" == "false" ]]; then
+  VERIFY_WORKER_URL="${DEPLOY_HEALTH_URL:-$WORKER_URL}"
+  VERIFY_PAGES_DOMAIN="${DEPLOY_PAGES_URL:-https://$DOMAIN}"
   LOCAL_SHA="$(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null | cut -c1-8 || echo "unknown")"
-  MAX_RETRIES=3
-  RETRY_DELAY=5
+  MAX_RETRIES="${DEPLOY_VERIFY_RETRIES:-3}"
+  RETRY_DELAY="${DEPLOY_VERIFY_RETRY_DELAY:-5}"
 
   echo ""
   echo "--- Post-deploy Verification ---"
-  echo "  Worker URL: $WORKER_URL"
+  echo "  Worker URL: $VERIFY_WORKER_URL"
   echo "  Pages URL:  $PAGES_URL"
-  echo "  Custom domain: $DOMAIN"
+  echo "  Custom domain: $VERIFY_PAGES_DOMAIN"
   echo ""
 
-  # Health check
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] Checking /api/health..."
-    HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$WORKER_URL/api/health" 2>/dev/null || echo "000")
-    if [[ "$HEALTH_STATUS" == "200" ]]; then
-      echo "  Health: OK (HTTP $HEALTH_STATUS)"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  Health: Got HTTP $HEALTH_STATUS, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  Health: FAILED after $MAX_RETRIES attempts (HTTP $HEALTH_STATUS)"
-      echo "  WARNING: Health endpoint not healthy. Check worker logs."
-    fi
-  done
+  if [[ "$PAGES_ONLY" == "false" ]]; then
+    # Health check
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] Checking /api/health..."
+      HEALTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$VERIFY_WORKER_URL/api/health" 2>/dev/null || echo "000")
+      if [[ "$HEALTH_STATUS" == "200" ]]; then
+        echo "  Health: OK (HTTP $HEALTH_STATUS)"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  Health: Got HTTP $HEALTH_STATUS, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  Health: FAILED after $MAX_RETRIES attempts (HTTP $HEALTH_STATUS)"
+        echo "ERROR: Health endpoint not healthy. Deploy may have failed."
+        exit 1
+      fi
+    done
 
-  # SHA match
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] Checking /api/version SHA match..."
-    VERSION_JSON=$(curl -s --max-time 5 "$WORKER_URL/api/version" 2>/dev/null || echo '{}')
-    LIVE_SHA=$(echo "$VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
+    # SHA match
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] Checking /api/version SHA match..."
+      VERSION_JSON=$(curl -s --max-time 5 "$VERIFY_WORKER_URL/api/version" 2>/dev/null || echo '{}')
+      LIVE_SHA=$(echo "$VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
 
-    if [[ "$LIVE_SHA" == "$LOCAL_SHA" ]]; then
-      echo "  SHA Match: $LIVE_SHA == $LOCAL_SHA"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  SHA Mismatch: live=$LIVE_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  SHA MISMATCH: live=$LIVE_SHA local=$LOCAL_SHA"
-      echo "  WARNING: Deployed version does not match local commit."
-    fi
-  done
+      if [[ "$LIVE_SHA" == "$LOCAL_SHA" ]]; then
+        echo "  SHA Match: $LIVE_SHA == $LOCAL_SHA"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  SHA Mismatch: live=$LIVE_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  SHA MISMATCH after $MAX_RETRIES attempts: live=$LIVE_SHA local=$LOCAL_SHA"
+        echo "ERROR: Deployed version does not match local commit. Deploy may not have propagated."
+        exit 1
+      fi
+    done
+  fi
 
-  # Custom domain version match
-  echo ""
-  echo "[Verify] Checking custom domain $DOMAIN/version.json..."
-  for i in $(seq 1 $MAX_RETRIES); do
-    echo "[Verify $i/$MAX_RETRIES] ..."
-    PAGES_VERSION_JSON=$(curl -s --max-time 5 "https://$DOMAIN/version.json" 2>/dev/null || echo '{}')
-    PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
-    PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://$DOMAIN/version.json" 2>/dev/null || echo "000")
+  if [[ "$WORKER_ONLY" == "false" ]]; then
+    # Custom domain version match
+    echo ""
+    echo "[Verify] Checking custom domain $VERIFY_PAGES_DOMAIN/version.json..."
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "[Verify $i/$MAX_RETRIES] ..."
+      PAGES_VERSION_JSON=$(curl -s --max-time 5 "$VERIFY_PAGES_DOMAIN/version.json" 2>/dev/null || echo '{}')
+      PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha"[^,]*' | cut -d'"' -f4 || echo "MISSING")
+      PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$VERIFY_PAGES_DOMAIN/version.json" 2>/dev/null || echo "000")
 
-    if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
-      echo "  Custom domain SHA Match: $PAGES_SHA == $LOCAL_SHA (HTTP $PAGES_HTTP)"
-      break
-    fi
-    if [[ $i -lt $MAX_RETRIES ]]; then
-      echo "  Custom domain SHA Mismatch: pages=$PAGES_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
-      sleep $RETRY_DELAY
-    else
-      echo "  Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$LOCAL_SHA (HTTP $PAGES_HTTP)"
-      echo "  WARNING: Custom domain may still serve cached content."
-      echo "  To force refresh: run 'bash scripts/deploy-fix.sh'"
-    fi
-  done
+      if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
+        echo "  Custom domain SHA Match: $PAGES_SHA == $LOCAL_SHA (HTTP $PAGES_HTTP)"
+        break
+      fi
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "  Custom domain SHA Mismatch: pages=$PAGES_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "  Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$LOCAL_SHA (HTTP $PAGES_HTTP)"
+        echo "ERROR: Custom domain version does not match local commit. Run 'bash scripts/deploy-fix.sh' or investigate caching."
+        exit 1
+      fi
+    done
+  fi
 
-  echo "--- Verification Complete ---"
+  echo "--- Verification PASSED ---"
 else
   echo ""
   echo "Skipping post-deploy verification (--skip-verify)"

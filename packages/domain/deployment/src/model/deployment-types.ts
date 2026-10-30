@@ -70,3 +70,12 @@ export interface StagingCredentialsValidation {
   missing: string[];
 }
 
+export interface VersionParityResult {
+  matches: boolean;
+  pagesSha: string | null;
+  workerSha: string | null;
+  expectedSha?: string;
+  error?: string;
+}
+
+

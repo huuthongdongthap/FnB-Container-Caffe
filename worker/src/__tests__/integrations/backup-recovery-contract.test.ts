@@ -71,6 +71,38 @@ describe('Backup, Recovery & Business Continuity — Canonical Invariants', () =
     const badIntegrity = evaluateBackupIntegrity(manifest, 'wrong-sha256-hash', 28);
     expect(badIntegrity.valid).toBe(false);
     expect(badIntegrity.error).toContain('Checksum mismatch');
+
+    // Per-table record count drift detection
+    const matchingRecordsIntegrity = evaluateBackupIntegrity(manifest, checksum, 28, {
+      orders: 1500,
+      payments: 1450
+    });
+    expect(matchingRecordsIntegrity.valid).toBe(true);
+
+    const driftedRecordsIntegrity = evaluateBackupIntegrity(manifest, checksum, 28, {
+      orders: 1500,
+      payments: 1400
+    });
+    expect(driftedRecordsIntegrity.valid).toBe(false);
+    expect(driftedRecordsIntegrity.error).toContain('Record count mismatch for table payments');
+
+    // Reject shell injection / path traversal in backupId and databaseId, and non-hex checksum
+    const unsafeManifest = validateBackupManifest({
+      ...manifest,
+      backupId: 'backup_1; rm -rf /',
+      databaseId: '../outside-db',
+      checksumSha256: 'not-a-valid-hex-checksum-at-all',
+      recordsCount: { orders: -5 }
+    });
+    expect(unsafeManifest.valid).toBe(false);
+    expect(unsafeManifest.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Invalid backupId format'),
+        expect.stringContaining('Invalid databaseId format'),
+        expect.stringContaining('Invalid checksum SHA-256'),
+        expect.stringContaining('Invalid record count for table orders')
+      ])
+    );
   });
 
   // ── 3. Sequential Service Recovery Ordering ───────────────────────────────
@@ -101,6 +133,14 @@ describe('Backup, Recovery & Business Continuity — Canonical Invariants', () =
     // Step 3: Worker redeploy & DO reconnection
     expect(plan.steps[2]!.stepNumber).toBe(3);
     expect(plan.steps[2]!.service).toContain('Worker');
+
+    // Reject restoration plan generation when manifest contains unsafe identifiers
+    expect(() =>
+      generateRestorationPlan('failed_migration', {
+        ...manifest,
+        backupId: 'backup; whoami'
+      })
+    ).toThrow(/Cannot generate restoration plan from invalid backup manifest/);
   });
 
   // ── 4. Cross-Domain Relationship Invariants & Orphan Detection ───────────
@@ -138,6 +178,18 @@ describe('Backup, Recovery & Business Continuity — Canonical Invariants', () =
     });
     expect(dupes.healthy).toBe(false);
     expect(dupes.duplicateProtectionActive).toBe(false);
+
+    // Orphan payments when zero orders exist
+    const orphanPayments = verifyReferentialInvariants({
+      ordersCount: 0,
+      orderItemsCount: 0,
+      paymentsCount: 3,
+      unlinkedItemsCount: 0,
+      duplicateTransactionsCount: 0
+    });
+    expect(orphanPayments.healthy).toBe(false);
+    expect(orphanPayments.foreignKeyIntegrity).toBe(false);
+    expect(orphanPayments.errors[0]).toContain('orphan payments with zero parent orders');
   });
 
   // ── 5. Pre-Recovery Readiness Checklist ───────────────────────────────────

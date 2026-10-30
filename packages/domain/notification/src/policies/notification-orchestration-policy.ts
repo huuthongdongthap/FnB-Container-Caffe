@@ -114,12 +114,27 @@ export async function processNotificationIntent(
   }
 }
 
+function constantTimeStringMatch(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  const maxLen = Math.max(bufA.length, bufB.length);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (bufA[i] ?? 0) ^ (bufB[i] ?? 0);
+  }
+  return diff === 0;
+}
+
 export function verifyWebhookSignature(signature: string | undefined, secretKey?: string): boolean {
-  if (!secretKey) return true;
-  if (!signature || signature !== `sig_${secretKey}` || signature.length < 8) {
+  if (secretKey === undefined) return true;
+  if (typeof secretKey !== 'string' || secretKey.trim() === '') {
     return false;
   }
-  return true;
+  if (!signature || typeof signature !== 'string' || signature.length < 8) {
+    return false;
+  }
+  return constantTimeStringMatch(signature, `sig_${secretKey}`);
 }
 
 export function verifyAndDeduplicateCallback(
@@ -127,6 +142,9 @@ export function verifyAndDeduplicateCallback(
   processedKeys: Set<string>,
   secretKey?: string
 ): { valid: boolean; deduplicated: boolean; reason?: string } {
+  if (!callback || typeof callback.idempotencyKey !== 'string' || callback.idempotencyKey.trim() === '') {
+    return { valid: false, deduplicated: false, reason: 'missing_idempotency_key' };
+  }
   if (!verifyWebhookSignature(callback.signature, secretKey)) {
     return { valid: false, deduplicated: false, reason: 'invalid_callback_signature' };
   }

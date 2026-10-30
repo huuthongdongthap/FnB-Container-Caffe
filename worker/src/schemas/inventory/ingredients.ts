@@ -20,11 +20,13 @@ export const IngredientTranslationSchema = z.object({
 export const IngredientCreateSchema = z.object({
   sku: z.string().min(1).max(50).regex(/^[A-Z0-9-_]+$/).openapi({ example: 'COF-BEAN-001' }),
   name: z.string().min(1).max(100),
+  category: z.string().min(1).max(50).optional(),
   unit: z.string().min(1).max(20),
   costPerUnit: MoneySchema,
   currentStock: z.number().default(0),
   minStock: z.number().int().nonnegative().default(10),
   maxStock: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
   locationId: z.string().min(1).optional(),
   supplierId: z.string().min(1).nullable().optional(),
   translations: z.array(IngredientTranslationSchema).max(20).optional(),
@@ -34,11 +36,13 @@ export const IngredientCreateSchema = z.object({
 export const IngredientUpdateSchema = z.object({
   sku: z.string().min(1).max(50).regex(/^[A-Z0-9-_]+$/).optional(),
   name: z.string().min(1).max(100).optional(),
+  category: z.string().min(1).max(50).optional(),
   unit: z.string().min(1).max(20).optional(),
   costPerUnit: MoneySchema.optional(),
   currentStock: z.number().optional(),
   minStock: z.number().int().nonnegative().optional(),
   maxStock: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
   locationId: z.string().min(1).optional(),
   supplierId: z.string().min(1).nullable().optional(),
   translations: z.array(IngredientTranslationSchema).max(20).optional(),
@@ -84,7 +88,9 @@ export const ingredientRoutes = {
     security: [{ BearerAuth: [] }],
     request: {
       query: PaginationQuerySchema.extend({
-        locationId: z.string().uuid().optional(),
+        locationId: z.string().min(1).optional(),
+        category: z.string().optional(),
+        isActive: z.coerce.boolean().optional(),
         lowStock: z.coerce.boolean().optional(),
         search: z.string().optional(),
       }),

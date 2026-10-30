@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE="${1:-http://localhost:8787}"
+BASE="http://localhost:8787"
+EXPECTED_SHA="${EXPECTED_SHA:-}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --expected-sha)
+      EXPECTED_SHA="${2:-}"
+      shift 2
+      ;;
+    *)
+      BASE="$1"
+      shift
+      ;;
+  esac
+done
+
 EMAIL="smoke+$(date +%s)@aura.test"
 PASSWORD="Passw0rd!"
 NAME="Smoke User"
@@ -11,6 +26,10 @@ pass() { printf 'PASS %s\n' "$*"; }
 fail() { printf 'FAIL %s\n' "$*"; exit 1; }
 
 echo "BASE=$BASE"
+
+# 0 Health check (fail-closed JSON readiness)
+HEALTH=$(curl -sS "$BASE/api/health") || fail "health-connect"
+echo "$HEALTH" | jq -e '.status == "ok" or .status == "healthy"' >/dev/null 2>/dev/null && pass "health" || fail "health: $HEALTH"
 
 # 1 Register
 REG_BODY=$(cat <<EOF
@@ -61,8 +80,18 @@ else
   fail "receipt-status-$STATUS body: $BODY"
 fi
 
-# 7 Version
-VER=$(curl -sS "$BASE/api/version")
-echo "$VER" | jq -e '.shortSha' >/dev/null 2>/dev/null && pass "version" || pass "version (no sha)"
+# 7 Version (fail-closed: require valid non-unknown shortSha and optional EXPECTED_SHA match)
+VER=$(curl -sS "$BASE/api/version") || fail "version-connect"
+SHORT_SHA=$(echo "$VER" | jq -r '.shortSha // empty' 2>/dev/null || true)
+if [[ -z "$SHORT_SHA" || "$SHORT_SHA" == "unknown" || "$SHORT_SHA" == "null" ]]; then
+  fail "version-invalid-sha: $VER"
+fi
+if [[ -n "$EXPECTED_SHA" ]]; then
+  EXPECTED_SHORT="${EXPECTED_SHA:0:8}"
+  if [[ "${SHORT_SHA:0:8}" != "$EXPECTED_SHORT" ]]; then
+    fail "version-sha-mismatch: expected $EXPECTED_SHORT, got $SHORT_SHA"
+  fi
+fi
+pass "version ($SHORT_SHA)"
 
 pass "smoke-ok"

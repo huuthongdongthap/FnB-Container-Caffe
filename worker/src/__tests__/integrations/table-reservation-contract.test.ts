@@ -170,4 +170,24 @@ describe('Table / Reservation Contract', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toBe('cross_operating_unit_mismatch');
   });
+
+  it('10. capacity & cancelled reservation seating guards: blocks over-capacity bookings and seating cancelled reservations', async () => {
+    const db = createMockDb();
+    const overCap = await createCanonicalReservation(db as any, {
+      tableId: 'tbl_01', customerName: 'Đoàn Đông', customerPhone: '0901112222',
+      date: '2026-10-15', time: '20:00', guestCount: 10, // tbl_01 capacity is 4
+    });
+    expect(overCap.ok).toBe(false);
+    expect(overCap.error).toBe('capacity_exceeded');
+
+    const rsvRes = await createCanonicalReservation(db as any, {
+      tableId: 'tbl_01', customerName: 'Khách Huỷ', customerPhone: '0909999999',
+      date: '2026-10-15', time: '20:30', guestCount: 2,
+    });
+    await updateReservationStatus(db as any, rsvRes.reservation!.id, 'cancelled');
+
+    const seatCancelled = await seatTable(db as any, { tableId: 'tbl_01', reservationId: rsvRes.reservation!.id });
+    expect(seatCancelled.ok).toBe(false);
+    expect(seatCancelled.error).toBe('invalid_reservation_status');
+  });
 });

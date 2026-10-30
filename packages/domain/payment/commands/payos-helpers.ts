@@ -73,11 +73,12 @@ export function validatePayOSAccess(
   const isStaffOrOwner =
     role === 'owner' ||
     role === 'manager' ||
+    role === 'supervisor' ||
     role === 'staff' ||
     role === 'admin' ||
     role === 'cashier' ||
     role === 'waiter';
-  if (orderRow.customer_id && customerId && orderRow.customer_id !== customerId && !isStaffOrOwner) {
+  if (orderRow.customer_id && (!customerId || orderRow.customer_id !== customerId) && !isStaffOrOwner) {
     return { allowed: false, reason: 'forbidden' };
   }
   if (orderRow.payment_status === 'paid') {

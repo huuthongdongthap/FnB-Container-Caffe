@@ -77,13 +77,24 @@ export const LoyaltyTransactionListResponseSchema = z.object({
   meta: PaginationMetaSchema,
 }).openapi('LoyaltyTransactionListResponse');
 
+export const LoyaltyRewardTypeEnum = z.enum([
+  'discount',
+  'free_item',
+  'upgrade',
+  'experience',
+  'merchandise',
+  'voucher',
+  'free_drink',
+  'percent',
+]);
+
 export const LoyaltyRewardSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive(),
-  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']),
-  value: z.number().positive(),
+  type: LoyaltyRewardTypeEnum,
+  value: z.number().nonnegative(),
   maxRedemptions: z.number().int().positive().nullable(),
   currentRedemptions: z.number().int().nonnegative().default(0),
   validFrom: z.string().date().nullable(),
@@ -99,8 +110,8 @@ export const LoyaltyRewardCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive(),
-  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']),
-  value: z.number().positive(),
+  type: LoyaltyRewardTypeEnum,
+  value: z.number().nonnegative(),
   maxRedemptions: z.number().int().positive().nullable().optional(),
   validFrom: z.string().date().optional(),
   validTo: z.string().date().optional(),
@@ -113,8 +124,8 @@ export const LoyaltyRewardUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive().optional(),
-  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']).optional(),
-  value: z.number().positive().optional(),
+  type: LoyaltyRewardTypeEnum.optional(),
+  value: z.number().nonnegative().optional(),
   maxRedemptions: z.number().int().positive().nullable().optional(),
   validFrom: z.string().date().nullable().optional(),
   validTo: z.string().date().nullable().optional(),
@@ -129,9 +140,9 @@ export const LoyaltyRewardListResponseSchema = z.object({
 }).openapi('LoyaltyRewardListResponse');
 
 export const RedeemRewardSchema = z.object({
-  rewardId: z.string().uuid(),
-  orderId: z.string().uuid().optional(),
-  idempotencyKey: z.string().uuid(),
+  rewardId: z.string().min(1),
+  orderId: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1),
 }).openapi('RedeemReward');
 
 export const RedeemResponseSchema = z.object({

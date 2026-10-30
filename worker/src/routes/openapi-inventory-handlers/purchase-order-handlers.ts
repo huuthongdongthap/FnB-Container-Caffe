@@ -13,15 +13,15 @@ async function writePoAuditLog(
 ): Promise<void> {
   try {
     await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'purchase_order', entityId, metadata, now).run();
+      `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(userId, userId, userId, action, 'purchase_order', entityId, 'purchase_order', entityId, metadata, metadata, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, userId, action, 'purchase_order', entityId, 'purchase_order', entityId, metadata, metadata, now).run();
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${Date.now()}`, userId, action, 'purchase_order', entityId, metadata, now).run();
     } catch {
       try {
         await db.prepare(
@@ -217,7 +217,10 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       try {
         ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
       } catch {
-        ingredient = await db.prepare('SELECT *, unit_cost as cost_per_unit FROM inventory_items WHERE id = ?').bind(item.ingredientId).first().catch(() => null);
+        ingredient = null;
+      }
+      if (!ingredient) {
+        ingredient = await db.prepare('SELECT *, COALESCE(cost_per_unit, unit_cost, 0) as cost_per_unit FROM inventory_items WHERE id = ?').bind(item.ingredientId).first().catch(() => null);
       }
       if (!ingredient) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
@@ -322,23 +325,30 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         try {
           ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
         } catch {
-          ingredient = await db.prepare('SELECT *, unit_cost as cost_per_unit FROM inventory_items WHERE id = ?').bind(item.ingredientId).first().catch(() => null);
+          ingredient = null;
+        }
+        if (!ingredient) {
+          ingredient = await db.prepare('SELECT *, COALESCE(cost_per_unit, unit_cost, 0) as cost_per_unit FROM inventory_items WHERE id = ?').bind(item.ingredientId).first().catch(() => null);
         }
         if (!ingredient) {
           return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
         }
 
-        await db.prepare(
-          `INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_cost, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(
-          `poi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          id,
-          item.ingredientId,
-          item.quantity,
-          item.unitCost || ingredient.cost_per_unit,
-          now
-        ).run();
+        const unitCost = item.unitCost || ingredient.cost_per_unit || 0;
+        const itemTotal = (item.quantity || 1) * unitCost;
+        const itemId = `poi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        try {
+          await db.prepare(
+            `INSERT INTO purchase_order_items (id, purchase_order_id, po_id, ingredient_id, quantity, unit_cost, unit_price, total_price, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(itemId, id, id, item.ingredientId, item.quantity, unitCost, unitCost, itemTotal, now).run();
+        } catch {
+          await db.prepare(
+            `INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_cost, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          ).bind(itemId, id, item.ingredientId, item.quantity, unitCost, now).run();
+        }
       }
     }
 
@@ -375,7 +385,12 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         ingredient = await db.prepare('SELECT * FROM ingredients WHERE id = ?').bind(item.ingredientId).first();
       } catch {
         usingCanonical = true;
+      }
+      if (!ingredient) {
         ingredient = await db.prepare('SELECT * FROM inventory_items WHERE id = ?').bind(item.ingredientId).first().catch(() => null);
+        if (ingredient) {
+          usingCanonical = true;
+        }
       }
       if (!ingredient) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
@@ -383,6 +398,8 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
       const previousStock = Number(ingredient.current_stock || 0);
       const newStock = previousStock + item.receivedQuantity;
+      const movId = `mov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       if (!usingCanonical) {
         await db.prepare('UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?')
           .bind(newStock, now, item.ingredientId).run();
@@ -391,7 +408,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
-          `mov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          movId,
           item.ingredientId,
           'purchase_receipt',
           item.receivedQuantity,
@@ -401,22 +418,39 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           user.id,
           now
         ).run();
+
+        await db.prepare('UPDATE inventory_items SET current_stock = ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+          .bind(newStock, now, now, item.ingredientId).run().catch(() => {});
+
+        await db.prepare(
+          `INSERT OR IGNORE INTO inventory_transactions (
+            id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+          )
+          SELECT ?, ?, 'in', ?, 'purchase', ?, ?, ?
+          WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
+        ).bind(
+          movId,
+          item.ingredientId,
+          item.receivedQuantity,
+          id,
+          `Received from PO ${id}`,
+          now,
+          item.ingredientId
+        ).run().catch(() => {});
       } else {
         await db.prepare('UPDATE inventory_items SET current_stock = ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
           .bind(newStock, now, now, item.ingredientId).run();
 
         await db.prepare(
-          `INSERT INTO inventory_transactions (id, item_id, type, quantity, previous_stock, new_stock, unit_cost, reason, performed_by, created_at)
-           VALUES (?, ?, 'restock', ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO inventory_transactions (
+            id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+          ) VALUES (?, ?, 'in', ?, 'purchase', ?, ?, ?)`
         ).bind(
-          `mov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          movId,
           item.ingredientId,
           item.receivedQuantity,
-          previousStock,
-          newStock,
-          ingredient.unit_cost || 0,
+          id,
           `Received from PO ${id}`,
-          user.id,
           now
         ).run();
       }

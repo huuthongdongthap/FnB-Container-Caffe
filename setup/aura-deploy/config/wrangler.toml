@@ -1,14 +1,26 @@
 name = "aura-cafe-{{DOMAIN_SLUG}}"
-compatibility_date = "2025-05-01"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 [[d1_databases]]
-binding = "DB"
+binding = "AURA_DB"
 database_name = "aura-cafe-{{DOMAIN_SLUG}}"
 database_id = ""
 
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = ""
+
+[[durable_objects.bindings]]
+name = "ORDER_BROADCASTER"
+class_name = "OrderBroadcaster"
+
 [vars]
 ENVIRONMENT = "production"
+CORS_ORIGIN = "https://{{DOMAIN_SLUG}}.pages.dev"
+FRONTEND_URL = "https://{{DOMAIN_SLUG}}.pages.dev"
 CAFE_NAME = "{{CAFE_NAME}}"
 CAFE_NAME_SHORT = "{{CAFE_NAME_SHORT}}"
 DOMAIN_SLUG = "{{DOMAIN_SLUG}}"

@@ -9,10 +9,35 @@ import { segmentSQL, type BroadcastCustomer } from './types';
 
 const log = createLogger({ route: 'broadcast' });
 
+function getTenantId(c: { get: (k: string) => unknown }): string {
+  const user = c.get('user') as { tenantId?: string } | undefined;
+  return user?.tenantId || 'default';
+}
+
+function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const r = row as Record<string, unknown>;
+  if (r.tenant_id === undefined) {
+    return tenantId === 'default';
+  }
+  const rowTenant = typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default';
+  return rowTenant === tenantId;
+}
+
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
   // POST /api/broadcast/send — send bulk broadcast
   router.post('/send', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c as unknown as { get: (k: string) => unknown });
 
     const raw = await c.req.json();
     const parsed = broadcastSendSchema.safeParse(raw);
@@ -36,15 +61,18 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
 
     // ── Lookup customers in segment ──
     const seg = segmentSQL(segment);
+    const tenantAwareSql = seg.sql
+      .replace(/^SELECT DISTINCT c\./, 'SELECT DISTINCT c.tenant_id, c.')
+      .replace(/^SELECT id, name, phone, email/, 'SELECT id, name, phone, email, tenant_id');
     let customers: BroadcastCustomer[] = [];
     try {
       const stmt = seg.params
-        ? db.prepare(seg.sql).bind(...seg.params)
-        : db.prepare(seg.sql);
+        ? db.prepare(tenantAwareSql).bind(...seg.params)
+        : db.prepare(tenantAwareSql);
       const { results } = await stmt.all<BroadcastCustomer>();
       customers = results || [];
     } catch (err) {
-      // Fallback for legacy test mocks
+      // Fallback for legacy test mocks without tenant_id, loyalty_tier, or date_of_birth
       let fallbackSql = seg.sql;
       if (fallbackSql.includes('loyalty_tier')) {
         fallbackSql = fallbackSql.replace(/loyalty_tier/g, 'tier');
@@ -62,6 +90,8 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
         return c.json({ success: false, error: 'Lỗi truy vấn phân khúc khách hàng' }, 500);
       }
     }
+
+    customers = customers.filter((cust) => matchesTenantRow(cust, tenantId));
 
     if (customers.length === 0) {
       return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
@@ -138,7 +168,7 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
                   const result = await sendEmail(env, {
                     to: customer.email,
                     subject: title || 'AURA CAFE',
-                    html: message.replace(/\n/g, '<br>')
+                    html: escapeHtml(message).replace(/\n/g, '<br>')
                   });
                   if (result) {
                     sentCount++; return;

@@ -20,7 +20,12 @@ interface Env {
 }
 
 function calculateTotalCash(denominations: { denomination: number; count: number }[]): number {
-  return denominations.reduce((sum, d) => sum + d.denomination * d.count, 0);
+  if (!Array.isArray(denominations)) return 0;
+  return denominations.reduce((sum, d) => {
+    const denom = typeof d?.denomination === 'number' && Number.isFinite(d.denomination) && d.denomination > 0 ? d.denomination : 0;
+    const count = typeof d?.count === 'number' && Number.isFinite(d.count) && d.count > 0 ? d.count : 0;
+    return sum + denom * count;
+  }, 0);
 }
 
 function determineVarianceStatus(variance: number): VarianceStatus {

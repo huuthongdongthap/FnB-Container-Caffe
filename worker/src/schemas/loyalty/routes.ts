@@ -16,6 +16,7 @@ import {
   LoyaltyRewardCreateSchema,
   LoyaltyRewardUpdateSchema,
   LoyaltyRewardListResponseSchema,
+  LoyaltyRewardTypeEnum,
   RedeemRewardSchema,
   RedeemResponseSchema,
   LoyaltySummarySchema,
@@ -88,7 +89,7 @@ export const LoyaltyRoutes = {
       summary: 'Claim birthday bonus points',
       tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { 'application/json': { schema: z.object({ idempotencyKey: z.string().uuid() }) } } } },
+      request: { body: { content: { 'application/json': { schema: z.object({ idempotencyKey: z.string().min(1) }) } } } },
       responses: {
         200: { description: 'Bonus claimed', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ points: z.number().int().positive(), newBalance: z.number().int().nonnegative() })) } } },
         400: { description: 'Already claimed or not birthday month', content: { 'application/json': { schema: ErrorResponseSchema } } },
@@ -102,7 +103,7 @@ export const LoyaltyRoutes = {
       summary: 'List available rewards',
       tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional(), type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']).optional() }) },
+      request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional(), type: LoyaltyRewardTypeEnum.optional() }) },
       responses: {
         200: { description: 'Rewards list', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardListResponseSchema) } } },
       },
@@ -186,7 +187,7 @@ export const LoyaltyRoutes = {
       summary: 'Adjust customer points (admin)',
       tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { 'application/json': { schema: z.object({ customerId: z.string().uuid(), points: z.number().int(), reason: z.string().max(200), idempotencyKey: z.string().uuid() }) } } } },
+      request: { body: { content: { 'application/json': { schema: z.object({ customerId: z.string().min(1), points: z.number().int(), reason: z.string().max(200), idempotencyKey: z.string().min(1) }) } } } },
       responses: {
         200: { description: 'Adjusted', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyTransactionSchema) } } },
         400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },

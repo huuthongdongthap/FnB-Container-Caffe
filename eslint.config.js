@@ -114,9 +114,9 @@ export default [
       'prefer-promise-reject-errors': 'error',
     },
   },
-  // TypeScript & TSX for worker/src/**/*.ts, src/**/*.{ts,tsx}, and packages/**/*.ts
+  // TypeScript & TSX for worker/src/**/*.ts, src/**/*.{ts,tsx}, packages/**/*.ts, and setup/aura-deploy/src/**/*.ts
   {
-    files: ['worker/src/**/*.ts', 'src/**/*.{ts,tsx}', 'packages/**/*.ts'],
+    files: ['worker/src/**/*.ts', 'src/**/*.{ts,tsx}', 'packages/**/*.ts', 'setup/aura-deploy/src/**/*.ts'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
@@ -155,6 +155,13 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
       'no-shadow': 'off',
       '@typescript-eslint/no-shadow': 'off',
+    },
+  },
+  // CLI wizard outputs to stdout via console.log by design
+  {
+    files: ['setup/aura-deploy/src/**/*.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ];

@@ -9,10 +9,15 @@
 
 set -euo pipefail
 
-DEMO_NAME="demo-cafe"
-DEMO_DIR="/tmp/aura-demo-$(date +%s)"
+DEMO_NAME="${DEMO_NAME:-demo-cafe}"
+DEMO_DIR="${DEMO_DIR:-/tmp/aura-demo-$(date +%s)}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [[ "${1:-}" == "--dry-run" ]]; then
+  echo "[DRY RUN] Demo deployment preflight: DEMO_NAME=$DEMO_NAME DEMO_DIR=$DEMO_DIR"
+  exit 0
+fi
 
 echo "=== Deploying Demo Instance: $DEMO_NAME ==="
 echo ""

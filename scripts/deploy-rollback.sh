@@ -7,7 +7,7 @@ TARGET="pages"
 PROJECT_NAME="${CLOUDFLARE_PAGES_PROJECT:-fnb-caffe-container}"
 
 usage() {
-  echo "Usage: bash scripts/deploy-rollback.sh [--target pages|worker|d1] <deployment-id|timestamp|bookmark> [d1-database]"
+  echo "Usage: bash scripts/deploy-rollback.sh [--dry-run] [--target pages|worker|d1] <deployment-id|timestamp|bookmark> [d1-database]"
 }
 
 fail() {
@@ -21,38 +21,61 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
+DRY_RUN="${ROLLBACK_DRY_RUN:-false}"
+if [[ "$1" == "--dry-run" ]]; then
+  DRY_RUN="$1"
+  shift
+fi
+
 if [[ "$1" == "--target" || "$1" == "-t" ]]; then
   [[ $# -ge 3 ]] || fail "Target and rollback identifier are required"
   TARGET="$2"
   shift 2
 fi
+
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN="$1"
+  shift
+fi
+
 case "$TARGET" in
   pages|worker|d1) ;;
   *) fail "Unknown rollback target: $TARGET" ;;
 esac
 
-ROLLBACK_ID="$1"
-shift
+ROLLBACK_ID="${1:-}"
 [[ -n "$ROLLBACK_ID" ]] || fail "Rollback identifier is required"
+shift
 [[ $# -eq 0 || ( "$TARGET" == "d1" && $# -eq 1 ) ]] || fail "Unexpected rollback arguments"
 
 if [[ "$TARGET" == "pages" || "$TARGET" == "worker" ]]; then
   [[ "$ROLLBACK_ID" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] || fail "Deployment/version identifier must be a UUID"
 fi
 
-if [[ "$TARGET" == "worker" ]]; then
+if [[ "$TARGET" == "worker" || "$TARGET" == "d1" ]]; then
   [[ -f "$WORKER_CONFIG" ]] || fail "Worker configuration is missing"
-  npx wrangler rollback "$ROLLBACK_ID" --config "$WORKER_CONFIG"
-elif [[ "$TARGET" == "d1" ]]; then
-  [[ -f "$WORKER_CONFIG" ]] || fail "Worker configuration is missing"
+fi
+
+if [[ "$TARGET" == "d1" ]]; then
   DB_NAME="${1:-fnb-caffe-db}"
   [[ "$DB_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]] || fail "Invalid D1 database name"
+  if ! [[ "$ROLLBACK_ID" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{8}-[[:xdigit:]]{8}-[[:xdigit:]]{32}$ || "$ROLLBACK_ID" =~ ^[0-9]+$ || "$ROLLBACK_ID" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+    fail "D1 restore requires a Unix/RFC3339 timestamp or a D1 bookmark"
+  fi
+fi
+
+if [[ "$DRY_RUN" == "--dry-run" || "$DRY_RUN" == "true" ]]; then
+  echo "[DRY RUN] Validated rollback target=$TARGET id=$ROLLBACK_ID"
+  exit 0
+fi
+
+if [[ "$TARGET" == "worker" ]]; then
+  npx wrangler rollback "$ROLLBACK_ID" --config "$WORKER_CONFIG"
+elif [[ "$TARGET" == "d1" ]]; then
   if [[ "$ROLLBACK_ID" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{8}-[[:xdigit:]]{8}-[[:xdigit:]]{32}$ ]]; then
     npx wrangler d1 time-travel restore "$DB_NAME" --bookmark "$ROLLBACK_ID" --config "$WORKER_CONFIG"
-  elif [[ "$ROLLBACK_ID" =~ ^[0-9]+$ || "$ROLLBACK_ID" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
-    npx wrangler d1 time-travel restore "$DB_NAME" --timestamp "$ROLLBACK_ID" --config "$WORKER_CONFIG"
   else
-    fail "D1 restore requires a Unix/RFC3339 timestamp or a D1 bookmark"
+    npx wrangler d1 time-travel restore "$DB_NAME" --timestamp "$ROLLBACK_ID" --config "$WORKER_CONFIG"
   fi
 else
   ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-${CF_ACCOUNT_ID:-}}"
