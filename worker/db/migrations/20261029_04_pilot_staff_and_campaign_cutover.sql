@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS staff_devices (
     device_token TEXT UNIQUE NOT NULL,
     pin_hash TEXT NOT NULL DEFAULT '',
     role TEXT DEFAULT 'staff',
-    is_active INTEGER DEFAULT 1,
     last_login_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
