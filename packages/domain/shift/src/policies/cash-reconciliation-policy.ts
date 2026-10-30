@@ -33,20 +33,20 @@ async function getShiftWindow(
   shiftId: string
 ): Promise<{ clock_in: string; clock_out: string | null } | null> {
   try {
-    const row = await db
-      .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
-      .bind(shiftId)
-      .first<{ clock_in: string; clock_out: string | null }>();
-    if (row) return row;
-  } catch {
-    // Fallback to staff_shifts or legacy shifts columns
-  }
-  try {
     const staffShift = await db
       .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
       .bind(shiftId)
       .first<{ clock_in: string; clock_out: string | null }>();
     if (staffShift) return staffShift;
+  } catch {
+    // Fallback to legacy shifts table when staff_shifts is absent in unit test mocks
+  }
+  try {
+    const row = await db
+      .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
+      .bind(shiftId)
+      .first<{ clock_in: string; clock_out: string | null }>();
+    if (row) return row;
   } catch {
     // Fallback to shifts with actual_start/start_time
   }

@@ -43,5 +43,8 @@
 # ── 6. Version.json — exclude from SPA routing (served as static file) ──
 /version.json                 /version.json               200
 
+# ── 6b. Relative /api/* requests → Worker API (307 preserves HTTP method & body) ──
+/api/*                        https://aura-space-worker.sadec-marketing-hub.workers.dev/api/:splat  307
+
 # ── 7. SPA fallback (MUST be last — all unmatched paths → index.html) ──
 /*                            /index.html                 200

@@ -18,11 +18,11 @@ Remediate the 4 post-cutover data completeness and edge-routing gaps discovered 
 
 | Phase | Name | Status | File |
 |---|---|---|---|
-| 01 | D1 Catalog Image Backfill & Menu UI Resolution | Pending | [phase-01-d1-catalog-image-backfill-and-menu-ui-resolution.md](./phase-01-d1-catalog-image-backfill-and-menu-ui-resolution.md) |
-| 02 | BOM `recipe_ingredients` & `cron_jobs` Seed Cutover | Pending | [phase-02-bom-recipe-ingredients-and-cron-jobs-seed-cutover.md](./phase-02-bom-recipe-ingredients-and-cron-jobs-seed-cutover.md) |
-| 03 | Pages `/api/*` Proxy & Service Worker Sync Hardening | Pending | [phase-03-pages-api-proxy-and-service-worker-sync-hardening.md](./phase-03-pages-api-proxy-and-service-worker-sync-hardening.md) |
-| 04 | Canonical Shift Table Query Priority & Regression Tests | Pending | [phase-04-canonical-shift-table-query-order-and-staging-gate-alignment.md](./phase-04-canonical-shift-table-query-order-and-staging-gate-alignment.md) |
-| 05 | Remote D1 Cutover, Redeploy & Live Smoke Verification | Pending | [phase-05-remote-d1-cutover-redeploy-and-live-smoke-verification.md](./phase-05-remote-d1-cutover-redeploy-and-live-smoke-verification.md) |
+| 01 | D1 Catalog Image Backfill & Menu UI Resolution | Completed | [phase-01-d1-catalog-image-backfill-and-menu-ui-resolution.md](./phase-01-d1-catalog-image-backfill-and-menu-ui-resolution.md) |
+| 02 | BOM `recipe_ingredients` & `cron_jobs` Seed Cutover | Completed | [phase-02-bom-recipe-ingredients-and-cron-jobs-seed-cutover.md](./phase-02-bom-recipe-ingredients-and-cron-jobs-seed-cutover.md) |
+| 03 | Pages `/api/*` Proxy & Service Worker Sync Hardening | Completed | [phase-03-pages-api-proxy-and-service-worker-sync-hardening.md](./phase-03-pages-api-proxy-and-service-worker-sync-hardening.md) |
+| 04 | Canonical Shift Table Query Priority & Regression Tests | Completed | [phase-04-canonical-shift-table-query-order-and-staging-gate-alignment.md](./phase-04-canonical-shift-table-query-order-and-staging-gate-alignment.md) |
+| 05 | Remote D1 Cutover, Redeploy & Live Smoke Verification | Completed | [phase-05-remote-d1-cutover-redeploy-and-live-smoke-verification.md](./phase-05-remote-d1-cutover-redeploy-and-live-smoke-verification.md) |
 
 ## Key Dependencies
 - Phases 01 and 02 share the additive D1 migration `worker/db/migrations/20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql` (and `.down.sql`).

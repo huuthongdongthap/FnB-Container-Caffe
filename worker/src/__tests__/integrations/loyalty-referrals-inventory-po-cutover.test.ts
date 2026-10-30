@@ -10,10 +10,12 @@ import { claimGuestOrder } from '../../../../packages/domain/customer/policies/o
 import { writeCanonicalAuditLog } from '../../../../packages/domain/audit/src/policies/audit-writer-policy';
 import { createNotificationIntent, processNotificationIntent } from '../../../../packages/domain/notification/src/policies/notification-orchestration-policy';
 import { openCanonicalShift, recordShiftSale, closeCanonicalShift } from '../../../../packages/domain/shift/src/policies/shift-lifecycle-policy';
+import { reconcileShiftCash } from '../../../../packages/domain/shift/src/policies/cash-reconciliation-policy';
 import { ErpnextProductClient } from '../../clients/erpnext-product-client';
 import { openApiLoyaltyRouter } from '../../routes/openapi-loyalty';
 import { openApiPromotionsRouter } from '../../routes/openapi-promotions';
 import { openApiInventoryRouter } from '../../routes/openapi-inventory';
+import { openApiCronRouter } from '../../routes/openapi-cron';
 import { inventoryForecastingRouter } from '../../routes/inventory-forecasting';
 import { referralRouter } from '../../routes/referrals';
 import { checkinRouter } from '../../routes/checkin';
@@ -188,6 +190,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     app.route('/', openApiLoyaltyRouter);
     app.route('/', openApiPromotionsRouter);
     app.route('/', openApiInventoryRouter);
+    app.route('/', openApiCronRouter);
     app.route('/api/inventory/forecasting', inventoryForecastingRouter);
     app.route('/api/referrals', referralRouter);
     app.route('/api/checkin', checkinRouter);
@@ -338,5 +341,60 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     } | undefined;
     expect(erpSyncRow?.erpnext_item_code).toBe('ITEM-CF-01');
     expect(erpSyncRow?.erpnext_product_id).toBe(0);
+
+    // 10. Catalog Images, BOM recipe_ingredients & Cron Seed Cutover (20261030_01)
+    sqlite.exec(`
+      INSERT OR IGNORE INTO products (id, category_id, name, price, is_available, sort_order)
+      VALUES ('tc001', 'cat_coffee', 'Cà Phê Đen', 25000, 1, 2);
+      INSERT OR IGNORE INTO menu_items (id, name, category, price, available)
+      VALUES ('tc001', 'Cà Phê Đen', 'Cà Phê', 25000, 1);
+    `);
+    const migration30Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261030_01_catalog_images_bom_ingredients_and_cron_seed.sql'),
+      'utf8'
+    );
+    const migration30Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261030_01_catalog_images_bom_ingredients_and_cron_seed.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration30Up);
+
+    const tc001Product = sqlite.prepare(`SELECT image_url FROM products WHERE id = 'tc001'`).get() as { image_url: string };
+    expect(tc001Product.image_url).toBe('/menu/aura-drinks/ca-phe-den.webp');
+    const tc001Menu = sqlite.prepare(`SELECT image_url FROM menu_items WHERE id = 'tc001'`).get() as { image_url: string };
+    expect(tc001Menu.image_url).toBe('/menu/aura-drinks/ca-phe-den.webp');
+    const bomCount = sqlite.prepare(`SELECT COUNT(*) AS cnt FROM recipe_ingredients`).get() as { cnt: number };
+    expect(bomCount.cnt).toBeGreaterThanOrEqual(46);
+    const cronCount = sqlite.prepare(`SELECT COUNT(*) AS cnt FROM cron_jobs`).get() as { cnt: number };
+    expect(cronCount.cnt).toBe(5);
+
+    sqlite.exec(migration30Down);
+    sqlite.exec(migration30Up);
+    const cronCountAfterReapply = sqlite.prepare(`SELECT COUNT(*) AS cnt FROM cron_jobs`).get() as { cnt: number };
+    expect(cronCountAfterReapply.cnt).toBe(5);
+
+    const delInUseRes = await app.request('/api/inventory/ingredients/ing_coffee_bean', {
+      method: 'DELETE',
+      headers: ownerAuth,
+    }, env);
+    expect(delInUseRes.status).toBe(409);
+    const delInUseBody = (await delInUseRes.json()) as { error: string };
+    expect(delInUseBody.error).toContain('used in recipes');
+
+    const cronJobsRes = await app.request('/api/cron/jobs', { headers: ownerAuth }, env);
+    expect(cronJobsRes.status).toBe(200);
+    const cronJobsBody = (await cronJobsRes.json()) as { data: { jobs: Array<{ id: string }> } };
+    expect(cronJobsBody.data.jobs).toHaveLength(5);
+
+    const reconRes = await reconcileShiftCash({ AURA_DB: db as never }, {
+      shiftId: openedShift.shift!.id,
+      locationId: 'loc_sadec_flagship',
+      staffId: 'USR_owner01',
+      openingFloat: 500000,
+      denominations: [{ denomination: 500000, count: 1, subtotal: 500000 }],
+      varianceReason: 'Balanced shift',
+    });
+    expect(reconRes.shiftId).toBe(openedShift.shift!.id);
+    expect(reconRes.status).toBe('balanced');
   });
 });

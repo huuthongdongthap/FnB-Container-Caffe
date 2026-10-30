@@ -17,6 +17,7 @@ import {
   MenuTableBanner,
 } from '@/components/menu/menu-catalog-unavailable-state';
 import { isReadyToServeItem } from '@/lib/menu-customization';
+import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
 
 function transformToStitchItem(item: CustomerMenuItem): MenuItemData {
@@ -25,7 +26,7 @@ function transformToStitchItem(item: CustomerMenuItem): MenuItemData {
     name: item.name,
     description: item.description ?? '',
     price: new Intl.NumberFormat('vi-VN').format(item.priceCents) + '₫',
-    imageSrc: item.imageUrl ?? '',
+    imageSrc: resolveMenuDrinkImage(item.id, item.imageUrl),
     imageAlt: item.name,
     category: item.category,
     badge: item.tags?.includes('featured') ? 'NỔI BẬT' : undefined,

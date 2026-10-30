@@ -39,3 +39,6 @@
 /reports/*    /404.html  404
 /worker/*     /404.html  404
 /db/*         /404.html  404
+
+# Route relative /api/* requests to the production Worker API (307 preserves HTTP method & body)
+/api/*        https://aura-space-worker.sadec-marketing-hub.workers.dev/api/:splat  307

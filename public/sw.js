@@ -234,16 +234,7 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncOrders() {
-  try {
-    const payload = { synced: true, timestamp: Date.now() };
-    await fetch('/api/orders/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch {
-    // Will retry on next sync event
-  }
+  return retryQueuedRequests();
 }
 
 async function retryQueuedRequests() {
@@ -262,7 +253,8 @@ async function retryQueuedRequests() {
         body: data.body || null
       });
 
-      if (response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('application/json')) {
         await cache.delete(key);
       }
     } catch {
