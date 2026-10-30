@@ -1,9 +1,21 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, authenticateRequest } from '../middleware/auth';
 import { sendPushToStaff } from '../tree/push/notifier';
 import { DEFAULT_STAFF_PUSH_ROLE } from '../tree/push/roles';
 import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErrorResponse } from '../lib/validators';
+
+const STAFF_PUSH_AUTH_ROLES = new Set([
+  'owner',
+  'manager',
+  'admin',
+  'staff',
+  'waiter',
+  'cashier',
+  'kitchen',
+  'barista',
+  'chef',
+]);
 
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
@@ -74,22 +86,48 @@ pushRouter.post('/subscribe', async(c) => {
   const db = c.env.AURA_DB;
   const raw = await c.req.json() as Record<string, unknown>;
   const isManualStaffEntry = !raw.endpoint && typeof raw.name === 'string' && raw.name.trim().length > 0;
-  const normalizedPayload = isManualStaffEntry
-    ? {
-        endpoint: `https://manual.auraspace.local/staff/${encodeURIComponent(String(raw.name).trim().toLowerCase())}`,
-        auth_key: 'manual_pending',
-        p256dh_key: 'manual_pending',
-        customer_id: String(raw.name).trim(),
-        user_agent: String(raw.name).trim(),
-        role: typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : DEFAULT_STAFF_PUSH_ROLE,
-      }
-    : raw;
+  const requestedRole = typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : (isManualStaffEntry ? DEFAULT_STAFF_PUSH_ROLE : 'customer');
 
-  const parsed = pushSubscribeSchema.safeParse(normalizedPayload);
-  if (!parsed.success) {
-    return zodErrorResponse(c, parsed.error);
+  if (isManualStaffEntry || requestedRole !== 'customer') {
+    let authSession: Awaited<ReturnType<typeof authenticateRequest>> | { role?: string } | null = null;
+    try {
+      authSession = await authenticateRequest(c.req.raw, c.env);
+    } catch {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!authSession || ('blocked' in authSession && authSession.blocked)) {
+      return c.json({ success: false, error: 'Forbidden: staff role required for staff push subscriptions' }, 403);
+    }
+    const resolvedRole = ('payload' in authSession && authSession.payload
+      ? authSession.payload.role
+      : (authSession as { role?: string }).role) || '';
+    if (!STAFF_PUSH_AUTH_ROLES.has(String(resolvedRole))) {
+      return c.json({ success: false, error: 'Forbidden: staff role required for staff push subscriptions' }, 403);
+    }
   }
-  const { endpoint, auth_key, p256dh_key, customer_id, user_agent, role } = parsed.data;
+
+  let endpoint: string;
+  let auth_key: string;
+  let p256dh_key: string;
+  let customer_id: string | undefined;
+  let user_agent: string | undefined;
+  let role: string | undefined;
+
+  if (isManualStaffEntry) {
+    const cleanName = String(raw.name).trim();
+    endpoint = `https://manual.auraspace.local/staff/${encodeURIComponent(cleanName.toLowerCase())}`;
+    auth_key = 'manual_pending';
+    p256dh_key = 'manual_pending';
+    customer_id = cleanName;
+    user_agent = cleanName;
+    role = requestedRole;
+  } else {
+    const parsed = pushSubscribeSchema.safeParse({ ...raw, role: requestedRole });
+    if (!parsed.success) {
+      return zodErrorResponse(c, parsed.error);
+    }
+    ({ endpoint, auth_key, p256dh_key, customer_id, user_agent, role } = parsed.data);
+  }
 
   const id = `SUB-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const now = new Date().toISOString();

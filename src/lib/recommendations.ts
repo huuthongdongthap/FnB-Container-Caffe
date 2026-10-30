@@ -28,7 +28,6 @@ function buildCoOccurrence(orders: OrderHistoryItem[][]): Map<string, Map<string
   const coMap = new Map<string, Map<string, number>>();
 
   for (const order of orders) {
-    const ids = order.map((i) => i.id);
     for (const item of order) {
       if (!coMap.has(item.id)) coMap.set(item.id, new Map());
       const neighbors = coMap.get(item.id)!;

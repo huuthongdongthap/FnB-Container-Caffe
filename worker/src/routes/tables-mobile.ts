@@ -1,5 +1,6 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { getTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
@@ -63,24 +64,35 @@ export async function getTablesMobile(
       return errorResponse('Không có quyền', 403);
     }
 
+    const tenantId = getTenantId(context);
     let rows: Array<Record<string, unknown>> = [];
+    let cafeTablesSucceeded = false;
+    let cafeTablesTotalRows = 0;
     try {
       const cafeRes = await context.env.AURA_DB
         .prepare('SELECT * FROM cafe_tables ORDER BY table_number ASC')
         .all();
-      rows = (cafeRes.results as Array<Record<string, unknown>>) || [];
+      const rawCafeRows = (cafeRes.results as Array<Record<string, unknown>>) || [];
+      cafeTablesSucceeded = true;
+      cafeTablesTotalRows = rawCafeRows.length;
+      rows = rawCafeRows.filter(
+        (r) => tenantId === '*' || !r.tenant_id || String(r.tenant_id) === tenantId
+      );
     } catch (err) {
       if (!String((err as Error)?.message || '').includes('no such table')) {
         throw err;
       }
     }
 
-    if (rows.length === 0) {
+    if (!cafeTablesSucceeded || cafeTablesTotalRows === 0) {
       try {
         const legacyRes = await context.env.AURA_DB
           .prepare('SELECT * FROM tables ORDER BY table_number ASC')
           .all();
-        rows = (legacyRes.results as Array<Record<string, unknown>>) || [];
+        const rawLegacyRows = (legacyRes.results as Array<Record<string, unknown>>) || [];
+        rows = rawLegacyRows.filter(
+          (r) => tenantId === '*' || !r.tenant_id || String(r.tenant_id) === tenantId
+        );
       } catch (err) {
         if (!String((err as Error)?.message || '').includes('no such table')) {
           throw err;
@@ -121,6 +133,7 @@ export async function updateTableStatus(
       return errorResponse('Trạng thái không hợp lệ', 400);
     }
 
+    const tenantId = getTenantId(context);
     let existing: Record<string, unknown> | null = null;
     let useLegacyTable = false;
     try {
@@ -143,7 +156,7 @@ export async function updateTableStatus(
         .first<Record<string, unknown>>();
     }
 
-    if (!existing) {
+    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
       return errorResponse('Bàn không tồn tại', 404);
     }
 

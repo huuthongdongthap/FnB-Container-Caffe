@@ -1,14 +1,16 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import type {
   OrderExportRow,
   RevenueExportRow,
   CustomerExportRow
 } from './types';
 
-// Helper: escape CSV cell per RFC 4180 when value contains comma, quote, or newline
+// Helper: escape CSV cell per RFC 4180 and neutralize spreadsheet formula prefixes
 function escapeCsvCell(val: unknown): string {
-  const str = String(val ?? '');
+  const rawStr = String(val ?? '');
+  const str = typeof val === 'string' && /^[\t\r ]*[=+\-@]/.test(rawStr) ? `'${rawStr}` : rawStr;
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -37,6 +39,9 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/export — CSV export for orders, revenue, or customers
   app.get('/export', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
     const type = c.req.query('type') || 'orders';
@@ -44,8 +49,8 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     if (type === 'orders') {
       const { results } = await db.prepare(
         `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
-         FROM orders WHERE DATE(created_at) BETWEEN ? AND ? ORDER BY created_at`
-      ).bind(from, to).all<OrderExportRow>();
+         FROM orders WHERE DATE(created_at) BETWEEN ? AND ?${tenantClause} ORDER BY created_at`
+      ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
 
       const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
       const rows = (results || []).map((r) => [
@@ -71,9 +76,9 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
                 COALESCE(SUM(total), 0) as revenue,
                 CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
          FROM orders
-         WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+         WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
          GROUP BY DATE(created_at) ORDER BY date`
-      ).bind(from, to).all<RevenueExportRow>();
+      ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
 
       // Get cashback earned per day separately
       let cashbackResults: { date: string; amount: number }[] = [];

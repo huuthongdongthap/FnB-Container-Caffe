@@ -4,6 +4,8 @@ import { authenticateRequest } from '../lib/staff-session-auth';
 import { StaffSessionError } from '../lib/staff-session';
 import { getAuthToken } from '../lib/jwt';
 
+export { authenticateRequest };
+
 export interface AuthUser {
   id: string; email: string; name: string;
   role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef';
@@ -26,9 +28,14 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
   return async (c, next) => {
     const env = c.env as Env;
     const isProd = env?.ENVIRONMENT === 'production' || (env as Record<string, unknown>)?.NODE_ENV === 'production';
+    const allowTestHarness = !isProd && (
+      (env as Record<string, unknown>)?.ALLOW_PLAYWRIGHT_TEST_HEADER === 'true' ||
+      env?.ENVIRONMENT === 'development' ||
+      env?.ENVIRONMENT === 'test'
+    );
     const testHeader = (typeof c?.req?.header === 'function' ? c.req.header('x-playwright-test') : null)
       ?? (c?.req?.raw?.headers?.get?.('x-playwright-test') ?? null);
-    const isPlaywright = !isProd && testHeader === 'true';
+    const isPlaywright = allowTestHarness && testHeader === 'true' && allowedRoles.includes('staff');
 
     if (isPlaywright) {
       c.set('user', {

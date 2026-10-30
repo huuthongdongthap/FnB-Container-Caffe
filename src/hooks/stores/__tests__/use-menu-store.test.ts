@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
-import { offlineDb } from '@/lib/offline-db';
+import { offlineDb as _offlineDb } from '@/lib/offline-db';
 
 // Mock offlineDb for offline hydration tests
 vi.mock('@/lib/offline-db', () => ({

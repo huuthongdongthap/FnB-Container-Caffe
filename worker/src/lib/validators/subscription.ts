@@ -20,7 +20,7 @@ const planBaseSchema = z.object({
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
   billing_cycle: z.string().optional(),
-  features: z.union([z.string(), z.array(z.string()).transform((arr) => JSON.stringify(arr))]).optional(),
+  features: z.union([z.string(), z.array(z.string()).max(50).transform((arr) => JSON.stringify(arr))]).optional(),
   description: z.string().optional()
 });
 

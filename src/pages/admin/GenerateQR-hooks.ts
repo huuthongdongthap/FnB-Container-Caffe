@@ -28,9 +28,9 @@ export function useQrTables(t: (key: string) => string) {
 	}, [t]);
 
 	useEffect(() => {
-		let cancelled = false;
+		let _cancelled = false;
 		loadTables();
-		return () => { cancelled = true; };
+		return () => { _cancelled = true; };
 	}, [loadTables]);
 
 	const handleRegenerate = useCallback(async () => {

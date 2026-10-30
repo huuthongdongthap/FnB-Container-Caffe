@@ -31,7 +31,7 @@ const SyncOrderSchema = z.object({
     customer_name: z.string().optional(),
     customer_phone: z.string().optional(),
     table_id: z.string().optional().nullable(),
-    items: z.array(z.record(z.string(), z.unknown())),
+    items: z.array(z.record(z.string(), z.unknown())).max(100),
     total: z.number(),
     payment_method: z.string().optional(),
     notes: z.string().optional()

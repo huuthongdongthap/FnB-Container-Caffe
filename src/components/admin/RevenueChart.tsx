@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn';
-import type { DataPoint, RevenueChartProps, ChartPadding } from './RevenueChart-types';
+import type { DataPoint as _DataPoint, RevenueChartProps, ChartPadding } from './RevenueChart-types';
 import { RevenueChartSkeleton } from './RevenueChart-skeleton';
 import { RevenueChartError } from './RevenueChart-error';
 import { RevenueChartEmpty } from './RevenueChart-empty';

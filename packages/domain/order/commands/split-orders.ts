@@ -11,7 +11,7 @@ import { publishOrderEvent } from '../policies/customer-order-payload';
 
 const log = createLogger({ route: 'orders' });
 const splitOrderEntrySchema = z.object({
-  items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   total: z.number().min(1000, 'Tổng tiền tối thiểu 1,000đ'),
   customer_name: z.string().min(1), customer_phone: z.string().min(8).max(15),
   customer_email: z.string().optional().or(z.literal('')), customer_address: z.string().optional(),

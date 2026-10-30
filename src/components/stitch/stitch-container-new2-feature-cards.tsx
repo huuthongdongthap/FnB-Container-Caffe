@@ -14,7 +14,7 @@ export function FeatureCardsSection({
   sectionTitle: string;
   cards: FeatureCard[];
 }) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   return (
     <section
       className="py-32 px-5 md:px-[64px] max-w-[1280px] mx-auto"

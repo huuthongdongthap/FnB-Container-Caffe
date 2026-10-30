@@ -1,4 +1,4 @@
-import type { Recipe, RecipeComponent } from '../model/supplier-policy';
+import type { RecipeComponent } from '../model/supplier-policy';
 
 interface D1Database {
   prepare: (sql: string) => {

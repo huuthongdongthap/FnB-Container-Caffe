@@ -87,7 +87,7 @@ const recommendSchema = z.object({
     sweetness: z.enum(['low', 'medium', 'high']).optional(),
     temperature: z.enum(['iced', 'hot']).optional(),
     intensity: z.enum(['mild', 'strong']).optional(),
-    flavor_notes: z.array(z.string()).optional()
+    flavor_notes: z.array(z.string()).max(20).optional()
   }).optional()
 });
 

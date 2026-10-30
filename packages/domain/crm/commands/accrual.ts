@@ -320,7 +320,7 @@ export async function applyAccrual(
             now,
           ),
       ]);
-    } catch (e) {
+    } catch (_e) {
       // Tier upgrade is non-blocking — accrual already committed.
       tierUpgraded = false;
     }

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { DinDinConfig } from './DinDinMenu-types';
-import { EMPTY_ITEM } from './DinDinMenu-constants';
+import { EMPTY_ITEM as _EMPTY_ITEM } from './DinDinMenu-constants';
 
 interface Props {
   config: DinDinConfig;

@@ -114,9 +114,9 @@ export default [
       'prefer-promise-reject-errors': 'error',
     },
   },
-  // TypeScript & TSX for worker/src/**/*.ts and src/**/*.{ts,tsx}
+  // TypeScript & TSX for worker/src/**/*.ts, src/**/*.{ts,tsx}, and packages/**/*.ts
   {
-    files: ['worker/src/**/*.ts', 'src/**/*.{ts,tsx}'],
+    files: ['worker/src/**/*.ts', 'src/**/*.{ts,tsx}', 'packages/**/*.ts'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {

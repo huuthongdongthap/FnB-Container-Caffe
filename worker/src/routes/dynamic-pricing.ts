@@ -45,7 +45,7 @@ const calculateSchema = z.object({
     category: z.string().optional(),
     quantity: z.number().int().positive().default(1),
     unit_cost: z.number().nonnegative().optional()
-  })).min(1),
+  })).min(1).max(100),
   timestamp: z.string().optional()
 });
 

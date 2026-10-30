@@ -112,7 +112,7 @@ async function deployAction(brandPath?: string, projectFlag?: string): Promise<v
   console.log(chalk.bold('\n  Step 2 of 3: Deploy to Cloudflare Pages'));
   const pagesDeployOk = await runStepStream(
     'wrangler pages deploy',
-    `npx wrangler pages deploy dist --project-name=${projectName} --branch=main`,
+    `npx --no-install wrangler pages deploy dist --project-name=${projectName} --branch=main`,
     rootDir,
   );
   if (!pagesDeployOk) {
@@ -128,7 +128,7 @@ async function deployAction(brandPath?: string, projectFlag?: string): Promise<v
       .toString().trim();
     const workerDeployOk = await runStepStream(
       'wrangler worker deploy',
-      `npx wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:${gitSha}`,
+      `npx --no-install wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:${gitSha}`,
       workerDir,
     );
     if (!workerDeployOk) {

@@ -11,7 +11,7 @@ import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useTranslation } from 'react-i18next';
 import { FileDown } from 'lucide-react';
-import type { Period, GroupBy, RevenueOverview, PeriodDataPoint } from './sales-report-types';
+import type { Period, GroupBy, RevenueOverview, PeriodDataPoint as _PeriodDataPoint } from './sales-report-types';
 import { periodDates } from './date-helpers';
 import {
   useDailyReportData,

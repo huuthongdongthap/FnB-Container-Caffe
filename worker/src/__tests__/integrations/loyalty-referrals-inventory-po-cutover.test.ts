@@ -16,6 +16,10 @@ import { openApiLoyaltyRouter } from '../../routes/openapi-loyalty';
 import { openApiPromotionsRouter } from '../../routes/openapi-promotions';
 import { openApiInventoryRouter } from '../../routes/openapi-inventory';
 import { openApiCronRouter } from '../../routes/openapi-cron';
+import { openApiTablesRouter } from '../../routes/openapi-tables';
+import { vendorRoutes } from '../../routes/erpnext/vendors';
+import { dindinRouter } from '../../routes/dindin';
+import { calBookingWebhookRouter } from '../../routes/cal-booking-webhook';
 import { inventoryForecastingRouter } from '../../routes/inventory-forecasting';
 import { referralRouter } from '../../routes/referrals';
 import { checkinRouter } from '../../routes/checkin';
@@ -191,6 +195,10 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     app.route('/', openApiPromotionsRouter);
     app.route('/', openApiInventoryRouter);
     app.route('/', openApiCronRouter);
+    app.route('/', openApiTablesRouter);
+    vendorRoutes(app);
+    app.route('/api/dindin', dindinRouter);
+    app.route('/api/cal-booking-webhook', calBookingWebhookRouter);
     app.route('/api/inventory/forecasting', inventoryForecastingRouter);
     app.route('/api/referrals', referralRouter);
     app.route('/api/checkin', checkinRouter);
@@ -401,5 +409,166 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     );
     expect(reconRes.shift_id).toBe(openedShift.shift!.id);
     expect(reconRes.variance_status).toBe('balanced');
+
+    // 11. Replica Schema Parity Cutover (20261030_02) + 3-Way 124-Table Column Parity & Zero-Error Canonical D1 Query Priority
+    const migration30_02Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261030_02_replica_schema_parity_and_waste_log_cutover.sql'),
+      'utf8'
+    );
+    const migration30_02Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261030_02_replica_schema_parity_and_waste_log_cutover.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration30_02Up);
+    sqlite.exec(migration30_02Down);
+    sqlite.exec(migration30_02Up);
+
+    const canonicalSqlite = new DatabaseSync(':memory:');
+    canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
+    const getSchemaMap = (conn: DatabaseSync) => {
+      const tables = (conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        .all() as Array<{ name: string }>).map((r) => r.name);
+      const map: Record<string, string[]> = {};
+      for (const t of tables) {
+        map[t] = (conn.prepare(`PRAGMA table_info("${t}")`).all() as Array<{ name: string }>)
+          .map((c) => c.name)
+          .sort();
+      }
+      return { tables, map };
+    };
+    const replicaSchema = getSchemaMap(sqlite);
+    const canonicalSchema = getSchemaMap(canonicalSqlite);
+    expect(replicaSchema.tables).toHaveLength(124);
+    expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
+    expect(replicaSchema.map).toEqual(canonicalSchema.map);
+
+    const sqlErrors: string[] = [];
+    const origPrepare = db.prepare.bind(db);
+    (db as unknown as { prepare: (sql: string) => D1PreparedStatement }).prepare = (sql: string) => {
+      try {
+        sqlite.prepare(sql);
+      } catch (e) {
+        sqlErrors.push(`${(e as Error).message} :: ${sql}`);
+      }
+      const stmt = origPrepare(sql);
+      const wrapBind = (bound: any) => ({
+        ...bound,
+        first: async (...args: any[]) => {
+          try {
+            return await bound.first(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+        all: async (...args: any[]) => {
+          try {
+            return await bound.all(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+        run: async (...args: any[]) => {
+          try {
+            return await bound.run(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+      });
+      return {
+        ...stmt,
+        bind: (...args: any[]) => wrapBind(stmt.bind(...args)),
+        first: async (...args: any[]) => {
+          try {
+            return await stmt.first(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+        all: async (...args: any[]) => {
+          try {
+            return await stmt.all(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+        run: async (...args: any[]) => {
+          try {
+            return await stmt.run(...args);
+          } catch (e) {
+            sqlErrors.push(`EXEC :: ${(e as Error).message} :: ${sql}`);
+            throw e;
+          }
+        },
+      };
+    };
+
+    const tablesRes = await app.request('/api/tables', { headers: ownerAuth }, env);
+    expect(tablesRes.status).toBe(200);
+    const createTableRes = await app.request(
+      '/api/tables',
+      {
+        method: 'POST',
+        headers: { ...ownerAuth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zoneId: 'indoor', code: 'A-01', capacity: 4 }),
+      },
+      env
+    );
+    expect(createTableRes.status).toBe(201);
+    const createdTableBody = (await createTableRes.json()) as { data: { id: string } };
+    const patchTableRes = await app.request(
+      `/api/tables/${createdTableBody.data.id}`,
+      {
+        method: 'PATCH',
+        headers: { ...ownerAuth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'B-01', status: 'occupied' }),
+      },
+      env
+    );
+    expect(patchTableRes.status).toBe(200);
+    const zoneDetailRes = await app.request('/api/table-zones/indoor', { headers: ownerAuth }, env);
+    expect(zoneDetailRes.status).toBe(200);
+    const vendorsRes = await app.request('/api/erpnext/vendors', { headers: ownerAuth }, env);
+    expect(vendorsRes.status).toBe(200);
+    const dindinCartsRes = await app.request('/api/dindin/carts', { headers: ownerAuth }, env);
+    expect(dindinCartsRes.status).toBe(200);
+    const loyaltyAdminAccountsRes = await app.request(
+      '/api/loyalty/admin/accounts?search=FNB',
+      { headers: ownerAuth },
+      env
+    );
+    expect(loyaltyAdminAccountsRes.status).toBe(200);
+    const calWebhookRes = await app.request(
+      '/api/cal-booking-webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cal-webhook-secret': env.CAL_WEBHOOK_SECRET || 'test-cal-secret',
+        },
+        body: JSON.stringify({
+          triggerEvent: 'BOOKING_CREATED',
+          createdAt: '2026-10-30T10:00:00Z',
+          payload: {
+            uid: 'cal-replica-uid-1',
+            title: 'Replica Booking',
+            startTime: '2026-10-30T19:00:00Z',
+            endTime: '2026-10-30T20:00:00Z',
+            attendees: [{ name: 'Khach Replica', email: 'replica@auraspace.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+            organizer: { name: 'AURA SPACE', email: 'booking@auraspace.vn' },
+            location: 'Sa Dec',
+          },
+        }),
+      },
+      { ...env, CAL_WEBHOOK_SECRET: env.CAL_WEBHOOK_SECRET || 'test-cal-secret' }
+    );
+    expect(calWebhookRes.status).toBe(200);
+    expect(sqlErrors).toEqual([]);
   });
 });

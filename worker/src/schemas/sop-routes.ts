@@ -14,7 +14,6 @@ import {
   SopApplySanctionSchema,
   SopCreateTemplateSchema,
   SopIdParamsSchema,
-  SopItemParamsSchema,
   SopMonitorResponseSchema,
   SopRecordViolationSchema,
   SopReminderAcknowledgeResponseSchema,

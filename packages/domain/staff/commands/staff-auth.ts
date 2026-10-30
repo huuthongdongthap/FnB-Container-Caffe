@@ -6,9 +6,8 @@
 
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
-import { hashPassword } from 'worker/src/lib/jwt';
 import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
-import { staffRoleSchema, pinSchema, registerDeviceSchema } from 'worker/src/lib/validators';
+import { pinSchema, registerDeviceSchema } from 'worker/src/lib/validators';
 import { generateId } from 'worker/src/tree/auth/helpers';
 import {
   requireStaffAccount, loadStaffAccount, isAccountActive, isStaffRole, issueStaffSession, staffTenant, staffSessionErrorResponse,

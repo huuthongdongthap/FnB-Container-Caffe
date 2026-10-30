@@ -35,7 +35,7 @@ export const broadcastSendSchema = z.object({
 
 export const campaignConfigSchema = z.object({
   is_active: z.coerce.number().int().min(0).max(1).optional(),
-  channels: z.union([z.string(), z.array(z.string())]).optional(),
+  channels: z.union([z.string(), z.array(z.string()).max(10)]).optional(),
   timing: z.string().max(200).optional().or(z.literal(''))
 });
 

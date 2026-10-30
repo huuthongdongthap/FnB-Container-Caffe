@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen, waitFor } from '@/test-utils';
+import { renderWithProviders, screen, waitFor as _waitFor } from '@/test-utils';
 import { StitchPromotionsNew } from '../StitchPromotionsNew';
 import type { PromoOffer } from '../StitchPromotionsNew';
 

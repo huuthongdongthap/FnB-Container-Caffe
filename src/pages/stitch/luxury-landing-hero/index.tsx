@@ -3,7 +3,7 @@
 /* Hero landing with animated glass panels, feature bento grid, teaser */
 
 import { StitchShell, StitchNav } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
+import { PageHeader as _PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
 
 const FEATURES = [
   { icon: '🏭', label: 'Architectural Concept', title: 'Industrial Roots', desc: 'Housed in repurposed steel vessels, our space celebrates raw materials—polished concrete, exposed beams, and matte metal finishes.', featured: false },

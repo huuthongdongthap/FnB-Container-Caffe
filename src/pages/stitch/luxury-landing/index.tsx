@@ -3,7 +3,7 @@
 /* Converted: HTML → React/TSX, Tailwind → CSS vars, Material Symbols → text */
 
 import { StitchShell } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
+import { PageHeader as _PageHeader, PageFooter } from '@/components/stitch/StitchLayout'
 
 const SECTION =
   'bg-[var(--aura-noir-deep)]/50';

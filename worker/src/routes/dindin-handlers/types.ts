@@ -64,11 +64,19 @@ export async function readCartRD(env: Env, sessionId: string): Promise<Cart | nu
   try {
     row = await queryFirst<{ raw: string }>(
       env.AURA_DB,
-      'SELECT raw FROM dindin_cart WHERE session_id = ?',
+      'SELECT COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
       sessionId
     );
   } catch {
-    row = null;
+    try {
+      row = await queryFirst<{ raw: string }>(
+        env.AURA_DB,
+        'SELECT raw FROM dindin_cart WHERE session_id = ?',
+        sessionId
+      );
+    } catch {
+      row = null;
+    }
   }
   if (!row) {
     return null;
@@ -86,10 +94,18 @@ export async function writeCart(env: Env, sessionId: string, cart: Cart): Promis
     kvSet(env.AUTH_KV, cartKVKey(sessionId), blob),
     execute(
       env.AURA_DB,
-      'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
+      'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
       sessionId,
+      blob,
       blob
-    ).catch(() => {}),
+    ).catch(() =>
+      execute(
+        env.AURA_DB,
+        'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
+        sessionId,
+        blob
+      ).catch(() => {})
+    ),
   ]);
 }
 

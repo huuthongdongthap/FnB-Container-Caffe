@@ -65,6 +65,8 @@ role: string;
 tenantId?: string;
 tier?: string;
 sessionId?: string;
+authVersion?: number;
+emailVerified?: boolean;
 sub?: string;
 jti?: string;
 iat?: number;

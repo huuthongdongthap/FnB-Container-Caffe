@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StitchShell } from '../StitchBase';
-import { PageHeader, PageFooter } from '@/components/stitch/StitchLayout';
+import { PageHeader, PageFooter as _PageFooter } from '@/components/stitch/StitchLayout';
 import { TIER_THRESHOLDS, TIER_LABELS, BENEFITS, MAX_VIS_PTS } from './loyalty-calc-constants';
 import { SpendingInputCard } from './loyalty-calc-spending-input';
 import { TierGauge } from './loyalty-calc-tier-gauge';

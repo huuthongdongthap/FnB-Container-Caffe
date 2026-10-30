@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useTranslation, Trans } from 'react-i18next';
+import { useTranslation, Trans as _Trans } from 'react-i18next';
 
 interface DeliveryInfoProps {
   fullName: string;

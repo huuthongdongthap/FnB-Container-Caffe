@@ -12,7 +12,7 @@ import {
 
 // ── Order create ──
 export const createOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   total: z.number().or(z.string()).refine(
     (val) => Number.isFinite(Number(val)) && Number(val) >= 1000,
     'Tổng tiền tối thiểu 1,000đ'
@@ -44,6 +44,13 @@ export const createOrderSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['customer_address'],
       message: 'Địa chỉ giao hàng là bắt buộc với đơn giao tận nơi',
+    });
+  }
+  if (data.order_type === 'delivery' && data.payment_method !== 'payos') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['payment_method'],
+      message: 'Đơn giao tận nơi yêu cầu thanh toán trả trước qua PayOS',
     });
   }
   if (data.order_type === 'dine_in' && !(data.table_id ?? '').trim()) {
@@ -79,7 +86,7 @@ export const createOrderInputSchema = z.object({
       quantity: z.number().int().positive(),
       price: z.number().positive()
     })
-  ).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  ).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   customer_name: z.string().optional(),
   customer_phone: z.string().optional(),
   customer_address: z.string().optional(),
@@ -96,7 +103,7 @@ export const guestOrderSchema = z.object({
     product_id: z.string().min(1),
     quantity: z.number().int().positive(),
     price: z.number().positive()
-  })).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  })).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   total: z.number().or(z.string()).refine(
     (val) => Number(val) >= 1000,
     'Tổng tiền tối thiểu 1,000đ'),

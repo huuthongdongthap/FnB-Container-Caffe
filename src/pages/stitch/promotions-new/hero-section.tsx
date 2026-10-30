@@ -7,7 +7,7 @@ interface HeroSectionProps {
   formatTime: (sec: number) => string;
 }
 
-export function HeroSection({ offer, timer, formatTime }: HeroSectionProps) {
+export function HeroSection({ offer, timer: _timer, formatTime: _formatTime }: HeroSectionProps) {
   return (
     <section className="px-4 sm:px-6 pt-2 pb-6 max-w-7xl mx-auto">
       <div className="relative overflow-hidden group rounded-3xl border border-[var(--aura-chrome-mid)]/20 shadow-2xl min-h-[460px] flex flex-col justify-end">

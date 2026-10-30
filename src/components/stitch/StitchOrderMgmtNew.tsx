@@ -30,22 +30,22 @@ import {
   DEFAULT_ORDERS,
   GLASS_CLASSES,
 } from './stitch-order-mgmt-default';
-import { StitchOrderMgmtHeader } from './StitchOrderMgmtNew-header';
+import { StitchOrderMgmtHeader as _StitchOrderMgmtHeader } from './StitchOrderMgmtNew-header';
 import { StitchOrderMgmtDashboard } from './StitchOrderMgmtNew-dashboard';
 import { StitchOrderMgmtTable } from './StitchOrderMgmtNew-table';
 
 /* ─── Main Component ────────────────────────────────────────────────── */
 
 export function StitchOrderMgmtNew({
-  brandName = 'Aura Cafe',
-  brandSubtitle = 'Terminal v1.0',
-  headerTitle = 'Aether Cafe Terminal',
-  headerSubtitle = 'Order Management',
-  adminName = 'Aura Admin',
-  adminAvatarUrl = '',
+  brandName: _brandName = 'Aura Cafe',
+  brandSubtitle: _brandSubtitle = 'Terminal v1.0',
+  headerTitle: _headerTitle = 'Aether Cafe Terminal',
+  headerSubtitle: _headerSubtitle = 'Order Management',
+  adminName: _adminName = 'Aura Admin',
+  adminAvatarUrl: _adminAvatarUrl = '',
   stats = DEFAULT_STATS,
   orders = DEFAULT_ORDERS,
-  activeNav = 'orders',
+  activeNav: _activeNav = 'orders',
   activeFilter = 'all',
   isLoading = false,
   error = null,
@@ -55,7 +55,7 @@ export function StitchOrderMgmtNew({
   onRefresh,
 }: Readonly<StitchOrderMgmtNewProps>) {
   const { t } = useTranslation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [_sidebarOpen, _setSidebarOpen] = useState(false);
 
   const tTerminal = (key: string) => t(`terminal.${key}`);
 

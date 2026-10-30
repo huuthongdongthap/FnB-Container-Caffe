@@ -9,7 +9,7 @@ export function TimelineStep({
   time,
   isActive,
   isCompleted,
-  isLast,
+  isLast: _isLast,
 }: TimelineStepProps) {
   const isHighlighted = isActive || isCompleted;
   const diamondColor = isActive

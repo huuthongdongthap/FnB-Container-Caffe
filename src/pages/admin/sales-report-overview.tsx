@@ -8,7 +8,7 @@ interface SalesReportOverviewProps {
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
-export function SalesReportOverview({ overview, isLoading, t }: SalesReportOverviewProps) {
+export function SalesReportOverview({ overview, isLoading: _isLoading, t }: SalesReportOverviewProps) {
   if (!overview) return null;
 
   return (

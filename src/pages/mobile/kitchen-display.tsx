@@ -63,7 +63,7 @@ const STATION_COLORS: Record<KitchenStation, string> = {
 };
 
 export default function KitchenDisplay() {
-  const { token, user } = useMobileAuth();
+  const { token: _token, user: _user } = useMobileAuth();
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);

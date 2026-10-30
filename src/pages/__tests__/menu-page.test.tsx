@@ -25,10 +25,6 @@ vi.mock('@/components/stitch/StitchLandingNew-nav', () => ({
   LandingNav: () => <nav data-testid="landing-nav" />,
 }));
 
-vi.mock('@/components/menu/recommendation-section', () => ({
-  RecommendationSection: () => <div data-testid="recommendation-section" />,
-}));
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'vi-VN' },
@@ -185,5 +181,32 @@ describe('MenuPage', () => {
       price: 29000,
       quantity: 1,
     });
+  });
+
+  it('renders RecommendationSection from live useCustomerMenu catalog and routes clicks through customizer parity', () => {
+    mockUseCustomerMenu.mockReturnValue({
+      data: LIVE_CATALOG,
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    renderMenuPage('/menu');
+
+    expect(screen.getByText('Bạn có thể thích')).toBeInTheDocument();
+
+    // Clicking recommended ready-to-serve item adds directly with packshot image
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm Nước suối' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(useCartStore.getState().items[0]).toMatchObject({
+      productId: 'bt001',
+      name: 'Nước suối',
+      price: 10000,
+      image: '/menu/aura-drinks/dasani.webp',
+    });
+
+    // Clicking recommended craft drink opens DrinkCustomizerModal
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm Cà phê sữa đá' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

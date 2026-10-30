@@ -23,7 +23,7 @@ export const PurchaseOrderSchema = z.object({
     quantity: z.number().int().positive(),
     unitCost: MoneySchema,
     receivedQuantity: z.number().int().nonnegative().default(0),
-  })),
+  })).max(200),
   subtotal: MoneySchema,
   taxAmount: MoneySchema.default(0),
   totalAmount: MoneySchema,
@@ -41,7 +41,7 @@ export const PurchaseOrderCreateSchema = z.object({
     ingredientId: z.string().min(1),
     quantity: z.number().int().positive(),
     unitCost: MoneySchema,
-  })).min(1),
+  })).min(1).max(200),
   expectedDate: z.string().date().optional(),
   notes: z.string().max(1000).optional(),
 }).openapi('PurchaseOrderCreate');
@@ -132,7 +132,7 @@ export const purchaseOrderRoutes = {
               items: z.array(z.object({
                 ingredientId: z.string().min(1),
                 receivedQuantity: z.number().int().positive(),
-              })).min(1),
+              })).min(1).max(200),
             }),
           },
         },

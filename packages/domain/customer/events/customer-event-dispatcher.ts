@@ -6,7 +6,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
 import {
-  type CanonicalCustomerEvent,
   type CanonicalEventType,
   createCanonicalCustomerEvent
 } from './customer-crm-event-contract';

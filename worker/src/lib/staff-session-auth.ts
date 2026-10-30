@@ -26,5 +26,20 @@ export async function authenticateRequest(
   catch { throw new SessionUnavailableError(); }
   if (revoked) throw new StaffSessionError('SESSION_REVOKED');
   const account = isStaffIdentity(claims) ? await validateStaffSession(env.AURA_DB, claims) : null;
+  if (!account && payload.email && env.AUTH_KV?.get) {
+    let rawCustomer: string | null = null;
+    try { rawCustomer = await env.AUTH_KV.get(`user:${payload.email}`); }
+    catch { throw new SessionUnavailableError(); }
+    if (rawCustomer) {
+      try {
+        const storedCustomer = JSON.parse(rawCustomer) as { auth_version?: number };
+        const storedVersion = Number(storedCustomer.auth_version || 1);
+        const tokenVersion = Number(payload.authVersion || 1);
+        if (storedVersion !== tokenVersion) throw new StaffSessionError('SESSION_REVOKED');
+      } catch (err) {
+        if (err instanceof StaffSessionError) throw err;
+      }
+    }
+  }
   return { payload, token, account } as const;
 }

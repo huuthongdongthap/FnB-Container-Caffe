@@ -12,6 +12,6 @@ interface StitchNavProps {
   ctaLabel?: string;
 }
 
-export function StitchNav({ ctaLabel }: StitchNavProps) {
+export function StitchNav({ ctaLabel: _ctaLabel }: StitchNavProps) {
   return null;
 }

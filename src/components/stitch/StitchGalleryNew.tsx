@@ -28,7 +28,7 @@ export function StitchGalleryNew({
   onItemClick,
   onLoadMore,
 }: Readonly<StitchGalleryNewProps>) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState<FilterId>('all');
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);

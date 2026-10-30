@@ -17,8 +17,10 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
       if (row && row.tenant_id && row.tenant_id !== tenantId) {
         return false;
       }
-    } catch {
-      // Optional tenant_id column in partial schemas
+    } catch (err) {
+      if (!/no such column:\s*tenant_id/i.test(String(err))) {
+        return false;
+      }
     }
     return true;
   }

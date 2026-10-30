@@ -14,7 +14,7 @@ declare module 'web-push' {
     };
   }
 
-  interface WebPushError extends Error {
+  export interface WebPushError extends Error {
     statusCode: number;
     body: string;
     headers: Record<string, string>;

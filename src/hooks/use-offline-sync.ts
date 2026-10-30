@@ -86,13 +86,11 @@ export function useOfflineSync() {
 
     try {
       const pending = await offlineDb.getPendingOrders();
-      let synced = 0;
       let failed = 0;
 
       for (const item of pending) {
         const ok = await syncItem(item as QueuedItem);
-        if (ok) synced++;
-        else failed++;
+        if (!ok) failed++;
       }
 
       if (mountedRef.current) {

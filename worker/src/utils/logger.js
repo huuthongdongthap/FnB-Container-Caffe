@@ -16,6 +16,28 @@
  */
 
 const LEVELS = ['debug', 'info', 'warn', 'error'];
+const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email|to|recipient)$/i;
+const REDACTED = '[REDACTED]';
+
+export function redact(value, depth = 0) {
+  if (depth > 4) {
+    return '[DEPTH_LIMIT]';
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((v) => redact(v, depth + 1));
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = REDACTED_KEYS.test(k) ? REDACTED : redact(v, depth + 1);
+    }
+    return out;
+  }
+  if (typeof value === 'string' && /^0\d{9}$/.test(value)) {
+    return REDACTED;
+  }
+  return value;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -25,9 +47,9 @@ function emit(level, base, msg, extra) {
   const record = {
     level,
     ts: nowIso(),
-    ...base,
-    msg,
-    ...(extra && typeof extra === 'object' ? extra : {}),
+    ...redact(base),
+    msg: typeof msg === 'string' && /^0\d{9}$/.test(msg) ? REDACTED : msg,
+    ...(extra && typeof extra === 'object' ? redact(extra) : {}),
   };
   // Keep error objects short — Workers logs truncate at ~4KB
   const line = JSON.stringify(record);

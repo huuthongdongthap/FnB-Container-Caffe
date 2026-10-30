@@ -1,9 +1,13 @@
 import type { Context, Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import type { GroupedSalesGroup, RevenueOverviewData } from './types';
 
 export async function handleOverview(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+  const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+  const tenantBinds = tenantId === '*' ? [] : [tenantId];
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const from = c.req.query('from') || todayStr;
@@ -20,13 +24,13 @@ export async function handleOverview(c: Context<{ Bindings: Env }>) {
     db.prepare(`
       SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
       FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
-    `).bind(from, to).first<{ revenue: number; orders_count: number }>(),
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
+    `).bind(from, to, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
     db.prepare(`
       SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
       FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
-    `).bind(prevStart, prevEnd).first<{ revenue: number; orders_count: number }>(),
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
+    `).bind(prevStart, prevEnd, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
   ]);
 
   const todayRevenue = current?.revenue || 0;
@@ -55,6 +59,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
 
   app.get('/sales-by-hour', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date().toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -63,9 +70,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
              COALESCE(SUM(total), 0) as value,
              COUNT(*) as count
       FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
       GROUP BY hour ORDER BY hour
-    `).bind(from, to).all<{ hour: number; value: number; count: number }>();
+    `).bind(from, to, ...tenantBinds).all<{ hour: number; value: number; count: number }>();
 
     const resultMap = new Map((results || []).map((r) => [r.hour, r]));
     const groups: GroupedSalesGroup[] = [];
@@ -83,6 +90,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
 
   app.get('/sales-by-day', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -91,15 +101,19 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
              COALESCE(SUM(total), 0) as value,
              COUNT(*) as count
       FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
       GROUP BY label ORDER BY label
-    `).bind(from, to).all<GroupedSalesGroup>();
+    `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
 
     return c.json({ success: true, data: { groups: results || [] } });
   });
 
   app.get('/sales-by-category', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tenantOrderClause = tenantId === '*' ? '' : ' AND (o.tenant_id = ? OR o.tenant_id IS NULL)';
+    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -113,9 +127,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
         JOIN products p ON p.id = oi.product_id
         JOIN categories c ON c.id = p.category_id
         JOIN orders o ON o.id = oi.order_id
-        WHERE o.status != 'cancelled' AND DATE(o.created_at) BETWEEN ? AND ?
+        WHERE o.status != 'cancelled' AND DATE(o.created_at) BETWEEN ? AND ?${tenantOrderClause}
         GROUP BY c.name ORDER BY value DESC
-      `).bind(from, to).all<GroupedSalesGroup>();
+      `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     } catch {
       results = [];
@@ -127,8 +141,8 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
 
     const { results: rawOrders } = await db.prepare(`
       SELECT items FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
-    `).bind(from, to).all<{ items: string }>();
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
+    `).bind(from, to, ...tenantBinds).all<{ items: string }>();
 
     const catMap = new Map<string, { value: number; count: number }>();
     for (const row of rawOrders || []) {
@@ -159,6 +173,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
 
   app.get('/sales-by-payment', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+    const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -167,9 +184,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
              COALESCE(SUM(total), 0) as value,
              COUNT(*) as count
       FROM orders
-      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+      WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
       GROUP BY payment_method ORDER BY value DESC
-    `).bind(from, to).all<GroupedSalesGroup>();
+    `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
 
     return c.json({ success: true, data: { groups: results || [] } });
   });

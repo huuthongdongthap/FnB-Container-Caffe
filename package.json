@@ -10,8 +10,8 @@
     "apps/*"
   ],
   "scripts": {
-    "lint": "eslint worker/src/ src/",
-    "lint:fix": "eslint worker/src/ src/ --fix",
+    "lint": "eslint worker/src/ src/ packages/ --max-warnings=0",
+    "lint:fix": "eslint worker/src/ src/ packages/ --fix",
     "lint:migrations": "node scripts/lint-d1-migrations.mjs",
     "verify:gates": "node scripts/verify-staging-gates.mjs",
     "typecheck": "tsc --noEmit",
@@ -85,7 +85,7 @@
     "react-dom": "^19.2.7",
     "react-helmet-async": "^3.0.0",
     "react-i18next": "^17.0.8",
-    "react-router-dom": "^7.18.1",
+    "react-router-dom": "^7.18.2",
     "three": "^0.185.1",
     "web-push": "^3.6.7",
     "web-vitals": "^5.3.0",

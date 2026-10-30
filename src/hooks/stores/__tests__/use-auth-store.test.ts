@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
-const API_BASE = 'https://aura-space-worker.agencyos-openclaw.workers.dev';
+const _API_BASE = 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

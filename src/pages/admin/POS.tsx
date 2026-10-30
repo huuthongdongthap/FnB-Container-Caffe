@@ -46,7 +46,7 @@ export default function AdminPOSPage() {
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
-  const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
+  const [selectedTableId, _setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);

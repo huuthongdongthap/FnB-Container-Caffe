@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
+import { Button as _Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PricingCard, { type PricingTier } from '@/components/saas/PricingCard';
 import { apiFetch } from '@/lib/api-client';

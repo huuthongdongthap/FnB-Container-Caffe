@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export function useReveal() {
-  const [visible, setVisible] = useState(false);
+  const [visible, _setVisible] = useState(false);
 
   useEffect(() => {
     const handler = () => {

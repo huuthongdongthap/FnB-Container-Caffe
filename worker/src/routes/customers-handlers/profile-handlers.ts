@@ -47,6 +47,10 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
           'SELECT c.* FROM customers c WHERE c.id = ?'
         ).bind(customerId).first<CustomerRecord>();
       }
+      const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
+      if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
+        customer = null;
+      }
     }
 
     if (!customer) {
@@ -97,6 +101,10 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         `UPDATE customers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
       ).bind(...params, customerId, tenantId).run();
     } catch {
+      const existing = await db.prepare('SELECT tenant_id FROM customers WHERE id = ?').bind(customerId).first<{ tenant_id?: string | null }>().catch(() => null);
+      if (existing?.tenant_id && existing.tenant_id.trim() !== '' && existing.tenant_id !== tenantId) {
+        return c.json({ success: false, error: 'Customer not found' }, 404);
+      }
       try {
         await db.prepare(
           `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
@@ -122,6 +130,10 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         customer = await db.prepare(
           'SELECT c.* FROM customers c WHERE c.id = ?'
         ).bind(customerId).first<CustomerRecord>();
+      }
+      const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
+      if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
+        customer = null;
       }
     }
 

@@ -29,9 +29,16 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
   ).all<Record<string, unknown>>();
   const categoryIndex = buildIndexFromDbRows(mappings || []);
 
-  const { results: activeOrders } = await db.prepare(
-    `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
-  ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>();
+  let activeOrders: Array<Record<string, unknown>> | undefined;
+  try {
+    ({ results: activeOrders } = await db.prepare(
+      `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.order_type, o.payment_status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+    ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
+  } catch {
+    ({ results: activeOrders } = await db.prepare(
+      `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+    ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
+  }
 
   const { results: assignedItems } = await db.prepare(
     'SELECT order_item_id FROM order_item_stations WHERE station_id = ?'
@@ -42,6 +49,7 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
 
   const tickets: Array<Record<string, unknown>> = [];
   for (const order of activeOrders || []) {
+    if (order.order_type === 'delivery' && order.payment_status !== 'paid') continue;
     const itemsForStation = filterItemsForStation(order.items as string, stationId, categoryIndex);
     const hasAssignedItems = assignedOrderIds.has(order.id as string);
     if (itemsForStation.length === 0 && !hasAssignedItems) continue;
@@ -81,15 +89,15 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
   if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
 
   const now = new Date().toISOString();
-  const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
-  await db.prepare(
-    'INSERT OR REPLACE INTO order_item_stations (order_item_id, station_id, started_at, ready_at) VALUES (?, ?, ?, NULL)'
-  ).bind(compositeItemId, stationId, now).run();
-
   if (order.status === 'confirmed' || order.status === 'pending') {
     const transition = await executeKdsStatusTransition(db, orderId, 'preparing', role, { tenantId, kv: c.env?.AUTH_KV });
     if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 409) as any);
   }
+
+  const compositeItemId = itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`;
+  await db.prepare(
+    'INSERT OR REPLACE INTO order_item_stations (order_item_id, station_id, started_at, ready_at) VALUES (?, ?, ?, NULL)'
+  ).bind(compositeItemId, stationId, now).run();
 
   return c.json({
     success: true,

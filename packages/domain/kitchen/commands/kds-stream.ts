@@ -43,6 +43,8 @@ interface OrderRecord {
   items: string;
   notes?: string | null;
   status: string;
+  order_type?: string | null;
+  payment_status?: string | null;
   created_at: string;
 }
 
@@ -116,14 +118,27 @@ kdsStreamRouter.get('/stream', async(c) => {
           throw error;
         }
         const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
-        const statement = db.prepare(
-          `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
-           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-           ${tenantClause}
-           ORDER BY created_at ASC LIMIT 50`
-        );
-        const { results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>();
-        return (results || []).map(mapKdsOrder);
+        let results: OrderRecord[] | undefined;
+        try {
+          const statement = db.prepare(
+            `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+             WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+             ${tenantClause}
+             ORDER BY created_at ASC LIMIT 50`
+          );
+          ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+        } catch {
+          const statement = db.prepare(
+            `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
+             WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+             ${tenantClause}
+             ORDER BY created_at ASC LIMIT 50`
+          );
+          ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+        }
+        return (results || [])
+          .filter((r) => !(r.order_type === 'delivery' && r.payment_status !== 'paid'))
+          .map(mapKdsOrder);
       };
 
       try {

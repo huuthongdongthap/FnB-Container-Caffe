@@ -8,8 +8,7 @@
  */
 
 import type { SopShiftType, SopSource, SopTemplate } from '../model/sop-types';
-import type { SopTemplateItemRow, SopTemplateRow } from '../src/model/sop-row-mapper';
-import { toTemplate } from '../src/model/sop-row-mapper';
+import type { SopTemplateRow } from '../src/model/sop-row-mapper';
 import { SopAccessError, assertId, type SopScope } from './sop-access';
 import { sopDatabase } from './sop-violation-columns';
 import { findTemplate } from './sop-template-reads';

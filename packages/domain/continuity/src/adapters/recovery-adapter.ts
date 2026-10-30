@@ -3,7 +3,7 @@
  * Validates integrity checksums, simulate isolated restorations, and inspect record parity.
  */
 
-import type { BackupManifest, ContinuityValidationResult } from '../model/continuity-types';
+import type { BackupManifest } from '../model/continuity-types';
 
 export async function computeContentHash(content: string): Promise<string> {
   const encoder = new TextEncoder();

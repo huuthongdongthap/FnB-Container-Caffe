@@ -66,7 +66,7 @@ export function MD3MenuItem({
 export function MD3Menu({ open, anchorRef, onClose, children }: MD3MenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const _itemRefs = useRef<(HTMLElement | null)[]>([]);
   const [focusIdx, setFocusIdx] = useState(-1);
 
   /* ── compute position below anchor ── */

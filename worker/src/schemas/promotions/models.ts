@@ -29,10 +29,10 @@ export const PromotionRuleSchema = z.object({
   maxDiscount: MoneySchema.optional(),
   buyQuantity: z.number().int().positive().optional(),
   getQuantity: z.number().int().positive().optional(),
-  applicableProductIds: z.array(z.string().uuid()).optional(),
-  applicableCategoryIds: z.array(z.string().uuid()).optional(),
-  excludedProductIds: z.array(z.string().uuid()).optional(),
-  excludedCategoryIds: z.array(z.string().uuid()).optional(),
+  applicableProductIds: z.array(z.string().uuid()).max(200).optional(),
+  applicableCategoryIds: z.array(z.string().uuid()).max(200).optional(),
+  excludedProductIds: z.array(z.string().uuid()).max(200).optional(),
+  excludedCategoryIds: z.array(z.string().uuid()).max(200).optional(),
   customerTier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
   maxUsesPerCustomer: z.number().int().positive().optional(),
 });
@@ -44,7 +44,7 @@ export const PromotionScheduleSchema = z.object({
   recurrence: z
     .enum(['none', 'daily', 'weekly', 'monthly', 'yearly'])
     .default('none'),
-  recurrenceDays: z.array(z.number().int().min(0).max(6)).optional(),
+  recurrenceDays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
   recurrenceTime: z.string().time().optional(),
 });
 
@@ -61,8 +61,8 @@ export const PromotionCreateSchema = z.object({
   code: z.string().min(3).max(50).regex(/^[A-Z0-9-_]+$/).optional(),
   stackable: z.boolean().default(false),
   priority: z.number().int().default(0),
-  locationIds: z.array(z.string().uuid()).optional(),
-  translations: z.array(PromotionTranslationSchema).optional(),
+  locationIds: z.array(z.string().uuid()).max(100).optional(),
+  translations: z.array(PromotionTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('PromotionCreate');
 
@@ -79,8 +79,8 @@ export const PromotionUpdateSchema = z.object({
   code: z.string().min(3).max(50).regex(/^[A-Z0-9-_]+$/).optional(),
   stackable: z.boolean().optional(),
   priority: z.number().int().optional(),
-  locationIds: z.array(z.string().uuid()).optional(),
-  translations: z.array(PromotionTranslationSchema).optional(),
+  locationIds: z.array(z.string().uuid()).max(100).optional(),
+  translations: z.array(PromotionTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('PromotionUpdate');
 
@@ -129,8 +129,8 @@ export const PromotionUsageListResponseSchema = z.object({
 export const ValidatePromotionSchema = z.object({
   code: z.string().min(3).max(50),
   orderAmount: MoneySchema,
-  productIds: z.array(z.string().uuid()).optional(),
-  categoryIds: z.array(z.string().uuid()).optional(),
+  productIds: z.array(z.string().uuid()).max(200).optional(),
+  categoryIds: z.array(z.string().uuid()).max(200).optional(),
   customerId: z.string().uuid().optional(),
   loyaltyTier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
   locationId: z.string().uuid().optional(),

@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn';
 import { formatVnd } from '@/lib/format';
-import type { GroupedSalesData, GroupedSalesChartProps } from './GroupedSalesChart-types';
+import type { GroupedSalesData as _GroupedSalesData, GroupedSalesChartProps } from './GroupedSalesChart-types';
 import { TITLE_MAP, EMPTY_MSG } from './GroupedSalesChart-constants';
 import {
   GroupedSalesSkeleton,

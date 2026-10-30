@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@/test-utils';
+import { render, screen, fireEvent, waitFor as _waitFor } from '@/test-utils';
 import { TicketQueue } from '@/components/kds/TicketQueue';
 import { OrderTicket } from '@/components/kds/OrderTicket';
 import { OrderCompleteButton } from '@/components/kds/OrderCompleteButton';

@@ -55,6 +55,24 @@ export async function transitionOrderStatus(
   const allowed = canActorTransition(role, directStart ? 'confirmed' : order.status, targetStatus);
   if (!allowed.ok) return { success: false, error: allowed.error, statusCode: 403 };
 
+  if (targetStatus === 'preparing') {
+    try {
+      const paymentRow = await db
+        .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${tenantClause}`)
+        .bind(orderId, ...tenantBinds)
+        .first<{ order_type?: string | null; payment_status?: string | null }>();
+      if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid') {
+        return {
+          success: false,
+          error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
+          statusCode: 409,
+        };
+      }
+    } catch {
+      // Allow fallback when minimal schema omits order_type or payment_status
+    }
+  }
+
   const fields = Object.entries(options.fields ?? {}).filter(([, value]) => value !== undefined);
   if (isNoOp && fields.length === 0) {
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };

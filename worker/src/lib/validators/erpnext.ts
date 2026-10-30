@@ -20,7 +20,7 @@ export const erpnextTagSchema = z.object({
 });
 
 export const erpnextProductSyncSchema = z.object({
-  product_ids: z.array(z.string()).optional()
+  product_ids: z.array(z.string()).max(200).optional()
 });
 
 export const erpnextSalesOrderSchema = z.object({
@@ -34,7 +34,7 @@ export const erpnextSalesOrderSchema = z.object({
       rate: z.number().positive(),
       amount: z.number().optional()
     })
-  ).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  ).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   table_id: z.string().optional(),
   notes: z.string().optional()
 });

@@ -1,4 +1,4 @@
-import type { TableInfo } from './waiter-orders-types';
+import type { TableInfo as _TableInfo } from './waiter-orders-types';
 
 /* ── Status labels ────────────────────────────────────────────────── */
 

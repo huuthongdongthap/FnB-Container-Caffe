@@ -4,9 +4,6 @@
  * Invariants: Products remain Catalog master; Never trust client quantities/costs; Stock deduction is idempotent.
  */
 import type { D1Database } from '@cloudflare/workers-types';
-import { createLogger } from 'worker/src/middleware/logger';
-
-const log = createLogger({ route: 'inventory-recipe-policy' });
 
 export interface CanonicalRecipeComponent {
   ingredientId: string;

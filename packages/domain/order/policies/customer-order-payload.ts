@@ -8,7 +8,6 @@
  * 4. Zero Catalog lookups: reads purely from frozen snapshot items.
  */
 
-import { isTerminal, type OrderStatus } from '../model/order-state-machine';
 import { canAccessOrder } from '../../customer/policies/order-ownership-policy';
 export { canAccessOrder };
 

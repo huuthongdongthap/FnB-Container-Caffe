@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import type { CreatePromotionInput } from './types';
 
@@ -7,6 +8,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/promotions — list all promotions
   router.get('/', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     let results: unknown[] = [];
     try {
       const res = await db.prepare(
@@ -17,12 +19,18 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       const res = await db.prepare('SELECT * FROM promotions').all().catch(() => ({ results: [] }));
       results = res.results || [];
     }
+    if (tenantId !== '*') {
+      results = (results as Array<Record<string, unknown>>).filter(
+        (r) => !r.tenant_id || String(r.tenant_id) === tenantId
+      );
+    }
     return c.json({ success: true, data: results, promotions: results });
   });
 
   // GET /api/promotions/:code — get single promotion
   router.get('/:code', async (c, next) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
     if (code === 'SUMMARY') {
       await next();
@@ -30,7 +38,10 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     }
     let promo = await db.prepare(
       'SELECT * FROM promotions WHERE code = ?'
-    ).bind(code).first();
+    ).bind(code).first<Record<string, unknown>>();
+    if (promo && tenantId !== '*' && promo.tenant_id && String(promo.tenant_id) !== tenantId) {
+      return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+    }
     if (!promo && code === 'WELCOME') {
       promo = {
         id: 'promo_welcome',
@@ -104,11 +115,12 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // PATCH /api/promotions/:code — update promotion
   router.patch('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
     const body = await c.req.json() as Partial<CreatePromotionInput>;
 
-    const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
-    if (!existing) {
+    const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
+    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
       return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
     }
 
@@ -165,9 +177,10 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // DELETE /api/promotions/:code — delete promotion
   router.delete('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
-    const existing = await db.prepare('SELECT code FROM promotions WHERE code = ?').bind(code).first();
-    if (!existing) {
+    const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
+    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
       return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
     }
 

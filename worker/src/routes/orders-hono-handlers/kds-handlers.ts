@@ -34,6 +34,10 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
 
   const kdsOrders: KdsOrder[] = [];
   for (const order of results || []) {
+    const rawOrder = order as unknown as Record<string, unknown>;
+    if (rawOrder.order_type === 'delivery' && rawOrder.payment_status !== 'paid') {
+      continue;
+    }
     let items: OrderItem[] = [];
     if (Array.isArray(order.items)) {
       items = order.items;

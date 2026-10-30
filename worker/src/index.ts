@@ -115,7 +115,8 @@ app.get('/api/realtime/:channelId', requireAuth(KDS_ROLES), tenantMiddleware, (c
   const user = c.get('user');
   const channelId = c.req.param('channelId');
   const tenantId = user?.tenantId || 'default';
-  if (channelId !== tenantId && !channelId.startsWith(`${tenantId}:`) && channelId !== 'kitchen') {
+  const isDefaultKitchenAlias = channelId === 'kitchen' && tenantId === 'default';
+  if (channelId !== tenantId && !channelId.startsWith(`${tenantId}:`) && !isDefaultKitchenAlias) {
     return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
   }
   return realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx);

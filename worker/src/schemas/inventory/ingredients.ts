@@ -27,7 +27,7 @@ export const IngredientCreateSchema = z.object({
   maxStock: z.number().int().nonnegative().optional(),
   locationId: z.string().min(1).optional(),
   supplierId: z.string().min(1).nullable().optional(),
-  translations: z.array(IngredientTranslationSchema).optional(),
+  translations: z.array(IngredientTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientCreate');
 
@@ -41,7 +41,7 @@ export const IngredientUpdateSchema = z.object({
   maxStock: z.number().int().nonnegative().optional(),
   locationId: z.string().min(1).optional(),
   supplierId: z.string().min(1).nullable().optional(),
-  translations: z.array(IngredientTranslationSchema).optional(),
+  translations: z.array(IngredientTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('IngredientUpdate');
 

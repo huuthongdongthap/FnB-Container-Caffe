@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Wallet, Award, CreditCard, ArrowLeft } from 'lucide-react';
+import { User, Wallet as _Wallet, Award, CreditCard, ArrowLeft } from 'lucide-react';
 
 import { CheckoutNewSkeleton } from './StitchCheckoutNew-skeleton';
 import { EmptyCartState } from './StitchCheckoutNew-empty-state';
@@ -123,7 +123,7 @@ export function StitchCheckoutNew({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(initialState.form.paymentMethod || 'payos');
   const [orderType, setOrderType] = useState<OrderType>(initialState.form.orderType || 'delivery');
   const [form, setForm] = useState<CheckoutNewFormData>(initialState.form);
-  const [activeBooking, setActiveBooking] = useState(initialState.booking);
+  const [activeBooking, _setActiveBooking] = useState(initialState.booking);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);

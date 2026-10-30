@@ -7,7 +7,7 @@ interface TierGaugeProps {
   pct: number;
 }
 
-export function TierGauge({ points, currentTier, activeNodes, pct }: TierGaugeProps) {
+export function TierGauge({ points: _points, currentTier, activeNodes, pct }: TierGaugeProps) {
   return (
     <section className="mb-8">
       <div className="flex justify-between items-end mb-2">

@@ -58,6 +58,8 @@ describe('resolveMenuDrinkImage', () => {
   it('maps fallback yogurt aliases and preserves the combined smoothie representative', () => {
     expect(resolveMenuDrinkImage('yo002', '/menu/yaourt.jpg'))
       .toBe(resolveMenuDrinkImage('yg002'));
+    expect(resolveMenuDrinkPackshots('yo001'))
+      .toBe(resolveMenuDrinkPackshots('yg001'));
     expect(DEFAULT_ITEMS.find((item) => item.id === 'sm001')?.imageSrc)
       .toBe(MENU_DRINK_IMAGES.sm002);
     expect(DEFAULT_ITEMS.every((item) => item.imageSrc.startsWith('/menu/aura-drinks/'))).toBe(true);

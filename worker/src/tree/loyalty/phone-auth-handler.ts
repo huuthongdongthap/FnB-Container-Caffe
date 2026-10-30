@@ -125,10 +125,29 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             }
           } else if (
             verifiedPayload &&
-            (!verifiedPayload.tenantId || verifiedPayload.tenantId === tenantId) &&
-            (verifiedPayload.id === customer.id || verifiedPayload.email === customer.email)
+            (!verifiedPayload.tenantId || verifiedPayload.tenantId === tenantId)
           ) {
-            proofVerified = true;
+            if (verifiedPayload.id === customer.id) {
+              proofVerified = true;
+            } else if (
+              verifiedPayload.email &&
+              customer.email &&
+              verifiedPayload.email === customer.email &&
+              verifiedPayload.emailVerified === true &&
+              c.env.AUTH_KV?.get
+            ) {
+              const rawEmailAccount = await c.env.AUTH_KV.get(`user:${customer.email}`).catch(() => null);
+              if (rawEmailAccount) {
+                try {
+                  const parsedEmailAccount = JSON.parse(rawEmailAccount) as { email_verified?: boolean };
+                  if (parsedEmailAccount.email_verified === true) {
+                    proofVerified = true;
+                  }
+                } catch {
+                  // Ignore malformed KV record
+                }
+              }
+            }
           }
         }
         if (!proofVerified && typeof body.otp === 'string' && body.otp.trim().length >= 4 && c.env.AUTH_KV) {

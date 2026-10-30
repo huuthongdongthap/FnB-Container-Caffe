@@ -4,9 +4,10 @@ import { apiFetch, API_BASE } from '@/lib/api-client';
 import type { ApiFetchOptions } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
+import { readClientSession } from '@/lib/client-session';
 import { TERMINAL_STATUSES, POLL_INTERVAL } from './order-store-constants';
 import { mapSseEventToOrder } from './order-store-utils';
-import type { CustomerOrder, CreateOrderPayload, OrderState } from './order-store-types';
+import type { CustomerOrder, CreateOrderPayload as _CreateOrderPayload, OrderState } from './order-store-types';
 export type {
   OrderItem,
   Order,
@@ -42,7 +43,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         set({ loading: false, error: 'Vui lòng kết nối mạng để xác nhận đơn hàng', queuedOffline: false });
         return null;
       }
-      try { await offlineDb.saveOrder(payload); set({ loading: false, error: null, queuedOffline: true }); return null; }
+      try {
+        const sessionUser = readClientSession().user;
+        await offlineDb.saveOrder(payload, {
+          tenantId: sessionUser?.tenantId ?? null,
+          userId: sessionUser?.id ?? null,
+        });
+        set({ loading: false, error: null, queuedOffline: true });
+        return null;
+      }
       catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi lưu tạm đơn' }); return null; }
     }
     try {
@@ -160,7 +169,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     if (get().flushInProgress) return null;
     set({ flushInProgress: true });
     try {
-      const pending = await offlineDb.getPendingOrders();
+      const sessionUser = readClientSession().user;
+      const pending = await offlineDb.getPendingOrders({
+        tenantId: sessionUser?.tenantId ?? null,
+        userId: sessionUser?.id ?? null,
+      });
       if (pending.length === 0) { set({ queuedOffline: false }); return null; }
       let lastOrder: CustomerOrder | null = null;
       let allSucceeded = true;
@@ -194,8 +207,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 }));
 
 /* ── Auto-flush queued orders when connection restores ───────────────── */
-let lastOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-
 export function useOrderStoreWithOfflineFlush<T>(selector: (state: OrderState) => T): T;
 export function useOrderStoreWithOfflineFlush(): OrderState;
 export function useOrderStoreWithOfflineFlush<T>(selector?: (state: OrderState) => T): T | OrderState {
@@ -204,7 +215,6 @@ export function useOrderStoreWithOfflineFlush<T>(selector?: (state: OrderState) 
   const queuedOffline = useOrderStore((s) => s.queuedOffline);
   useEffect(() => {
     if (wasOffline && queuedOffline) void flushQueuedOrders();
-    lastOnline = isOnline;
   }, [isOnline, wasOffline, queuedOffline, flushQueuedOrders]);
   return selector ? useStore(useOrderStore, selector) : useStore(useOrderStore);
 }

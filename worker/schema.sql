@@ -338,12 +338,18 @@ CREATE TABLE contact_messages (
 -- =====================================================
 CREATE TABLE reviews (
     id TEXT PRIMARY KEY,
+    order_id TEXT,
+    customer_id TEXT,
     customer_name TEXT NOT NULL,
     rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    content TEXT NOT NULL,
+    comment TEXT DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
     tags TEXT DEFAULT '[]',
     status TEXT DEFAULT 'published',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    is_approved INTEGER DEFAULT 1,
+    is_visible INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =====================================================
@@ -1652,16 +1658,19 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE TABLE IF NOT EXISTS loyalty_accounts (
   id TEXT PRIMARY KEY,
   customer_id TEXT UNIQUE NOT NULL,
+  current_points INTEGER NOT NULL DEFAULT 0,
   points_balance INTEGER DEFAULT 0,
   lifetime_points INTEGER DEFAULT 0,
   tier TEXT DEFAULT 'bronze',
   tier_expires_at TEXT,
   streak_days INTEGER DEFAULT 0,
   last_checkin_date TEXT,
+  order_count INTEGER DEFAULT 0,
   total_spent REAL DEFAULT 0,
   total_orders INTEGER DEFAULT 0,
   referral_code TEXT,
   referred_by TEXT,
+  last_activity_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -1670,16 +1679,30 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_customer
 
 CREATE TABLE IF NOT EXISTS tier_configs (
   tier TEXT PRIMARY KEY,
+  tier_name TEXT,
   min_points INTEGER NOT NULL DEFAULT 0,
+  cashback_rate REAL NOT NULL DEFAULT 0.02,
   multiplier REAL NOT NULL DEFAULT 1.0,
+  point_multiplier REAL NOT NULL DEFAULT 1.0,
+  points_multiplier REAL NOT NULL DEFAULT 1.0,
+  birthday_discount INTEGER DEFAULT 0,
   benefits TEXT DEFAULT '[]',
-  color TEXT DEFAULT '#CD7F32'
+  perks TEXT DEFAULT '[]',
+  color TEXT DEFAULT '#CD7F32',
+  display_name_vi TEXT,
+  min_spent_vnd INTEGER NOT NULL DEFAULT 0,
+  max_spent_vnd INTEGER,
+  expiry_days INTEGER DEFAULT 90,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS loyalty_redemptions (
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
   reward_id TEXT NOT NULL,
+  code TEXT,
   points_spent INTEGER NOT NULL DEFAULT 0,
   order_id TEXT,
   status TEXT DEFAULT 'active',
@@ -1727,13 +1750,17 @@ CREATE INDEX IF NOT EXISTS idx_inventory_forecast_snapshots_tenant
 
 CREATE TABLE IF NOT EXISTS payment_transactions (
   id TEXT PRIMARY KEY,
+  payment_id TEXT,
   order_id TEXT NOT NULL,
   provider TEXT NOT NULL DEFAULT 'cash',
+  method TEXT DEFAULT 'payos',
   amount REAL NOT NULL DEFAULT 0,
   currency TEXT DEFAULT 'VND',
   status TEXT NOT NULL DEFAULT 'pending',
+  transaction_id TEXT,
   transaction_ref TEXT,
   gateway_response TEXT,
+  raw_payload TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -1780,6 +1807,177 @@ CREATE INDEX IF NOT EXISTS idx_staff_devices_token
 CREATE INDEX IF NOT EXISTS idx_staff_devices_staff_id
   ON staff_devices(staff_id);
 
-
-
-
+-- 19. Production D1 Canonical Parity Tables & Columns
+CREATE TABLE IF NOT EXISTS ai_barista_interactions ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', customer_id TEXT, customer_phone TEXT, query_prompt TEXT, preferences_json TEXT, recommended_product_id TEXT NOT NULL, recommended_product_name TEXT NOT NULL, engine_used TEXT NOT NULL DEFAULT 'deterministic', feedback TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ai_product_affinities ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', item_a TEXT NOT NULL, item_b TEXT NOT NULL, co_occurrence_count INTEGER NOT NULL DEFAULT 1, affinity_score REAL NOT NULL DEFAULT 0.0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS birthday_redemptions ( id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, discount_percent INTEGER NOT NULL DEFAULT 15, order_id TEXT, redeemed_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (customer_id) REFERENCES customers(id) );
+CREATE TABLE IF NOT EXISTS category_stations (category_id TEXT NOT NULL, station_id TEXT NOT NULL, PRIMARY KEY (category_id, station_id));
+CREATE TABLE IF NOT EXISTS container_telemetry_logs ( id TEXT PRIMARY KEY, container_id TEXT NOT NULL, tenant_id TEXT NOT NULL DEFAULT 'default', power_source TEXT NOT NULL, battery_percentage REAL, ambient_temp_celsius REAL NOT NULL, kds_online INTEGER NOT NULL DEFAULT 1, network_ping_ms INTEGER DEFAULT 20, alert_status TEXT NOT NULL DEFAULT 'NORMAL', alert_message TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS customer_support_interactions ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', channel TEXT NOT NULL DEFAULT 'web', customer_phone TEXT, user_query TEXT NOT NULL, detected_intent TEXT NOT NULL, bot_response TEXT NOT NULL, engine_used TEXT NOT NULL DEFAULT 'deterministic', created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS dynamic_pricing_rules ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', name TEXT NOT NULL, rule_type TEXT NOT NULL, discount_percent REAL NOT NULL, target_category TEXT, target_product_id TEXT, min_margin_percent REAL NOT NULL DEFAULT 30.0, days_of_week TEXT NOT NULL DEFAULT '1,2,3,4,5', start_time TEXT NOT NULL, end_time TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_product_sync (product_id TEXT PRIMARY KEY, erpnext_product_id INTEGER NOT NULL, last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, erpnext_write_date TEXT, cached_stock INTEGER, cached_price REAL, erpnext_item_code TEXT, erpnext_modified TEXT);
+CREATE TABLE IF NOT EXISTS erpnext_sync_log ( id TEXT PRIMARY KEY, method TEXT NOT NULL DEFAULT 'POST', endpoint TEXT NOT NULL, request_body TEXT, response_body TEXT, error TEXT, status TEXT NOT NULL DEFAULT 'pending', retry_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_sync_queue ( id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, erpnext_id TEXT, action TEXT NOT NULL, payload TEXT NOT NULL, status TEXT DEFAULT 'pending', error_message TEXT, attempts INTEGER DEFAULT 0, next_retry_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_webhook_log ( id INTEGER PRIMARY KEY AUTOINCREMENT, doctype TEXT NOT NULL, docname TEXT NOT NULL, action TEXT NOT NULL, payload TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS franchise_locations ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', code TEXT UNIQUE NOT NULL, name TEXT NOT NULL, address TEXT, city TEXT DEFAULT 'Sa Đéc', phone TEXT, royalty_percentage REAL DEFAULT 5.0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS frigate_events ( id TEXT PRIMARY KEY, camera TEXT NOT NULL, label TEXT NOT NULL, start_time REAL NOT NULL, end_time REAL, score REAL, payload TEXT, received_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ha_automation_log ( id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT NOT NULL, trigger_entity TEXT, payload TEXT, result TEXT, executed_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ha_device_states ( id INTEGER PRIMARY KEY AUTOINCREMENT, entity_id TEXT NOT NULL UNIQUE, state TEXT NOT NULL, attributes TEXT, last_changed TEXT DEFAULT (datetime('now')), last_updated TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS happy_hour_windows (id TEXT PRIMARY KEY, name TEXT NOT NULL, day_of_week INTEGER NOT NULL, start_time TEXT NOT NULL, end_time TEXT NOT NULL, discount_rate REAL NOT NULL DEFAULT 0, apply_to TEXT NOT NULL DEFAULT 'all', apply_ids TEXT, priority INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS kds_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, categories TEXT NOT NULL DEFAULT '[]', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS kitchen_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS loyalty_rewards ( id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, description TEXT, points_cost INTEGER NOT NULL DEFAULT 100, points_required INTEGER NOT NULL DEFAULT 100, type TEXT NOT NULL DEFAULT 'voucher', reward_type TEXT NOT NULL DEFAULT 'voucher', value REAL DEFAULT 0, reward_value TEXT DEFAULT '0', menu_item_id TEXT, min_tier TEXT DEFAULT 'bronze', max_redemptions INTEGER, stock INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0, valid_from TEXT, valid_to TEXT, valid_until TEXT, image_url TEXT, terms TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS loyalty_tier_configs ( tier TEXT PRIMARY KEY, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, max_points INTEGER, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, discount_percent REAL DEFAULT 0, birthday_bonus INTEGER DEFAULT 500, free_shipping INTEGER DEFAULT 0, priority_support INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', color TEXT, icon TEXT, updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS loyalty_transactions ( id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, balance_after INTEGER NOT NULL DEFAULT 0, order_id TEXT, reward_id TEXT, description TEXT, reason TEXT, idempotency_key TEXT, created_by TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS menu_modifiers (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, option_name TEXT NOT NULL, price_delta INTEGER NOT NULL DEFAULT 0, available INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS mixpost_posts ( id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', platforms TEXT DEFAULT '[]', media_urls TEXT DEFAULT '[]', source TEXT DEFAULT 'manual', scheduled_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS mixpost_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, content_template TEXT NOT NULL, accounts TEXT DEFAULT '[]', schedule_cron TEXT NOT NULL DEFAULT '* *', is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS notifications ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT DEFAULT 'info', title_vi TEXT NOT NULL, title_en TEXT NOT NULL, body_vi TEXT, body_en TEXT, data TEXT DEFAULT '{}', read_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS order_item_stations (order_item_id TEXT NOT NULL, station_id TEXT NOT NULL, started_at TEXT, ready_at TEXT, PRIMARY KEY (order_item_id, station_id));
+CREATE TABLE IF NOT EXISTS saas_pricing ( id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name_vi TEXT NOT NULL, name_en TEXT NOT NULL, description_vi TEXT, description_en TEXT, price_vnd INTEGER NOT NULL, price_usd REAL, currency TEXT NOT NULL DEFAULT 'VND', billing_period TEXT NOT NULL DEFAULT 'monthly', sort_order INTEGER NOT NULL DEFAULT 0, is_recommended INTEGER NOT NULL DEFAULT 0, features_vi TEXT NOT NULL DEFAULT '[]', features_en TEXT NOT NULL DEFAULT '[]', cta_text_vi TEXT NOT NULL DEFAULT 'Bắt đầu', cta_text_en TEXT NOT NULL DEFAULT 'Get Started', cta_link TEXT NOT NULL DEFAULT '/register', active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS saas_tenants ( id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT, tier TEXT NOT NULL DEFAULT 'BASIC', status TEXT NOT NULL DEFAULT 'trial', owner_user_id TEXT, trial_ends_at TEXT, current_period_end TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS table_qr_codes ( id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS table_sessions (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'active', opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at DATETIME, order_count INTEGER NOT NULL DEFAULT 0, total_amount INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, order_id TEXT, current_order_id TEXT, started_at TEXT, ended_at TEXT);
+CREATE TABLE IF NOT EXISTS ti_menu_cache ( id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT, price REAL DEFAULT 0, active INTEGER DEFAULT 1, cached_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ti_order_bridge ( id TEXT PRIMARY KEY, local_order_id TEXT NOT NULL, ti_order_id TEXT, status TEXT NOT NULL, error TEXT, synced_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS wifi_sessions ( id TEXT PRIMARY KEY, client_mac TEXT NOT NULL, ip_address TEXT, phone TEXT, customer_id TEXT, status TEXT NOT NULL, session_timeout INTEGER DEFAULT 3600, authorized_at TEXT DEFAULT (datetime('now')), expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')) );
+ALTER TABLE _alerts ADD COLUMN value REAL;
+ALTER TABLE _alerts ADD COLUMN threshold REAL;
+ALTER TABLE _alerts ADD COLUMN resolved_at TEXT;
+ALTER TABLE bonus_campaigns ADD COLUMN auto_upgrade_tier TEXT;
+ALTER TABLE bonus_campaigns ADD COLUMN auto_upgrade_min_spend INTEGER DEFAULT 0;
+ALTER TABLE cafe_tables ADD COLUMN seats INTEGER DEFAULT 4;
+ALTER TABLE cafe_tables ADD COLUMN notes TEXT;
+ALTER TABLE cafe_tables ADD COLUMN current_order_id TEXT;
+ALTER TABLE checkins ADD COLUMN streak INTEGER DEFAULT 1;
+ALTER TABLE checkins ADD COLUMN points_earned INTEGER DEFAULT 10;
+ALTER TABLE checkins ADD COLUMN tenant_id TEXT DEFAULT 'default';
+ALTER TABLE customers ADD COLUMN signup_bonus_claimed INTEGER DEFAULT 0;
+ALTER TABLE customers ADD COLUMN last_expiry_warning_at TEXT;
+ALTER TABLE customers ADD COLUMN cashback_balance REAL DEFAULT 0;
+ALTER TABLE customers ADD COLUMN visit_count INTEGER DEFAULT 0;
+ALTER TABLE customers ADD COLUMN last_ip TEXT;
+ALTER TABLE customers ADD COLUMN tax_id TEXT;
+ALTER TABLE customers ADD COLUMN erpnext_id TEXT;
+ALTER TABLE customers ADD COLUMN sync_status TEXT DEFAULT 'pending';
+ALTER TABLE customers ADD COLUMN erpnext_last_synced TEXT;
+ALTER TABLE erpnext_mappings ADD COLUMN error_message TEXT;
+ALTER TABLE erpnext_mappings ADD COLUMN updated_at TEXT;
+ALTER TABLE erpnext_mappings ADD COLUMN aura_order_id TEXT;
+ALTER TABLE erpnext_mappings ADD COLUMN erpnext_invoice_id TEXT;
+ALTER TABLE erpnext_sync_logs ADD COLUMN mapping_id INTEGER;
+ALTER TABLE erpnext_sync_logs ADD COLUMN attempt INTEGER;
+ALTER TABLE erpnext_sync_logs ADD COLUMN error_message TEXT;
+ALTER TABLE ingredients ADD COLUMN supplier_id TEXT;
+ALTER TABLE ingredients ADD COLUMN last_restocked_at TEXT;
+ALTER TABLE inventory_items ADD COLUMN reorder_point REAL DEFAULT 10;
+ALTER TABLE inventory_items ADD COLUMN location TEXT DEFAULT 'main';
+ALTER TABLE inventory_items ADD COLUMN expiry_date TEXT;
+ALTER TABLE inventory_items ADD COLUMN supplier_id TEXT;
+ALTER TABLE inventory_items ADD COLUMN unit_cost REAL DEFAULT 0;
+ALTER TABLE inventory_items ADD COLUMN is_active INTEGER DEFAULT 1;
+ALTER TABLE inventory_items ADD COLUMN last_restocked_at TEXT;
+ALTER TABLE inventory_snapshots ADD COLUMN created_at TEXT;
+ALTER TABLE inventory_transactions ADD COLUMN previous_stock REAL DEFAULT 0;
+ALTER TABLE inventory_transactions ADD COLUMN new_stock REAL DEFAULT 0;
+ALTER TABLE inventory_transactions ADD COLUMN unit_cost REAL DEFAULT 0;
+ALTER TABLE inventory_transactions ADD COLUMN reason TEXT;
+ALTER TABLE inventory_transactions ADD COLUMN performed_by TEXT;
+ALTER TABLE inventory_transactions ADD COLUMN inventory_item_id TEXT;
+ALTER TABLE inventory_transactions ADD COLUMN staff_id TEXT;
+ALTER TABLE loyalty_audit_log ADD COLUMN ip_address TEXT;
+ALTER TABLE loyalty_audit_log ADD COLUMN user_agent TEXT;
+ALTER TABLE loyalty_tiers ADD COLUMN points_multiplier REAL DEFAULT 1.0;
+ALTER TABLE loyalty_tiers ADD COLUMN perks TEXT DEFAULT '[]';
+ALTER TABLE loyalty_tiers ADD COLUMN color TEXT DEFAULT '#CD7F32';
+ALTER TABLE loyalty_tiers ADD COLUMN updated_at TEXT;
+ALTER TABLE menu_items ADD COLUMN name_en TEXT;
+ALTER TABLE menu_items ADD COLUMN sort_order INTEGER DEFAULT 0;
+ALTER TABLE mrr_snapshots ADD COLUMN by_zone TEXT DEFAULT '{}';
+ALTER TABLE mrr_snapshots ADD COLUMN by_plan TEXT DEFAULT '{}';
+ALTER TABLE orders ADD COLUMN reward_code_used TEXT;
+ALTER TABLE orders ADD COLUMN staff_id TEXT;
+ALTER TABLE orders ADD COLUMN table_number INTEGER;
+ALTER TABLE orders ADD COLUMN is_cod INTEGER DEFAULT 0;
+ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT 'dine_in';
+ALTER TABLE orders ADD COLUMN delivery_address TEXT;
+ALTER TABLE orders ADD COLUMN promo_code TEXT;
+ALTER TABLE orders ADD COLUMN promotion_code TEXT;
+ALTER TABLE orders ADD COLUMN discount_amount INTEGER DEFAULT 0;
+ALTER TABLE orders ADD COLUMN loyalty_points_awarded INTEGER DEFAULT 0;
+ALTER TABLE orders ADD COLUMN loyalty_reversal_at TEXT;
+ALTER TABLE payments ADD COLUMN payment_method TEXT;
+ALTER TABLE products ADD COLUMN category TEXT;
+ALTER TABLE promotion_usages ADD COLUMN idempotency_key TEXT;
+ALTER TABLE promotion_usages ADD COLUMN used_at TEXT;
+ALTER TABLE promotions ADD COLUMN description TEXT;
+ALTER TABLE promotions ADD COLUMN discount_value REAL DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN discount_type TEXT DEFAULT 'percentage';
+ALTER TABLE promotions ADD COLUMN max_uses INTEGER;
+ALTER TABLE promotions ADD COLUMN current_uses INTEGER DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN used_count INTEGER DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN min_order_value REAL DEFAULT 0;
+ALTER TABLE promotions ADD COLUMN max_discount_value REAL;
+ALTER TABLE promotions ADD COLUMN valid_from TEXT;
+ALTER TABLE promotions ADD COLUMN valid_to TEXT;
+ALTER TABLE promotions ADD COLUMN excluded_items TEXT;
+ALTER TABLE promotions ADD COLUMN updated_at TEXT;
+ALTER TABLE promotions ADD COLUMN start_date TEXT;
+ALTER TABLE promotions ADD COLUMN end_date TEXT;
+ALTER TABLE purchase_order_items ADD COLUMN unit TEXT DEFAULT 'g';
+ALTER TABLE purchase_order_items ADD COLUMN po_id TEXT;
+ALTER TABLE purchase_order_items ADD COLUMN unit_cost REAL DEFAULT 0;
+ALTER TABLE purchase_order_items ADD COLUMN created_at TEXT;
+ALTER TABLE purchase_orders ADD COLUMN expected_date TEXT;
+ALTER TABLE purchase_orders ADD COLUMN total_amount REAL DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN received_date TEXT;
+ALTER TABLE purchase_orders ADD COLUMN total_cost REAL DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN expected_delivery TEXT;
+ALTER TABLE purchase_orders ADD COLUMN received_at TEXT;
+ALTER TABLE purchase_orders ADD COLUMN approved_by TEXT;
+ALTER TABLE purchase_orders ADD COLUMN received_by TEXT;
+ALTER TABLE push_subscriptions ADD COLUMN last_used_at TEXT;
+ALTER TABLE push_subscriptions ADD COLUMN device_id TEXT;
+ALTER TABLE push_subscriptions ADD COLUMN user_id TEXT;
+ALTER TABLE recipes ADD COLUMN is_active INTEGER DEFAULT 1;
+ALTER TABLE referrals ADD COLUMN referrer_customer_id TEXT;
+ALTER TABLE referrals ADD COLUMN referee_customer_id TEXT;
+ALTER TABLE referrals ADD COLUMN referrer_bonus_vnd INTEGER DEFAULT 0;
+ALTER TABLE referrals ADD COLUMN referee_bonus_vnd INTEGER DEFAULT 0;
+ALTER TABLE reservations ADD COLUMN tenant_id TEXT DEFAULT 'default';
+ALTER TABLE reservations ADD COLUMN cal_booking_uid TEXT;
+ALTER TABLE reservations ADD COLUMN customer_email TEXT;
+ALTER TABLE reservations ADD COLUMN reservation_time TEXT;
+ALTER TABLE reservations ADD COLUMN special_requests TEXT;
+ALTER TABLE reservations ADD COLUMN phone TEXT;
+ALTER TABLE reservations ADD COLUMN pax INTEGER DEFAULT 2;
+ALTER TABLE reservations ADD COLUMN reservation_date TEXT;
+ALTER TABLE rewards ADD COLUMN name TEXT;
+ALTER TABLE rewards ADD COLUMN points_cost INTEGER DEFAULT 100;
+ALTER TABLE rewards ADD COLUMN type TEXT DEFAULT 'fixed';
+ALTER TABLE rewards ADD COLUMN value REAL DEFAULT 0;
+ALTER TABLE rewards ADD COLUMN reward_type TEXT DEFAULT 'fixed';
+ALTER TABLE rewards ADD COLUMN reward_value REAL DEFAULT 0;
+ALTER TABLE rewards ADD COLUMN min_tier TEXT DEFAULT 'bronze';
+ALTER TABLE rewards ADD COLUMN updated_at TEXT;
+ALTER TABLE suppliers ADD COLUMN notes TEXT;
+ALTER TABLE user_rewards ADD COLUMN redeemed_at TEXT;
+ALTER TABLE users ADD COLUMN email TEXT;
+ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'vi';
+ALTER TABLE users ADD COLUMN loyalty_tier TEXT DEFAULT 'bronze';
+ALTER TABLE users ADD COLUMN loyalty_points INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN avatar_url TEXT;
+ALTER TABLE users ADD COLUMN hire_date TEXT;
+ALTER TABLE visits ADD COLUMN table_id TEXT;
+ALTER TABLE visits ADD COLUMN amount REAL DEFAULT 0;
+ALTER TABLE visits ADD COLUMN points_earned INTEGER DEFAULT 0;
+ALTER TABLE staff_login_identities ADD COLUMN created_at TEXT DEFAULT (datetime('now'));
+ALTER TABLE staff_login_identities ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));
+ALTER TABLE staff_shifts ADD COLUMN staff_email TEXT;
+ALTER TABLE staff_shifts ADD COLUMN shift_type TEXT;
+ALTER TABLE users ADD COLUMN username TEXT;
+ALTER TABLE users ADD COLUMN full_name TEXT;
+ALTER TABLE users ADD COLUMN password_changed_at TEXT;
+ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'Member';
+ALTER TABLE users ADD COLUMN total_points INTEGER DEFAULT 0;

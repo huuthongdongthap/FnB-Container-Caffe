@@ -22,7 +22,6 @@ import {
   PaginationMetaSchema,
 } from './common';
 import {
-  SopDisciplineStepEnum,
   SopRunStatusEnum,
   SopShiftTypeEnum,
   SopSourceEnum,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useMobileAuth } from '@/hooks/use-mobile-auth';
+import { useMobileAuth as _useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -33,7 +33,7 @@ const confirmNo: React.CSSProperties = { flex: 1, padding: '11px 0', fontSize: 1
 
 /* ── Lookup maps ────────────────────────────────────────────────────*/
 
-const STATUS_COLORS: Record<string, string> = { free: '#10b981', occupied: '#ef4444', reserved: '#f59e0b' };
+const _STATUS_COLORS: Record<string, string> = { free: '#10b981', occupied: '#ef4444', reserved: '#f59e0b' };
 const STATUS_BG: Record<string, string> = { free: 'rgba(16, 185, 129, 0.14)', occupied: 'rgba(239, 68, 68, 0.14)', reserved: 'rgba(245, 158, 11, 0.14)' };
 const STATUS_BORDER: Record<string, string> = { free: '#10b981', occupied: '#ef4444', reserved: '#f59e0b' };
 const STATUS_LABELS: Record<string, string> = { free: 'Trống', occupied: 'Đang dùng', reserved: 'Đặt trước' };
@@ -68,7 +68,7 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
 export default function TableManager() {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; newStatus: string } | null>(null);
 
   const loadTables = useCallback(async () => {

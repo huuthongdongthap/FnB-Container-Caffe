@@ -43,7 +43,7 @@ export async function getKdsMobile(
     try {
       orders = await context.env.AURA_DB
         .prepare(
-          `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.created_at, o.updated_at,
+          `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.order_type, o.payment_status, o.created_at, o.updated_at,
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
@@ -64,7 +64,9 @@ export async function getKdsMobile(
         .bind(...tenantBinds).all();
     }
 
-    const rows = orders.results as Array<Record<string, unknown>>;
+    const rows = (orders.results as Array<Record<string, unknown>>).filter(
+      (r) => !(r.order_type === 'delivery' && r.payment_status !== 'paid')
+    );
     return jsonResponse({
       success: true,
       orders: rows.map((r) => ({

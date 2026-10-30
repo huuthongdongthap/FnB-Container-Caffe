@@ -10,7 +10,6 @@ import {
   ProductStatusEnum,
   DateTimeSchema,
   MoneySchema,
-  CategoryTypeEnum,
   ReferenceSchema,
 } from 'worker/src/schemas/common';
 
@@ -24,7 +23,7 @@ export const ProductTranslationSchema = z.object({
   name: z.string().min(1).max(150).openapi({ example: 'Cà phê đen đá' }),
   description: z.string().max(1000).optional().openapi({ example: 'Cà phê robusta rang xay truyền thống, uống đá mát lạnh' }),
   ingredients: z.string().max(2000).optional().openapi({ example: 'Cà phê rang xay, đá, đường (tùy chọn)' }),
-  allergens: z.array(z.string()).optional().openapi({ example: ['caffeine'] }),
+  allergens: z.array(z.string()).max(50).optional().openapi({ example: ['caffeine'] }),
   story: z.string().max(2000).optional().openapi({ example: 'Hạt cà phê từ vườn 30 năm tuổi tại Sa Đéc...' }),
 });
 
@@ -49,7 +48,7 @@ export const ProductModifierSchema = z.object({
     priceAdjustment: z.number().int().default(0),
     isDefault: z.boolean().default(false),
     stock: z.number().int().nonnegative().optional(),
-  })).min(1),
+  })).min(1).max(50),
 }).openapi('ProductModifier');
 
 export const ProductCreateSchema = z.object({
@@ -57,21 +56,21 @@ export const ProductCreateSchema = z.object({
   name: z.string().min(1).optional(),
   categoryId: z.string().min(1),
   category_id: z.string().min(1).optional(),
-  translations: z.array(ProductTranslationSchema).min(1).optional(),
+  translations: z.array(ProductTranslationSchema).min(1).max(20).optional(),
   price: MoneySchema.optional(),
   basePrice: MoneySchema.optional(),
   status: ProductStatusEnum.default('active'),
-  variants: z.array(ProductVariantSchema).optional(),
-  modifiers: z.array(ProductModifierSchema).optional(),
+  variants: z.array(ProductVariantSchema).max(50).optional(),
+  modifiers: z.array(ProductModifierSchema).max(50).optional(),
   images: z.array(z.object({
     url: z.string().url(),
     alt: z.string().optional(),
     isPrimary: z.boolean().default(false),
     displayOrder: z.number().int().nonnegative().default(0),
-  })).optional(),
+  })).max(20).optional(),
   preparationTimeMinutes: z.number().int().positive().default(5),
   calories: z.number().int().nonnegative().optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string()).max(50).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductCreate');
 
@@ -80,21 +79,21 @@ export const ProductUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   categoryId: z.string().min(1).optional(),
   category_id: z.string().min(1).optional(),
-  translations: z.array(ProductTranslationSchema).min(1).optional(),
+  translations: z.array(ProductTranslationSchema).min(1).max(20).optional(),
   price: MoneySchema.optional(),
   basePrice: MoneySchema.optional(),
   status: ProductStatusEnum.optional(),
-  variants: z.array(ProductVariantSchema).optional(),
-  modifiers: z.array(ProductModifierSchema).optional(),
+  variants: z.array(ProductVariantSchema).max(50).optional(),
+  modifiers: z.array(ProductModifierSchema).max(50).optional(),
   images: z.array(z.object({
     url: z.string().url(),
     alt: z.string().optional(),
     isPrimary: z.boolean().default(false),
     displayOrder: z.number().int().nonnegative().default(0),
-  })).optional(),
+  })).max(20).optional(),
   preparationTimeMinutes: z.number().int().positive().optional(),
   calories: z.number().int().nonnegative().optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string()).max(50).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('ProductUpdate');
 

@@ -9,7 +9,7 @@ import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { hasM3NavBar } from '@/components/stitch/shell-config';
 
 export default function CartBottomBar() {
-  const items = useCartStore((s) => s.items);
+  const _items = useCartStore((s) => s.items);
   const tableId = useCartStore((s) => s.tableId);
   const totalItems = useCartStore((s) => s.totalItems);
   const subtotal = useCartStore((s) => s.subtotal);

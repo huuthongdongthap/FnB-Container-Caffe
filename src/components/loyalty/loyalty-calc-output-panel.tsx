@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { formatVnd } from '@/lib/format';
 import { TierProjection } from '@/components/loyalty/tier-projection';
 import { ReferralCalculator } from '@/components/loyalty/referral-calculator';
-import type { CalculatorInputs } from './loyalty-calculator-types';
+import type { CalculatorInputs as _CalculatorInputs } from './loyalty-calculator-types';
 import type { getTierForSpend } from '@/hooks/use-loyalty';
 
 type TierConfig = ReturnType<typeof getTierForSpend>;

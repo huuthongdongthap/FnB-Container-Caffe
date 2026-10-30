@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/api-client';
 
 export default function TableCheckinPage() {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
    const search = useQueryParams();
  const tableSlug = search.get('table') || '';
 

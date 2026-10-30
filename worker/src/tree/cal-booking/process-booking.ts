@@ -46,13 +46,13 @@ export async function createReservationFromBooking(
   let table: CafeTableRow | null = null;
   if (zone) {
     const { results: zoneResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND status = \'Available\''
+      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = \'available\''
     ).bind(guestCount).all();
     const available = (zoneResults || []) as unknown as CafeTableRow[];
-    table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2))[0] || null;
+    table = available.find((t: CafeTableRow) => (t.zone || '').toLowerCase() === zone.toLowerCase()) || available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2))[0] || null;
   } else {
     const { results: tablesResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND status = \'Available\''
+      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = \'available\''
     ).bind(guestCount).all();
     const available = (tablesResults || []) as unknown as CafeTableRow[];
     available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2));

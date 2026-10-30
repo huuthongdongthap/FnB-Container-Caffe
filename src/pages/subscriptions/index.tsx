@@ -5,7 +5,7 @@ import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { usePlans, useMyActiveSubscription, useSubscribe, type Plan, type CreateSubscriptionInput } from '@/hooks/use-subscriptions';
+import { usePlans, useMyActiveSubscription, useSubscribe, type Plan as _Plan, type CreateSubscriptionInput } from '@/hooks/use-subscriptions';
 import { Link } from 'react-router-dom';
 import { formatVND, statusBadge } from './subscriptions-helpers';
 import { PlanCard } from './plan-card';

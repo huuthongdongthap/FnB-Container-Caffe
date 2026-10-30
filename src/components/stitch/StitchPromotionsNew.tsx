@@ -45,7 +45,7 @@ export function StitchPromotionsNew({
   hero = defaultProps.hero,
   offers = defaultProps.offers,
 }: Readonly<StitchPromotionsNewProps>) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
 
   /* Scroll-based header opacity transition */
   useEffect(() => {

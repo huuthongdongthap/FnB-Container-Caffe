@@ -12,16 +12,34 @@ import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { getRecommendations, getPopularItems, type RecommendationItem } from '@/lib/recommendations';
 import { useToast } from '@/components/ui/toast';
 
+export interface RecommendationCatalogItem {
+  id: string;
+  name: string;
+  price: number;
+  image_url?: string;
+  tags?: string[];
+}
+
 interface RecommendationSectionProps {
   /** IDs to exclude from recommendations (e.g., items already in cart) */
   excludeIds?: Set<string>;
+  /** Optional pre-loaded catalog items (e.g., from useCustomerMenu on /menu) */
+  catalogItems?: RecommendationCatalogItem[];
+  /** Optional handler when user adds a recommended item (e.g., opens DrinkCustomizerModal on /menu) */
+  onAddItem?: (itemId: string) => void;
 }
 
-export function RecommendationSection({ excludeIds = new Set() }: RecommendationSectionProps) {
+export function RecommendationSection({
+  excludeIds = new Set(),
+  catalogItems,
+  onAddItem,
+}: RecommendationSectionProps) {
   const { showToast } = useToast();
   const orderHistory = useOrderStore((s) => s.orderHistory);
-  const menuItems = useMenuStore((s) => s.items);
+  const storeMenuItems = useMenuStore((s) => s.items);
   const addItem = useCartStore((s) => s.addItem);
+
+  const menuItems = catalogItems && catalogItems.length > 0 ? catalogItems : storeMenuItems;
 
   const recommendations = useMemo(() => {
     if (menuItems.length === 0) return [];
@@ -58,7 +76,17 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
   if (recommendations.length === 0) return null;
 
   const handleAddToCart = (item: RecommendationItem) => {
-    addItem({ id: item.id, productId: item.id, name: item.name, price: item.price });
+    if (onAddItem) {
+      onAddItem(item.id);
+      return;
+    }
+    addItem({
+      id: item.id,
+      productId: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image,
+    });
     showToast(`Đã thêm ${item.name}`, 'success');
   };
 

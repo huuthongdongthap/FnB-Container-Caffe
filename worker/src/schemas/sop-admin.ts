@@ -47,8 +47,8 @@ export const SopCreateTemplateSchema = z
     description: z.string().max(2000).optional().nullable(),
     source: SopSourceEnum,
     shiftType: SopShiftTypeEnum,
-    applicableRoles: z.array(StaffRoleEnum).min(1),
-    items: z.array(SopTemplateItemSchema.omit({ id: true })).min(1),
+    applicableRoles: z.array(StaffRoleEnum).min(1).max(20),
+    items: z.array(SopTemplateItemSchema.omit({ id: true })).min(1).max(200),
   })
   .openapi('SopCreateTemplate');
 

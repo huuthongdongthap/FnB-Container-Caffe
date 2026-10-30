@@ -14,7 +14,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { KVNamespace } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
-import { computeFrequencyBand, resolveBandPolicy, DEFAULT_BAND_POLICY, type BandPolicy } from './frequency-band';
+import { computeFrequencyBand, resolveBandPolicy, type BandPolicy } from './frequency-band';
 
 const log = createLogger({ route: 'crm.segments' });
 

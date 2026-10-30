@@ -231,4 +231,62 @@ describe('verifyEmail & registerWithVerification hardening', () => {
     expect(response.status).toBe(200);
     expect((await response.json()).user).toMatchObject({ id: 'staff', email: '', name: 'Name staff', role: 'staff', tenantId: 'cafe-a' });
   });
+
+  it('GET /api/auth/devices lists canonical staff_devices and OpenAPI auth/staff handlers work on minimal canonical D1', async() => {
+    const f = staffSessionFixture(); sqliteDatabases.push(f.sqlite);
+    const staffToken = await f.token('staff', true);
+    const devRes = await f.request('/api/auth/devices', staffToken);
+    expect(devRes.status).toBe(200);
+    const devBody = (await devRes.json()) as { success: boolean; data: Array<{ id: string; fingerprint: string; platform: string; isTrusted: boolean }> };
+    expect(devBody.success).toBe(true);
+    expect(devBody.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'device-1', fingerprint: 'local-device-token', platform: 'mobile', isTrusted: true }),
+      ])
+    );
+
+    const { openApiAuthRouter } = await import('../../routes/openapi-auth');
+    const ownerToken = await f.token('owner');
+    const regStaffRes = await openApiAuthRouter.request(
+      '/api/auth/register-staff',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'OpenAPI Waiter', email: 'openapi.waiter@aura.vn', password: 'WaiterPass123!', role: 'waiter' }),
+      },
+      f.env
+    );
+    expect(regStaffRes.status).toBe(201);
+    const regStaffBody = (await regStaffRes.json()) as { success: boolean; data: { id: string; email: string; role: string } };
+    expect(regStaffBody.data).toMatchObject({ email: 'openapi.waiter@aura.vn', role: 'waiter' });
+    const identityRow = f.sqlite.prepare('SELECT email, staff_id FROM staff_login_identities WHERE staff_id = ?').get(regStaffBody.data.id) as { email: string; staff_id: string };
+    expect(identityRow).toEqual({ email: 'openapi.waiter@aura.vn', staff_id: regStaffBody.data.id });
+
+    const listStaffRes = await openApiAuthRouter.request(
+      '/api/auth/staff',
+      { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } },
+      f.env
+    );
+    expect(listStaffRes.status).toBe(200);
+    const listStaffBody = (await listStaffRes.json()) as { data: { staff: Array<{ id: string; email: string }> } };
+    expect(listStaffBody.data.staff.find((s) => s.id === regStaffBody.data.id)?.email).toBe('openapi.waiter@aura.vn');
+
+    const loginRes = await openApiAuthRouter.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'openapi.waiter@aura.vn', password: 'WaiterPass123!' }),
+      },
+      f.env
+    );
+    expect(loginRes.status).toBe(200);
+
+    const meRes = await openApiAuthRouter.request(
+      '/api/auth/me',
+      { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } },
+      f.env
+    );
+    expect(meRes.status).toBe(200);
+  });
 });

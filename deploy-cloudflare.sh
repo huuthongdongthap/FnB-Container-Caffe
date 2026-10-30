@@ -152,7 +152,7 @@ fi
 # ── 1. Frontend Build ────────────────────────────────────────────────────
 if [[ "$WORKER_ONLY" == "false" ]]; then
   echo "[1/3] Building frontend with Vite..."
-  npx vite build --mode production 2>&1 | tail -5
+  npx --no-install vite build --mode production 2>&1 | tail -5
 
   echo "Copying static SEO and signage assets to dist..."
   cp robots.txt sitemap.xml dist/ 2>/dev/null || true
@@ -173,7 +173,7 @@ VERSIONEOF
   echo "Cache-busting version.json written: $GIT_COMMIT_SHORT @ $BUILD_TIMESTAMP"
 
   echo "[2/3] Deploying to Cloudflare Pages..."
-  npx wrangler pages deploy "$DIST_DIR" \
+  npx --no-install wrangler pages deploy "$DIST_DIR" \
     --project-name=fnb-caffe-container \
     --branch=main \
     2>&1 | tail -5
@@ -184,7 +184,7 @@ if [[ "$PAGES_ONLY" == "false" ]]; then
   echo "[3/3] Deploying Cloudflare Worker..."
   GIT_COMMIT_SHA=$(git rev-parse HEAD)
   cd "$WORKER_DIR"
-  npx wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
+  npx --no-install wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
   cd ..
 fi
 

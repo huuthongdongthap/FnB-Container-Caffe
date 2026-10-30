@@ -131,7 +131,7 @@ export function ChartSvg({
             const step = Math.floor(current.length / labelCount);
             return i % step === 0 || i === current.length - 1;
           })
-          .map((d, _, arr) => {
+          .map((d, _, _arr) => {
             const i = current.indexOf(d);
             const x = PADDING.left + (i / Math.max(current.length - 1, 1)) * INNER_W;
             return (

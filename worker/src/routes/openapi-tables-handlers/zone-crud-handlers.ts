@@ -24,9 +24,11 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       whereClause += ' AND location_id = ?';
       params.push(locationId);
     }
+    const isActiveBool =
+      isActive === true || isActive === 'true' || isActive === '1' || isActive === 1;
     if (isActive !== undefined) {
       whereClause += ' AND is_active = ?';
-      params.push(isActive ? 1 : 0);
+      params.push(isActiveBool ? 1 : 0);
     }
 
     const offset = (page - 1) * limit;
@@ -41,6 +43,30 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const sortDir = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     const orderClause = `${sortCol} ${sortDir}`;
 
+    const deriveZonesFromCafeTables = async () => {
+      if (isActive !== undefined && !isActiveBool) {
+        return { total: 0, zoneRows: [] as any[] };
+      }
+      const distinctRows = (await db.prepare(
+        'SELECT DISTINCT zone FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
+      ).all()) as { results: Array<{ zone: string }> };
+      const derived = (distinctRows.results || [])
+        .map((r, idx) => ({
+          id: r.zone,
+          slug: r.zone,
+          name: r.zone,
+          description: null,
+          sort_order: idx,
+          is_active: 1,
+          location_id: locationId || null,
+        }))
+        .filter((z) => !search || z.name.toLowerCase().includes(String(search).toLowerCase()));
+      return {
+        total: derived.length,
+        zoneRows: derived.slice(offset, offset + limit),
+      };
+    };
+
     let total = 0;
     let zoneRows: any[] = [];
     try {
@@ -53,24 +79,22 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
       ).bind(...params, limit, offset).all()) as { results: any[] };
       zoneRows = rows.results || [];
+
+      if (total === 0) {
+        const allZonesCount = (await db.prepare(
+          'SELECT COUNT(*) as total FROM table_zones'
+        ).first().catch(() => null)) as { total: number } | null;
+        if (!allZonesCount || allZonesCount.total === 0) {
+          const fallback = await deriveZonesFromCafeTables().catch(() => ({ total: 0, zoneRows: [] }));
+          total = fallback.total;
+          zoneRows = fallback.zoneRows;
+        }
+      }
     } catch {
       try {
-        const distinctRows = (await db.prepare(
-          'SELECT DISTINCT zone FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
-        ).all()) as { results: Array<{ zone: string }> };
-        const derived = (distinctRows.results || [])
-          .map((r, idx) => ({
-            id: r.zone,
-            slug: r.zone,
-            name: r.zone,
-            description: null,
-            sort_order: idx,
-            is_active: 1,
-            location_id: locationId || null,
-          }))
-          .filter((z) => !search || z.name.toLowerCase().includes(String(search).toLowerCase()));
-        total = derived.length;
-        zoneRows = derived.slice(offset, offset + limit);
+        const fallback = await deriveZonesFromCafeTables();
+        total = fallback.total;
+        zoneRows = fallback.zoneRows;
       } catch {
         total = 0;
         zoneRows = [];
@@ -94,10 +118,13 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     try {
       row = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
     } catch {
+      row = null;
+    }
+    if (!row) {
       try {
-        const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first();
+        const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first() as { zone?: string } | null;
         if (cafeTable) {
-          row = { id, slug: id, name: id, description: null, sort_order: 0, is_active: 1, location_id: null };
+          row = { id, slug: id, name: cafeTable.zone || id, description: null, sort_order: 0, is_active: 1, location_id: null };
         }
       } catch {
         row = null;
@@ -112,16 +139,16 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let tableResults: any[] = [];
     try {
       const tables = (await db.prepare(
-        `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
-         FROM tables WHERE zone_id = ? ORDER BY name`
-      ).bind(id).all()) as { results: any[] };
+        `SELECT id, COALESCE(code, CAST(table_number AS TEXT)) as code, name, capacity, status, COALESCE(position_x, 0) as position_x, COALESCE(position_y, 0) as position_y, COALESCE(width, 80) as width, COALESCE(height, 80) as height, COALESCE(rotation, 0) as rotation
+         FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?) ORDER BY name`
+      ).bind(id, id).all()) as { results: any[] };
       tableResults = tables.results || [];
     } catch {
       try {
         const tables = (await db.prepare(
-          `SELECT id, COALESCE(code, CAST(table_number AS TEXT)) as code, name, capacity, status, COALESCE(position_x, 0) as position_x, COALESCE(position_y, 0) as position_y, COALESCE(width, 80) as width, COALESCE(height, 80) as height, COALESCE(rotation, 0) as rotation
-           FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?) ORDER BY name`
-        ).bind(id, id).all()) as { results: any[] };
+          `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
+           FROM tables WHERE zone_id = ? ORDER BY name`
+        ).bind(id).all()) as { results: any[] };
         tableResults = tables.results || [];
       } catch {
         try {
@@ -246,9 +273,12 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
     } catch {
       usingFallback = true;
-      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first().catch(() => null);
+    }
+    if (!existing) {
+      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first().catch(() => null) as { zone?: string } | null;
       if (cafeTable) {
-        existing = { id, slug: id, name: id, is_active: 1, location_id: null };
+        usingFallback = true;
+        existing = { id, slug: id, name: cafeTable.zone || id, is_active: 1, location_id: null };
       }
     }
     if (!existing) {
@@ -326,9 +356,12 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
     } catch {
       usingFallback = true;
-      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE zone = ? LIMIT 1').bind(id).first().catch(() => null);
+    }
+    if (!existing) {
+      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first().catch(() => null) as { zone?: string } | null;
       if (cafeTable) {
-        existing = { id, name: id };
+        usingFallback = true;
+        existing = { id, name: cafeTable.zone || id };
       }
     }
     if (!existing) {
@@ -338,10 +371,10 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Check for tables in zone
     let tables: { count: number } | null = null;
     try {
-      tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
+      tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
     } catch {
       try {
-        tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
+        tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;
       } catch {
         tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone = ?').bind(id).first().catch(() => null)) as { count: number } | null;
       }

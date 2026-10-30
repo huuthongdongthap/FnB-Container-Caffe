@@ -17,10 +17,10 @@ import { Coffee } from 'lucide-react';
 
 import type {
   StitchAccountNewProps,
-  AccountProfileNew,
-  LoyaltyDataNew,
-  OrderItemNew,
-  AccountCardNew,
+  AccountProfileNew as _AccountProfileNew,
+  LoyaltyDataNew as _LoyaltyDataNew,
+  OrderItemNew as _OrderItemNew,
+  AccountCardNew as _AccountCardNew,
 } from './StitchAccountNew-types';
 import {
   defaultProfile,

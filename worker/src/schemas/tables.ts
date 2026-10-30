@@ -46,7 +46,7 @@ export const TableCreateSchema = z.object({
   isActive: z.boolean().optional(),
   locationId: z.string().optional(),
   qrCode: z.string().optional(),
-  translations: z.array(TableTranslationSchema).optional(),
+  translations: z.array(TableTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableCreate');
 
@@ -65,7 +65,7 @@ export const TableUpdateSchema = z.object({
   dimensions: z.object({ width: z.number().positive().optional(), height: z.number().positive().optional(), rotation: z.number().min(0).max(360).optional() }).optional(),
   isActive: z.boolean().optional(),
   locationId: z.string().optional(),
-  translations: z.array(TableTranslationSchema).optional(),
+  translations: z.array(TableTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('TableUpdate');
 
@@ -151,9 +151,11 @@ export const TableRoutes = {
     tags: ['Tables'],
     request: {
       query: PaginationQuerySchema.extend({
+        order: z.enum(['asc', 'desc']).optional(),
         zoneId: z.string().min(1).optional(),
         status: TableStatusEnum.optional(),
         capacity: z.coerce.number().int().positive().optional(),
+        locationId: z.string().min(1).optional(),
       }),
     },
     responses: {
@@ -211,6 +213,13 @@ export const TableRoutes = {
       path: '/api/table-zones',
       summary: 'List table zones',
       tags: ['Tables'],
+      request: {
+        query: PaginationQuerySchema.extend({
+          order: z.enum(['asc', 'desc']).optional(),
+          locationId: z.string().min(1).optional(),
+          isActive: z.union([z.boolean(), z.enum(['true', 'false', '1', '0'])]).optional(),
+        }),
+      },
       responses: {
         200: { description: 'Zone list', content: { 'application/json': { schema: SuccessResponseSchema(z.array(TableZoneResponseSchema)) } } },
       },
@@ -267,7 +276,7 @@ export const TableRoutes = {
         content: {
           'application/json': {
             schema: z.object({
-              tableIds: z.array(z.string().min(1)).min(1),
+              tableIds: z.array(z.string().min(1)).min(1).max(100),
               status: TableStatusEnum,
             }),
           },

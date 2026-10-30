@@ -81,6 +81,10 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
         'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
       ).bind(phone).first<Customer>();
     }
+    const rowTenant = (customer as unknown as Record<string, unknown> | null)?.tenant_id;
+    if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
+      customer = null;
+    }
   }
   if (!customer) {
     return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);

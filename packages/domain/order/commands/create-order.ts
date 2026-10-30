@@ -58,17 +58,27 @@ export async function createOrder(
     const resolvedCustomerId = ownership.customerId;
     const now = new Date().toISOString();
     const rawPromoCode = (data.promo_code || data.promotion_code || '').trim().toUpperCase();
-    let appliedPromo: { id: string; code: string; discountAmount: number } | null = null;
+    let appliedPromo: { id: string; code: string; discountAmount: number; reservedInPlace?: boolean } | null = null;
     if (rawPromoCode) {
       const isWelcome = rawPromoCode === 'WELCOME';
       let promo = await db.prepare(
-        'SELECT id, code, percent, max_discount, min_order, starts_at, expires_at, usage_limit, usage_count, is_active FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
+        'SELECT * FROM promotions WHERE UPPER(code) = ?'
       ).bind(rawPromoCode).first<{
         id: string; code: string; percent: number; max_discount: number; min_order: number;
         starts_at?: string | null; expires_at?: string | null; usage_limit: number; usage_count: number;
+        is_active?: number; tenant_id?: string | null;
       }>().catch(() => null);
+      if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
+        return errorResponse('Mã khuyến mãi không tồn tại hoặc không thuộc cửa hàng hiện tại', 400);
+      }
+      if (promo && promo.tenant_id === 'default' && tenantId !== 'default' && tenantId !== '*') {
+        return errorResponse('Mã khuyến mãi không tồn tại hoặc không thuộc cửa hàng hiện tại', 400);
+      }
+      if (promo && Number(promo.is_active ?? 1) === 0) {
+        return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
+      }
       if (!promo && isWelcome) {
-        promo = { id: 'promo_welcome', code: 'WELCOME', percent: 10, max_discount: 30000, min_order: 0, usage_limit: 0, usage_count: 0 };
+        promo = { id: 'promo_welcome', code: 'WELCOME', percent: 10, max_discount: 30000, min_order: 0, usage_limit: 0, usage_count: 0, is_active: 1 };
       }
       if (!promo) return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
       if (promo.starts_at && new Date(promo.starts_at) > new Date()) return errorResponse('Chương trình khuyến mãi chưa bắt đầu', 400);
@@ -87,12 +97,23 @@ export async function createOrder(
           return errorResponse('Mã WELCOME chỉ áp dụng cho khách hàng mới lần đầu đến quán', 400);
         }
       }
+      let reservedInPlace = false;
+      if (!isWelcome || promo.id !== 'promo_welcome') {
+        const reserveRes = await db.prepare(
+          'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+        ).bind(promo.code).run().catch(() => null) as { meta?: { changes?: number }; changes?: number } | null;
+        const changes = reserveRes?.meta?.changes ?? reserveRes?.changes;
+        if (changes !== undefined && Number(changes) < 1) {
+          return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
+        }
+        reservedInPlace = true;
+      }
       const pct = isWelcome ? (promo.percent || 10) : promo.percent;
       const cap = isWelcome ? (promo.max_discount || 30000) : promo.max_discount;
       const rawDisc = Math.round((snapshot.subtotal * pct) / 100);
       snapshot.discount = cap > 0 ? Math.min(rawDisc, cap) : rawDisc;
       snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + snapshot.shipping_fee + snapshot.tip_amount;
-      appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount };
+      appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount, reservedInPlace };
     }
     const responseBody = {
       success: true, data: {
@@ -138,15 +159,22 @@ export async function createOrder(
     }
     try { await db.batch(statements); }
     catch (error) {
+      if (appliedPromo?.reservedInPlace) {
+        await db.prepare(
+          'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = ?'
+        ).bind(appliedPromo.code).run().catch(() => {});
+      }
       // A concurrent same-key request either committed the entire order or nothing.
       const saved = idem ? await findReplay() : null;
       if (saved) return replayResponse(saved, idem!.fingerprint);
       throw error;
     }
     if (appliedPromo) {
-      await db.prepare(
-        'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
-      ).bind(appliedPromo.code).run().catch(() => {});
+      if (!appliedPromo.reservedInPlace) {
+        await db.prepare(
+          'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+        ).bind(appliedPromo.code).run().catch(() => {});
+      }
       await db.prepare(
         'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
       ).bind(appliedPromo.id, appliedPromo.code, orderId, appliedPromo.discountAmount, snapshot.subtotal, now).run().catch(() => {});

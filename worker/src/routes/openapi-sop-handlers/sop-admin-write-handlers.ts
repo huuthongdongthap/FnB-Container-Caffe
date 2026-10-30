@@ -16,7 +16,6 @@ import {
   closeViolation,
   confirmViolation,
   createTemplate,
-  findViolation,
   recordViolation,
   sopScope,
   updateTemplate,

@@ -19,7 +19,7 @@ describe('Breadcrumbs', () => {
   it('marks the last item as current page', () => {
     render(<Breadcrumbs items={crumbs} />);
     const nav = screen.getByRole('navigation', { name: /breadcrumb/i });
-    const links = within(nav).getAllByRole('link');
+    const _links = within(nav).getAllByRole('link');
     // The last crumb should not be a link (current page)
     const lastItem = within(nav).getByText('Đội ngũ');
     expect(lastItem.closest('a')).toBeNull();

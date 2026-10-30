@@ -46,7 +46,10 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
+    let user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
+    if (!user) {
+      user = await db.prepare('SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)').bind(body.email).first().catch(() => null);
+    }
     if (!user) {
       return c.json({ success: true, data: { success: true } });
     }
@@ -105,20 +108,59 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          FROM trusted_devices WHERE user_id = ? ORDER BY created_at DESC`
       ).bind(user.id).all();
     } catch {
-      return c.json({ success: true, data: [] });
+      devices = { results: [] };
+    }
+
+    const mapped = (devices.results || []).map((d: any) => ({
+      ...d,
+      isTrusted: d.is_trusted === 1,
+      platform: d.platform,
+      browser: d.browser,
+      lastUsedAt: d.last_used_at,
+      createdAt: d.created_at,
+      expiresAt: d.expires_at,
+    }));
+
+    if (user?.role && user.role !== 'customer') {
+      let staffRows: any[] = [];
+      try {
+        const res = await db.prepare(
+          `SELECT id, device_token, device_name, role, COALESCE(is_active, 1) AS is_active, last_login_at, created_at, updated_at
+           FROM staff_devices WHERE staff_id = ? ORDER BY created_at DESC`
+        ).bind(user.id).all();
+        staffRows = res.results || [];
+      } catch {
+        try {
+          const res = await db.prepare(
+            `SELECT id, device_token, device_name, role, last_login_at, created_at, updated_at
+             FROM staff_devices WHERE staff_id = ? ORDER BY created_at DESC`
+          ).bind(user.id).all();
+          staffRows = res.results || [];
+        } catch {
+          staffRows = [];
+        }
+      }
+      const seenIds = new Set(mapped.map((d: any) => String(d.id)));
+      for (const sd of staffRows) {
+        if (seenIds.has(String(sd.id))) continue;
+        mapped.push({
+          id: sd.id,
+          fingerprint: sd.device_token || sd.id,
+          name: sd.device_name || sd.id,
+          platform: 'mobile',
+          browser: null,
+          ip: null,
+          isTrusted: Number(sd.is_active ?? 1) === 1,
+          lastUsedAt: sd.last_login_at || sd.updated_at || sd.created_at || null,
+          createdAt: sd.created_at || null,
+          expiresAt: null,
+        });
+      }
     }
 
     return c.json({
       success: true,
-      data: (devices.results || []).map((d: any) => ({
-        ...d,
-        isTrusted: d.is_trusted === 1,
-        platform: d.platform,
-        browser: d.browser,
-        lastUsedAt: d.last_used_at,
-        createdAt: d.created_at,
-        expiresAt: d.expires_at,
-      })),
+      data: mapped,
     });
   });
 

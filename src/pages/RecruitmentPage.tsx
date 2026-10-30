@@ -14,11 +14,11 @@ import {
   Send,
   User,
   Calendar,
-  MessageSquare,
+  MessageSquare as _MessageSquare,
   Award,
   ChevronRight,
   ExternalLink,
-  Briefcase,
+  Briefcase as _Briefcase,
   Smile,
 } from 'lucide-react';
 

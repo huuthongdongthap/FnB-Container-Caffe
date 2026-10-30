@@ -10,7 +10,7 @@ interface EventCalendarProps {
   className?: string;
 }
 
-function formatDate(iso: string): string {
+function _formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString('vi-VN', {
     day: 'numeric',

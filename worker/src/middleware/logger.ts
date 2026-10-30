@@ -34,7 +34,7 @@ export interface Logger {
 
 // Field names whose values must never reach logs verbatim — secrets, auth
 // material, and customer PII. Values are replaced by a fixed marker.
-const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email)$/i;
+const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email|to|recipient)$/i;
 const REDACTED = '[REDACTED]';
 
 /**

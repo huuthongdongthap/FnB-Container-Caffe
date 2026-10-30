@@ -8,6 +8,7 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
   const tables: Record<string, any[]> = {
     promotions: [...(seedData.promotions || [])],
     promotion_redemptions: [...(seedData.promotion_redemptions || [])],
+    orders: [...(seedData.orders || [{ id: 'ord1', tenant_id: 'default', status: 'pending' }])],
   };
 
   function getTable(sql: string): string {
@@ -160,6 +161,21 @@ describe('POST /redeem', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/Invalid code/i);
+  });
+
+  test('returns 404 when order_id does not exist in orders', async () => {
+    env.AURA_DB = createMockD1({ promotions: [{ ...validPromo }], orders: [] });
+
+    const res = await router.request('/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: 'SAVE10', order_id: 'ord_missing', order_total: 100000 }),
+    }, env);
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/Order not found/i);
   });
 
   test('returns 400 on missing code', async () => {

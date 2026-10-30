@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { D1Database } from '@cloudflare/workers-types';
 import { validatePromotionSchema, redeemPromotionSchema } from '../../lib/validators';
+import { getTenantId } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import type { PromotionCode } from './types';
 
@@ -97,10 +98,15 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const isWelcome = upperCode === 'WELCOME';
 
     let promo = await db.prepare(
-      'SELECT * FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
-    ).bind(upperCode).first<PromotionCode>();
+      'SELECT * FROM promotions WHERE UPPER(code) = ?'
+    ).bind(upperCode).first<PromotionCode & { tenant_id?: string | null }>();
 
-    if (!promo && isWelcome) {
+    const tenantId = getTenantId(c);
+    if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
+      promo = null;
+    } else if (promo && Number(promo.is_active ?? 1) === 0) {
+      promo = null;
+    } else if (!promo && isWelcome) {
       promo = DEFAULT_WELCOME_PROMO;
     }
 
@@ -181,10 +187,15 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const isWelcome = upperCode === 'WELCOME';
 
     let promo = await db.prepare(
-      'SELECT * FROM promotions WHERE UPPER(code) = ? AND is_active = 1'
-    ).bind(upperCode).first<PromotionCode>();
+      'SELECT * FROM promotions WHERE UPPER(code) = ?'
+    ).bind(upperCode).first<PromotionCode & { tenant_id?: string | null }>();
 
-    if (!promo && isWelcome) {
+    const tenantId = getTenantId(c);
+    if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
+      promo = null;
+    } else if (promo && Number(promo.is_active ?? 1) === 0) {
+      promo = null;
+    } else if (!promo && isWelcome) {
       promo = DEFAULT_WELCOME_PROMO;
     }
 
@@ -245,6 +256,16 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
 
     if (!isWelcome && promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) {
       return c.json({ success: false, error: 'Usage limit reached' }, 400);
+    }
+
+    const orderRow = await db.prepare(
+      'SELECT id, tenant_id, status FROM orders WHERE id = ? LIMIT 1'
+    ).bind(data.order_id).first<{ id?: string; tenant_id?: string | null; status?: string }>().catch(() => null);
+    if (!orderRow || !orderRow.id) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+    if (orderRow.tenant_id && orderRow.tenant_id !== 'default' && orderRow.tenant_id !== tenantId) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
     }
 
     const rawDiscount = Math.round(data.order_total * percent / 100);

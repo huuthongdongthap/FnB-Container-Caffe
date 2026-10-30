@@ -9,8 +9,6 @@ import {
   SlugSchema,
   CategoryTypeEnum,
   DateTimeSchema,
-  MoneySchema,
-  ReferenceSchema,
 } from 'worker/src/schemas/common';
 
 /**
@@ -28,7 +26,7 @@ export const CategoryCreateSchema = z.object({
   slug: SlugSchema,
   type: CategoryTypeEnum,
   parentId: z.string().nullable().optional(),
-  translations: z.array(CategoryTranslationSchema).min(1).openapi({
+  translations: z.array(CategoryTranslationSchema).min(1).max(20).openapi({
     description: 'At least one translation required (vi or en)',
   }),
   displayOrder: z.number().int().nonnegative().default(0),
@@ -41,7 +39,7 @@ export const CategoryUpdateSchema = z.object({
   slug: SlugSchema.optional(),
   type: CategoryTypeEnum.optional(),
   parentId: z.string().nullable().optional(),
-  translations: z.array(CategoryTranslationSchema).min(1).optional(),
+  translations: z.array(CategoryTranslationSchema).min(1).max(20).optional(),
   displayOrder: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
   imageUrl: z.string().url().nullable().optional(),
@@ -172,7 +170,7 @@ export const CategoryRoutes = {
         content: {
           'application/json': {
             schema: z.object({
-              items: z.array(z.object({ id: z.string(), displayOrder: z.number().int().nonnegative() })),
+              items: z.array(z.object({ id: z.string(), displayOrder: z.number().int().nonnegative() })).max(200),
             }),
           },
         },

@@ -113,6 +113,7 @@ export interface ClaimGuestOrderInput {
   db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T = unknown>() => Promise<T | null>; run: () => Promise<unknown> } } };
   orderId: string;
   actor: ActorContext | null | undefined;
+  tenantId?: string;
 }
 
 export interface ClaimGuestOrderResult {
@@ -125,7 +126,7 @@ export interface ClaimGuestOrderResult {
 }
 
 export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<ClaimGuestOrderResult> {
-  const { db, orderId, actor } = input;
+  const { db, orderId, actor, tenantId } = input;
   if (!actor || !actor.id || (actor.role !== 'customer' && !PRIVILEGED_STAFF_ROLES.includes(actor.role || ''))) {
     return { success: false, error: 'Unauthorized: authentication required to claim an order', statusCode: 401 };
   }
@@ -138,6 +139,17 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
     return { success: false, error: 'Order not found', statusCode: 404 };
   }
 
+  if (tenantId && tenantId !== '*') {
+    try {
+      const tenantRow = await db.prepare('SELECT tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ tenant_id?: string | null }>();
+      if (tenantRow?.tenant_id && tenantRow.tenant_id !== tenantId) {
+        return { success: false, error: 'Order not found', statusCode: 404 };
+      }
+    } catch {
+      // Allow fallback when minimal schema omits tenant_id
+    }
+  }
+
   if (order.customer_id === actor.id) {
     return { success: true, idempotent: true, orderId, customerId: actor.id };
   }
@@ -147,7 +159,17 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
   }
 
   const now = new Date().toISOString();
-  await db.prepare('UPDATE orders SET customer_id = ?, updated_at = ? WHERE id = ?').bind(actor.id, now, orderId).run();
+  const updateResult = await db.prepare(
+    'UPDATE orders SET customer_id = ?, updated_at = ? WHERE id = ? AND customer_id IS NULL'
+  ).bind(actor.id, now, orderId).run() as { meta?: { changes?: number }; rowCount?: number } | undefined;
+  const changes = updateResult?.meta?.changes ?? updateResult?.rowCount ?? 1;
+  if (Number(changes) === 0) {
+    const latest = await db.prepare('SELECT customer_id FROM orders WHERE id = ?').bind(orderId).first<{ customer_id?: string | null }>();
+    if (latest?.customer_id === actor.id) {
+      return { success: true, idempotent: true, orderId, customerId: actor.id };
+    }
+    return { success: false, error: 'Order already belongs to another registered customer', statusCode: 409 };
+  }
 
   try {
     await db.prepare(

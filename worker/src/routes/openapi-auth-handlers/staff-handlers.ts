@@ -15,21 +15,47 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Only owners can register staff' }, 403);
     }
 
-    const existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
+    let existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
+    if (!existing) {
+      existing = await db.prepare('SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)').bind(body.email).first().catch(() => null);
+    }
     if (existing) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
+    const tenantId = user.tenantId || user.tenant_id || 'default';
+
+    try {
+      await db.prepare(
+        `INSERT INTO users (id, name, email, phone, password_hash, role, tenant_id, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id, body.name, body.email, body.phone || null, passwordHash,
+        body.role, tenantId, body.locale || 'vi', 'bronze', 0, 1, null, now, now
+      ).run();
+    } catch {
+      try {
+        await db.prepare(
+          `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id, body.name, body.email, body.phone || null, passwordHash,
+          body.role, body.locale || 'vi', 'bronze', 0, 1, null, now, now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO users (id, name, phone, password_hash, role, tenant_id, is_active, auth_version, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`
+        ).bind(id, body.name, body.phone || null, passwordHash, body.role, tenantId, now, now).run();
+      }
+    }
 
     await db.prepare(
-      `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, body.name, body.email, body.phone || null, passwordHash,
-      body.role, body.locale || 'vi', 'bronze', 0, 1, null, now, now
-    ).run();
+      `INSERT INTO staff_login_identities (email, staff_id) VALUES (lower(?), ?)
+       ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`
+    ).bind(body.email, id).run().catch(() => {});
 
     try {
       await db.prepare(
@@ -54,16 +80,23 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const staff = await db.prepare(
+    let staff = await db.prepare(
       'SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at FROM users WHERE id = ?'
-    ).bind(id).first();
+    ).bind(id).first().catch(() => null);
+    if (!staff) {
+      const minimal = await db.prepare(
+        'SELECT id, name, phone, role, is_active, created_at, updated_at FROM users WHERE id = ?'
+      ).bind(id).first();
+      staff = minimal ? { ...minimal, email: body.email, locale: body.locale || 'vi', avatar_url: null } : null;
+    }
 
     return c.json({
       success: true,
       data: {
         ...staff!,
+        email: staff!.email || body.email,
         role: staff!.role,
-        locale: staff!.locale,
+        locale: staff!.locale || body.locale || 'vi',
         isActive: staff!.is_active === 1,
         createdAt: staff!.created_at,
         updatedAt: staff!.updated_at,
@@ -110,17 +143,32 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const safeSort = allowedSorts[sort] || 'name';
     const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
     const orderClause = `${safeSort} ${safeDirection}`;
-    const rows = await db.prepare(
-      `SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at
-       FROM users ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all();
+    let rows: { results: Array<Record<string, unknown>> };
+    try {
+      rows = await db.prepare(
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at
+         FROM users ${whereClause}
+         ORDER BY ${orderClause}
+         LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all();
+    } catch {
+      const canonicalWhere = whereClause.replace(/\brole\b/g, 'u.role').replace(/\bis_active\b/g, 'u.is_active');
+      const canonicalOrder = safeSort === 'email' ? `s.email ${safeDirection}` : `u.${safeSort} ${safeDirection}`;
+      rows = await db.prepare(
+        `SELECT u.id, u.name, s.email AS email, u.phone, u.role, u.is_active, u.created_at, u.updated_at
+         FROM users u LEFT JOIN staff_login_identities s ON s.staff_id = u.id
+         ${canonicalWhere}
+         ORDER BY ${canonicalOrder}
+         LIMIT ? OFFSET ?`
+      ).bind(...params, limit, offset).all();
+    }
 
     const staff = rows.results.map((row: Record<string, unknown>) => ({
       ...row,
+      email: row.email || '',
       role: row.role,
-      locale: row.locale,
+      locale: row.locale || 'vi',
+      avatar_url: row.avatar_url ?? null,
       isActive: row.is_active === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -150,18 +198,30 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const refreshToken = generateToken();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
+    try {
+      await db.prepare(
+        `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id, body.name, body.email, body.phone || null, passwordHash,
+        'owner', body.locale || 'vi', 'diamond', 0, 1, null, now, now
+      ).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO users (id, name, phone, password_hash, role, tenant_id, is_active, auth_version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'owner', 'default', 1, 1, ?, ?)`
+      ).bind(id, body.name, body.phone || null, passwordHash, now, now).run();
+    }
+
     await db.prepare(
-      `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, body.name, body.email, body.phone || null, passwordHash,
-      'owner', body.locale || 'vi', 'diamond', 0, 1, null, now, now
-    ).run();
+      `INSERT INTO staff_login_identities (email, staff_id) VALUES (lower(?), ?)
+       ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`
+    ).bind(body.email, id).run().catch(() => {});
 
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, 1, null, 'Bootstrap Device', now, now).run();
+    ).bind(sessionId, id, accessToken, refreshToken, expiresAt, 1, null, 'Bootstrap Device', now, now).run().catch(() => {});
 
     try {
       await db.prepare(
@@ -193,14 +253,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         user: {
           id: owner!.id,
           name: owner!.name,
-          email: owner!.email,
+          email: owner!.email || body.email,
           phone: owner!.phone,
           role: owner!.role,
-          locale: owner!.locale,
-          loyaltyTier: owner!.loyalty_tier,
-          loyaltyPoints: owner!.loyalty_points,
-          emailVerified: owner!.email_verified === 1,
-          avatarUrl: owner!.avatar_url,
+          locale: owner!.locale || body.locale || 'vi',
+          loyaltyTier: owner!.loyalty_tier || owner!.tier || 'diamond',
+          loyaltyPoints: owner!.loyalty_points ?? owner!.total_points ?? 0,
+          emailVerified: owner!.email_verified !== undefined ? owner!.email_verified === 1 : true,
+          avatarUrl: owner!.avatar_url ?? null,
           createdAt: owner!.created_at,
           updatedAt: owner!.updated_at,
         },

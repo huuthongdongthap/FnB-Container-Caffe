@@ -13,7 +13,6 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { KVNamespace } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
 import { getCustomerAccount, type CustomerAccount } from './get-customer-account';
-import { loadPolicy, tierByName } from './loyalty-policy';
 import {
   computeFrequencyBand,
   resolveBandPolicy,
@@ -44,15 +43,6 @@ export interface Customer360Options {
   /** Max orders to scan for preferences (default 100). */
   orderLimit?: number;
 }
-
-const EMPTY_PREFERENCES: CustomerPreferences = {
-  favouriteCategories: [],
-  favouriteItems: [],
-  avgOrderCents: 0,
-  preferredChannel: null,
-  orderCount: 0,
-  totalSpentCents: 0,
-};
 
 const EMPTY_EVENTS: AggregateResult = { customerId: '', events: [], total: 0 };
 

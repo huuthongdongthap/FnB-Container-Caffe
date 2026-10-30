@@ -46,7 +46,7 @@ vi.mock('lucide-react', () => ({
   MapPin: () => null,
 }));
 
-const PARTIAL_DATA = {
+const _PARTIAL_DATA = {
   navLinks: [{ id: 'home', label: 'Home', href: '#', isActive: true }],
   heroTag: 'Premium',
   heroTitle: 'AURA CAFE —',

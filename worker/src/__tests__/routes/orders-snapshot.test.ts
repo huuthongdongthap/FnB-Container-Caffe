@@ -53,7 +53,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
         customer_phone: '0912345678',
         customer_email: 'test@example.com',
         customer_address: '123 Le Loi, Sa Dec',
-        payment_method: 'cod',
+        payment_method: 'payos',
         order_type: 'delivery',
         shipping_fee: 5000,
         discount: 0,

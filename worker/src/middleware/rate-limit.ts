@@ -110,6 +110,27 @@ export const CLIENT_ERROR_RATE_LIMIT: RateLimitConfig = {
   errorMessage: 'Too many error reports. Please try again later.'
 };
 
+const rateLimitLocks = new Map<string, Promise<unknown>>();
+
+async function withKeyLock<T>(lockKey: string, fn: () => Promise<T>): Promise<T> {
+  const prev = rateLimitLocks.get(lockKey) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chained = prev.then(() => current);
+  rateLimitLocks.set(lockKey, chained);
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (rateLimitLocks.get(lockKey) === chained) {
+      rateLimitLocks.delete(lockKey);
+    }
+  }
+}
+
 export async function checkRateLimit(
   c: Context<{ Bindings: Env }>,
   config: RateLimitConfig
@@ -122,18 +143,26 @@ export async function checkRateLimit(
   if (!isProd && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
     return true;
   }
-  const isTestBypass = !isProd && c.req.header('x-playwright-test') === 'true';
+  const envRecord = c.env as Record<string, unknown>;
+  const allowTestHarness = !isProd && (
+    envRecord?.ALLOW_PLAYWRIGHT_TEST_HEADER === 'true' ||
+    envRecord?.ENVIRONMENT === 'development' ||
+    envRecord?.ENVIRONMENT === 'test'
+  );
+  const isTestBypass = allowTestHarness && c.req.header('x-playwright-test') === 'true';
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
   if (!isProd && (ip === '127.0.0.1' || ip === 'localhost' || isTestBypass)) {
     return true;
   }
   const key = buildRateLimitKey(c, config);
-  const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= config.max) {
-    return false;
-  }
-  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: config.windowSec });
-  return true;
+  return withKeyLock(key, async () => {
+    const count = Number(await c.env.AUTH_KV.get(key) || 0);
+    if (count >= config.max) {
+      return false;
+    }
+    await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: config.windowSec });
+    return true;
+  });
 }
 
 export function rateLimitMiddleware(config: RateLimitConfig) {
@@ -162,10 +191,12 @@ export async function throttleByKey(
   max: number,
   windowSec: number
 ): Promise<boolean> {
-  const cur = parseInt(await kv.get(key) || '0', 10);
-  if (cur >= max) {
-    return false;
-  }
-  await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
-  return true;
+  return withKeyLock(key, async () => {
+    const cur = parseInt(await kv.get(key) || '0', 10);
+    if (cur >= max) {
+      return false;
+    }
+    await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
+    return true;
+  });
 }

@@ -102,7 +102,19 @@ export async function processCustomerQuery(
              LIMIT 1`
           ).bind(tbl, tbl).first<{ id: string; total: number; status: string }>();
         } catch {
-          activeOrder = null;
+          try {
+            activeOrder = await db.prepare(
+              `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
+               FROM orders o
+               LEFT JOIN cafe_tables t ON o.table_id = t.id
+               WHERE (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
+                 AND o.status NOT IN ('completed', 'cancelled')
+               ORDER BY o.created_at DESC
+               LIMIT 1`
+            ).bind(String(tbl), tbl).first<{ id: string; total: number; status: string }>();
+          } catch {
+            activeOrder = null;
+          }
         }
       }
       if (activeOrder) {

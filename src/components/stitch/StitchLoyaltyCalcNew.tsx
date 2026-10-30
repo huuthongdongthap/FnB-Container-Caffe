@@ -39,7 +39,7 @@ export function StitchLoyaltyCalcNew({
   tierLabels = DEFAULT_TIER_LABELS,
   benefits = defaultBenefits,
 }: Readonly<StitchLoyaltyCalcNewProps>) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const { spending, points, percentage, currentTierIndex, nextTierIndex, pointsToNext, handleSpendingChange } =
     useLoyaltyCalc(pointsPerDollar, tierMilestones);
 

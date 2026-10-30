@@ -138,7 +138,7 @@ describe('Order Persistence Tamper & Schema Validation', () => {
         customer_phone: '0904445566',
         fulfillment_type: 'DELIVERY',
         delivery_address: '123 Đường Hoa, Sa Đéc',
-        payment_method: 'cod',
+        payment_method: 'payos',
         items: [{ name: 'Trà Sen', qty: 2, price: 30000, product_id: 'P_VALID' }],
       }),
     }), env);

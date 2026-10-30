@@ -48,7 +48,7 @@ export function CartSidebar({
   guestLabel,
   orderNumber,
   cartOpen,
-  setCartOpen,
+  setCartOpen: _setCartOpen,
   onCompleteOrder,
   onPayment,
   customer = null,

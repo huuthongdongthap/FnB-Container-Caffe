@@ -101,6 +101,7 @@ describe('update-order', () => {
     it('allows valid transition: confirmed → preparing', async() => {
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'confirmed' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -114,6 +115,22 @@ describe('update-order', () => {
 
       const result = await updateOrder(req, env, 'ORD_1', 'staff');
       expect(result.status).toBe(200);
+    });
+
+    it('blocks confirmed → preparing for unpaid delivery orders with 409', async() => {
+      const db = makeDB([
+        makeChain(undefined, [{ id: 'ORD_DELIV_1', status: 'confirmed' }]),
+        makeChain({ order_type: 'delivery', payment_status: 'unpaid' }),
+      ]);
+      const env = makeEnv(db);
+
+      const body = new TextEncoder().encode(JSON.stringify({ status: 'preparing' }));
+      const req = new Request('https://test.aura/api/orders/ORD_DELIV_1', {
+        method: 'PUT', body, headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await updateOrder(req, env, 'ORD_DELIV_1', 'staff');
+      expect(result.status).toBe(409);
     });
 
     it('allows valid transition: preparing → ready', async() => {

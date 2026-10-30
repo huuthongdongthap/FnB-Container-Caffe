@@ -2,7 +2,7 @@
  * Email Utility — SendGrid HTTP API wrapper for Cloudflare Workers
  */
 
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from '../middleware/logger';
 
 const log = createLogger({ route: 'email.send' });
 

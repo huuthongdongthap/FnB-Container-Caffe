@@ -1,6 +1,6 @@
 import React from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { Card, CardBody } from '@/components/ui/card';
+import { Card, CardBody as _CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';

@@ -1,5 +1,5 @@
 import { forwardRef, type HTMLAttributes } from 'react';
-import { MD3Card, type MD3CardProps } from '@/components/md3/md3-card';
+import { MD3Card, type MD3CardProps as _MD3CardProps } from '@/components/md3/md3-card';
 
 /**
  * CardAdapter — backward-compatible wrapper around MD3Card.

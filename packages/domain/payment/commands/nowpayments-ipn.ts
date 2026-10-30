@@ -2,7 +2,6 @@
 
 import { jsonResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
-import type { Env } from 'worker/src/types/env';
 
 const log = createLogger({ route: 'nowpayments-ipn' });
 
@@ -45,9 +44,14 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
 
     // Signature verification
     const isProd = env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
+    const allowUnsignedDev = !isProd && (
+      env.ALLOW_UNSIGNED_NOWPAYMENTS_IPN === 'true' ||
+      env.ENVIRONMENT === 'development' ||
+      env.ENVIRONMENT === 'test'
+    );
     if (!secret) {
-      if (isProd) {
-        log.error('NOWPAYMENTS_IPN_SECRET not configured in production — rejecting IPN');
+      if (!allowUnsignedDev) {
+        log.error('NOWPAYMENTS_IPN_SECRET not configured — rejecting IPN');
         return new Response('Server configuration error', { status: 500 });
       }
       log.warn('NOWPAYMENTS_IPN_SECRET not configured — accepting without verification (dev mode)');

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@/test-utils';
+import { render, screen, fireEvent, waitFor as _waitFor } from '@/test-utils';
 import { CheckinForm } from '@/components/checkin/CheckinForm';
 import { PhotoUpload } from '@/components/checkin/PhotoUpload';
 import { ApprovalStatus } from '@/components/checkin/ApprovalStatus';

@@ -1,6 +1,6 @@
 /* ─── Loading skeleton ─── */
 
-export function GroupedSalesSkeleton({ title }: { title: string }) {
+export function GroupedSalesSkeleton({ title: _title }: { title: string }) {
   return (
     <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-5">
       <div className="h-4 w-32 bg-[var(--aura-noir-bright)] rounded animate-shimmer mb-4" />

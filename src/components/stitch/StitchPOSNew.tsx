@@ -16,7 +16,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 import type { StitchPOSNewProps, POSNewCartItem } from './StitchPOSNew-types';
 import { DEFAULT_MENU_ITEMS, DEFAULT_ADDONS, MENU_CATEGORIES } from './StitchPOSNew-types';
-import type { POSCustomer } from '@/hooks/use-pos-customer';
+import type { POSCustomer as _POSCustomer } from '@/hooks/use-pos-customer';
 import { POSHeader } from './StitchPOSNew-header';
 import { MenuSection } from './StitchPOSNew-menu-section';
 import { CartSidebar } from './StitchPOSNew-cart-sidebar';

@@ -22,7 +22,7 @@ export function CheckoutForm({
   onSubmit,
   onFormChange,
 }: CheckoutFormProps) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const [form, setForm] = useState<CheckoutFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
 

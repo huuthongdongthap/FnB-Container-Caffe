@@ -17,7 +17,7 @@ import {
 import { WEEK_DAYS, TIER_BENEFIT_KEYS, DEFAULT_CHECKIN, REWARD_IMAGES } from './loyalty-constants';
 import { getDefaultLoyaltyData } from '@/components/stitch/loyalty-default-data';
 import { LoyaltyHeader } from './loyalty-header';
-import type { Reward, PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';
+import type { Reward, PointsHistoryEntry as _PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';
 
 /* ── Re-exports for backward compatibility ──────────────────────── */
 export type { Reward, PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';

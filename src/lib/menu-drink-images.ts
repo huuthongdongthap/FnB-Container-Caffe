@@ -98,8 +98,9 @@ export function resolveMenuDrinkImage(id: string, imageUrl?: string | null): str
 }
 
 export function resolveMenuDrinkPackshots(id: string, imageUrl?: string | null) {
-  return resolveMenuDrinkImage(id, imageUrl) === MENU_DRINK_IMAGES[id]
-    ? MENU_DRINK_PACKSHOTS[id]
+  const canonicalId = ID_ALIASES[id] ?? id;
+  return resolveMenuDrinkImage(id, imageUrl) === MENU_DRINK_IMAGES[canonicalId]
+    ? MENU_DRINK_PACKSHOTS[canonicalId]
     : undefined;
 }
 

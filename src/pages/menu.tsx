@@ -92,6 +92,18 @@ export function MenuPage() {
     return flattenMenu(menu).map(transformToStitchItem);
   }, [menu]);
 
+  const recommendationCatalogItems = useMemo(
+    () =>
+      stitchItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: parseInt(item.price.replace(/\D/g, ''), 10) || 0,
+        image_url: item.imageSrc || undefined,
+        tags: item.tags,
+      })),
+    [stitchItems],
+  );
+
   const isCatalogUnavailable = Boolean(error) || stitchItems.length === 0;
 
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
@@ -185,6 +197,11 @@ export function MenuPage() {
           <div className="mt-12">
             <RecommendationSection
               excludeIds={new Set(cartItems.map((i) => i.productId || i.id))}
+              catalogItems={recommendationCatalogItems}
+              onAddItem={(itemId) => {
+                const target = stitchItems.find((item) => item.id === itemId);
+                if (target) handleAddToCart(target);
+              }}
             />
           </div>
         </StitchMenuNew>

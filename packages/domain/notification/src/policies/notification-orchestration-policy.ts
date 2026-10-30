@@ -6,7 +6,7 @@
 
 import type {
   ChannelType, ProviderType, DomainNotificationEvent, NotificationIntent,
-  NotificationResult, ProviderCallback, RecipientInfo, DeliveryStatus,
+  NotificationResult, ProviderCallback, RecipientInfo,
 } from '../model/notification-types';
 import {
   evaluateChannelEligibility, sanitizeNotificationPayload, validateTemplatePayload,

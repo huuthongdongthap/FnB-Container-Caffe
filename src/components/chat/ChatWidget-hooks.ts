@@ -11,7 +11,7 @@ export function useChatWidget() {
   const [showForm, setShowForm] = useState(!name || !phone);
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
-  const { sendMessage, sendState, messages, fetchMessages } = useChat();
+  const { sendMessage, sendState, messages, fetchMessages: _fetchMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

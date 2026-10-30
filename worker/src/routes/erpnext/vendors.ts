@@ -29,25 +29,26 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
         return c.json({ success: false, error: 'Database not available' }, 503);
       }
 
-      const limit = parseInt(c.req.query('limit') || '100', 10);
+      const parsedLimit = parseInt(c.req.query('limit') || '100', 10);
+      const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1), 500);
 
       let results: any[] = [];
       try {
         const res = await db
           .prepare(
-            'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
+            'SELECT id, name, tax_id, address, phone, is_active, created_at, updated_at FROM suppliers ORDER BY created_at DESC LIMIT ?'
           )
           .bind(limit)
-          .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
+          .all();
         results = res.results || [];
       } catch {
         try {
           const res = await db
             .prepare(
-              'SELECT id, name, tax_id, address, phone, is_active, created_at, updated_at FROM suppliers ORDER BY created_at DESC LIMIT ?'
+              'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
             )
             .bind(limit)
-            .all();
+            .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
           results = res.results || [];
         } catch {
           results = [];

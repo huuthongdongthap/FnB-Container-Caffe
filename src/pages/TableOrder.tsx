@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useMemo as _useMemo, type ReactNode } from 'react';
 import { useSearchParams, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -15,6 +15,7 @@ import {
 import { useHandleViewCart } from './TableOrder-hooks';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
+import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
 import { UtensilsCrossed, ArrowRight, MapPin, Coffee, Sparkles } from 'lucide-react';
 
 export type { CartItem } from '@/components/stitch';
@@ -32,7 +33,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     category: 'coffee',
     badge: 'Truyền Thống',
     featured: true,
-    imageSrc: '/photos/IMG_6593.webp',
+    imageSrc: resolveMenuDrinkImage('tc001') || '/photos/IMG_6593.webp',
     imageAlt: 'Cà phê đen nguyên chất AURA CAFE',
   },
   {
@@ -44,7 +45,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     category: 'coffee',
     badge: 'Bán Chạy',
     featured: true,
-    imageSrc: '/photos/IMG_6581.webp',
+    imageSrc: resolveMenuDrinkImage('tc002') || '/photos/IMG_6581.webp',
     imageAlt: 'Cà phê sữa đá pha máy AURA CAFE',
   },
   {
@@ -56,7 +57,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     category: 'signature',
     badge: 'Đặc Sản',
     featured: true,
-    imageSrc: '/photos/IMG_6554-frame.webp',
+    imageSrc: resolveMenuDrinkImage('tc003') || '/photos/IMG_6554-frame.webp',
     imageAlt: 'Cà phê muối AURA CAFE',
   },
   {
@@ -66,7 +67,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     price: 28000,
     priceLabel: '28.000₫',
     category: 'coffee',
-    imageSrc: '/photos/IMG_6555-frame.webp',
+    imageSrc: resolveMenuDrinkImage('tc004') || '/photos/IMG_6555-frame.webp',
     imageAlt: 'Bạc xỉu đá thơm béo',
   },
   {
@@ -76,7 +77,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     price: 35000,
     priceLabel: '35.000₫',
     category: 'coffee',
-    imageSrc: '/photos/IMG_6564.webp',
+    imageSrc: resolveMenuDrinkImage('hc003') || '/photos/IMG_6564.webp',
     imageAlt: 'Ly Cappuccino tạo hình nghệ thuật',
   },
   {
@@ -88,7 +89,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     category: 'signature',
     badge: 'Signature',
     featured: true,
-    imageSrc: '/photos/IMG_6693.webp',
+    imageSrc: resolveMenuDrinkImage('fp004') || '/photos/IMG_6693.webp',
     imageAlt: 'Cà phê dừa đá xay độc bản',
   },
   {
@@ -100,7 +101,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     category: 'tea',
     badge: 'Phổ Biến',
     featured: true,
-    imageSrc: '/photos/IMG_6556-frame.webp',
+    imageSrc: resolveMenuDrinkImage('te006') || '/photos/IMG_6556-frame.webp',
     imageAlt: 'Ly trà đào thanh mát',
   },
   {
@@ -111,7 +112,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     priceLabel: '35.000₫',
     category: 'signature',
     badge: 'Bán Chạy',
-    imageSrc: '/photos/IMG_6699.webp',
+    imageSrc: resolveMenuDrinkImage('sm002') || '/photos/IMG_6699.webp',
     imageAlt: 'Sinh tố bơ tươi sánh mịn',
   },
   {
@@ -121,7 +122,7 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     price: 25000,
     priceLabel: '25.000₫',
     category: 'signature',
-    imageSrc: '/photos/IMG_6696.webp',
+    imageSrc: resolveMenuDrinkImage('sd001') || '/photos/IMG_6696.webp',
     imageAlt: 'Ly soda màu xanh đại dương mát lạnh',
   },
   {
@@ -131,18 +132,17 @@ const AURA_VI_ORDER_ITEMS: MenuItem[] = [
     price: 23000,
     priceLabel: '23.000₫',
     category: 'tea',
-    imageSrc: '/photos/IMG_6565.webp',
+    imageSrc: resolveMenuDrinkImage('jc006') || '/photos/IMG_6565.webp',
     imageAlt: 'Nước cam vắt tươi nguyên chất',
   },
 ];
 
-/* 5 Authentic Container Zones */
+/* 4 Authentic Container Zones (Canonical Tables 01–12) */
 const ZONES_FOR_TABLES = [
   { id: 1, name: 'Quầy Bar Container (Tầng trệt)', tables: ['01', '02', '03', '04'] },
-  { id: 2, name: 'Lounge Thủy Mộc (Bàn lớn)', tables: ['05', '06', '07', '08'] },
-  { id: 3, name: 'Sân Thượng Rooftop (Tầng 2)', tables: ['09', '10', '11', '12'] },
-  { id: 4, name: 'Cabin Yên Tĩnh (Làm việc)', tables: ['13', '14', '15', '16'] },
-  { id: 5, name: 'Khu Sân Vườn Ngoài Trời', tables: ['17', '18', '19', '20'] },
+  { id: 2, name: 'Lounge Thủy Mộc (Trong nhà)', tables: ['05', '06', '07', '08'] },
+  { id: 3, name: 'Sân Thượng Rooftop (Tầng 2)', tables: ['09', '10'] },
+  { id: 4, name: 'Khu Sân Vườn Ngoài Trời', tables: ['11', '12'] },
 ];
 
 export function TableOrder(): ReactNode {

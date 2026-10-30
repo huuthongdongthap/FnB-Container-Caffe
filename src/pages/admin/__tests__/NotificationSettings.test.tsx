@@ -30,7 +30,7 @@ vi.mock('@/lib/api-client', () => {
 });
 
 import NotificationSettingsPage from '@/pages/admin/NotificationSettings';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch as _apiFetch } from '@/lib/api-client';
 
 describe('NotificationSettingsPage', () => {
   beforeEach(() => {

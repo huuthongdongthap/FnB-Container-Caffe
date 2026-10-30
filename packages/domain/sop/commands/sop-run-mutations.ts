@@ -14,9 +14,6 @@ import {
   type CheckItemInput,
   type CompleteRunInput,
   type SopRun,
-  type SopRunItem,
-  type SopTemplate,
-  type SopTemplateItem,
 } from '../index';
 import { assertActorOrManager, assertId, SopAccessError, type SopScope } from './sop-access';
 import { sopDatabase } from './sop-violation-columns';

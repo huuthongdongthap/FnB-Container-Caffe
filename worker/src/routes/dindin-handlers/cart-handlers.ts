@@ -14,16 +14,16 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/carts', async (c) => {
     let carts: Array<Record<string, unknown>> = [];
     try {
-      let results: Array<{ session_id: string; cart: string; updated_at?: string }> | undefined;
+      let results: Array<{ session_id: string; cart: string; raw?: string; updated_at?: string }> | undefined;
       try {
         const res = await c.env.AURA_DB.prepare(
-          'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
-        ).all<{ session_id: string; cart: string; updated_at?: string }>();
+          'SELECT session_id, COALESCE(raw, cart) as cart, raw, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
+        ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string }>();
         results = res.results;
       } catch {
         const res = await c.env.AURA_DB.prepare(
-          'SELECT session_id, COALESCE(cart, raw) as cart, raw, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
-        ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string }>();
+          'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
+        ).all<{ session_id: string; cart: string; updated_at?: string }>();
         results = res.results;
       }
       for (const row of results || []) {

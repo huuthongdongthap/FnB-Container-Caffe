@@ -23,7 +23,6 @@ import {
   type SopTemplate,
   type SopViolation,
 } from '@aura/domain-sop';
-import { SopRunProgressSchema } from '../../schemas/sop';
 import type { SopAdminRoutes } from '../../schemas/sop-routes';
 
 function progressOf(run: SopRun) {

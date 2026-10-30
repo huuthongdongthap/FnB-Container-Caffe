@@ -9,6 +9,8 @@ export interface OfflineOrderRecord {
   orderData: object;
   createdAt: number;
   synced: boolean;
+  tenantId?: string | null;
+  userId?: string | null;
   attemptCount?: number;
   lastAttemptAt?: number;
   [key: string]: unknown;
@@ -19,6 +21,10 @@ const STORE_NAME = 'offlineOrders';
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
     const request = indexedDB.open(DB_NAME, 2);
 
     request.onerror = () => reject(request.error ?? new Error('IDB open error'));
@@ -41,20 +47,34 @@ export class OfflineDB {
     return `local_${ts}_${rand}`;
   }
 
-  /* Persist a serialized order payload. Returns the assigned localId. */
-  async saveOrder(orderData: object): Promise<string> {
+  /* Persist a serialized order payload bound to the active session/tenant. Returns the assigned localId. */
+  async saveOrder(
+    orderData: object,
+    context?: { tenantId?: string | null; userId?: string | null }
+  ): Promise<string> {
     const db = await openDB();
     const localId = OfflineDB.generateId();
+    const tenantId = context?.tenantId ?? (orderData as { tenant_id?: string | null })?.tenant_id ?? null;
+    const userId = context?.userId ?? (orderData as { customer_id?: string | null })?.customer_id ?? null;
     return new Promise<string>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).add({ localId, orderData, createdAt: Date.now(), synced: false });
+      tx.objectStore(STORE_NAME).add({
+        localId,
+        orderData,
+        tenantId,
+        userId,
+        createdAt: Date.now(),
+        synced: false,
+      });
       tx.oncomplete = () => resolve(localId);
       tx.onerror = () => reject(tx.error);
     });
   }
 
-  /* Return every queued (not yet synced) order. */
-  async getPendingOrders(): Promise<OfflineOrderRecord[]> {
+  /* Return every queued (not yet synced) order matching the active session/tenant context. */
+  async getPendingOrders(
+    context?: { tenantId?: string | null; userId?: string | null }
+  ): Promise<OfflineOrderRecord[]> {
     const db = await openDB();
     const preservedKeys = new Set(['menu', '_meta_categories']);
     return new Promise<OfflineOrderRecord[]>((resolve, reject) => {
@@ -62,11 +82,18 @@ export class OfflineDB {
       const req = tx.objectStore(STORE_NAME).getAll();
       req.onsuccess = () => {
         const records = (req.result as OfflineOrderRecord[])
-          .filter(r => !preservedKeys.has(r.localId) && !r.localId?.startsWith('_') && !r.synced)
+          .filter(r => {
+            if (preservedKeys.has(r.localId) || r.localId?.startsWith('_') || r.synced) return false;
+            if (context?.tenantId && r.tenantId && r.tenantId !== context.tenantId) return false;
+            if (context?.userId && r.userId && r.userId !== context.userId) return false;
+            return true;
+          })
           .map(r => ({
             ...(typeof r.orderData === 'object' && r.orderData !== null ? r.orderData : {}),
             localId: r.localId,
             orderData: r.orderData,
+            tenantId: r.tenantId ?? null,
+            userId: r.userId ?? null,
             createdAt: r.createdAt,
             synced: r.synced,
           }));

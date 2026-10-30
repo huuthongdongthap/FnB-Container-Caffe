@@ -8,7 +8,7 @@ import {
   CHANNEL_LABELS,
 } from './CampaignsManager-constants';
 import type {
-  CampaignTrigger,
+  CampaignTrigger as _CampaignTrigger,
   CampaignChannel,
   CampaignConfig,
 } from '@/hooks/use-campaigns-admin';

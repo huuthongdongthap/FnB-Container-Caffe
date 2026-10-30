@@ -19,7 +19,6 @@ import {
   sopForShift,
   sopScope,
   storeHour,
-  SOP_ROLES,
 } from '@aura/domain-sop';
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';

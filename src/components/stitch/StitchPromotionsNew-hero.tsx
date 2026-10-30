@@ -1,7 +1,7 @@
 /**
  * Hero promotion section with countdown timer for the AURA CAFE promotions page.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback as _useCallback } from 'react';
 import { Clock } from 'lucide-react';
 import type { PromoOffer } from './StitchPromotionsNew-types';
 import { HeroGlassCard } from './StitchPromotionsNew-glass-card';

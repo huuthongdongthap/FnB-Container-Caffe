@@ -25,7 +25,7 @@ interface LoginResponse {
   message?: string;
 }
 
-interface MobileLoginProps {
+interface _MobileLoginProps {
   
 }
 

@@ -19,7 +19,7 @@ import { HelmetHead } from '@/components/seo/HelmetHead';
 import { cn } from '@/lib/cn';
 import { Smartphone, ChevronRight } from 'lucide-react';
 
-import { glassCardClasses, keyframeStyles } from './StitchCheckinNew-constants';
+import { glassCardClasses as _glassCardClasses, keyframeStyles } from './StitchCheckinNew-constants';
 import { useCheckinForm } from './StitchCheckinNew-hooks';
 import { TopAppBar } from './StitchCheckinNew-top-app-bar';
 import { HeroCard } from './StitchCheckinNew-hero-card';

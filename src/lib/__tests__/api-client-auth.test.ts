@@ -8,14 +8,14 @@ vi.mock('@/hooks/stores/use-auth-store', () => ({
   },
 }));
 
-const { useAuthStore: mockAuthStore } = vi.mocked(
+const { useAuthStore: _mockAuthStore } = vi.mocked(
   await vi.importActual<typeof import('@/hooks/stores/use-auth-store')>('@/hooks/stores/use-auth-store'),
 );
 
 // Can't use top-level await in module scope. Use dynamic mock instead.
 // Actually, vi.mock hoists. Let's use a simpler approach.
 
-function setMockToken(token: string | null) {
+function _setMockToken(_token: string | null) {
   // We need to intercept apiFetch's call to use-auth-store.getState()
   // Since api-client imports useAuthStore at module level, we mock at module level
 }

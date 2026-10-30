@@ -29,6 +29,6 @@ export const logger = {
 
   debug(msg: string, ctx?: LogContext): void {
     if (isProduction()) return;
-    console.debug(formatMessage('DEBUG', msg, ctx));
+    console.info(formatMessage('DEBUG', msg, ctx));
   },
 };

@@ -3,7 +3,7 @@
  * Enforces customer consent, channel eligibility, template integrity, and zero secret leakage.
  */
 
-import type { ChannelType, RecipientInfo, NotificationIntent } from '../model/notification-types';
+import type { ChannelType, RecipientInfo } from '../model/notification-types';
 
 const SECRET_KEY_PATTERN = /password|secret|token|api_key|auth|bearer|cvv|pan|card_number/i;
 

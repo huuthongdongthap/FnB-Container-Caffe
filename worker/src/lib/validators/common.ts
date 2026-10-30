@@ -29,7 +29,7 @@ export const orderItemSchema = z.object({
   qty: z.number().int().positive().optional(),
   quantity: z.number().int().positive().optional(),
   price: z.number().nonnegative().optional(),
-  modifiers: z.array(z.unknown()).optional(),
+  modifiers: z.array(z.unknown()).max(20).optional(),
   notes: z.string().max(500).optional(),
 });
 

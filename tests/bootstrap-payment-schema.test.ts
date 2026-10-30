@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 const schema = readFileSync(new URL('../worker/schema.sql', import.meta.url), 'utf8');
+const dbRootSchema = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
 const databases: DatabaseSync[] = [];
-const freshDatabase = () => {
+const freshDatabase = (sql = schema) => {
   const db = new DatabaseSync(':memory:');
   databases.push(db);
-  db.exec(schema);
+  db.exec(sql);
   return db;
 };
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -43,5 +44,24 @@ describe('fresh Worker bootstrap payment and operational schema', () => {
     insert.run('local-payment-1', '123456');
     expect(() => insert.run('local-payment-2', '123456')).toThrow(/UNIQUE/);
     expect(() => { insert.run('cod-1', null); insert.run('cod-2', ''); insert.run('cod-3', ''); }).not.toThrow();
+  });
+
+  it('maintains 124-table canonical parity between worker/schema.sql and db/schema.sql', () => {
+    const workerDb = freshDatabase(schema);
+    const rootDb = freshDatabase(dbRootSchema);
+    const listTables = (db: DatabaseSync) =>
+      db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        .all()
+        .map(row => String(row.name));
+    const workerTables = listTables(workerDb);
+    const rootTables = listTables(rootDb);
+    expect(workerTables.length).toBeGreaterThanOrEqual(124);
+    expect(rootTables).toEqual(workerTables);
+    expect(rootDb.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    for (const table of workerTables) {
+      const workerCols = workerDb.prepare(`PRAGMA table_info(${table})`).all().map(r => String(r.name)).sort();
+      const rootCols = rootDb.prepare(`PRAGMA table_info(${table})`).all().map(r => String(r.name)).sort();
+      expect(rootCols, `columns mismatch for ${table}`).toEqual(workerCols);
+    }
   });
 });

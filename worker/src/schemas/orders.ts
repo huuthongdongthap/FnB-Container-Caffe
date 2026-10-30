@@ -80,7 +80,7 @@ export const OrderChannelEnum = z.enum(['dine_in', 'takeaway', 'online', 'delive
 export const OrderItemInputSchema = z.object({
   menuItemId: z.string().min(1).openapi({ example: 'prod_cafe_den' }),
   quantity: z.number().int().positive().openapi({ example: 2 }),
-  modifiers: z.array(z.string()).optional().openapi({ description: 'Selected modifier choice IDs' }),
+  modifiers: z.array(z.string()).max(20).optional().openapi({ description: 'Selected modifier choice IDs' }),
   notes: z.string().max(500).optional(),
 }).openapi('OrderItemInput');
 
@@ -88,7 +88,7 @@ export const OrderCreateSchema = z.object({
   tableId: z.string().min(1).optional(),
   locationId: z.string().min(1),
   customer: OrderCustomerSchema.optional(),
-  items: z.array(OrderItemInputSchema).min(1),
+  items: z.array(OrderItemInputSchema).min(1).max(100),
   channel: OrderChannelEnum.default('dine_in'),
   notes: z.string().max(1000).optional(),
   paymentMethod: SupportedPaymentMethodEnum.optional(),

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect as _useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCheckinStore } from '@/hooks/stores/use-checkin-store';
 import { CheckinForm } from '@/components/checkin/CheckinForm';
-import { ApprovalStatus } from '@/components/checkin/ApprovalStatus';
+import { ApprovalStatus as _ApprovalStatus } from '@/components/checkin/ApprovalStatus';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 import { PartyPopper } from 'lucide-react';

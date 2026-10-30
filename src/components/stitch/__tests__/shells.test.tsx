@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import CustomerShell from '../CustomerShell';
 import OpsShell from '../OpsShell';
 import AdminShell from '../AdminShell';
-import { getShellConfig, hasM3NavBar, MD3_SHELL_CONFIG } from '../shell-config';
+import { getShellConfig, hasM3NavBar, MD3_SHELL_CONFIG as _MD3_SHELL_CONFIG } from '../shell-config';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

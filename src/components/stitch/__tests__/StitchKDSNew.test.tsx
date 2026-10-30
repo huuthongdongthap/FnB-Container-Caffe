@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent as _fireEvent } from '@/test-utils';
 import { StitchKDSNew } from '../StitchKDSNew';
 
 vi.mock('react-i18next', () => ({

@@ -15,7 +15,6 @@ import type {
   OrderSnapshotInput,
   OrderSnapshotRejection,
   OrderSnapshotResult,
-  RawOrderItemInput,
 } from './order-snapshot-types';
 
 export * from './order-snapshot-types';

@@ -43,7 +43,7 @@ export const CronJobCreateSchema = z.object({
   schedule: CronJobScheduleSchema.optional(),
   payload: z.union([CronJobPayloadSchema, z.record(z.string(), z.unknown())]).optional(),
   isActive: z.boolean().default(true),
-  locationIds: z.array(z.string().uuid()).optional(),
+  locationIds: z.array(z.string().uuid()).max(100).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CronJobCreate');
 
@@ -53,7 +53,7 @@ export const CronJobUpdateSchema = z.object({
   schedule: CronJobScheduleSchema.optional(),
   payload: CronJobPayloadSchema.optional(),
   isActive: z.boolean().optional(),
-  locationIds: z.array(z.string().uuid()).optional(),
+  locationIds: z.array(z.string().uuid()).max(100).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).openapi('CronJobUpdate');
 

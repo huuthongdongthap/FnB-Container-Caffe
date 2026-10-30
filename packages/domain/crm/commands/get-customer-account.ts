@@ -9,7 +9,6 @@
  */
 import type { D1Database } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
-import { computeTier } from './compute-tier';
 import { loadPolicy, type LoyaltyPolicy } from './loyalty-policy';
 
 const log = createLogger({ route: 'crm.account' });

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import type { AdminOrder } from '@/hooks/use-admin';
+import type { AdminOrder as _AdminOrder } from '@/hooks/use-admin';
 import { STATUS_VARIANT } from './OrderTable-constants';
 import { StatusActions } from './OrderTable-status-actions';
 import { RefundAction } from './OrderTable-refund-action';

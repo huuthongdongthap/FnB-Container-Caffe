@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 export function StitchSubscriptionsNewHero() {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
 
   return (
     <section className="mb-12 text-center">

@@ -40,7 +40,7 @@ interface StaffNotificationPreferences {
 }
 
 export function StaffNotificationSettings() {
-  const { t, i18n } = useTranslation();
+  const { t: _t, i18n } = useTranslation();
   const isVi = i18n.language === 'vi';
 
   const {

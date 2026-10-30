@@ -46,6 +46,7 @@ export async function changePassword(request: Request, env: Record<string, unkno
 
     user.password = await hashPassword(newPassword);
     user.updated_at = new Date().toISOString();
+    user.auth_version = Number(user.auth_version || 1) + 1;
     if (account) {
       await changeStaffPassword((env as unknown as Env).AURA_DB, account, user.password);
       if (payload.email) await authKV.put(`user:${payload.email}`, JSON.stringify(user)).catch(() => {});

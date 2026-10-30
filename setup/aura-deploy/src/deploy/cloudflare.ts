@@ -23,7 +23,7 @@ export async function deployToCloudflare(
   // Check wrangler availability (soft check, not a blocker for the stub)
   let wranglerAvailable = false;
   try {
-    execSync('npx wrangler --version', { stdio: 'pipe', timeout: 10_000 });
+    execSync('npx --no-install wrangler --version', { stdio: 'pipe', timeout: 10_000 });
     wranglerAvailable = true;
   } catch {
     wranglerAvailable = false;

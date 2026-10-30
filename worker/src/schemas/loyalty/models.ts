@@ -23,7 +23,7 @@ export const LoyaltyTierConfigSchema = z.object({
   prioritySupport: z.boolean().default(false),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().optional(),
-  benefits: z.array(z.string()).optional(),
+  benefits: z.array(z.string()).max(50).optional(),
 }).openapi('LoyaltyTierConfig');
 
 export const LoyaltyTierConfigUpdateSchema = z.object({
@@ -37,7 +37,7 @@ export const LoyaltyTierConfigUpdateSchema = z.object({
   prioritySupport: z.boolean().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().optional(),
-  benefits: z.array(z.string()).optional(),
+  benefits: z.array(z.string()).max(50).optional(),
 }).openapi('LoyaltyTierConfigUpdate');
 
 export const LoyaltyAccountSchema = z.object({

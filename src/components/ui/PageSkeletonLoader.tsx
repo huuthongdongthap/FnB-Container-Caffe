@@ -1,4 +1,4 @@
-import { Skeleton } from './skeleton';
+import { Skeleton as _Skeleton } from './skeleton';
 
 export function PageSkeletonLoader() {
   return (

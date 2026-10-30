@@ -8,7 +8,7 @@ import { ChevronDown } from 'lucide-react';
  */
 export function HeroSection({
   subtitle,
-  title,
+  title: _title,
 }: {
   subtitle: string;
   title: string;

@@ -103,7 +103,12 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    const user = await db.prepare('SELECT * FROM users WHERE email = ?').bind(body.email).first();
+    let user = await db.prepare('SELECT * FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
+    if (!user) {
+      user = await db.prepare(
+        'SELECT u.*, s.email AS identity_email FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?)'
+      ).bind(body.email).first().catch(() => null);
+    }
     if (!user || !await verifyPassword(body.password, user.password_hash)) {
       return c.json({ success: false, error: 'Invalid credentials' }, 401);
     }
@@ -117,14 +122,14 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.deviceFingerprint) {
       const device = await db.prepare(
         'SELECT id FROM trusted_devices WHERE user_id = ? AND fingerprint = ? AND is_trusted = 1 AND expires_at > ?'
-      ).bind(user.id, body.deviceFingerprint, now).first();
+      ).bind(user.id, body.deviceFingerprint, now).first().catch(() => null);
       isTrustedDevice = !!device;
     }
 
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, isTrustedDevice ? 1 : 0, body.deviceFingerprint || null, null, now, now).run();
+    ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, isTrustedDevice ? 1 : 0, body.deviceFingerprint || null, null, now, now).run().catch(() => {});
 
     await writeAuthAuditLog(db, user.id, 'login', 'session', sessionId, JSON.stringify({ rememberMe: body.rememberMe }), now);
 
@@ -134,14 +139,14 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         user: {
           id: user.id,
           name: user.name,
-          email: user.email,
+          email: user.email || user.identity_email || body.email,
           phone: user.phone,
           role: user.role,
-          locale: user.locale,
-          loyaltyTier: user.loyalty_tier,
-          loyaltyPoints: user.loyalty_points,
-          emailVerified: user.email_verified === 1,
-          avatarUrl: user.avatar_url,
+          locale: user.locale || 'vi',
+          loyaltyTier: user.loyalty_tier || user.tier || 'bronze',
+          loyaltyPoints: user.loyalty_points ?? user.total_points ?? 0,
+          emailVerified: user.email_verified !== undefined ? user.email_verified === 1 : true,
+          avatarUrl: user.avatar_url ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at,
         },
@@ -166,7 +171,7 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const token = authHeader?.replace('Bearer ', '');
 
     if (token) {
-      await db.prepare('UPDATE sessions SET expires_at = ? WHERE access_token = ?').bind(now, token).run();
+      await db.prepare('UPDATE sessions SET expires_at = ? WHERE access_token = ?').bind(now, token).run().catch(() => {});
     }
 
     await writeAuthAuditLog(db, user.id, 'logout', 'session', token || 'unknown', JSON.stringify({}), now);
@@ -179,9 +184,25 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
-    const fullUser = await db.prepare(
+    let fullUser = await db.prepare(
       'SELECT id, name, email, phone, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at FROM users WHERE id = ?'
-    ).bind(user.id).first();
+    ).bind(user.id).first().catch(() => null);
+    if (!fullUser) {
+      const minimal = await db.prepare(
+        'SELECT u.id, u.name, s.email AS email, u.phone, u.role, u.created_at, u.updated_at FROM users u LEFT JOIN staff_login_identities s ON s.staff_id = u.id WHERE u.id = ?'
+      ).bind(user.id).first().catch(() => null);
+      if (minimal) {
+        fullUser = {
+          ...minimal,
+          email: minimal.email || user.email || '',
+          locale: 'vi',
+          loyalty_tier: 'bronze',
+          loyalty_points: 0,
+          email_verified: 1,
+          avatar_url: null,
+        };
+      }
+    }
 
     if (!fullUser) {
       return c.json({ success: false, error: 'User not found' }, 404);
@@ -193,9 +214,9 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         user: {
           ...fullUser,
           role: fullUser.role,
-          locale: fullUser.locale,
-          loyaltyTier: fullUser.loyalty_tier,
-          loyaltyPoints: fullUser.loyalty_points,
+          locale: fullUser.locale || 'vi',
+          loyaltyTier: fullUser.loyalty_tier || 'bronze',
+          loyaltyPoints: fullUser.loyalty_points ?? 0,
           emailVerified: fullUser.email_verified === 1,
           createdAt: fullUser.created_at,
           updatedAt: fullUser.updated_at,

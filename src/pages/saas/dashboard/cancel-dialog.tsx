@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Props) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');

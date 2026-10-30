@@ -37,7 +37,7 @@ export function TierProgressGauge({
             background: 'var(--aura-bronze-shimmer)',
           }}
         />
-        {tierMilestones.map((milestone, idx) => {
+        {tierMilestones.map((milestone, _idx) => {
           const pos = (milestone / tierMilestones[tierMilestones.length - 1]!) * 100;
           const isActive = points >= milestone;
           return (

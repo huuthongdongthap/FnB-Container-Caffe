@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { useTranslation as _useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';

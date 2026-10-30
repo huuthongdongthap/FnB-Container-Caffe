@@ -55,11 +55,21 @@ function extractRouteFromUrl(rawHref: string): string {
 
 export const clientErrorsRouter = new Hono<{ Bindings: Env }>();
 
+const MAX_CLIENT_ERROR_BODY_BYTES = 64 * 1024;
+
 clientErrorsRouter.post('/', rateLimitMiddleware(CLIENT_ERROR_RATE_LIMIT), async(c) => {
+  const contentLength = Number(c.req.header('content-length') || 0);
+  if (contentLength > MAX_CLIENT_ERROR_BODY_BYTES) {
+    return c.json({ success: false, error: 'Payload too large' }, 413);
+  }
   const db = c.env.AURA_DB;
   let body: Record<string, unknown>;
   try {
-    body = await c.req.json() as Record<string, unknown>;
+    const rawBody = await c.req.text();
+    if (rawBody.length > MAX_CLIENT_ERROR_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+    body = JSON.parse(rawBody) as Record<string, unknown>;
   } catch {
     return c.json({ success: false, error: 'Invalid JSON body' }, 400);
   }

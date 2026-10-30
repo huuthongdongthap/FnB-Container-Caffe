@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cn, Card, Badge, Button, Input } from '@/components/ui';
+import { cn, Card, Badge, Button, Input as _Input } from '@/components/ui';
 
 interface TicketTier {
   id: string;

@@ -73,7 +73,7 @@ const CUSTOM_ITEMS: POSNewMenuItem[] = [
   { id: 'p1', name: 'Custom Brew', price: 5.0, category: 'Coffee' },
 ];
 
-const CUSTOM_ADDONS: POSNewAddOn[] = [
+const _CUSTOM_ADDONS: POSNewAddOn[] = [
   { id: 'pa1', name: 'Extra Shot', price: 1.5 },
 ];
 

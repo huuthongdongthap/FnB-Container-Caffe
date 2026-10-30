@@ -12,7 +12,6 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import {
-  resolveReferralPolicy,
   DEFAULT_REFERRAL_POLICY,
   type ReferralPolicy,
   type ReferralBonusType,

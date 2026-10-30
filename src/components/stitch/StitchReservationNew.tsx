@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ZoneData, StitchReservationNewProps } from './StitchReservationNew-types';
+import type { ZoneData as _ZoneData, StitchReservationNewProps } from './StitchReservationNew-types';
 import { defaultZones } from './StitchReservationNew-data';
 import {
   TopAppBar,
@@ -34,7 +34,7 @@ export function StitchReservationNew({
   onClose,
   onConfirmReservation,
 }: Readonly<StitchReservationNewProps & { onConfirmReservation?: () => void }>) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const [selectedParty, setSelectedParty] = useState<number | string>(1);
   const [selectedDate, setSelectedDate] = useState(14);
   const [selectedTime, setSelectedTime] = useState('7:30 PM');

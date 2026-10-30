@@ -18,7 +18,10 @@ function makeDB(allResults: unknown[] = []) {
 }
 
 vi.mock('../../middleware/auth', () => ({
-  requireAuth: () => (_c: any, next: any) => next()
+  requireAuth: () => (_c: any, next: any) => next(),
+  authenticateRequest: vi.fn().mockResolvedValue({
+    payload: { id: 'staff-1', email: 'staff@auraspace.vn', name: 'Staff 1', role: 'owner' }
+  })
 }));
 
 describe('checkin & push admin contract smoke', () => {
@@ -152,6 +155,23 @@ describe('checkin & push admin contract smoke', () => {
       env
     );
     expect(delRes.status).toBe(200);
+
+    // 5. Rejects non-staff role on manual staff subscription with 403
+    const { authenticateRequest } = await import('../../middleware/auth');
+    vi.mocked(authenticateRequest).mockResolvedValueOnce({
+      payload: { id: 'cust-1', email: 'cust@auraspace.vn', name: 'Customer', role: 'customer' },
+      token: 'tok',
+      account: null
+    });
+    const forbiddenRes = await app.fetch(
+      new Request('https://test.aura/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Barista Minh', role: 'staff' }),
+      }),
+      env
+    );
+    expect(forbiddenRes.status).toBe(403);
   });
 
   it('PATCH /:id/reject — blocks rejecting an already approved check-in with 400', async() => {

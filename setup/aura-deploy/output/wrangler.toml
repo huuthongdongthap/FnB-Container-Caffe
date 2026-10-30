@@ -8,6 +8,7 @@ database_name = "aura-cafe-mytestcafe"
 database_id = ""
 
 [vars]
+ENVIRONMENT = "production"
 CAFE_NAME = "My Test Cafe"
 CAFE_NAME_SHORT = "My"
 DOMAIN_SLUG = "mytestcafe"

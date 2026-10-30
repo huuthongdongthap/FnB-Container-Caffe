@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen, waitFor, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen, waitFor as _waitFor, fireEvent as _fireEvent } from '@/test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

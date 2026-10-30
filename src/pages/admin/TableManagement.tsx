@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api-client';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import type { CafeTableRow, OrderRow } from './TableManagement-types';
-import { STATUS_KEYS_MAP, STATUS_OPTIONS, ACTIVE_ORDER_STATUSES } from './TableManagement-constants';
+import { STATUS_KEYS_MAP, STATUS_OPTIONS as _STATUS_OPTIONS, ACTIVE_ORDER_STATUSES } from './TableManagement-constants';
 import { TableCard } from './TableManagement-card';
 import { TableFilters } from './TableManagement-filters';
 

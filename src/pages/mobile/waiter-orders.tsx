@@ -18,7 +18,7 @@ export { TABLE_STATUS_LABELS, tableCardStyle, tabStyle, orderStatusColor } from 
 /* ── Component ────────────────────────────────────────────────────── */
 
 export default function WaiterOrders() {
-  const { token } = useMobileAuth();
+  const { token: _token } = useMobileAuth();
   const [tab, setTab] = useState<'orders' | 'tables'>('orders');
   const [orders, setOrders] = useState<MobileOrder[]>([]);
   const [tables, setTables] = useState<TableInfo[]>([]);

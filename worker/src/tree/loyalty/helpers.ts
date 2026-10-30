@@ -33,11 +33,20 @@ export async function throttle(
 
 const consumedOtpClaims = new WeakMap<object, Set<string>>();
 
+function resolveOtpStoreAnchor(kv: object): object {
+  const backingData = (kv as { data?: unknown })?.data;
+  if (backingData && typeof backingData === 'object') {
+    return backingData;
+  }
+  return kv;
+}
+
 export function claimOtpOnce(kv: object, otpKey: string, code: string): boolean {
-  let set = consumedOtpClaims.get(kv);
+  const anchor = resolveOtpStoreAnchor(kv);
+  let set = consumedOtpClaims.get(anchor);
   if (!set) {
     set = new Set<string>();
-    consumedOtpClaims.set(kv, set);
+    consumedOtpClaims.set(anchor, set);
   }
   const claim = `${otpKey}:${code}`;
   if (set.has(claim)) {
@@ -48,7 +57,8 @@ export function claimOtpOnce(kv: object, otpKey: string, code: string): boolean 
 }
 
 export function resetOtpClaim(kv: object, otpKey: string): void {
-  const set = consumedOtpClaims.get(kv);
+  const anchor = resolveOtpStoreAnchor(kv);
+  const set = consumedOtpClaims.get(anchor);
   if (!set) return;
   for (const item of set) {
     if (item.startsWith(`${otpKey}:`)) {

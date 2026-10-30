@@ -24,7 +24,7 @@ export function StitchOrderMgmtSidebar({
   brandSubtitle,
   activeNav,
   sidebarOpen,
-  onClose,
+  onClose: _onClose,
 }: Readonly<SidebarProps>) {
   const { t } = useTranslation();
   const tNav = (key: string) => t(`nav.${key}`);

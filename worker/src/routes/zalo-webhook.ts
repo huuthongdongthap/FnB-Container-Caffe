@@ -104,6 +104,10 @@ zaloWebhookRouter.post('/', async (c) => {
   const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
   const signatureHeader = c.req.header('X-ZaloOA-Signature') || c.req.header('x-zalooa-signature');
 
+  if (isProd && !zaloSecret) {
+    return c.json({ success: false, error: 'Zalo webhook secret is not configured' }, 503);
+  }
+
   if (zaloSecret && (isProd || signatureHeader)) {
     if (!signatureHeader) {
       return c.json({ success: false, error: 'Missing Zalo webhook signature' }, 401);

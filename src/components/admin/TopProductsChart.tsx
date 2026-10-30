@@ -90,7 +90,7 @@ function TopProductsEmpty() {
 /* ─── Main component ─── */
 
 export function TopProductsChart({ data, loading, error, onRetry, className }: TopProductsChartProps) {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   if (loading && data.length === 0) return <TopProductsSkeleton />;
   if (error) return <TopProductsError message={error} onRetry={onRetry} />;
   if (data.length === 0) return <TopProductsEmpty />;

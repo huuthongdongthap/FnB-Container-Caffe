@@ -7,6 +7,7 @@ import { updateTableStatusSchema, zodErrorResponse } from 'worker/src/lib/valida
 import { signQRUrl } from 'worker/src/tree/qr/signer';
 import type { Env } from 'worker/src/types/env';
 import { requireAuth } from 'worker/src/middleware/auth';
+import { getTenantId } from 'worker/src/middleware/tenant';
 import { audit } from 'worker/src/middleware/audit-log';
 import type { CafeTable, QrCodeRow } from '../model/table-types';
 import { canTransitionTo, normalizeTableStatus } from '../policies/status';
@@ -74,16 +75,20 @@ tablesRouter.get('/:id', async (c) => {
 });
 
 // PATCH helper — read current row then update status, returning the row pre-update.
-async function updateTable(db: Env['AURA_DB'], id: string, status: string) {
-  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
-  if (!table) {
+async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenantId = '*') {
+  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable & { tenant_id?: string | null }>();
+  if (!table || (tenantId !== '*' && table.tenant_id && String(table.tenant_id) !== tenantId)) {
     return null;
   }
   const normalizedTarget = normalizeTableStatus(status) ?? (status as CafeTable['status']);
   if (!canTransitionTo(table.status, normalizedTarget)) {
     return null;
   }
-  await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind(normalizedTarget, id).run();
+  if (tenantId !== '*' && table.tenant_id) {
+    await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ? AND tenant_id = ?').bind(normalizedTarget, id, tenantId).run();
+  } else {
+    await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind(normalizedTarget, id).run();
+  }
   return table;
 }
 
@@ -91,7 +96,7 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string) {
 tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']), audit('table_occupy'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const table = await updateTable(db, id, 'Occupied');
+  const table = await updateTable(db, id, 'Occupied', getTenantId(c));
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
@@ -102,7 +107,7 @@ tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff', 'adm
 tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']), audit('table_release'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const table = await updateTable(db, id, 'Available');
+  const table = await updateTable(db, id, 'Available', getTenantId(c));
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
@@ -119,7 +124,7 @@ tablesRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'adm
     return zodErrorResponse(c, parsed.error);
   }
   const { status } = parsed.data;
-  const table = await updateTable(db, id, status);
+  const table = await updateTable(db, id, status, getTenantId(c));
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }

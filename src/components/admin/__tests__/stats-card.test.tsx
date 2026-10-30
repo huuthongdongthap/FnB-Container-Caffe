@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi as _vi } from 'vitest';
 import { render, screen } from '@/test-utils';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { OrderTable } from '@/components/admin/OrderTable';

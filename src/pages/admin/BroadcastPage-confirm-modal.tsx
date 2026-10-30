@@ -28,7 +28,7 @@ export function BroadcastConfirmModal({
   onConfirm,
   segmentName,
   customerCount,
-  channel,
+  channel: _channel,
   channelLabel,
   title,
   message,

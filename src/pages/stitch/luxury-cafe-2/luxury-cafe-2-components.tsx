@@ -20,7 +20,7 @@ export function StitchShell({ children }: { children: React.ReactNode }) {
 /* ── Nav ────────────────────────────────────────────────────────────── */
 
 export function Nav() {
-  const [open, setOpen] = useState(false);
+  const [_open, _setOpen] = useState(false);
   return (
     <PageHeader brand="AURA CAFE" scrollEffect />
   );

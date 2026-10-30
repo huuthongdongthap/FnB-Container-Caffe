@@ -8,6 +8,7 @@ database_name = "aura-cafe-{{DOMAIN_SLUG}}"
 database_id = ""
 
 [vars]
+ENVIRONMENT = "production"
 CAFE_NAME = "{{CAFE_NAME}}"
 CAFE_NAME_SHORT = "{{CAFE_NAME_SHORT}}"
 DOMAIN_SLUG = "{{DOMAIN_SLUG}}"

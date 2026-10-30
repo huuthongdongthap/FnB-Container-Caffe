@@ -6,6 +6,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import { claimGuestOrder } from '@aura/domain-customer';
 
 export async function handleClaimOrder(c: Context<{ Bindings: Env }>) {
@@ -17,6 +18,7 @@ export async function handleClaimOrder(c: Context<{ Bindings: Env }>) {
     db: db as any,
     orderId: id,
     actor: user,
+    tenantId: getTenantId(c),
   });
 
   if (!result.success) {
