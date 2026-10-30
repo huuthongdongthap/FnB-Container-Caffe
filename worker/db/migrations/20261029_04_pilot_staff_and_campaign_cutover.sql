@@ -36,6 +36,37 @@ INSERT OR IGNORE INTO staff_login_identities (email, staff_id) VALUES
     ('huuthong.dongthap@gmail.com', 'USR_morztzcs6p52k'),
     ('gaogavi01@gmail.com', 'USR_morzvfpc50ree');
 
+-- Deactivate pre-launch synthetic test staff accounts (e.g. USR_test_758780),
+-- increment auth_version to revoke any pre-existing tokens, and purge orphan or
+-- disabled-user rows from staff_login_identities and staff_devices so both
+-- db-admin-checklist preflight queries return 0.
+UPDATE users
+SET is_active = 0,
+    auth_version = COALESCE(auth_version, 1) + 1,
+    updated_at = datetime('now')
+WHERE id LIKE 'USR_test_%';
+
+DELETE FROM staff_login_identities
+WHERE staff_id LIKE 'USR_test_%'
+   OR staff_id NOT IN (SELECT id FROM users WHERE COALESCE(is_active, 1) = 1);
+
+CREATE TABLE IF NOT EXISTS staff_devices (
+    id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    device_name TEXT,
+    device_token TEXT UNIQUE NOT NULL,
+    pin_hash TEXT NOT NULL DEFAULT '',
+    role TEXT DEFAULT 'staff',
+    is_active INTEGER DEFAULT 1,
+    last_login_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+DELETE FROM staff_devices
+WHERE staff_id LIKE 'USR_test_%'
+   OR staff_id NOT IN (SELECT id FROM users WHERE COALESCE(is_active, 1) = 1);
+
 -- Activate Pilot Store 2026-2027 signup & referral bonus campaign (50.000 VND signup bonus, cap 100, 10.000 VND referral)
 INSERT OR IGNORE INTO bonus_campaigns (
     code, name, description, type,

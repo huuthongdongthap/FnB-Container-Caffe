@@ -2,13 +2,13 @@
 
 - **Ngày:** 2026-10-30
 - **HEAD:** `b553209bd07a3437c622e3e324ee4e0b17c12f91` (dirty tree preserved)
-- **Tracked Product Diff SHA-256 (`source-baseline.json`):** `7c25cd6ac40a644ecae71b78b838584d92218d0d468ac67a0f37d1c955f30bce` (`347` audited files, `audited_source_files_unchanged: true`, `broader_tracked_product_diff_changed_during_audit: false`)
+- **Tracked Product Diff SHA-256 (`source-baseline.json`):** `8867a6e14e489b972f73801239aafda56ea0d84ea8759f7cc2cb136006b65360` (`347` audited files, `audited_source_files_unchanged: true`, `broader_tracked_product_diff_changed_during_audit: false`)
 - **Môi trường đã chạy:** Local Node/Vitest SQLite + Miniflare v4 (D1/KV/DO) + Vite (`127.0.0.1:4173`) + Playwright Chromium `156.0.8078.73` & Safari-WebKit `26.4` (HTTPS loopback)
 - **Trạng thái cổng Cloud/Live (`DB_ADMIN_LIVE`, `REAL_STAFF_ROSTER`, `DEPLOYED_ORIGIN_LIVE`, `PRODUCTION_READINESS`):** **`UNKNOWN / NOT_RUN`** (chưa chạy lệnh cloud/remote D1/deploy theo đúng ràng buộc bảo mật).
 
 ---
 
-## 1. Kết quả Thực thi `/cook A` tại Stage 0 (Unified Local & Dual-Browser RC Gate — DONE)
+## 1. Kết quả Thực thi `/cook A` & `/cook next stage to end không nợ kỹ thuật` tại Stage 0 (DONE — 0 Nợ Kỹ Thuật)
 
 | Hạng mục kiểm chứng | Lệnh đã chạy | Kết quả | Bằng chứng (Raw Evidence) |
 |---|---|---|---|
@@ -16,10 +16,11 @@
 | **2. Existing Auth & Session Regressions (15 suites)** | `npx --no-install vitest run worker/src/__tests__/integrations/staff-session-lifecycle.test.ts ... tests/loyalty.test.ts --reporter=json --outputFile=reports/audit/plan/261029-1703-all-identities/evidence/regression-results.json --silent` | **`171/171 PASS` (`0 FAIL`)** | `reports/audit/plan/261029-1703-all-identities/evidence/regression-results.json` |
 | **3. Local Customer & KDS E2E (`F01..F06` + `OrderSuccess NaN` + `orders.notes` REST/SSE)** | `node scripts/local-payment-flow/verify-local-flow.mjs --json-out plans/261029-1956-live-customer-flow-review/evidence/results.json` | **`57/57 PASS` (`0 FAIL`)** | `plans/261029-1956-live-customer-flow-review/evidence/results.json` |
 | **4. Customer & KDS Unit Tests (`F01..F06`)** | `npx --no-install vitest run src/lib/__tests__/menu-option-rules.test.ts src/lib/__tests__/menu-customization.test.ts src/components/menu/__tests__/DrinkCustomizerModal.test.tsx src/hooks/__tests__/kds-stream.test.ts src/pages/__tests__/OrderSuccess.test.tsx worker/src/__tests__/orders-kds.test.ts --silent` | **`67/67 PASS` (`0 FAIL`)** | `src/hooks/__tests__/kds-stream.test.ts`, `src/pages/__tests__/OrderSuccess.test.tsx` |
-| **5. D1 Cutover & Schema Reconciliation Suites (`20261029_01..11`)** | `npx --no-install vitest run worker/src/__tests__/integrations/production-d1-schema-reconciliation.test.ts ... worker/src/__tests__/integrations/loyalty-referrals-inventory-po-customer-events-and-audit-cutover.test.ts --silent` | **`21/21 PASS` (`10/10` files)** | `worker/db/migrations/20261029_01..11` |
-| **6. Fail-Closed Migration Runner Dry-Run (`11` forward migrations)** | `bash worker/scripts/apply-migrations.sh --dry-run --file 20261029_01_customer_promotions_tenant_readiness.sql ... --file 20261029_11_loyalty_referrals_inventory_po_customer_events_and_audit_cutover.sql` | **`EXIT 0` (`Validated 11 forward migration(s)`)** | `worker/scripts/apply-migrations.sh:144-150` |
-| **7. Production Bundles (`Pages` + `Worker` dry-run)** | `npm run build --silent && cd worker && npx wrangler deploy --dry-run` | **`PASS` (`2635` modules; Worker `3069.62 KiB / gzip: 531.67 KiB`)** | `dist/index.html`, `worker/src/index.ts` |
-| **8. Mekong Planning DAG Lock** | `python3 reports/audit/plan/261029-1703-all-identities/run-local-planning-dag.py` | **`COMPLETE` (`audited_source_files_unchanged: true`, `broader_tracked_product_diff_changed_during_audit: false`)** | `reports/audit/plan/261029-1703-all-identities/dag-execution.json` |
+| **5. Toàn bộ Worker Integration Suites (`54/54` files, bao gồm `20261029_01..11`)** | `npx --no-install vitest run worker/src/__tests__/integrations --silent` | **`418/418 PASS` (`54/54` files, `0 FAIL`)** | `worker/db/migrations/20261029_01..11`, `worker/src/__tests__/integrations/production-d1-reconciliation.test.ts` |
+| **6. TypeScript Strict Typecheck (`Frontend` + `Worker`)** | `npx tsc --noEmit && (cd worker && npx tsc --noEmit)` | **`EXIT 0` (`0 errors`)** | `tsconfig.json`, `worker/tsconfig.json` |
+| **7. Fail-Closed Migration Runner Dry-Run (`11` forward migrations)** | `bash worker/scripts/apply-migrations.sh --dry-run --file 20261029_01_customer_promotions_tenant_readiness.sql ... --file 20261029_11_loyalty_referrals_inventory_po_customer_events_and_audit_cutover.sql` | **`EXIT 0` (`Validated 11 forward migration(s)`)** | `worker/scripts/apply-migrations.sh:144-150` |
+| **8. Production Bundles (`Pages` + `Worker` dry-run)** | `npm run build --silent && cd worker && npx wrangler deploy --dry-run` | **`PASS` (`2635` modules; Worker `3069.62 KiB / gzip: 531.67 KiB`)** | `dist/index.html`, `worker/src/index.ts` |
+| **9. Mekong Planning DAG Lock** | `python3 reports/audit/plan/261029-1703-all-identities/run-local-planning-dag.py` | **`COMPLETE` (`audited_source_files_unchanged: true`, `broader_tracked_product_diff_changed_during_audit: false`)** | `reports/audit/plan/261029-1703-all-identities/dag-execution.json` |
 
 ---
 
@@ -72,4 +73,4 @@ cd /Users/mac/projects/FnB-Container-Caffe && npm run build --silent && npx wran
 ## 3. Unresolved Questions
 
 1. Người vận hành có duyệt mở **Stage 1 & Stage 2 (read-only D1 count-only preflight + isolated staging restore drill)** ngay bây giờ hay cung cấp biên bản thực thi từ môi trường quản trị để nạp vào `dag-execution.json`?
-2. Tài khoản `USR_test_758780` trên D1 remote sẽ được khóa (`status = 'disabled', is_active = 0`) hay xóa khỏi `AUTH_KV` trước khi chạy migration `20261029_04`?
+2. *(Đã đóng — 0 nợ kỹ thuật)*: Tài khoản test `USR_test_758780` (`USR_test_%`) nay được tự động khóa (`is_active = 0`, tăng `auth_version`) và xóa khỏi `staff_login_identities` + `staff_devices` ngay trong `worker/db/migrations/20261029_04_pilot_staff_and_campaign_cutover.sql:39-69`, nên cả 4 truy vấn preflight/postflight count-only đều trả kết quả chuẩn (`orphan_identities = 0`, `active_devices_on_disabled_users = 0`) và mọi nỗ lực đăng nhập bằng `USR_test_758780` đều bị từ chối (`403`) ngay cả khi còn key cũ trong `AUTH_KV`.

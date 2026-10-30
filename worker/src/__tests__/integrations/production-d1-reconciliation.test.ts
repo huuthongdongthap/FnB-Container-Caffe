@@ -442,7 +442,17 @@ describe('Production D1 Reconciliation & Cutover Migrations (20261029_03 & 20261
   it('reconciles real AUTH_KV Owner and Staff accounts (USR_OWNER_001, USR_morztzcs6p52k, USR_morzvfpc50ree) so loginUser succeeds and imports password_hash into D1', async () => {
     const { sqlite, db, authKV, kvMap } = createLegacyProductionReplica();
     sqlite.exec(migration03);
+    sqlite.exec(`
+      INSERT INTO users (id, name, role, phone, email, tenant_id, is_active, auth_version)
+      VALUES ('USR_test_758780', 'Synthetic Test Staff', 'staff', '0900007587', 'test758780@auraspace.vn', 'default', 1, 1);
+      INSERT INTO staff_login_identities (email, staff_id) VALUES ('test758780@auraspace.vn', 'USR_test_758780');
+    `);
     sqlite.exec(migration04);
+
+    const testRow = sqlite.prepare("SELECT is_active, auth_version FROM users WHERE id = 'USR_test_758780'").get() as { is_active: number; auth_version: number };
+    expect(testRow).toEqual({ is_active: 0, auth_version: 2 });
+    const testIdentityCount = sqlite.prepare("SELECT COUNT(*) AS cnt FROM staff_login_identities WHERE staff_id = 'USR_test_758780'").get() as { cnt: number };
+    expect(testIdentityCount.cnt).toBe(0);
 
     const ownerPassHash = await hashPassword('OwnerSecret#2026');
     const staffPassHash = await hashPassword('StaffSecret#2026');
