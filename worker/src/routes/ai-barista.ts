@@ -6,9 +6,27 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
+import { optionalAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
 
 export const aiBaristaRouter = new Hono<{ Bindings: Env }>();
+
+aiBaristaRouter.use('/*', async (c, next) => {
+  if (!c.get('user' as never) && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    return optionalAuth()(c, next);
+  }
+  return next();
+});
+
+function resolveBaristaTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  if (c.get?.('user')) {
+    const raw = getTenantId(c);
+    return raw === '*' ? 'default' : raw;
+  }
+  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
+  if (!raw || raw === '*') return 'default';
+  return raw;
+}
 
 interface SpecialtyItem {
   id: string;
@@ -83,13 +101,19 @@ const SPECIALTY_CATALOG: SpecialtyItem[] = [
 const recommendSchema = z.object({
   prompt: z.string().max(500).optional(),
   preferences: z.object({
-    mood: z.string().optional(),
+    mood: z.string().max(100).optional(),
     sweetness: z.enum(['low', 'medium', 'high']).optional(),
     temperature: z.enum(['iced', 'hot']).optional(),
     intensity: z.enum(['mild', 'strong']).optional(),
-    flavor_notes: z.array(z.string()).max(20).optional()
+    flavor_notes: z.array(z.string().max(50)).max(20).optional()
   }).optional()
 });
+
+function makeBaristaInteractionId(): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  return `barista_${Date.now().toString(36)}_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
 
 // POST /api/ai/barista/recommend
 aiBaristaRouter.post('/recommend', async (c) => {
@@ -98,16 +122,13 @@ aiBaristaRouter.post('/recommend', async (c) => {
   if (!parsed.success) {
     return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid input' }, 400);
   }
-
   const { prompt, preferences } = parsed.data;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveBaristaTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  // Semantic rule-based matching
   let bestItem = SPECIALTY_CATALOG[0];
   let maxScore = -1;
   const textQuery = `${prompt || ''} ${preferences?.mood || ''} ${(preferences?.flavor_notes || []).join(' ')}`.toLowerCase();
-
   for (const item of SPECIALTY_CATALOG) {
     let score = 0;
     if (preferences?.temperature && (item.temp === preferences.temperature || item.temp === 'both')) score += 3;
@@ -146,7 +167,7 @@ aiBaristaRouter.post('/recommend', async (c) => {
 
   // Log interaction non-blocking
   try {
-    const interactionId = `barista_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const interactionId = makeBaristaInteractionId();
     await db.prepare(`
       INSERT INTO ai_barista_interactions (
         id, tenant_id, query_prompt, preferences_json,

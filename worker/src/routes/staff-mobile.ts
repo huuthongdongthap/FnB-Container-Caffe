@@ -23,7 +23,7 @@ import type { Env } from '../types/env';
 export const staffMobileRouter = new Hono<{ Bindings: Env }>();
 
 // ── Public: device login + token refresh + me ──
-const ALL_STAFF_ROLES = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin'];
+const ALL_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin', 'shipper'];
 const mobilePublic = new Hono<{ Bindings: Env }>();
 mobilePublic.post('/login', staffMobileLogin);
 mobilePublic.post('/refresh', staffTokenRefresh);
@@ -41,37 +41,37 @@ mobileDevices.get('/', listStaffDevices);
 staffMobileRouter.route('/devices', mobileDevices);
 
 // ── Protected: KDS ──
-staffMobileRouter.use('/kds/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/kds/*', requireStaff(ALL_STAFF_ROLES));
 const mobileKds = new Hono<{ Bindings: Env }>();
-mobileKds.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+mobileKds.use('*', requireStaff(ALL_STAFF_ROLES));
 mobileKds.get('/orders', getKdsMobile);
 mobileKds.patch('/orders/:id/status', updateKdsStatus);
 staffMobileRouter.route('/kds', mobileKds);
 
 // ── Protected: Notifications (mobile PWA) ──
-staffMobileRouter.use('/notifications', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
-staffMobileRouter.use('/notifications/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/notifications', requireStaff(ALL_STAFF_ROLES));
+staffMobileRouter.use('/notifications/*', requireStaff(ALL_STAFF_ROLES));
 const mobileNotifs = new Hono<{ Bindings: Env }>();
-mobileNotifs.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+mobileNotifs.use('*', requireStaff(ALL_STAFF_ROLES));
 mobileNotifs.get('/', getNotifications);
 mobileNotifs.post('/subscribe', subscribePush);
 mobileNotifs.post('/:id/read', markNotificationRead);
 staffMobileRouter.route('/notifications', mobileNotifs);
 
 // ── Protected: Tables ──
-staffMobileRouter.use('/tables', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
-staffMobileRouter.use('/tables/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/tables', requireStaff(ALL_STAFF_ROLES));
+staffMobileRouter.use('/tables/*', requireStaff(ALL_STAFF_ROLES));
 const mobileTables = new Hono<{ Bindings: Env }>();
-mobileTables.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+mobileTables.use('*', requireStaff(ALL_STAFF_ROLES));
 mobileTables.get('/', getTablesMobile);
 mobileTables.patch('/:id', updateTableStatus);
 staffMobileRouter.route('/tables', mobileTables);
 
 // ── Protected: Orders ──
-staffMobileRouter.use('/orders', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
-staffMobileRouter.use('/orders/*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+staffMobileRouter.use('/orders', requireStaff(ALL_STAFF_ROLES));
+staffMobileRouter.use('/orders/*', requireStaff(ALL_STAFF_ROLES));
 const mobileOrders = new Hono<{ Bindings: Env }>();
-mobileOrders.use('*', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+mobileOrders.use('*', requireStaff(ALL_STAFF_ROLES));
 mobileOrders.get('/', getOrdersMobile);
 mobileOrders.post('/', createOrderMobile);
 mobileOrders.get('/:id', getOrderDetail);

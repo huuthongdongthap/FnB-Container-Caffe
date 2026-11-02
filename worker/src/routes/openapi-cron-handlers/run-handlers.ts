@@ -1,8 +1,9 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
-import { formatRun } from './helpers';
+import { formatRun, checkCronJobTenant } from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 
 export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/cron/jobs/:id/trigger - Manually trigger cron job
@@ -11,10 +12,11 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const now = new Date().toISOString();
 
     const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
-    if (!job) {
+    if (!job || !(await checkCronJobTenant(db, job as any, tenantId))) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
 
@@ -39,7 +41,7 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
     } catch {
       const metaStr = JSON.stringify({ jobId: id, manual: true });
       try {
@@ -71,11 +73,19 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const now = new Date().toISOString();
 
     const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first();
     if (!run) {
       return c.json({ success: false, error: 'Cron run not found' }, 404);
+    }
+
+    if (tenantId !== '*') {
+      const parentJob = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(run.job_id).first().catch(() => null);
+      if (parentJob ? !(await checkCronJobTenant(db, parentJob as any, tenantId)) : tenantId !== 'default') {
+        return c.json({ success: false, error: 'Cron run not found' }, 404);
+      }
     }
 
     if (run.status !== 'failed' && run.status !== 'timeout') {
@@ -104,7 +114,7 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
     } catch {
       const metaStr = JSON.stringify({ originalRunId: id, jobId: run.job_id });
       try {
@@ -137,9 +147,10 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'started_at', order = 'desc', status } = query;
+    const tenantId = getTenantId(c);
 
     const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null);
-    if (!job) {
+    if (!job || !(await checkCronJobTenant(db, job as any, tenantId))) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
 
@@ -192,11 +203,19 @@ export function registerRunHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(CronRoutes.runs.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
+    const tenantId = getTenantId(c);
 
     const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first().catch(() => null);
 
     if (!run) {
       return c.json({ success: false, error: 'Cron run not found' }, 404);
+    }
+
+    if (tenantId !== '*') {
+      const parentJob = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind((run as any).job_id).first().catch(() => null);
+      if (parentJob ? !(await checkCronJobTenant(db, parentJob as any, tenantId)) : tenantId !== 'default') {
+        return c.json({ success: false, error: 'Cron run not found' }, 404);
+      }
     }
 
     return c.json({

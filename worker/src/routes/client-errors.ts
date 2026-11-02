@@ -85,7 +85,10 @@ clientErrorsRouter.post('/', rateLimitMiddleware(CLIENT_ERROR_RATE_LIMIT), async
   const href = sanitizeClientHref(rawHref);
   const ts = String(body.ts || body.timestamp || new Date().toISOString()).slice(0, 64);
 
-  const id = `CE-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const randBytes = new Uint8Array(3);
+  crypto.getRandomValues(randBytes);
+  const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const id = `CE-${Date.now().toString(36)}-${randHex}`;
   try {
     await db.prepare(
       `INSERT INTO client_errors (id, route, message, stack, href, user_agent, ts)

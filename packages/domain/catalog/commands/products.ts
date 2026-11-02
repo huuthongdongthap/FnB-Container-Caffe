@@ -9,8 +9,9 @@
 
 import { Hono } from 'hono';
 import { createProductSchema, updateProductSchema, zodErrorResponse } from 'worker/src/lib/validators';
-import { requireAuth } from 'worker/src/middleware/auth';
+import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { audit } from 'worker/src/middleware/audit-log';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import type { Env } from 'worker/src/types/env';
 import type { Product } from '../model/catalog-types';
 import {
@@ -20,15 +21,60 @@ import {
 } from '../policies/menu-projection';
 
 export const productsRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
+productsRouter.use('*', async (c, next) => {
+  if (!c.get('user' as never) && c.req.header('Authorization')) {
+    return optionalAuth()(c, next);
+  }
+  await next();
+});
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+
+async function findSlugMatchForTenant(
+  db: Env['AURA_DB'],
+  sql: string,
+  slug: string,
+  tenantId: string,
+  excludeId?: string
+): Promise<Product | null> {
+  const stmt = excludeId !== undefined ? db.prepare(sql).bind(slug, excludeId) : db.prepare(sql).bind(slug);
+  let candidates: Record<string, unknown>[] = [];
+  if (typeof stmt.all === 'function') {
+    const res = await stmt.all<Record<string, unknown>>().catch(() => null);
+    if (res && Array.isArray(res.results) && res.results.length > 0) {
+      candidates = res.results;
+    }
+  }
+  if (candidates.length === 0 && typeof stmt.first === 'function') {
+    const first = await stmt.first<Record<string, unknown>>().catch(() => null);
+    if (first) candidates = [first];
+  }
+  const match = candidates.find(
+    (r) =>
+      (!excludeId || r.id !== excludeId) &&
+      (r.slug === undefined || r.slug === slug) &&
+      matchesTenantRow(r, tenantId)
+  );
+  return (match as unknown as Product) ?? null;
+}
+
+function generateProductId(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `prod_${Date.now().toString(36)}${rand}`;
+}
 
 // ── 1. Static / Literal Prefix Routes (MUST PRECEDENCE OVER /:id) ──
 productsRouter.get('/slug/:slug', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const slug = c.req.param('slug');
-  const row = (await db.prepare(
-    'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.slug = ?'
-  ).bind(slug).first()) as Product | null;
+  const row = await findSlugMatchForTenant(
+    db,
+    'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.slug = ?',
+    slug,
+    tenantId
+  );
   if (!row) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
@@ -38,6 +84,7 @@ productsRouter.get('/slug/:slug', async (c) => {
 // ── 2. Base Collection Routes ──
 productsRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const category = c.req.query('category') || c.req.query('categoryId');
   const available = c.req.query('available');
   const status = c.req.query('status');
@@ -61,12 +108,18 @@ productsRouter.get('/', async (c) => {
     params.push(`%${search}%`, `%${search}%`);
   }
   if (minPrice !== undefined && minPrice !== '') {
-    query += ' AND p.price >= ?';
-    params.push(Number(minPrice));
+    const parsedMin = Number(minPrice);
+    if (Number.isFinite(parsedMin)) {
+      query += ' AND p.price >= ?';
+      params.push(parsedMin);
+    }
   }
   if (maxPrice !== undefined && maxPrice !== '') {
-    query += ' AND p.price <= ?';
-    params.push(Number(maxPrice));
+    const parsedMax = Number(maxPrice);
+    if (Number.isFinite(parsedMax)) {
+      query += ' AND p.price <= ?';
+      params.push(parsedMax);
+    }
   }
   if (tags) {
     query += ' AND p.tags LIKE ?';
@@ -76,24 +129,49 @@ productsRouter.get('/', async (c) => {
   query += ' ORDER BY c.sort_order ASC, p.name ASC';
   const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
   const { results } = await stmt.all<Product>();
-  return c.json({ success: true, data: results });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  return c.json({ success: true, data: filtered });
 });
+
+async function isCrossTenantCategory(db: D1Database, categoryId: string | undefined, tenantId: string): Promise<boolean> {
+  if (!categoryId || tenantId === '*') return false;
+  const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).first<Record<string, unknown>>().catch(() => null);
+  if (row) {
+    return !matchesTenantRow(row, tenantId);
+  }
+  const allRes = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).all<Record<string, unknown>>().catch(() => null);
+  const matchedById = (allRes?.results || []).find((r) => String(r.id ?? '') === categoryId);
+  if (matchedById) {
+    return !matchesTenantRow(matchedById, tenantId);
+  }
+  return false;
+}
 
 productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
   const db = c.env.AURA_DB;
+  const rawTenantId = getTenantId(c);
+  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createProductSchema.safeParse(body);
   if (!parsed.success) {
     return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
+  if (data.category_id && await isCrossTenantCategory(db, data.category_id, tenantId)) {
+    return c.json({ success: false, error: 'Category not found' }, 404);
+  }
   if (data.slug) {
-    const existingSlug = await db.prepare('SELECT id FROM products WHERE slug = ?').bind(data.slug).first();
+    const existingSlug = await findSlugMatchForTenant(
+      db,
+      'SELECT * FROM products WHERE slug = ?',
+      data.slug,
+      tenantId
+    );
     if (existingSlug) {
       return c.json({ success: false, error: 'Slug already exists' }, 409);
     }
   }
-  const id = `prod_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const id = generateProductId();
   const rawBody = body as Record<string, unknown>;
   const tagsVal = rawBody.tags !== undefined
     ? (typeof rawBody.tags === 'string' ? rawBody.tags : JSON.stringify(rawBody.tags))
@@ -103,18 +181,24 @@ productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
   try {
     if (tagsVal !== undefined || badgeVal !== undefined) {
       await db.prepare(
-        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order, tags, badge) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
-      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0, tagsVal ?? null, badgeVal ?? null).run();
+        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order, tags, badge, tenant_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0, tagsVal ?? null, badgeVal ?? null, tenantId).run();
     } else {
       await db.prepare(
-        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
-      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order, tenant_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0, tenantId).run();
     }
   } catch {
     try {
-      await db.prepare(
-        'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
-      ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+      if (tagsVal !== undefined || badgeVal !== undefined) {
+        await db.prepare(
+          'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order, tags, badge) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+        ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0, tagsVal ?? null, badgeVal ?? null).run();
+      } else {
+        await db.prepare(
+          'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
+        ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id || '', data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
+      }
     } catch {
       await db.prepare(
         'INSERT INTO products (id, name, description, price, category_id, image_url, is_available) VALUES (?,?,?,?,?,?,?)'
@@ -129,8 +213,9 @@ productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
 // ── 3. Parameterized Record Routes (/:id) ──
 productsRouter.get('/:id', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const row = (await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(c.req.param('id')).first()) as Product | null;
-  if (!row) {
+  if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
   return c.json({ success: true, data: row });
@@ -138,6 +223,7 @@ productsRouter.get('/:id', async (c) => {
 
 const handleUpdateProduct = async (c: any) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const body = await c.req.json();
   const id = c.req.param('id');
   const parsed = updateProductSchema.safeParse(body);
@@ -146,12 +232,25 @@ const handleUpdateProduct = async (c: any) => {
   }
   const data = parsed.data;
   const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as Product | null;
-  if (!existing) {
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
+  }
+  if (data.category_id && await isCrossTenantCategory(db, data.category_id, tenantId)) {
+    return c.json({ success: false, error: 'Category not found' }, 404);
   }
   if (data.slug && data.slug !== existing.slug) {
     try {
-      const slugConflict = (await db.prepare('SELECT id FROM products WHERE slug = ? AND id != ?').bind(data.slug, id).first()) as { id: string } | null;
+      const existingRec = existing as unknown as Record<string, unknown>;
+      const targetTenant = existingRec.tenant_id && String(existingRec.tenant_id).trim()
+        ? String(existingRec.tenant_id).trim()
+        : (tenantId === '*' ? 'default' : tenantId);
+      const slugConflict = await findSlugMatchForTenant(
+        db,
+        'SELECT * FROM products WHERE slug = ? AND id != ?',
+        data.slug,
+        targetTenant,
+        id
+      );
       if (slugConflict && slugConflict.id !== id) {
         return c.json({ success: false, error: 'Slug already exists' }, 409);
       }
@@ -204,9 +303,10 @@ productsRouter.patch('/:id', staffAuth, audit('product_update'), handleUpdatePro
 
 productsRouter.delete('/:id', staffAuth, audit('product_delete'), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as Product | null;
-  if (!existing) {
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
   const orderItems = (await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first()) as { count: number } | null;

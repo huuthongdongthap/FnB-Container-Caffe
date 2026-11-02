@@ -2,10 +2,14 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Referral, CashbackWallet } from '../../types/models';
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + rand;
 }
 
-export async function reverseReferralCashback(db: D1Database, referralId: string): Promise<Record<string, unknown>> {
+export async function reverseReferralCashback(db: D1Database, referralId: string, tenantId?: string): Promise<Record<string, unknown>> {
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
   const referral = await db.prepare('SELECT * FROM referrals WHERE id = ? AND status = ?').bind(referralId, 'completed').first<Referral>();
   if (!referral || !referral.cashback_awarded_vnd) {
     return { success: false, reason: 'not_applicable' };
@@ -15,12 +19,28 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
   const referrerId = referral.referrer_id;
   const now = new Date().toISOString();
 
-  let wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet>();
+  let wallet: CashbackWallet | null = null;
+  if (effectiveTenant) {
+    try {
+      wallet = await db
+        .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(referrerId, effectiveTenant)
+        .first<CashbackWallet>();
+    } catch {
+      wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet>();
+    }
+  } else {
+    wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet>();
+  }
   const batch: ReturnType<typeof db.prepare>[] = [];
 
   if (!wallet) {
     const walletId = genId('cbw_');
-    batch.push(db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)').bind(walletId, referrerId, now));
+    batch.push(
+      effectiveTenant
+        ? db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, tenant_id) VALUES (?, ?, 0, 0, 0, ?, ?)').bind(walletId, referrerId, now, effectiveTenant)
+        : db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)').bind(walletId, referrerId, now)
+    );
     wallet = { id: walletId, customer_id: referrerId, balance: 0, total_earned: 0, total_spent: 0, created_at: now, updated_at: now };
   }
 

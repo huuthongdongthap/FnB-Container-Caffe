@@ -18,6 +18,7 @@ export interface PostOrderParams {
   env: Record<string, unknown>;
   ctx?: { waitUntil?: (p: Promise<unknown>) => void };
   orderId: string;
+  tenantId?: string;
   data: {
     customer_name: string;
     customer_phone: string;
@@ -36,33 +37,85 @@ export interface PostOrderParams {
 export async function runPostOrderSideEffects(params: PostOrderParams): Promise<void> {
   const { db, env, ctx, orderId, data, snapshot, validatedMethod, resolvedTableId } = params;
 
+  const effectiveTenant = params.tenantId && params.tenantId.trim() && params.tenantId !== '*'
+    ? params.tenantId.trim()
+    : 'default';
+
   let customerIdForCapture: string | null = data.customer_id || null;
   if (data.customer_email) {
-    await db.prepare(`
-      INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
-      VALUES (?, ?, ?, ?, 0, 0, 'bronze')
-      ON CONFLICT(email) DO NOTHING
-    `).bind(generateId('CUST_'), data.customer_email, data.customer_name, data.customer_phone).run();
-    const linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(data.customer_email).first<{ id: string }>();
+    const newCustId = generateId('CUST_');
+    try {
+      await db.prepare(`
+        INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id)
+        VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?)
+        ON CONFLICT DO NOTHING
+      `).bind(newCustId, data.customer_email, data.customer_name, data.customer_phone, effectiveTenant).run();
+    } catch {
+      await db.prepare(`
+        INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
+        VALUES (?, ?, ?, ?, 0, 0, 'bronze')
+        ON CONFLICT DO NOTHING
+      `).bind(newCustId, data.customer_email, data.customer_name, data.customer_phone).run();
+    }
+    let linkedCust: { id: string } | null = null;
+    try {
+      linkedCust = await db.prepare(
+        "SELECT id FROM customers WHERE email = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(data.customer_email, effectiveTenant).first<{ id: string }>();
+    } catch {
+      linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(data.customer_email).first<{ id: string }>();
+    }
     if (linkedCust) customerIdForCapture = linkedCust.id;
   } else if (data.customer_phone) {
     const digits = String(data.customer_phone).replace(/\D/g, '');
     if (digits.length >= 9 && digits.length <= 12) {
-      const existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>();
+      let existing: { id: string } | null = null;
+      try {
+        existing = await db.prepare(
+          "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(digits, effectiveTenant).first<{ id: string }>();
+      } catch {
+        existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>();
+      }
       if (!existing) {
         const custId = generateId('CUST_');
+        const wid = generateId('wal_');
         const now = new Date().toISOString();
-        await db.batch([
-          db.prepare(`
+        const syntheticEmail = effectiveTenant === 'default'
+          ? `${digits}@loyalty.aura`
+          : `${digits}+${effectiveTenant}@loyalty.aura`;
+        try {
+          await db.prepare(`
+            INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at, tenant_id)
+            VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?, ?)
+            ON CONFLICT DO NOTHING
+          `).bind(custId, syntheticEmail, data.customer_name, digits, now, now, effectiveTenant).run();
+        } catch {
+          await db.prepare(`
             INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
             VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)
-          `).bind(custId, `${digits}@loyalty.aura`, data.customer_name, digits, now, now),
-          db.prepare(`
-            INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
-            VALUES (?, ?, 0, 0, 0, ?, ?)
-          `).bind(generateId('wal_'), custId, now, now),
-        ]);
-        customerIdForCapture = custId;
+            ON CONFLICT DO NOTHING
+          `).bind(custId, syntheticEmail, data.customer_name, digits, now, now).run();
+        }
+        const insertedForTenant = await db.prepare(
+          "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(digits, effectiveTenant).first<{ id: string }>().catch(() => null);
+        if (insertedForTenant) {
+          try {
+            await db.prepare(`
+              INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at, tenant_id)
+              VALUES (?, ?, 0, 0, 0, ?, ?, ?)
+              ON CONFLICT DO NOTHING
+            `).bind(wid, insertedForTenant.id, now, now, effectiveTenant).run();
+          } catch {
+            await db.prepare(`
+              INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
+              VALUES (?, ?, 0, 0, 0, ?, ?)
+              ON CONFLICT DO NOTHING
+            `).bind(wid, insertedForTenant.id, now, now).run();
+          }
+          customerIdForCapture = insertedForTenant.id;
+        }
       } else {
         customerIdForCapture = existing.id;
       }
@@ -143,7 +196,8 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     await deductInventoryForOrder(
       env as unknown as import('worker/src/types/env').Env,
       orderId,
-      snapshot.items.map(i => ({ product_id: i.menuItemId, quantity: i.quantity, name: i.name }))
+      snapshot.items.map(i => ({ product_id: i.menuItemId, quantity: i.quantity, name: i.name })),
+      params.tenantId
     );
   } catch (e) {
     log.warn('Inventory deduction failed for order', { orderId, message: (e as Error).message });

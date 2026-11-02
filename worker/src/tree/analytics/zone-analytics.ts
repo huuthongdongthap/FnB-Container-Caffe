@@ -14,8 +14,16 @@ export interface ZoneRow {
 
 export async function getZoneStats(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number
+  days: number,
+  tenantId?: string
 ): Promise<ZoneRow[]> {
+  const hasTenant = Boolean(tenantId && tenantId !== '*');
+  const tenantClause = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
+  const binds: Array<number | string> = hasTenant && tenantId ? [days, tenantId] : [days];
   try {
     const { results } = await db.prepare(`  SELECT
     COALESCE(ct.zone, 'Mang đi') AS label,
@@ -24,10 +32,10 @@ export async function getZoneStats(
   FROM orders o
   LEFT JOIN cafe_tables ct ON ct.id = o.table_id
   WHERE o.status != 'cancelled'
-    AND o.created_at >= datetime('now', '-' || ? || ' days')
+    AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
- `).bind(days).all<ZoneRow>();
+ `).bind(...binds).all<ZoneRow>();
 
     return results || [];
   } catch {
@@ -39,10 +47,10 @@ export async function getZoneStats(
   FROM orders o
   LEFT JOIN tables t ON t.id = o.table_id
   WHERE o.status != 'cancelled'
-    AND o.created_at >= datetime('now', '-' || ? || ' days')
+    AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
- `).bind(days).all<ZoneRow>();
+ `).bind(...binds).all<ZoneRow>();
 
       return results || [];
     } catch {

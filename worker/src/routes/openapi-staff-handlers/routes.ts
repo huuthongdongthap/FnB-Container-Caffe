@@ -16,10 +16,10 @@ openApiStaffRouter.onError((error, c) => {
 });
 
 // Apply auth middleware to all routes
-openApiStaffRouter.use('/api/staff', requireAuth(['owner', 'manager', 'admin']));
+openApiStaffRouter.use('/api/staff', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
 openApiStaffRouter.use('/api/staff/*', async (c, next) => {
   const attendance = /^\/api\/staff\/(?:shifts|attendance)(?:\/|$)/.test(c.req.path);
-  return requireAuth(attendance ? STAFF_SESSION_ROLES : ['owner', 'manager', 'admin'])(c, next);
+  return requireAuth(attendance ? STAFF_SESSION_ROLES : ['owner', 'manager', 'supervisor', 'admin'])(c, next);
 });
 
 // Register sub-handlers

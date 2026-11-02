@@ -4,14 +4,16 @@
  */
 
 import { Hono } from 'hono';
-import { requireAuth } from 'worker/src/middleware/auth';
+import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import type { Env } from 'worker/src/types/env';
 import type { ModifierGroup, ModifierChoice } from '../model/catalog-types';
 import { syncModifierChoiceToMenuProjection } from '../policies/menu-projection';
 import { happyHourRouter } from './happy-hour';
 
 export const menuModifiersRouter = new Hono<{ Bindings: Env }>();
-const staffAuth = requireAuth(['owner', 'manager', 'staff', 'admin']);
+menuModifiersRouter.use('*', optionalAuth());
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);
@@ -24,14 +26,18 @@ function makeId(prefix: string): string {
 
 menuModifiersRouter.get('/groups', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const { results } = await db.prepare(
     'SELECT * FROM modifier_groups ORDER BY sort_order, name'
   ).all<ModifierGroup>();
-  return c.json({ success: true, data: results });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  return c.json({ success: true, data: filtered });
 });
 
 menuModifiersRouter.post('/groups', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const rawTenantId = getTenantId(c);
+  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = (await c.req.json()) as Record<string, unknown>;
   const name = String(body.name || '').trim();
   if (!name) return c.json({ success: false, error: 'name is required' }, 400);
@@ -42,14 +48,21 @@ menuModifiersRouter.post('/groups', staffAuth, async (c) => {
   const now = new Date().toISOString();
   try {
     await db.prepare(
-      `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, name, type, required, Number(body.sort_order) || 0, isActive, now, now).run();
+      `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, name, type, required, Number(body.sort_order) || 0, isActive, tenantId, now, now).run();
   } catch {
-    await db.prepare(
-      `INSERT INTO modifier_groups (id, name, type, required, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, name, type, required, Number(body.sort_order) || 0, now, now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(id, name, type, required, Number(body.sort_order) || 0, isActive, now, now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO modifier_groups (id, name, type, required, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(id, name, type, required, Number(body.sort_order) || 0, now, now).run();
+    }
   }
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(id).first<ModifierGroup>();
   return c.json({ success: true, data: group }, 201);
@@ -57,9 +70,12 @@ menuModifiersRouter.post('/groups', staffAuth, async (c) => {
 
 menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
-  const existing = await db.prepare('SELECT id FROM modifier_groups WHERE id = ?').bind(id).first<{ id: string }>();
-  if (!existing) return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  const existing = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!existing || !matchesTenantRow(existing, tenantId)) {
+    return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  }
   // product_modifier_groups has no FK to products, so the cascade on
   // modifier_choices leaves these links behind and the product silently
   // loses modifiers it still advertises.
@@ -73,7 +89,12 @@ menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
 
 menuModifiersRouter.get('/groups/:groupId/choices', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const groupId = c.req.param('groupId');
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
+  if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
+    return c.json({ success: true, data: [] });
+  }
   const { results } = await db.prepare(
     'SELECT * FROM modifier_choices WHERE group_id = ? ORDER BY sort_order, name'
   ).bind(groupId).all<ModifierChoice>();
@@ -82,9 +103,10 @@ menuModifiersRouter.get('/groups/:groupId/choices', async (c) => {
 
 menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const groupId = c.req.param('groupId');
-  const group = await db.prepare('SELECT id FROM modifier_groups WHERE id = ?').bind(groupId).first<{ id: string }>();
-  if (!group) return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>();
+  if (!group || !matchesTenantRow(group, tenantId)) return c.json({ success: false, error: 'Modifier group not found' }, 404);
   const body = (await c.req.json()) as Record<string, unknown>;
   const name = String(body.name || '').trim();
   if (!name) return c.json({ success: false, error: 'name is required' }, 400);
@@ -126,7 +148,12 @@ menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
 
 menuModifiersRouter.patch('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const { groupId, choiceId } = c.req.param();
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
+  if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
+    return c.json({ success: false, error: 'Modifier choice not found' }, 404);
+  }
   const existing = await db.prepare(
     'SELECT id FROM modifier_choices WHERE id = ? AND group_id = ?'
   ).bind(choiceId, groupId).first<{ id: string }>();
@@ -170,7 +197,12 @@ menuModifiersRouter.patch('/groups/:groupId/choices/:choiceId', staffAuth, async
 
 menuModifiersRouter.delete('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const { groupId, choiceId } = c.req.param();
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
+  if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
+    return c.json({ success: false, error: 'Modifier choice not found' }, 404);
+  }
   const existing = await db.prepare(
     'SELECT id FROM modifier_choices WHERE id = ? AND group_id = ?'
   ).bind(choiceId, groupId).first<{ id: string }>();
@@ -187,25 +219,36 @@ menuModifiersRouter.delete('/groups/:groupId/choices/:choiceId', staffAuth, asyn
 
 menuModifiersRouter.get('/products/:productId/groups', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const productId = c.req.param('productId');
+  const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>().catch(() => null);
+  if ((product && !matchesTenantRow(product, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !product)) {
+    return c.json({ success: true, data: [] });
+  }
   const { results } = await db.prepare(
-    `SELECT pm.group_id, pm.sort_order, mg.name, mg.type, mg.required
+    `SELECT pm.group_id, pm.sort_order, mg.*
      FROM product_modifier_groups pm
      JOIN modifier_groups mg ON mg.id = pm.group_id
      WHERE pm.product_id = ?
      ORDER BY pm.sort_order, mg.name`
   ).bind(productId).all<ModifierGroup & { group_id: string; sort_order: number }>();
-  return c.json({ success: true, data: results });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  return c.json({ success: true, data: filtered });
 });
 
 menuModifiersRouter.post('/products/:productId/groups', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const productId = c.req.param('productId');
   const body = (await c.req.json()) as Record<string, unknown>;
   const groupId = String(body.group_id || '').trim();
   if (!groupId) return c.json({ success: false, error: 'group_id is required' }, 400);
-  const group = await db.prepare('SELECT id FROM modifier_groups WHERE id = ?').bind(groupId).first<{ id: string }>();
-  if (!group) return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>().catch(() => null);
+  if ((product && !matchesTenantRow(product, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !product)) {
+    return c.json({ success: false, error: 'Product not found' }, 404);
+  }
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>();
+  if (!group || !matchesTenantRow(group, tenantId)) return c.json({ success: false, error: 'Modifier group not found' }, 404);
   await db.prepare(
     'INSERT OR IGNORE INTO product_modifier_groups (product_id, group_id, sort_order) VALUES (?, ?, ?)'
   ).bind(productId, groupId, Number(body.sort_order) || 0).run();
@@ -214,9 +257,20 @@ menuModifiersRouter.post('/products/:productId/groups', staffAuth, async (c) => 
 
 menuModifiersRouter.delete('/products/:productId/groups/:groupId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+  const productId = c.req.param('productId');
+  const groupId = c.req.param('groupId');
+  const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>().catch(() => null);
+  if ((product && !matchesTenantRow(product, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !product)) {
+    return c.json({ success: false, error: 'Product not found' }, 404);
+  }
+  const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
+  if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
+    return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  }
   await db.prepare(
     'DELETE FROM product_modifier_groups WHERE product_id = ? AND group_id = ?'
-  ).bind(c.req.param('productId'), c.req.param('groupId')).run();
+  ).bind(productId, groupId).run();
   return c.json({ success: true });
 });
 

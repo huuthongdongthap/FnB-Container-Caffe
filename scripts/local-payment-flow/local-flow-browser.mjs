@@ -273,6 +273,59 @@ export async function runBrowserFlow(runtime, context, check) {
       await page.screenshot({ path: path.join(verificationDir(), 'browser-kds-tenant-switch.png'), fullPage: true });
     } catch (error) { check('browser-kds-flow', false, 'flow executes', { error: String(error) }); }
     finally { await session.close(); }
+
+    const { session: auditSession, page: auditPage } = await newContext();
+    try {
+      await auditPage.goto('http://127.0.0.1:5197/account');
+      await auditPage.getByRole('button', { name: /Email & Mật khẩu/i }).click();
+      await auditPage.getByLabel('Email').fill('customer-default@local-review.test');
+      await auditPage.getByLabel('Mật khẩu').fill(REVIEW_PASSWORD);
+      const loginResp = auditPage.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login' && r.request().method() === 'POST', { timeout: 15000 });
+      const profileResp = auditPage.waitForResponse(r => new URL(r.url()).pathname === '/api/customers/me' && r.request().method() === 'GET', { timeout: 15000 });
+      await auditPage.getByRole('button', { name: /Đăng nhập bằng Email/i }).click();
+      const [loginResult, profileResult] = await Promise.all([loginResp, profileResp]);
+      const acctToken = await auditPage.evaluate(() => localStorage.getItem('aura_auth_token'));
+      check('browser-audit-261101-f01-account-self-service-login',
+        loginResult.status() === 200 && profileResult.status() === 200 && Boolean(acctToken),
+        '/account renders self-service customer login and loads GET /api/customers/me 200',
+        { loginStatus: loginResult.status(), profileStatus: profileResult.status(), hasToken: Boolean(acctToken) });
+
+      await auditPage.goto('http://127.0.0.1:5197/mobile/login');
+      await auditPage.locator('#device-token').fill('audit-device-staff');
+      for (const [idx, digit] of ['1', '2', '3', '4'].entries()) await auditPage.locator(`#pin-${idx}`).fill(digit);
+      await auditPage.getByRole('button', { name: /Đăng nhập|Sign In/i }).click();
+      await auditPage.waitForURL(/\/mobile$/, { timeout: 10000 });
+
+      await auditPage.goto('http://127.0.0.1:5197/mobile/login');
+      await auditPage.locator('#device-token').fill('audit-device-supervisor');
+      for (const [idx, digit] of ['1', '2', '3', '4'].entries()) await auditPage.locator(`#pin-${idx}`).fill(digit);
+      await auditPage.getByRole('button', { name: /Đăng nhập|Sign In/i }).click();
+      await auditPage.waitForURL(/\/mobile$/, { timeout: 10000 });
+
+      const refreshWait = auditPage.waitForResponse(r => new URL(r.url()).pathname.endsWith('/mobile/refresh') && r.request().method() === 'POST', { timeout: 15000 });
+      await auditPage.reload();
+      const refreshRes = await refreshWait;
+      const switchedState = await auditPage.evaluate(() => ({
+        auraDevice: localStorage.getItem('aura_device_token'),
+        mobileDevice: localStorage.getItem('mobile_device'),
+        user: JSON.parse(localStorage.getItem('aura_auth_user') || 'null'),
+      }));
+      check('browser-audit-261101-f02-mobile-device-switch',
+        refreshRes.status() === 200 && switchedState.auraDevice === 'audit-device-supervisor' && switchedState.mobileDevice === 'audit-device-supervisor',
+        'Switching mobile device updates both device keys and refreshes 200 on reload',
+        { refreshStatus: refreshRes.status(), auraDevice: switchedState.auraDevice, role: switchedState.user?.role });
+
+      await auditPage.goto('http://127.0.0.1:5197/kds');
+      const kdsUrl = new URL(auditPage.url()).pathname;
+      check('browser-audit-261101-f03-supervisor-shipper-nav',
+        kdsUrl === '/kds' && switchedState.user?.role === 'supervisor',
+        'supervisor role navigates to /kds and /mobile without redirect to /admin/login',
+        { kdsUrl, role: switchedState.user?.role });
+    } catch (error) {
+      check('browser-audit-261101-suite', false, 'F01-F03 browser checks pass', { error: String(error) });
+    } finally {
+      await auditSession.close();
+    }
     return { apiResponses, blockedExternalRequests: blocked, pageErrors: errors };
   } finally {
     if (browser) await browser.close();

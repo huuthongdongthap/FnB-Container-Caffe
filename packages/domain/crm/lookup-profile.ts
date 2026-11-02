@@ -47,6 +47,7 @@ const EMPTY: CrmProfile = {
 export interface LookupOptions {
   visitLimit?: number;
   orderLimit?: number;
+  tenantId?: string;
 }
 
 export async function lookupProfile(
@@ -56,6 +57,7 @@ export async function lookupProfile(
 ): Promise<CrmProfile> {
   const visitLimit = opts.visitLimit ?? 5;
   const orderLimit = opts.orderLimit ?? 5;
+  const targetTenant = opts.tenantId && opts.tenantId !== '*' ? opts.tenantId : null;
 
   try {
     const rawPhone = String(phone ?? '').trim();
@@ -64,42 +66,59 @@ export async function lookupProfile(
       digits.startsWith('84') && digits.length >= 11 ? '0' + digits.slice(2) : (digits || rawPhone);
 
     let identity: { customer_id: string; value?: string } | null = null;
-    try {
-      identity = await db
-        .prepare(
-          `SELECT customer_id, identifier_value AS value FROM customer_identities
-           WHERE identifier_type = 'phone' AND identifier_value = ?1
-           ORDER BY created_at DESC LIMIT 1`,
-        )
-        .bind(phone)
-        .first<{ customer_id: string; value?: string }>();
-    } catch {
+    if (!targetTenant) {
       try {
         identity = await db
           .prepare(
-            `SELECT customer_id, value FROM customer_identities
-             WHERE type = 'phone' AND value = ?1
+            `SELECT customer_id, identifier_value AS value FROM customer_identities
+             WHERE identifier_type = 'phone' AND identifier_value = ?1
              ORDER BY created_at DESC LIMIT 1`,
           )
           .bind(phone)
           .first<{ customer_id: string; value?: string }>();
       } catch {
-        identity = null;
+        try {
+          identity = await db
+            .prepare(
+              `SELECT customer_id, value FROM customer_identities
+               WHERE type = 'phone' AND value = ?1
+               ORDER BY created_at DESC LIMIT 1`,
+            )
+            .bind(phone)
+            .first<{ customer_id: string; value?: string }>();
+        } catch {
+          identity = null;
+        }
       }
     }
 
     if (!identity?.customer_id) {
       try {
-        identity = await db
-          .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
-          .bind(normalized, rawPhone)
-          .first<{ customer_id: string; value?: string }>();
+        identity = targetTenant
+          ? await db
+              .prepare(
+                "SELECT id AS customer_id FROM customers WHERE (phone = ? OR phone = ?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? LIMIT 1",
+              )
+              .bind(normalized, rawPhone, targetTenant)
+              .first<{ customer_id: string; value?: string }>()
+              .catch(() =>
+                db
+                  .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
+                  .bind(normalized, rawPhone)
+                  .first<{ customer_id: string; value?: string }>(),
+              )
+          : await db
+              .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
+              .bind(normalized, rawPhone)
+              .first<{ customer_id: string; value?: string }>();
       } catch {
         identity = null;
       }
     }
 
-    if (!identity?.customer_id) {
+    const resolvedCustomerId =
+      identity?.customer_id ?? (identity as { id?: string } | null)?.id ?? null;
+    if (!resolvedCustomerId) {
       return EMPTY;
     }
 
@@ -107,7 +126,7 @@ export async function lookupProfile(
       .prepare(
         `SELECT * FROM customers WHERE id = ?1`,
       )
-      .bind(identity.customer_id)
+      .bind(resolvedCustomerId)
       .first<{
         id: string;
         name: string | null;
@@ -117,10 +136,17 @@ export async function lookupProfile(
         loyalty_tier?: string | null;
         total_visits?: number | null;
         last_visit_at?: string | null;
+        tenant_id?: string | null;
       }>();
 
     if (!customer) {
       return EMPTY;
+    }
+    if (targetTenant && 'tenant_id' in customer && customer.tenant_id !== undefined) {
+      const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
+      if (custTenant !== targetTenant) {
+        return EMPTY;
+      }
     }
 
     const consents = await db
@@ -147,23 +173,36 @@ export async function lookupProfile(
       .bind(customer.id, visitLimit)
       .all<{ visited_at: string; channel: string }>();
 
+    const resolvedTenant =
+      targetTenant ?? ((customer.tenant_id && String(customer.tenant_id).trim()) || 'default');
     const orders = await db
       .prepare(
         `SELECT * FROM orders
          WHERE customer_id = ?1
-         ORDER BY created_at DESC LIMIT ?2`,
+           AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?2
+         ORDER BY created_at DESC LIMIT ?3`,
       )
-      .bind(customer.id, orderLimit)
+      .bind(customer.id, resolvedTenant, orderLimit)
       .all<Record<string, unknown>>()
       .catch(() =>
         db
           .prepare(
-            `SELECT id, total_cents, placed_at FROM orders
+            `SELECT * FROM orders
              WHERE customer_id = ?1
-             ORDER BY placed_at DESC LIMIT ?2`,
+             ORDER BY created_at DESC LIMIT ?2`,
           )
           .bind(customer.id, orderLimit)
-          .all<Record<string, unknown>>(),
+          .all<Record<string, unknown>>()
+          .catch(() =>
+            db
+              .prepare(
+                `SELECT id, total_cents, placed_at FROM orders
+                 WHERE customer_id = ?1
+                 ORDER BY placed_at DESC LIMIT ?2`,
+              )
+              .bind(customer.id, orderLimit)
+              .all<Record<string, unknown>>(),
+          ),
       );
 
     return {

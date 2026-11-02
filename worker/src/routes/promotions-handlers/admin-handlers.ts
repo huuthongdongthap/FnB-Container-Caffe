@@ -1,12 +1,38 @@
 import type { Hono } from 'hono';
-import { requireAuth } from '../../middleware/auth';
+import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import type { CreatePromotionInput } from './types';
 
+const PROMO_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+async function findPromoForTenant(
+  db: import('@cloudflare/workers-types').D1Database,
+  code: string,
+  tenantId: string,
+): Promise<Record<string, unknown> | null> {
+  const row = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
+  if (row && matchesTenantRow(row, tenantId)) return row;
+  if (row && tenantId !== '*') {
+    const scoped = await db.prepare("SELECT * FROM promotions WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+      .bind(code, tenantId).first<Record<string, unknown>>().catch(() => null);
+    if (scoped && matchesTenantRow(scoped, tenantId)) return scoped;
+  }
+  return null;
+}
+
 export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/promotions — list all promotions
-  router.get('/', async (c) => {
+  router.get('/', optionalAuth(), async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     let results: unknown[] = [];
@@ -21,14 +47,14 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     }
     if (tenantId !== '*') {
       results = (results as Array<Record<string, unknown>>).filter(
-        (r) => !r.tenant_id || String(r.tenant_id) === tenantId
+        (r) => matchesTenantRow(r, tenantId)
       );
     }
     return c.json({ success: true, data: results, promotions: results });
   });
 
   // GET /api/promotions/:code — get single promotion
-  router.get('/:code', async (c, next) => {
+  router.get('/:code', optionalAuth(), async (c, next) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
@@ -36,12 +62,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       await next();
       return;
     }
-    let promo = await db.prepare(
-      'SELECT * FROM promotions WHERE code = ?'
-    ).bind(code).first<Record<string, unknown>>();
-    if (promo && tenantId !== '*' && promo.tenant_id && String(promo.tenant_id) !== tenantId) {
-      return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
-    }
+    let promo = await findPromoForTenant(db, code, tenantId);
     if (!promo && code === 'WELCOME') {
       promo = {
         id: 'promo_welcome',
@@ -63,8 +84,10 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   });
 
   // POST /api/promotions — create new promotion
-  router.post('/', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+  router.post('/', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
+    const rawTenantId = getTenantId(c);
+    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const body = await c.req.json() as CreatePromotionInput;
     const code = body.code.trim().toUpperCase();
     if (!code) {
@@ -74,53 +97,45 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Phần trăm giảm phải từ 1-100' }, 400);
     }
 
-    const existing = await db.prepare('SELECT code FROM promotions WHERE code = ?').bind(code).first();
+    const existing = await findPromoForTenant(db, code, tenantId);
     if (existing) {
       return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
     }
 
+    const p = [code, body.percent, body.max_discount ?? 0, body.min_order ?? 0, body.usage_limit ?? 0];
+    const active = body.is_active ?? 1;
     try {
       await db.prepare(
-        `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
-      ).bind(
-        code,
-        body.percent,
-        body.max_discount ?? 0,
-        body.min_order ?? 0,
-        body.usage_limit ?? 0,
-        body.starts_at ?? null,
-        body.expires_at ?? null,
-        body.is_active ?? 1
-      ).run();
+        'INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active, tenant_id) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)'
+      ).bind(...p, body.starts_at ?? null, body.expires_at ?? null, active, tenantId).run();
     } catch {
-      await db.prepare(
-        `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
-      ).bind(
-        code,
-        body.percent,
-        body.max_discount ?? 0,
-        body.min_order ?? 0,
-        body.usage_limit ?? 0,
-        body.expires_at ?? null,
-        body.is_active ?? 1
-      ).run();
+      if (tenantId !== 'default') {
+        return c.json({ success: false, error: 'Failed to create promotion' }, 500);
+      }
+      try {
+        await db.prepare(
+          'INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)'
+        ).bind(...p, body.starts_at ?? null, body.expires_at ?? null, active).run();
+      } catch {
+        await db.prepare(
+          'INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active) VALUES (?, ?, ?, ?, ?, 0, ?, ?)'
+        ).bind(...p, body.expires_at ?? null, active).run();
+      }
     }
 
-    const created = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
+    const created = await findPromoForTenant(db, code, tenantId);
     return c.json({ success: true, data: created }, 201);
   });
 
   // PATCH /api/promotions/:code — update promotion
-  router.patch('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+  router.patch('/:code', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
     const body = await c.req.json() as Partial<CreatePromotionInput>;
 
-    const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
-    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
+    const existing = await findPromoForTenant(db, code, tenantId);
+    if (!existing) {
       return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
     }
 
@@ -128,63 +143,50 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Phần trăm giảm phải từ 1-100' }, 400);
     }
 
+    const whereClause = tenantId !== '*'
+      ? "WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+      : 'WHERE code = ?';
+    const whereArgs = tenantId !== '*' ? [code, tenantId] : [code];
+    const baseFields = [body.percent ?? null, body.max_discount ?? null, body.min_order ?? null, body.usage_limit ?? null];
+
     try {
       await db.prepare(
-        `UPDATE promotions SET
-          percent = COALESCE(?, percent),
-          max_discount = COALESCE(?, max_discount),
-          min_order = COALESCE(?, min_order),
-          usage_limit = COALESCE(?, usage_limit),
-          starts_at = COALESCE(?, starts_at),
-          expires_at = COALESCE(?, expires_at),
-          is_active = COALESCE(?, is_active)
-         WHERE code = ?`
-      ).bind(
-        body.percent ?? null,
-        body.max_discount ?? null,
-        body.min_order ?? null,
-        body.usage_limit ?? null,
-        body.starts_at ?? null,
-        body.expires_at ?? null,
-        body.is_active ?? null,
-        code
-      ).run();
+        `UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
+      ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
     } catch {
-      await db.prepare(
-        `UPDATE promotions SET
-          percent = COALESCE(?, percent),
-          max_discount = COALESCE(?, max_discount),
-          min_order = COALESCE(?, min_order),
-          usage_limit = COALESCE(?, usage_limit),
-          expires_at = COALESCE(?, expires_at),
-          is_active = COALESCE(?, is_active)
-         WHERE code = ?`
-      ).bind(
-        body.percent ?? null,
-        body.max_discount ?? null,
-        body.min_order ?? null,
-        body.usage_limit ?? null,
-        body.expires_at ?? null,
-        body.is_active ?? null,
-        code
-      ).run();
+      try {
+        await db.prepare(
+          'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
+        ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, code).run();
+      } catch {
+        await db.prepare(
+          'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
+        ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, code).run();
+      }
     }
 
-    const updated = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
+    const updated = await findPromoForTenant(db, code, tenantId);
     return c.json({ success: true, data: updated });
   });
 
   // DELETE /api/promotions/:code — delete promotion
-  router.delete('/:code', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+  router.delete('/:code', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     const code = c.req.param('code').toUpperCase();
-    const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
-    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
+    const existing = await findPromoForTenant(db, code, tenantId);
+    if (!existing) {
       return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
     }
 
-    await db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run();
+    if (tenantId !== '*') {
+      await db.prepare("DELETE FROM promotions WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+        .bind(code, tenantId)
+        .run()
+        .catch(() => db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run());
+    } else {
+      await db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run();
+    }
     return c.json({ success: true, data: null });
   });
 }

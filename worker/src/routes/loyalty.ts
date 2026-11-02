@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { redeemRewardSchema, zodErrorResponse } from '../lib/validators';
+import { resolvePilotStore } from '../lib/pilot-store';
 import type { Env } from '../types/env';
 import type { Customer } from '../types/models';
 
@@ -116,12 +117,25 @@ loyaltyRouter.get('/points', async(c) => {
 
 loyaltyRouter.get('/cashback', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
+  const custRecord = cust as unknown as Record<string, unknown>;
+  const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
+  const storeTenant = c.env.PILOT_TENANT_ID
+    ? resolvePilotStore(c.env).tenantId
+    : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
   const type = c.req.query('type');
 
-  const wallet = await c.env.AURA_DB.prepare('SELECT id FROM cashback_wallets WHERE customer_id = ?')
-    .bind(cust.id).first<{ id: string }>();
+  let wallet: { id: string } | null = null;
+  try {
+    wallet = await c.env.AURA_DB.prepare(
+      "SELECT id FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    )
+      .bind(cust.id, storeTenant).first<{ id: string }>();
+  } catch {
+    wallet = await c.env.AURA_DB.prepare('SELECT id FROM cashback_wallets WHERE customer_id = ?')
+      .bind(cust.id).first<{ id: string }>();
+  }
 
   if (!wallet) {
     return c.json({ success: true, data: [] });
@@ -157,6 +171,11 @@ loyaltyRouter.get('/cashback', async(c) => {
 
 loyaltyRouter.get('/rewards', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
+  const custRecord = cust as unknown as Record<string, unknown>;
+  const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
+  const storeTenant = c.env.PILOT_TENANT_ID
+    ? resolvePilotStore(c.env).tenantId
+    : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const db = c.env.AURA_DB;
 
   let allRewards: Array<{ id: string; title: string; point_cost: number }> = [];
@@ -180,14 +199,28 @@ loyaltyRouter.get('/rewards', async(c) => {
     }
   }
 
+  const tenantRewards = (allRewards || []).filter(r => {
+    const rec = r as unknown as Record<string, unknown>;
+    if ('tenant_id' in rec && rec.tenant_id !== undefined && rec.tenant_id !== null) {
+      const rowTenant = String(rec.tenant_id).trim() || 'default';
+      return rowTenant === storeTenant;
+    }
+    return true;
+  });
+
   const pts = cust.loyalty_points || 0;
-  const data = (allRewards || []).map(r => ({ ...r, can_redeem: pts >= r.point_cost }));
+  const data = tenantRewards.map(r => ({ ...r, can_redeem: pts >= r.point_cost }));
 
   return c.json({ success: true, data });
 });
 
 loyaltyRouter.post('/redeem', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
+  const custRecord = cust as unknown as Record<string, unknown>;
+  const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
+  const storeTenant = c.env.PILOT_TENANT_ID
+    ? resolvePilotStore(c.env).tenantId
+    : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = redeemRewardSchema.safeParse(body);
@@ -210,6 +243,13 @@ loyaltyRouter.post('/redeem', async(c) => {
   if (!reward) {
     return c.json({ success: false, error: 'Reward not found' }, 404);
   }
+  const rewardRec = reward as unknown as Record<string, unknown>;
+  if ('tenant_id' in rewardRec && rewardRec.tenant_id !== undefined && rewardRec.tenant_id !== null) {
+    const rewardTenant = String(rewardRec.tenant_id).trim() || 'default';
+    if (rewardTenant !== storeTenant) {
+      return c.json({ success: false, error: 'Reward not found' }, 404);
+    }
+  }
 
   const pts = cust.loyalty_points || 0;
   if (pts < reward.point_cost) {
@@ -218,14 +258,23 @@ loyaltyRouter.post('/redeem', async(c) => {
 
   const newPts = pts - reward.point_cost;
   const now = new Date().toISOString();
+  let deductRes: unknown;
   try {
-    await db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?').bind(newPts, now, cust.id).run();
+    deductRes = await db.prepare(
+      'UPDATE customers SET loyalty_points = loyalty_points - ?, updated_at = ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
+    ).bind(reward.point_cost, now, cust.id, reward.point_cost).run();
   } catch {
-    await db.prepare('UPDATE customers SET loyalty_points = ? WHERE id = ?').bind(newPts, cust.id).run();
+    deductRes = await db.prepare(
+      'UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
+    ).bind(reward.point_cost, cust.id, reward.point_cost).run();
+  }
+  const deductChanges = (deductRes as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 1;
+  if (deductChanges === 0) {
+    return c.json({ success: false, error: 'Không du diem', needed: reward.point_cost, current: pts }, 409);
   }
   await db.prepare(
-    'UPDATE loyalty_accounts SET current_points = ?, last_activity_at = ?, updated_at = ? WHERE customer_id = ? OR id = ?'
-  ).bind(newPts, now, now, cust.id, `la_${cust.id}`).run().catch(() => {});
+    'UPDATE loyalty_accounts SET current_points = MAX(0, COALESCE(current_points, 0) - ?), last_activity_at = ?, updated_at = ? WHERE customer_id = ? OR id = ?'
+  ).bind(reward.point_cost, now, now, cust.id, `la_${cust.id}`).run().catch(() => {});
 
   const logId = genId('ptl_');
   try {
@@ -245,7 +294,10 @@ loyaltyRouter.post('/redeem', async(c) => {
     ).bind(logId, cust.id, -reward.point_cost, 'redeem', `D?i: ${reward.title}`, now).run().catch(() => {});
   }
 
-  const code = `${reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+  const codeRand = new Uint8Array(3);
+  crypto.getRandomValues(codeRand);
+  const codeSuffix = Array.from(codeRand, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const code = `${reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}${codeSuffix}`;
   const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
   const redemptionId = genId('uwr_');
 

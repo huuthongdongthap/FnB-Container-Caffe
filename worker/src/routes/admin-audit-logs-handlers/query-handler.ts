@@ -2,16 +2,83 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { AuditLogger } from '../../lib/audit-logger';
 import { createLogger } from '../../middleware/logger';
+import { getTenantId } from '../../middleware/tenant';
 import { type PaginatedResponse } from './types';
 
 const log = createLogger({ route: 'admin-audit-logs:query' });
+
+export async function filterAuditRowsByTenant<T extends Record<string, any>>(
+  db: any,
+  rows: T[],
+  tenantId: string
+): Promise<T[]> {
+  if (tenantId === '*' || rows.length === 0) return rows;
+  const actorTenantCache = new Map<string, string | null>();
+  const filtered: T[] = [];
+
+  for (const row of rows) {
+    if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id) !== '') {
+      if (String(row.tenant_id) === tenantId) {
+        filtered.push(row);
+      }
+      continue;
+    }
+
+    const rawDetails = String(row.details || row.metadata || '');
+    let matchedFromMeta: boolean | null = null;
+    if (rawDetails.includes('tenant_id')) {
+      try {
+        const parsed = JSON.parse(rawDetails);
+        if (parsed && typeof parsed.tenant_id === 'string' && parsed.tenant_id) {
+          matchedFromMeta = parsed.tenant_id === tenantId;
+        }
+      } catch {
+        // Ignore non-JSON details
+      }
+    }
+    if (matchedFromMeta !== null) {
+      if (matchedFromMeta) filtered.push(row);
+      continue;
+    }
+
+    const actorId = String(row.actor_id || row.user_id || '');
+    if (actorId && db && typeof db.prepare === 'function') {
+      let actorTenant = actorTenantCache.get(actorId);
+      if (actorTenant === undefined) {
+        const userRow = (await db
+          .prepare('SELECT id, tenant_id FROM users WHERE id = ?')
+          .bind(actorId)
+          .first()
+          .catch(() => null)) as Record<string, unknown> | null;
+        if (userRow && 'tenant_id' in userRow && userRow.tenant_id !== undefined) {
+          actorTenant = userRow.tenant_id ? String(userRow.tenant_id) : 'default';
+        } else {
+          actorTenant = null;
+        }
+        actorTenantCache.set(actorId, actorTenant);
+      }
+      if (actorTenant !== null) {
+        if (actorTenant === tenantId) filtered.push(row);
+        continue;
+      }
+    }
+
+    if (tenantId === 'default') {
+      filtered.push(row);
+    }
+  }
+
+  return filtered;
+}
 
 export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs — query audit logs with filters and pagination
   router.get('/', async (c) => {
     try {
       // Create AuditLogger per-request (query only needs AURA_DB)
-      const auditLogger = new AuditLogger(c.executionCtx, c.env.AURA_DB);
+      let execCtx: any;
+      try { execCtx = c.executionCtx; } catch { execCtx = undefined; }
+      const auditLogger = new AuditLogger(execCtx, c.env.AURA_DB);
       const actorId = c.req.query('actor_id');
       const action = c.req.query('action');
       const resourceType = c.req.query('resource_type');
@@ -110,6 +177,17 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
           }
         } catch {
           // Keep original result on fallback query error
+        }
+      }
+
+      const tenantId = getTenantId(c as any);
+      if (tenantId !== '*' && result.rows.length > 0) {
+        const filteredRows = await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
+        if (filteredRows.length !== result.rows.length) {
+          result = {
+            rows: filteredRows as any,
+            total: Math.max(0, result.total - (result.rows.length - filteredRows.length)),
+          };
         }
       }
 

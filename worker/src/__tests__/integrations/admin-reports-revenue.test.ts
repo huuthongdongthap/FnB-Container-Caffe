@@ -163,4 +163,46 @@ describe('Admin Revenue Analytics & Grouped Sales Handlers', () => {
     expect(json.success).toBe(true);
     expect(json.data.groups).toEqual([{ label: 'Cà phê', value: 90000, count: 2 }]);
   });
+
+  it('isolates non-default tenant from NULL/default orders and customers across overview, daily, summary, customer-metrics, and CSV export', async () => {
+    const boundCalls: Array<{ sql: string; args: unknown[] }> = [];
+    const mockDb = {
+      prepare: vi.fn().mockImplementation((sql: string) => ({
+        bind: vi.fn().mockImplementation((...args: unknown[]) => {
+          boundCalls.push({ sql, args });
+          return {
+            first: vi.fn().mockResolvedValue({ revenue: 75000, orders_count: 1, count: 1, total: 75000 }),
+            all: vi.fn().mockResolvedValue({
+              results: sql.includes('FROM customers c')
+                ? [{ id: 'CUST_B1', name: 'Cust B', email: 'b@cafe.vn', phone: '0900000002', loyalty_tier: 'silver', created_at: '2026-10-30', total_spent: 75000, order_count: 1 }]
+                : [{ date: '2026-10-30', count: 1, revenue: 75000 }],
+            }),
+          };
+        }),
+        first: vi.fn().mockResolvedValue({ total: 0, count: 0 }),
+        all: vi.fn().mockResolvedValue({ results: [] }),
+      })),
+    };
+    const app = new Hono<{ Bindings: Env; Variables: { user?: unknown } }>();
+    app.use('*', async (c, next) => {
+      c.set('user', { id: 'USR_B1', role: 'owner', tenantId: 'cafe-b' });
+      await next();
+    });
+    app.route('/', reportsRouter);
+    const env = { AURA_DB: mockDb } as unknown as Env;
+
+    const overviewRes = await app.request('/overview?from=2026-10-30&to=2026-10-30', {}, env);
+    expect(overviewRes.status).toBe(200);
+    expect(boundCalls.some((c) => c.sql.includes('AND tenant_id = ?') && !c.sql.includes('IS NULL') && c.args.includes('cafe-b'))).toBe(true);
+
+    const summaryRes = await app.request('/summary', {}, env);
+    expect(summaryRes.status).toBe(200);
+    expect(boundCalls.some((c) => c.sql.includes('FROM customers WHERE tenant_id = ?') && c.args.includes('cafe-b'))).toBe(true);
+
+    const custExportRes = await app.request('/export?type=customers&from=2026-10-01&to=2026-10-30', {}, env);
+    expect(custExportRes.status).toBe(200);
+    const csvText = await custExportRes.text();
+    expect(csvText).toContain('CUST_B1');
+    expect(boundCalls.some((c) => c.sql.includes('WHERE c.tenant_id = ?') && c.args.includes('cafe-b'))).toBe(true);
+  });
 });

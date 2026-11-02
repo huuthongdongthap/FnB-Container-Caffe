@@ -9,7 +9,7 @@ export async function listStaff(request: Request, rawEnv: Record<string, unknown
   try {
     const session = await authenticateRequest(request, env);
     if (!session || 'blocked' in session) return errorResponse('Vui lòng đăng nhập', 401);
-    if (!session.account || !['owner', 'admin', 'manager'].includes(session.account.role)) return errorResponse('Không đủ quyền', 403);
+    if (!session.account || !['owner', 'admin', 'manager', 'supervisor'].includes(session.account.role)) return errorResponse('Không đủ quyền', 403);
     let rows;
     try {
       rows = await env.AURA_DB.prepare(`SELECT id, name, phone, role, is_active, created_at FROM users

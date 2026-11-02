@@ -7,9 +7,22 @@ import { registerSummaryHandlers } from './summary-handlers';
 
 export const openApiCronRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Apply auth middleware to all routes (owner/manager/admin only for cron management)
-openApiCronRouter.use('/api/cron', requireAuth(['owner', 'manager', 'admin']));
-openApiCronRouter.use('/api/cron/*', requireAuth(['owner', 'manager', 'admin']));
+const readCronAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
+const mutateCronAuth = requireAuth(['owner', 'manager', 'admin']);
+
+// Apply auth middleware to all routes (supervisor read-only; owner/manager/admin for mutations)
+openApiCronRouter.use('/api/cron', async (c, next) => {
+  if (c.req.method === 'GET') {
+    return readCronAuth(c, next);
+  }
+  return mutateCronAuth(c, next);
+});
+openApiCronRouter.use('/api/cron/*', async (c, next) => {
+  if (c.req.method === 'GET') {
+    return readCronAuth(c, next);
+  }
+  return mutateCronAuth(c, next);
+});
 
 // Register sub-handlers
 registerJobCrudHandlers(openApiCronRouter);

@@ -17,6 +17,14 @@ export interface TIWebhookPayload {
   timestamp?: string;
 }
 
+const ALLOWED_LOCAL_ORDER_STATUSES = new Set([
+  'confirmed',
+  'preparing',
+  'ready',
+  'completed',
+  'cancelled'
+]);
+
 export function mapTIStatusToLocal(tiStatus: string): string {
   const normalized = tiStatus.toLowerCase().trim();
   switch (normalized) {
@@ -35,7 +43,7 @@ export function mapTIStatusToLocal(tiStatus: string): string {
     case 'canceled':
       return 'cancelled';
     default:
-      return normalized;
+      return ALLOWED_LOCAL_ORDER_STATUSES.has(normalized) ? normalized : 'confirmed';
   }
 }
 
@@ -84,7 +92,11 @@ export async function processTIWebhook(
       .run();
   } else {
     bridgeId = crypto.randomUUID();
-    localOrderId = payload.local_order_id ?? `ti-auto-${tiOrderId ?? bridgeId.slice(0, 8)}`;
+    const safeInboundOrderId =
+      typeof payload.local_order_id === 'string' && payload.local_order_id.startsWith('ti-auto-')
+        ? payload.local_order_id
+        : `ti-auto-${tiOrderId ?? bridgeId.slice(0, 8)}`;
+    localOrderId = safeInboundOrderId;
     await db
       .prepare(
         "INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, synced_at, created_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))"
@@ -93,23 +105,76 @@ export async function processTIWebhook(
       .run();
   }
 
-  // Update local orders table if localOrderId matches
-  if (localOrderId) {
+  // Only mutate local orders when an existing ti_order_bridge links this webhook and state machine guards pass
+  if (bridgeRow && localOrderId) {
     try {
-      await db
-        .prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?")
-        .bind(mappedStatus, localOrderId)
-        .run();
-    } catch {
-      // Fallback in case orders table does not have updated_at column
-      try {
-        await db
-          .prepare('UPDATE orders SET status = ? WHERE id = ?')
-          .bind(mappedStatus, localOrderId)
-          .run();
-      } catch (err) {
-        log.warn('local_order_status_sync_skipped', { localOrderId, error: (err as Error).message });
+      let currentOrder = await db
+        .prepare('SELECT id, status, order_type, payment_status FROM orders WHERE id = ? LIMIT 1')
+        .bind(localOrderId)
+        .first<{ id: string; status: string; order_type?: string | null; payment_status?: string | null }>()
+        .catch(() => null);
+      if (!currentOrder) {
+        currentOrder = await db
+          .prepare('SELECT id, status FROM orders WHERE id = ? LIMIT 1')
+          .bind(localOrderId)
+          .first<{ id: string; status: string }>()
+          .catch(() => null);
       }
+      const currentStatus = currentOrder?.status;
+      const isTerminalState =
+        currentStatus === 'completed' ||
+        currentStatus === 'cancelled' ||
+        currentStatus === 'failed' ||
+        currentStatus === 'expired';
+      const unpaidDeliveryBlock =
+        mappedStatus === 'preparing' &&
+        currentOrder?.order_type === 'delivery' &&
+        currentOrder?.payment_status !== undefined &&
+        currentOrder?.payment_status !== null &&
+        currentOrder.payment_status !== 'paid';
+      const allowedNext: Record<string, string[]> = {
+        pending: ['confirmed', 'preparing', 'cancelled'],
+        confirmed: ['preparing', 'ready', 'completed', 'cancelled'],
+        preparing: ['ready', 'completed', 'cancelled'],
+        ready: ['served', 'delivered', 'completed', 'cancelled'],
+        served: ['completed'],
+        delivered: ['completed'],
+      };
+      const validTransition =
+        !currentStatus ||
+        currentStatus === mappedStatus ||
+        (!isTerminalState && (allowedNext[currentStatus]?.includes(mappedStatus) ?? false));
+
+      if (!isTerminalState && !unpaidDeliveryBlock && validTransition) {
+        try {
+          await db
+            .prepare(
+              currentStatus
+                ? "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?"
+                : "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?"
+            )
+            .bind(...(currentStatus ? [mappedStatus, localOrderId, currentStatus] : [mappedStatus, localOrderId]))
+            .run();
+        } catch {
+          await db
+            .prepare(
+              currentStatus
+                ? 'UPDATE orders SET status = ? WHERE id = ? AND status = ?'
+                : 'UPDATE orders SET status = ? WHERE id = ?'
+            )
+            .bind(...(currentStatus ? [mappedStatus, localOrderId, currentStatus] : [mappedStatus, localOrderId]))
+            .run();
+        }
+      } else {
+        log.warn('local_order_status_transition_blocked', {
+          localOrderId,
+          from: currentStatus,
+          to: mappedStatus,
+          unpaidDeliveryBlock,
+        });
+      }
+    } catch (err) {
+      log.warn('local_order_status_sync_skipped', { localOrderId, error: (err as Error).message });
     }
   }
 

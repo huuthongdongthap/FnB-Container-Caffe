@@ -1,29 +1,21 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
-import { resolvePilotStore } from '../../lib/pilot-store';
+import { getTenantId } from '../../lib/db';
 import { createLogger } from '../../middleware/logger';
-import { type CustomerRecord, SEGMENTS, PROFILE_SQL } from './types';
+import { type CustomerRecord, SEGMENTS, PROFILE_SQL, LEGACY_PROFILE_SQL } from './types';
 
 const log = createLogger({ route: 'customers-admin' });
 
-function resolveRequestTenant(c: { get: (k: string) => unknown; env: Env }): string {
-  const user = c.get('user') as { tenantId?: string; role?: string } | undefined;
-  if (user?.tenantId) {
-    return user.tenantId;
-  }
-  try {
-    return resolvePilotStore(c.env);
-  } catch {
-    return 'default';
-  }
+function resolveRequestTenant(c: unknown): string {
+  return getTenantId(c as Parameters<typeof getTenantId>[0]);
 }
 
 export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/customers/segments — segment list with counts (admin)
-  router.get('/segments', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
+  router.get('/segments', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = resolveRequestTenant(c as unknown as { get: (k: string) => unknown; env: Env });
+    const tenantId = resolveRequestTenant(c);
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
 
@@ -31,28 +23,39 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
       let birthdayCount = 0;
       try {
         const bRow = await db.prepare(
-          "SELECT COUNT(*) as count FROM customers WHERE date_of_birth IS NOT NULL AND substr(date_of_birth, 6, 2) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
-        ).bind(month, tenantId).first<{ count: number }>();
+          "SELECT COUNT(*) as count FROM customers WHERE date_of_birth IS NOT NULL AND substr(date_of_birth, 6, 2) = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)"
+        ).bind(month, tenantId, tenantId).first<{ count: number }>();
         birthdayCount = bRow?.count || 0;
       } catch {
         try {
           const bRow = await db.prepare(
-            'SELECT COUNT(*) as count FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?'
-          ).bind(month).first<{ count: number }>();
+            "SELECT COUNT(*) as count FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)"
+          ).bind(month, tenantId, tenantId).first<{ count: number }>();
           birthdayCount = bRow?.count || 0;
         } catch {
-          birthdayCount = 0;
+          if (tenantId === 'default' || tenantId === '*') {
+            try {
+              const bRow = await db.prepare(
+                'SELECT COUNT(*) as count FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?'
+              ).bind(month).first<{ count: number }>();
+              birthdayCount = bRow?.count || 0;
+            } catch {
+              birthdayCount = 0;
+            }
+          } else {
+            birthdayCount = 0;
+          }
         }
       }
 
       const results = await Promise.all([
-        db.prepare("SELECT COUNT(*) as count FROM customers WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'bronze' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'silver' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'gold' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'platinum' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(DISTINCT customer_phone) as count FROM orders WHERE created_at >= datetime('now', '-30 days') AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ count: number }>(),
-        db.prepare("SELECT COUNT(*) as count FROM customers c WHERE c.phone NOT IN (SELECT DISTINCT customer_phone FROM orders WHERE created_at >= datetime('now', '-90 days') AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND c.phone IS NOT NULL AND COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers WHERE LOWER(loyalty_tier) = 'bronze' AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers WHERE LOWER(loyalty_tier) = 'silver' AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers WHERE LOWER(loyalty_tier) = 'gold' AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers WHERE LOWER(loyalty_tier) = 'platinum' AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(DISTINCT customer_phone) as count FROM orders WHERE customer_phone IS NOT NULL AND created_at >= datetime('now', '-30 days') AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId).first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) as count FROM customers c WHERE c.phone NOT IN (SELECT DISTINCT customer_phone FROM orders WHERE customer_phone IS NOT NULL AND created_at >= datetime('now', '-90 days') AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)) AND c.phone IS NOT NULL AND (? = '*' OR COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?)").bind(tenantId, tenantId, tenantId, tenantId).first<{ count: number }>(),
       ]);
 
       const counts = [
@@ -80,9 +83,9 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
   });
 
   // GET /api/customers — admin customer list
-  router.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
+  router.get('/', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = resolveRequestTenant(c as unknown as { get: (k: string) => unknown; env: Env });
+    const tenantId = resolveRequestTenant(c);
     const rawPage = parseInt(c.req.query('page') || '1', 10);
     const rawLimit = parseInt(c.req.query('limit') || '50', 10);
     const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
@@ -91,9 +94,9 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
     const tierParam = c.req.query('tier');
     const offset = (page - 1) * limit;
 
-    let countQuery = "SELECT COUNT(*) as total FROM customers c WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?";
-    let dataQuery = `${PROFILE_SQL}WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?`;
-    const params: unknown[] = [tenantId];
+    let countQuery = "SELECT COUNT(*) as total FROM customers c WHERE (? = '*' OR COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?)";
+    let dataQuery = `${PROFILE_SQL}WHERE (? = '*' OR COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?)`;
+    const params: unknown[] = [tenantId, tenantId];
 
     if (search) {
       const clause = ' AND (c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)';
@@ -121,10 +124,17 @@ export function registerAdminHandlers(router: Hono<{ Bindings: Env }>): void {
         const res = await dataStmt.all<CustomerRecord>();
         results = res.results;
       } catch {
-        const fallbackQuery = dataQuery.replace(PROFILE_SQL, 'SELECT c.* FROM customers c ');
-        const fallbackStmt = db.prepare(fallbackQuery).bind(...params, limit, offset);
-        const res = await fallbackStmt.all<CustomerRecord>();
-        results = res.results;
+        try {
+          const legacyQuery = dataQuery.replace(PROFILE_SQL, LEGACY_PROFILE_SQL);
+          const legacyStmt = db.prepare(legacyQuery).bind(...params, limit, offset);
+          const res = await legacyStmt.all<CustomerRecord>();
+          results = res.results;
+        } catch {
+          const fallbackQuery = dataQuery.replace(PROFILE_SQL, 'SELECT c.* FROM customers c ');
+          const fallbackStmt = db.prepare(fallbackQuery).bind(...params, limit, offset);
+          const res = await fallbackStmt.all<CustomerRecord>();
+          results = res.results;
+        }
       }
 
       return c.json({

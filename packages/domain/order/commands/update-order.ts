@@ -26,7 +26,11 @@ export async function updateOrder(
     }
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
 
-    const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+    const tenantClause = tenantId === '*'
+      ? ''
+      : tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
 
     // Fetch full row — needed for DO broadcast payload below
@@ -129,9 +133,15 @@ export async function updateOrder(
           'SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
         ).bind(id).first<{ promotion_id?: string; code?: string }>();
         if (redRow && (redRow.promotion_id || redRow.code)) {
-          await db.prepare(
-            'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
-          ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+          try {
+            await db.prepare(
+              "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE (id = ? OR code = ?) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+            ).bind(redRow.promotion_id ?? '', redRow.code ?? '', tenantId, tenantId).run();
+          } catch {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
+            ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+          }
           await db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(id).run().catch(() => {});
         }
       } catch {
@@ -177,14 +187,28 @@ if (['served', 'completed'].includes(body.status as string)) {
       // one visit row + VisitRecorded event per completed order.
       try {
         const order = await db.prepare(
-          'SELECT total, order_type, table_id, customer_email, customer_phone FROM orders WHERE id = ?'
-        ).bind(id).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null }>();
+          'SELECT total, order_type, table_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?'
+        ).bind(id).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT total, order_type, table_id, customer_email, customer_phone FROM orders WHERE id = ?'
+          ).bind(id).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>()
+        );
 
         if (order) {
           const normalizedPhone = String(order.customer_phone || '').replace(/\D/g, '');
-          const visitCustomer = await db.prepare(
-            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-          ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
+          const orderTenant = typeof order.tenant_id === 'string' && order.tenant_id.trim()
+            ? order.tenant_id.trim()
+            : (tenantId && tenantId !== '*' ? tenantId : 'default');
+          let visitCustomer: { id: string } | null = null;
+          try {
+            visitCustomer = await db.prepare(
+              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+            ).bind(order.customer_email, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
+          } catch {
+            visitCustomer = await db.prepare(
+              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+            ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
+          }
 
           if (visitCustomer) {
             const { recordVisit } = await import('@aura/domain-customer');
@@ -209,15 +233,29 @@ if (['served', 'completed'].includes(body.status as string)) {
 
       try {
         const order = await db.prepare(
-          'SELECT total, payment_status, customer_id, customer_email, customer_phone FROM orders WHERE id = ?'
-        ).bind(id).first<{ total: number; payment_status?: string | null; customer_id?: string | null; customer_email: string | null; customer_phone: string | null }>();
+          'SELECT total, payment_status, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?'
+        ).bind(id).first<{ total: number; payment_status?: string | null; customer_id?: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT total, payment_status, customer_id, customer_email, customer_phone FROM orders WHERE id = ?'
+          ).bind(id).first<{ total: number; payment_status?: string | null; customer_id?: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>()
+        );
 
         if (order && order.total >= 20000 && (!order.payment_status || order.payment_status === 'paid')) {
           let customerId = order.customer_id || null;
           if (!customerId) {
-            const customer = await db.prepare(
-              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-            ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
+            const orderTenant = typeof order.tenant_id === 'string' && order.tenant_id.trim()
+              ? order.tenant_id.trim()
+              : (tenantId && tenantId !== '*' ? tenantId : 'default');
+            let customer: { id: string } | null = null;
+            try {
+              customer = await db.prepare(
+                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+              ).bind(order.customer_email, order.customer_phone, orderTenant, orderTenant).first<{ id: string }>();
+            } catch {
+              customer = await db.prepare(
+                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+              ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
+            }
             customerId = customer?.id || null;
           }
 

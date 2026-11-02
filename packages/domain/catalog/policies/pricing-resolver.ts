@@ -35,6 +35,7 @@ export interface ResolveServerPriceInput {
   modifiers?: unknown[];
   now?: Date;
   channelDeltas?: ChannelDeltaConfig;
+  tenantId?: string;
 }
 
 export interface ResolvedServerPrice {
@@ -64,6 +65,7 @@ export async function resolveServerProductPrice(
     available: number | boolean;
     category_id?: string | null;
     category?: string | null;
+    tenant_id?: string | null;
   };
 
   let dbItem: DbCatalogRow | null = null;
@@ -74,7 +76,19 @@ export async function resolveServerProductPrice(
           .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return row;
+        if (row) {
+          if (input.tenantId && input.tenantId !== '*' && row.tenant_id === undefined) {
+            const tenantRow = await db
+              .prepare('SELECT tenant_id FROM products WHERE id = ?')
+              .bind(id)
+              .first<{ tenant_id?: string | null }>()
+              .catch(() => null);
+            if (tenantRow && 'tenant_id' in tenantRow && tenantRow.tenant_id !== undefined) {
+              row.tenant_id = tenantRow.tenant_id;
+            }
+          }
+          return row;
+        }
       } catch {
         // fallback to legacy column list
       }
@@ -110,7 +124,13 @@ export async function resolveServerProductPrice(
 
     try {
       dbItem = await findById(productId);
-
+      if (dbItem && input.tenantId && input.tenantId !== '*' && 'tenant_id' in dbItem && dbItem.tenant_id !== undefined) {
+        const reqTenant = input.tenantId.trim() || 'default';
+        const itemTenant = (dbItem.tenant_id && String(dbItem.tenant_id).trim()) || 'default';
+        if (itemTenant !== reqTenant) {
+          dbItem = null;
+        }
+      }
     } catch {
       dbItem = null;
     }
@@ -168,7 +188,7 @@ export async function resolveServerProductPrice(
     };
   }
 
-  // Load active happy hour windows
+  // Load active happy hour windows scoped to tenant
   let happyHourWindows: HappyHourWindow[] = [];
   if (db) {
     try {
@@ -176,7 +196,18 @@ export async function resolveServerProductPrice(
         .prepare('SELECT * FROM happy_hour_windows WHERE active = 1')
         .bind()
         .all<HappyHourWindow>();
-      happyHourWindows = (Array.isArray(hhRes) ? hhRes : hhRes?.results || []) as HappyHourWindow[];
+      const rawWindows = (Array.isArray(hhRes) ? hhRes : hhRes?.results || []) as HappyHourWindow[];
+      const effectiveTenant = input.tenantId && input.tenantId.trim() ? input.tenantId.trim() : 'default';
+      happyHourWindows = effectiveTenant === '*'
+        ? rawWindows
+        : rawWindows.filter((w) => {
+            const row = w as unknown as Record<string, unknown>;
+            if ('tenant_id' in row && row.tenant_id !== undefined) {
+              const rowTenant = row.tenant_id && String(row.tenant_id).trim() ? String(row.tenant_id).trim() : 'default';
+              return rowTenant === effectiveTenant;
+            }
+            return effectiveTenant === 'default';
+          });
     } catch {
       happyHourWindows = [];
     }

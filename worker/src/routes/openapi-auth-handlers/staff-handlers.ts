@@ -2,6 +2,9 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, generateToken } from './helpers';
+import { getTenantId } from '../../middleware/tenant';
+
+const STAFF_LIST_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/register-staff - Register staff (owner only)
@@ -14,6 +17,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (user.role !== 'owner' && user.role !== 'admin') {
       return c.json({ success: false, error: 'Only owners can register staff' }, 403);
     }
+    if (body.role === 'admin' && user.role !== 'admin') {
+      return c.json({ success: false, error: 'Only admins can register admin accounts' }, 403);
+    }
 
     let existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
     if (!existing) {
@@ -25,7 +31,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
-    const tenantId = user.tenantId || user.tenant_id || 'default';
+    const rawTenantId = getTenantId(c);
+    const tenantId = rawTenantId === '*' ? (user.tenantId || user.tenant_id || 'default') : rawTenantId;
 
     try {
       await db.prepare(
@@ -61,7 +68,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
     } catch {
       const metaStr = JSON.stringify({ role: body.role });
       try {
@@ -111,12 +118,17 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive } = query;
 
-    if (user.role !== 'owner' && user.role !== 'admin' && user.role !== 'manager') {
+    if (!STAFF_LIST_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Only owners can list staff' }, 403);
     }
 
+    const tenantId = getTenantId(c);
     let whereClause = 'WHERE role != \'customer\'';
     const params: (string | number)[] = [];
+    if (tenantId !== '*') {
+      whereClause += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      params.push(tenantId);
+    }
 
     if (role) {
       whereClause += ' AND role = ?';
@@ -152,7 +164,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          LIMIT ? OFFSET ?`
       ).bind(...params, limit, offset).all();
     } catch {
-      const canonicalWhere = whereClause.replace(/\brole\b/g, 'u.role').replace(/\bis_active\b/g, 'u.is_active');
+      const canonicalWhere = whereClause
+        .replace(/\brole\b/g, 'u.role')
+        .replace(/\bis_active\b/g, 'u.is_active')
+        .replace(/\btenant_id\b/g, 'u.tenant_id');
       const canonicalOrder = safeSort === 'email' ? `s.email ${safeDirection}` : `u.${safeSort} ${safeDirection}`;
       rows = await db.prepare(
         `SELECT u.id, u.name, s.email AS email, u.phone, u.role, u.is_active, u.created_at, u.updated_at
@@ -227,7 +242,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run();
     } catch {
       try {
         await db.prepare(

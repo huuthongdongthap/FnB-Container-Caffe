@@ -4,6 +4,23 @@
  */
 
 import type { D1Database, D1Result } from '@cloudflare/workers-types';
+import { getTenantId as resolveTenantId } from '../middleware/tenant';
+
+export { resolveTenantId as getTenantId };
+
+/**
+ * Checks whether a database row belongs to the active tenant context.
+ * Rows without a `tenant_id` column (legacy/minimal test schemas) match `'default'` or `'*'`.
+ */
+export function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (!row) return false;
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 export interface QueryResult<T = unknown> {
   results: T[];

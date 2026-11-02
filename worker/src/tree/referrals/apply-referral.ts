@@ -2,7 +2,10 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ReferralCode } from '../../types/models';
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + rand;
 }
 
 export async function applyReferralForNewCustomer(db: D1Database, newCustomerId: string, referralCode: string): Promise<Record<string, unknown>> {
@@ -33,9 +36,26 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
     return { success: false, reason: 'already_processed_points' };
   }
 
-  const referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string }>();
+  const referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string; tenant_id?: string | null }>();
   if (!referrer) {
     return { success: false, reason: 'referrer_not_found' };
+  }
+  try {
+    const referrerWithTenant = referrer.tenant_id !== undefined
+      ? referrer
+      : await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string; tenant_id?: string | null }>();
+    if (referrerWithTenant && referrerWithTenant.tenant_id !== undefined) {
+      const referee = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(newCustomerId).first<{ id: string; tenant_id?: string | null }>();
+      if (referee && referee.tenant_id !== undefined) {
+        const refTenant = (referrerWithTenant.tenant_id && referrerWithTenant.tenant_id.trim()) || 'default';
+        const custTenant = (referee.tenant_id && referee.tenant_id.trim()) || 'default';
+        if (refTenant !== custTenant) {
+          return { success: false, reason: 'referrer_not_found' };
+        }
+      }
+    }
+  } catch {
+    // Optional tenant_id column in minimal test schemas
   }
 
   const REFERRER_CASHBACK_VND = 10000;

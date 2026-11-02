@@ -7,8 +7,8 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier', 'shipper'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
 
 function normalizeOrderItems(raw: unknown): Array<Record<string, unknown>> {
   let parsed: unknown[] = [];
@@ -52,7 +52,12 @@ export async function getOrdersMobile(
     const tenantId = getTenantId(context);
     let query = 'SELECT * FROM orders WHERE 1=1';
     const params: string[] = [];
-    if (tenantId !== '*') { query += ' AND tenant_id = ?'; params.push(tenantId); }
+    if (tenantId !== '*') {
+      query += tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
+      params.push(tenantId);
+    }
 
     if (tableId) {
       query += ' AND table_id = ?';
@@ -96,13 +101,19 @@ export async function createOrderMobile(
     if (!Array.isArray(body.items) || body.items.length === 0) return errorResponse('Danh sách món trống', 400);
     let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
     try { ctx = context.executionCtx; } catch { /* unit tests have no execution context */ }
+    const userActor = (context.get('user') as unknown as Record<string, unknown> | undefined) || {};
+    const tenantId = getTenantId(context);
     const response = await createOrderFromAlias(context.req.raw, context.env, {
       ...body,
       customer_name: body.customer_name || `Bàn ${body.table_number || body.table_id}`,
       customer_phone: body.customer_phone || '0000000000',
       order_type: 'dine_in',
       payment_method: String(body.payment_method || 'cod').toLowerCase(),
-    }, ctx, context.get('user'));
+    }, ctx, {
+      id: typeof userActor.id === 'string' ? userActor.id : undefined,
+      role: typeof userActor.role === 'string' ? userActor.role : role,
+      tenantId: typeof userActor.tenantId === 'string' && userActor.tenantId ? userActor.tenantId : tenantId,
+    });
     if (!response.ok) return response;
     const result = await response.json() as { data: { id: string; total: number } };
     return jsonResponse({ success: true, order_id: result.data.id, total: result.data.total }, response.status);
@@ -129,8 +140,13 @@ export async function getOrderDetail(
     }
 
     const tenantId = getTenantId(context);
+    const tenantClause = tenantId === '*'
+      ? ''
+      : tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
     const row = await context.env.AURA_DB
-      .prepare(`SELECT * FROM orders WHERE id = ?${tenantId === '*' ? '' : ' AND tenant_id = ?'}`)
+      .prepare(`SELECT * FROM orders WHERE id = ?${tenantClause}`)
       .bind(...(tenantId === '*' ? [orderId] : [orderId, tenantId]))
       .first();
 

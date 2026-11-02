@@ -16,23 +16,32 @@ import { createFrigateClient } from '../../clients/frigate-client';
 import { syncFrigateEvents, getFrigateEvents } from '../../tree/integrations/frigate/sync';
 import { getOccupancyAnalytics } from '../../tree/integrations/frigate/occupancy';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'frigate-gateway' });
+const CAMERA_ID_REGEX = /^[a-zA-Z0-9_.-]{1,64}$/;
 
 export function createFrigateRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  const allow = requireAuth(['owner', 'admin', 'manager', 'staff']);
+  const allow = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
 
   // POST /api/integrations/frigate/events/sync
   app.post('/events/sync', allow, async(c) => {
     try {
       const camera = c.req.query('camera');
+      if (camera && !CAMERA_ID_REGEX.test(camera)) {
+        return c.json({ success: false, error: 'Invalid camera identifier', mock: false }, 400);
+      }
       const limit = c.req.query('limit');
-      const parsedLimit = limit ? Math.min(parseInt(limit, 10), 500) : 50;
+      const parsedLimit = limit ? Math.min(Math.max(1, parseInt(limit, 10) || 50), 500) : 50;
 
-      const result = await syncFrigateEvents(c.env, { camera: camera ?? undefined, limit: parsedLimit }, c.executionCtx as unknown as ExecutionContext);
+      const result = await syncFrigateEvents(
+        c.env,
+        { camera: camera ?? undefined, limit: parsedLimit, tenantId: getTenantId(c) },
+        c.executionCtx as unknown as ExecutionContext
+      );
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });
@@ -44,11 +53,22 @@ export function createFrigateRoutes() {
   app.get('/events', allow, async(c) => {
     try {
       const camera = c.req.query('camera');
+      if (camera && !CAMERA_ID_REGEX.test(camera)) {
+        return c.json({ error: 'Invalid camera identifier', mock: false }, 400);
+      }
       const limit = c.req.query('limit');
       const since = c.req.query('since');
-      const parsedLimit = limit ? Math.min(parseInt(limit, 10), 500) : 100;
+      if (since !== undefined && since !== '' && (!Number.isFinite(Number(since)) || Number(since) < 0)) {
+        return c.json({ error: 'Invalid since timestamp', mock: false }, 400);
+      }
+      const parsedLimit = limit ? Math.min(Math.max(1, parseInt(limit, 10) || 100), 500) : 100;
 
-      const { events } = await getFrigateEvents(c.env, { camera: camera ?? undefined, since: since ?? undefined, limit: parsedLimit });
+      const { events } = await getFrigateEvents(c.env, {
+        camera: camera ?? undefined,
+        since: since ?? undefined,
+        limit: parsedLimit,
+        tenantId: getTenantId(c)
+      });
       const client = createFrigateClient(c.env);
       return c.json({ events, mock: client === null ? true : undefined });
     } catch (err) {
@@ -62,6 +82,9 @@ export function createFrigateRoutes() {
   app.get('/camera/:id/snapshot', allow, async(c) => {
     try {
       const camera = c.req.param('id');
+      if (!CAMERA_ID_REGEX.test(camera)) {
+        return c.json({ error: 'Invalid camera identifier', mock: false }, 400);
+      }
 
       // If disabled, return an explicit mocked 200 with empty body
       const client = createFrigateClient(c.env);
@@ -93,7 +116,7 @@ export function createFrigateRoutes() {
   // Aggregated real-time customer occupancy and peak hour analytics.
   app.get('/occupancy', allow, async(c) => {
     try {
-      const report = await getOccupancyAnalytics(c.env as Record<string, unknown>);
+      const report = await getOccupancyAnalytics(c.env as Record<string, unknown>, getTenantId(c));
       return c.json(report);
     } catch (err) {
       log.error('frigate_occupancy_error', { error: (err as Error).message });

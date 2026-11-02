@@ -2,12 +2,16 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Referral, CashbackWallet } from '../../types/models';
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + rand;
 }
 
-export async function processReferralCashbackOnFirstOrder(db: D1Database, customerId: string, orderId: string, orderAmount: number): Promise<Record<string, unknown>> {
+export async function processReferralCashbackOnFirstOrder(db: D1Database, customerId: string, orderId: string, orderAmount: number, tenantId?: string): Promise<Record<string, unknown>> {
   const MIN_ORDER_AMOUNT = 20000;
   const REFERRER_CASHBACK_VND = 10000;
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
 
   if (orderAmount < MIN_ORDER_AMOUNT) {
     return { success: false, reason: 'order_below_min', min_required: MIN_ORDER_AMOUNT };
@@ -22,18 +26,52 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
     return { success: false, reason: 'already_processed_points' };
   }
 
-  const referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(pending.referrer_id).first<{ id: string }>();
+  let referrer: { id: string; tenant_id?: string | null } | null = null;
+  if (effectiveTenant) {
+    try {
+      referrer = await db
+        .prepare("SELECT id, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(pending.referrer_id, effectiveTenant)
+        .first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(pending.referrer_id).first<{ id: string }>();
+    }
+  } else {
+    referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(pending.referrer_id).first<{ id: string }>();
+  }
   if (!referrer) {
     return { success: false, reason: 'referrer_not_found' };
   }
+  if (effectiveTenant && 'tenant_id' in referrer && referrer.tenant_id !== undefined) {
+    const refTenant = String(referrer.tenant_id ?? '').trim() || 'default';
+    if (refTenant !== effectiveTenant) {
+      return { success: false, reason: 'referrer_not_found' };
+    }
+  }
 
   const now = new Date().toISOString();
-  let wallet = await db.prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?').bind(referrer.id).first<CashbackWallet>();
+  let wallet: CashbackWallet | null = null;
+  if (effectiveTenant) {
+    try {
+      wallet = await db
+        .prepare("SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(referrer.id, effectiveTenant)
+        .first<CashbackWallet>();
+    } catch {
+      wallet = await db.prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?').bind(referrer.id).first<CashbackWallet>();
+    }
+  } else {
+    wallet = await db.prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?').bind(referrer.id).first<CashbackWallet>();
+  }
   const batch: ReturnType<typeof db.prepare>[] = [];
 
   if (!wallet) {
     const walletId = genId('cbw_');
-    batch.push(db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)').bind(walletId, referrer.id, now));
+    batch.push(
+      effectiveTenant
+        ? db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, tenant_id) VALUES (?, ?, 0, 0, 0, ?, ?)').bind(walletId, referrer.id, now, effectiveTenant)
+        : db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)').bind(walletId, referrer.id, now)
+    );
     wallet = { id: walletId, customer_id: referrer.id, balance: 0, total_earned: 0, total_spent: 0, created_at: now, updated_at: now };
   }
 

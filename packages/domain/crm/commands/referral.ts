@@ -143,6 +143,7 @@ export async function redeemReferral(
   db: D1Database,
   referralCode: string,
   refereeId: string,
+  tenantId?: string,
 ): Promise<ReferralResult> {
   const normalized = referralCode.trim().toUpperCase();
 
@@ -171,11 +172,25 @@ export async function redeemReferral(
     return { success: false, reason: 'already_has_pending_referral' };
   }
 
-  const referrer = await db
-    .prepare('SELECT id FROM customers WHERE id = ?')
-    .bind(rc.customer_id)
-    .first<{ id: string }>();
+  let referrer: { id: string; tenant_id?: string | null } | null = null;
+  try {
+    referrer = await db
+      .prepare('SELECT id, tenant_id FROM customers WHERE id = ?')
+      .bind(rc.customer_id)
+      .first<{ id: string; tenant_id?: string | null }>();
+  } catch {
+    referrer = await db
+      .prepare('SELECT id FROM customers WHERE id = ?')
+      .bind(rc.customer_id)
+      .first<{ id: string }>();
+  }
   if (!referrer) return { success: false, reason: 'referrer_not_found' };
+  if (tenantId && tenantId !== '*' && 'tenant_id' in referrer && referrer.tenant_id !== undefined) {
+    const referrerTenant = (referrer.tenant_id && String(referrer.tenant_id).trim()) || 'default';
+    if (referrerTenant !== tenantId) {
+      return { success: false, reason: 'invalid_code' };
+    }
+  }
 
   const refId = genId('ref_');
   const now = nowIso();
@@ -211,8 +226,10 @@ export async function rewardReferralOnFirstOrder(
   orderId: string,
   orderAmountVnd: number,
   policyOverride?: ReferralPolicy,
+  tenantId?: string,
 ): Promise<ReferralResult> {
   const policy = policyOverride ?? DEFAULT_REFERRAL_POLICY;
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
 
   const referral = await db
     .prepare("SELECT * FROM referrals WHERE referred_customer_id = ? AND status = 'pending'")
@@ -220,11 +237,30 @@ export async function rewardReferralOnFirstOrder(
     .first<ReferralRow>();
   if (!referral) return { success: false, reason: 'no_pending_referral' };
 
-  const referrer = await db
-    .prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?')
-    .bind(referral.referrer_id)
-    .first<{ id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string }>();
+  let referrer: { id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string; tenant_id?: string | null } | null = null;
+  if (effectiveTenant) {
+    try {
+      referrer = await db
+        .prepare("SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(referral.referrer_id, effectiveTenant)
+        .first<{ id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string; tenant_id?: string | null }>();
+    } catch {
+      referrer = await db
+        .prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?')
+        .bind(referral.referrer_id)
+        .first<{ id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string }>();
+    }
+  } else {
+    referrer = await db
+      .prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?')
+      .bind(referral.referrer_id)
+      .first<{ id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string }>();
+  }
   if (!referrer) return { success: false, reason: 'referrer_not_found' };
+  if (effectiveTenant && 'tenant_id' in referrer && referrer.tenant_id !== undefined) {
+    const refTenant = String(referrer.tenant_id ?? '').trim() || 'default';
+    if (refTenant !== effectiveTenant) return { success: false, reason: 'referrer_not_found' };
+  }
 
   const now = nowIso();
 
@@ -293,18 +329,36 @@ export async function rewardReferralOnFirstOrder(
   const cashbackVnd = policy.cashbackReferrerVnd;
 
   // Ensure referrer has wallet
-  let wallet = await db
-    .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
-    .bind(referrer.id)
-    .first<{ id: string; balance: number; total_earned: number }>();
+  let wallet: { id: string; balance: number; total_earned: number } | null = null;
+  if (effectiveTenant) {
+    try {
+      wallet = await db
+        .prepare("SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(referrer.id, effectiveTenant)
+        .first<{ id: string; balance: number; total_earned: number }>();
+    } catch {
+      wallet = await db
+        .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
+        .bind(referrer.id)
+        .first<{ id: string; balance: number; total_earned: number }>();
+    }
+  } else {
+    wallet = await db
+      .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
+      .bind(referrer.id)
+      .first<{ id: string; balance: number; total_earned: number }>();
+  }
 
   const batch: ReturnType<typeof db.prepare>[] = [];
 
   if (!wallet) {
     const walletId = genId('cbw_');
     batch.push(
-      db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)')
-        .bind(walletId, referrer.id, now),
+      effectiveTenant
+        ? db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, tenant_id) VALUES (?, ?, 0, 0, 0, ?, ?)')
+            .bind(walletId, referrer.id, now, effectiveTenant)
+        : db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)')
+            .bind(walletId, referrer.id, now),
     );
     wallet = { id: walletId, balance: 0, total_earned: 0 };
   }
@@ -347,28 +401,61 @@ export async function rewardReferralOnFirstOrder(
   if (policy.cashbackRefereeVnd > 0) {
     try {
       const refereeCashback = policy.cashbackRefereeVnd;
-      const existingRefWallet = await db
-        .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
-        .bind(refereeId)
-        .first<{ id: string; balance: number; total_earned: number }>()
-        .catch(() => null);
+      const existingRefWallet = effectiveTenant
+        ? await db
+            .prepare("SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(refereeId, effectiveTenant)
+            .first<{ id: string; balance: number; total_earned: number }>()
+            .catch(() => null)
+        : await db
+            .prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?')
+            .bind(refereeId)
+            .first<{ id: string; balance: number; total_earned: number }>()
+            .catch(() => null);
       const refWalletId = existingRefWallet?.id || genId('cbw_');
       const existingRefBalance = Number(existingRefWallet?.balance ?? 0);
       const newRefBalance = existingRefBalance + refereeCashback;
       if (!existingRefWallet) {
+        if (effectiveTenant) {
+          try {
+            await db
+              .prepare(
+                'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, tenant_id) VALUES (?, ?, 0, 0, 0, ?, ?)',
+              )
+              .bind(refWalletId, refereeId, now, effectiveTenant)
+              .run();
+          } catch {
+            await db
+              .prepare(
+                'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
+              )
+              .bind(refWalletId, refereeId, now)
+              .run();
+          }
+        } else {
+          await db
+            .prepare(
+              'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
+            )
+            .bind(refWalletId, refereeId, now)
+            .run();
+        }
+      }
+      if (effectiveTenant) {
         await db
           .prepare(
-            'INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)',
+            "UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
           )
-          .bind(refWalletId, refereeId, now)
+          .bind(refereeCashback, refereeCashback, now, refereeId, effectiveTenant)
+          .run();
+      } else {
+        await db
+          .prepare(
+            'UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?',
+          )
+          .bind(refereeCashback, refereeCashback, now, refereeId)
           .run();
       }
-      await db
-        .prepare(
-          'UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?',
-        )
-        .bind(refereeCashback, refereeCashback, now, refereeId)
-        .run();
       await db
         .prepare(
           `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
@@ -400,7 +487,9 @@ export async function rewardReferralOnFirstOrder(
 export async function reverseReferralCashback(
   db: D1Database,
   referralId: string,
+  tenantId?: string,
 ): Promise<ReferralResult> {
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
   const referral = await db
     .prepare("SELECT * FROM referrals WHERE id = ? AND status = 'completed'")
     .bind(referralId)
@@ -412,18 +501,32 @@ export async function reverseReferralCashback(
   const debitVnd = referral.cashback_awarded_vnd;
   const now = nowIso();
 
-  let wallet = await db
-    .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
-    .bind(referral.referrer_id)
-    .first<{ id: string; balance: number }>();
+  let wallet = effectiveTenant
+    ? await db
+        .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(referral.referrer_id, effectiveTenant)
+        .first<{ id: string; balance: number }>()
+        .catch(() =>
+          db
+            .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+            .bind(referral.referrer_id)
+            .first<{ id: string; balance: number }>()
+        )
+    : await db
+        .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+        .bind(referral.referrer_id)
+        .first<{ id: string; balance: number }>();
 
   const batch: ReturnType<typeof db.prepare>[] = [];
 
   if (!wallet) {
     const walletId = genId('cbw_');
     batch.push(
-      db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)')
-        .bind(walletId, referral.referrer_id, now),
+      effectiveTenant
+        ? db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, tenant_id) VALUES (?, ?, 0, 0, 0, ?, ?)')
+            .bind(walletId, referral.referrer_id, now, effectiveTenant)
+        : db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)')
+            .bind(walletId, referral.referrer_id, now),
     );
     wallet = { id: walletId, balance: 0 };
   }

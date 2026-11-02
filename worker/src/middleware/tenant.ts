@@ -62,10 +62,13 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
  * Usage: const tenantId = getTenantId(c);
  */
 export function getTenantId(c: {
-  get: (_key: string) => unknown;
-  env?: Env;
+  get?: (_key: string) => unknown;
+  env?: unknown;
   req?: { method?: string; path?: string; query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined };
 }): string {
+  if (typeof c?.get !== 'function') {
+    return 'default';
+  }
   const explicitTenant = c.get('tenantId') as string | undefined;
   if (explicitTenant) {
     return explicitTenant;
@@ -76,7 +79,7 @@ export function getTenantId(c: {
     if (isHQSuperAdmin(user)) {
       const requestedTenant = c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id');
       if (requestedTenant && requestedTenant !== user.tenantId) {
-        writeTenantOverrideAudit(c, user, user.tenantId, requestedTenant);
+        writeTenantOverrideAudit(c as Parameters<typeof writeTenantOverrideAudit>[0], user, user.tenantId, requestedTenant);
         return requestedTenant;
       }
     }

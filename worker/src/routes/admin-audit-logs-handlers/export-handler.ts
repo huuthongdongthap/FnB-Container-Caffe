@@ -2,8 +2,10 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { AuditLogger } from '../../lib/audit-logger';
 import { createLogger } from '../../middleware/logger';
+import { getTenantId } from '../../middleware/tenant';
 import { CSV_HEADERS } from './types';
 import { escapeCsv } from './csv-helper';
+import { filterAuditRowsByTenant } from './query-handler';
 
 const log = createLogger({ route: 'admin-audit-logs:export' });
 
@@ -11,7 +13,9 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs/export — export audit logs as CSV with filters
   router.get('/export', async (c) => {
     try {
-      const auditLogger = new AuditLogger(c.executionCtx, c.env.AURA_DB);
+      let execCtx: any;
+      try { execCtx = c.executionCtx; } catch { execCtx = undefined; }
+      const auditLogger = new AuditLogger(execCtx, c.env.AURA_DB);
       const actorId = c.req.query('actor_id');
       const action = c.req.query('action');
       const resourceType = c.req.query('resource_type');
@@ -42,9 +46,14 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
         pageSize: 10000
       });
 
+      const tenantId = getTenantId(c as any);
+      const exportRows = tenantId === '*'
+        ? result.rows
+        : await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
+
       const csvRows: string[] = [CSV_HEADERS.join(',')];
 
-      for (const row of result.rows) {
+      for (const row of exportRows) {
         csvRows.push([
           escapeCsv(row.actor_id),
           escapeCsv(row.actor_name),

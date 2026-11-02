@@ -55,13 +55,23 @@ export async function fetchOrderRecord(
   orderId: string,
   tenantId?: string
 ): Promise<Record<string, unknown> | null> {
-  const scope = tenantId === undefined ? '' : ' AND o.tenant_id = ?';
-  const values = tenantId === undefined ? [orderId] : [orderId, tenantId];
+  const effectiveTenant = tenantId === '*' ? undefined : tenantId;
+  const joinScope = effectiveTenant === undefined
+    ? ''
+    : effectiveTenant === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
+  const bareScope = effectiveTenant === undefined
+    ? ''
+    : effectiveTenant === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const values = effectiveTenant === undefined ? [orderId] : [orderId, effectiveTenant];
   const withTable = (await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?${scope}`
+     FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?${joinScope}`
   ).bind(...values).first()) as Record<string, unknown> | null;
 
   if (withTable) return withTable;
-  return (await db.prepare(`SELECT * FROM orders WHERE id = ?${tenantId === undefined ? '' : ' AND tenant_id = ?'}`).bind(...values).first()) as Record<string, unknown> | null;
+  return (await db.prepare(`SELECT * FROM orders WHERE id = ?${bareScope}`).bind(...values).first()) as Record<string, unknown> | null;
 }

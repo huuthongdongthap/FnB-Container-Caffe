@@ -2,8 +2,11 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import {
+  checkRewardTenant,
   getLoyaltyAccountWithFallback,
+  matchesLoyaltyTenant,
   recordLoyaltyTransactionDualWrite,
   syncLoyaltyAccountAndCustomerBalance,
   writeLoyaltyAuditLog,
@@ -72,6 +75,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/rewards - List available rewards
   app.openapi(LoyaltyRoutes.rewards.list as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -93,38 +97,65 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let rewardResults: any[] = [];
-    try {
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${whereClause}`).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+    if (tenantId !== '*') {
+      let rawRewards: any[] = [];
+      try {
+        const rewards = (await db.prepare(
+          `SELECT * FROM loyalty_rewards ${whereClause} ORDER BY points_cost ASC`
+        ).bind(...params).all()) as { results: any[] };
+        rawRewards = rewards.results || [];
+      } catch {
+        const canonicalWhere = whereClause.replace('AND type = ?', 'AND reward_type = ?');
+        const rewards = (await db.prepare(
+          `SELECT * FROM loyalty_rewards ${canonicalWhere} ORDER BY points_cost ASC`
+        ).bind(...params).all().catch(() => ({ results: [] }))) as { results: any[] };
+        rawRewards = rewards.results || [];
+      }
+      const scoped: any[] = [];
+      for (const r of rawRewards) {
+        if (await checkRewardTenant(db, r, tenantId)) {
+          scoped.push(r);
+        }
+      }
+      total = scoped.length;
+      rewardResults = scoped.slice(offset, offset + limit);
+    } else {
+      try {
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${whereClause}`).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const rewards = (await db.prepare(
-        `SELECT * FROM loyalty_rewards ${whereClause} ORDER BY points_cost ASC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
-      rewardResults = rewards.results || [];
-    } catch {
-      const canonicalWhere = whereClause.replace('AND type = ?', 'AND reward_type = ?');
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
-      total = countResult?.total || 0;
+        const rewards = (await db.prepare(
+          `SELECT * FROM loyalty_rewards ${whereClause} ORDER BY points_cost ASC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()) as { results: any[] };
+        rewardResults = rewards.results || [];
+      } catch {
+        const canonicalWhere = whereClause.replace('AND type = ?', 'AND reward_type = ?');
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_rewards ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const rewards = (await db.prepare(
-        `SELECT * FROM loyalty_rewards ${canonicalWhere} ORDER BY points_cost ASC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
-      rewardResults = rewards.results || [];
+        const rewards = (await db.prepare(
+          `SELECT * FROM loyalty_rewards ${canonicalWhere} ORDER BY points_cost ASC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
+        rewardResults = rewards.results || [];
+      }
     }
 
     if (rewardResults.length === 0 && !query.type) {
       try {
         const activeFilter = query.isActive !== undefined ? 'WHERE is_active = ?' : '';
         const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
-        const fallbackCount = (await db.prepare(`SELECT COUNT(*) as total FROM rewards ${activeFilter}`).bind(...activeParams).first()) as { total: number } | null;
-        total = fallbackCount?.total || 0;
-        if (total > 0) {
-          const fallbackRewards = (await db.prepare(
-            `SELECT id, COALESCE(name, title) as name, description, COALESCE(points_cost, point_cost, 100) as points_cost, COALESCE(type, discount_type, 'voucher') as type, COALESCE(value, discount_value, 0) as value, CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock ELSE NULL END as max_redemptions, 0 as current_redemptions, image_url, COALESCE(is_active, 1) as is_active, created_at, COALESCE(updated_at, created_at) as updated_at
-             FROM rewards ${activeFilter} ORDER BY COALESCE(points_cost, point_cost, 100) ASC LIMIT ? OFFSET ?`
-          ).bind(...activeParams, limit, offset).all()) as { results: any[] };
-          rewardResults = fallbackRewards.results || [];
+        const fallbackRewards = (await db.prepare(
+          `SELECT *, id, COALESCE(name, title) as name, description, COALESCE(points_cost, point_cost, 100) as points_cost, COALESCE(type, discount_type, 'voucher') as type, COALESCE(value, discount_value, 0) as value, CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock ELSE NULL END as max_redemptions, 0 as current_redemptions, image_url, COALESCE(is_active, 1) as is_active, created_at, COALESCE(updated_at, created_at) as updated_at
+           FROM rewards ${activeFilter} ORDER BY COALESCE(points_cost, point_cost, 100) ASC`
+        ).bind(...activeParams).all()) as { results: any[] };
+        const scopedFallback: any[] = [];
+        for (const r of fallbackRewards.results || []) {
+          if (await checkRewardTenant(db, r, tenantId)) {
+            scopedFallback.push(r);
+          }
         }
+        total = scopedFallback.length;
+        rewardResults = scopedFallback.slice(offset, offset + limit);
       } catch {
         // Ignore when rewards table is absent
       }
@@ -142,11 +173,12 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/loyalty/rewards/{id} - Get reward by ID
   app.openapi(LoyaltyRoutes.rewards.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
 
     const { reward } = await findRewardByIdWithFallback(db, id);
 
-    if (!reward) {
+    if (!reward || !(await checkRewardTenant(db, reward, tenantId))) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
 
@@ -159,8 +191,10 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/loyalty/rewards - Create reward
   app.openapi(LoyaltyRoutes.rewards.create as any, async (c: any) => {
     const db = getDatabase(c);
+    const rawTenantId = getTenantId(c);
+    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
+    if (!user || !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     const body = c.req.valid('json');
@@ -169,42 +203,73 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const id = crypto.randomUUID();
     const isActiveInt = body.isActive !== false ? 1 : 0;
 
-    try {
-      await db.prepare(
-        `INSERT INTO loyalty_rewards (id, name, description, points_cost, type, value, max_redemptions, current_redemptions, valid_from, valid_to, is_active, image_url, terms, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.description || null,
-        body.pointsCost,
-        body.type,
-        body.value,
-        body.maxRedemptions || null,
-        0,
-        body.validFrom || null,
-        body.validTo || null,
-        isActiveInt,
-        body.imageUrl || null,
-        body.terms || null,
-        now,
-        now
-      ).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.description || null,
-        body.pointsCost,
-        body.type,
-        String(body.value ?? ''),
-        body.maxRedemptions ?? null,
-        isActiveInt,
-        now
-      ).run();
+    let insertedWithTenant = false;
+    if (tenantId !== 'default') {
+      try {
+        await db.prepare(
+          `INSERT INTO loyalty_rewards (id, name, description, points_cost, type, value, max_redemptions, current_redemptions, valid_from, valid_to, is_active, image_url, terms, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.description || null,
+          body.pointsCost,
+          body.type,
+          body.value,
+          body.maxRedemptions || null,
+          0,
+          body.validFrom || null,
+          body.validTo || null,
+          isActiveInt,
+          body.imageUrl || null,
+          body.terms || null,
+          tenantId,
+          now,
+          now
+        ).run();
+        insertedWithTenant = true;
+      } catch {
+        insertedWithTenant = false;
+      }
+    }
+    if (!insertedWithTenant) {
+      try {
+        await db.prepare(
+          `INSERT INTO loyalty_rewards (id, name, description, points_cost, type, value, max_redemptions, current_redemptions, valid_from, valid_to, is_active, image_url, terms, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.description || null,
+          body.pointsCost,
+          body.type,
+          body.value,
+          body.maxRedemptions || null,
+          0,
+          body.validFrom || null,
+          body.validTo || null,
+          isActiveInt,
+          body.imageUrl || null,
+          body.terms || null,
+          now,
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.description || null,
+          body.pointsCost,
+          body.type,
+          String(body.value ?? ''),
+          body.maxRedemptions ?? null,
+          isActiveInt,
+          now
+        ).run();
+      }
     }
 
     try {
@@ -237,7 +302,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       // Ignore when rewards table is absent
     }
 
-    await writeLoyaltyAuditLog(db, user.id, 'loyalty_reward_create', 'loyalty_reward', id, JSON.stringify(body), now);
+    await writeLoyaltyAuditLog(db, user.id, 'loyalty_reward_create', 'loyalty_reward', id, JSON.stringify({ ...body, tenant_id: tenantId }), now);
 
     const { reward } = await findRewardByIdWithFallback(db, id);
 
@@ -250,8 +315,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/loyalty/rewards/{id} - Update reward
   app.openapi(LoyaltyRoutes.rewards.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
+    if (!user || !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     const { id } = c.req.valid('param');
@@ -259,7 +325,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     const { reward: existing } = await findRewardByIdWithFallback(db, id);
-    if (!existing) {
+    if (!existing || !(await checkRewardTenant(db, existing, tenantId))) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
 
@@ -354,9 +420,10 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const id = body.rewardId || c.req.param?.('id');
     const now = new Date().toISOString();
+    const tenantId = getTenantId(c);
 
     const { reward } = await findRewardByIdWithFallback(db, id);
-    if (!reward) {
+    if (!reward || !(await checkRewardTenant(db, reward, tenantId))) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
 
@@ -365,7 +432,24 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const customerLookupId = String(user.customerId || user.id);
-    const { account } = await getLoyaltyAccountWithFallback(db, customerLookupId, now);
+    if (body.orderId) {
+      try {
+        const orderRow = await db.prepare('SELECT * FROM orders WHERE id = ? LIMIT 1').bind(body.orderId).first<Record<string, unknown>>();
+        if (orderRow && orderRow.id) {
+          if (!matchesLoyaltyTenant(orderRow, tenantId)) {
+            return c.json({ success: false, error: 'Order not found' }, 404);
+          }
+          if (user?.role === 'customer' && orderRow.customer_id !== undefined && orderRow.customer_id !== null && String(orderRow.customer_id).trim() !== '') {
+            if (String(orderRow.customer_id) !== customerLookupId && String(orderRow.customer_id) !== String(user.id)) {
+              return c.json({ success: false, error: 'Order not found' }, 404);
+            }
+          }
+        }
+      } catch {
+        // Optional orders table in unit tests
+      }
+    }
+    const { account } = await getLoyaltyAccountWithFallback(db, customerLookupId, now, tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
@@ -405,12 +489,67 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Duplicate redemption request' }, 409);
     }
 
+    let quotaReserved = false;
+    try {
+      const qRes = await db.prepare(
+        `UPDATE loyalty_rewards
+         SET current_redemptions = COALESCE(current_redemptions, 0) + 1
+         WHERE id = ? AND COALESCE(is_active, 1) = 1
+           AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions)`
+      ).bind(id).run();
+      if ((qRes?.meta?.changes ?? 1) === 0) {
+        return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+      }
+      quotaReserved = true;
+    } catch {
+      const qRes = await db.prepare(
+        `UPDATE loyalty_rewards
+         SET redeemed_count = COALESCE(redeemed_count, 0) + 1
+         WHERE id = ? AND COALESCE(is_active, 1) = 1
+           AND (stock IS NULL OR stock <= 0 OR COALESCE(redeemed_count, 0) < stock)`
+      ).bind(id).run().catch(() => null);
+      if (qRes && (qRes?.meta?.changes ?? 1) === 0) {
+        return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+      }
+      quotaReserved = Boolean(qRes);
+    }
+
     const transactionId = crypto.randomUUID();
     const pointsChange = -pointsCost;
     const newBalance = currentPoints + pointsChange;
     const accountId = String(account.id);
     const customerId = String(account.customer_id ?? customerLookupId);
     const rewardName = String(reward.name ?? reward.title ?? id);
+
+    try {
+      const deductRes = await db.prepare(
+        `UPDATE loyalty_accounts
+         SET current_points = current_points - ?, last_activity_at = ?, updated_at = ?
+         WHERE (id = ? OR customer_id = ?) AND COALESCE(current_points, 0) >= ?`
+      ).bind(pointsCost, now, now, accountId, customerId, pointsCost).run();
+      if ((deductRes?.meta?.changes ?? 1) === 0) {
+        if (quotaReserved) {
+          await db.prepare('UPDATE loyalty_rewards SET current_redemptions = MAX(0, COALESCE(current_redemptions, 1) - 1) WHERE id = ?').bind(id).run().catch(() => {});
+        }
+        return c.json({ success: false, error: 'Insufficient points' }, 409);
+      }
+    } catch {
+      try {
+        const custDeduct = await db.prepare(
+          `UPDATE customers
+           SET loyalty_points = loyalty_points - ?, updated_at = ?
+           WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?`
+        ).bind(pointsCost, now, customerId, pointsCost).run();
+        if ((custDeduct?.meta?.changes ?? 1) === 0) {
+          if (quotaReserved) {
+            await db.prepare('UPDATE loyalty_rewards SET current_redemptions = MAX(0, COALESCE(current_redemptions, 1) - 1) WHERE id = ?').bind(id).run().catch(() => {});
+          }
+          return c.json({ success: false, error: 'Insufficient points' }, 409);
+        }
+      } catch {
+        // Fallback for minimal test schemas
+      }
+    }
 
     await recordLoyaltyTransactionDualWrite(db, {
       txId: transactionId,
@@ -434,17 +573,22 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       now,
     });
 
-    try {
-      await db.prepare(
-        'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1 WHERE id = ?'
-      ).bind(id).run();
-    } catch {
-      await db.prepare(
-        'UPDATE loyalty_rewards SET redeemed_count = COALESCE(redeemed_count, 0) + 1 WHERE id = ?'
-      ).bind(id).run();
+    if (!quotaReserved) {
+      try {
+        await db.prepare(
+          'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1 WHERE id = ?'
+        ).bind(id).run();
+      } catch {
+        await db.prepare(
+          'UPDATE loyalty_rewards SET redeemed_count = COALESCE(redeemed_count, 0) + 1 WHERE id = ?'
+        ).bind(id).run().catch(() => {});
+      }
     }
 
-    const voucherCode = `RWD-${Date.now().toString(36).toUpperCase()}`;
+    const voucherRand = new Uint8Array(3);
+    crypto.getRandomValues(voucherRand);
+    const voucherSuffix = Array.from(voucherRand, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const voucherCode = `RWD-${Date.now().toString(36).toUpperCase()}-${voucherSuffix}`;
     const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
     try {
       await db.prepare(

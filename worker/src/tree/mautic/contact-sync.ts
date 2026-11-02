@@ -4,11 +4,14 @@
  */
 
 import { getMauticClient } from './client-factory';
-import { syncStatus } from './sync-state';
+import { getSyncStatus, matchesMauticTenant } from './sync-state';
 import type { MauticContactInput } from '../../lib/mautic-client';
 import type { CustomerContact, SyncContactsResponse, MauticBridgeEnv, MauticClientDuck } from './types';
 
-export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boolean; synced: number; errors: string[] }> {
+export async function syncContacts(
+  env: MauticBridgeEnv,
+  tenantId?: string
+): Promise<{ success: boolean; synced: number; errors: string[] }> {
   const client = getMauticClient(env) as MauticClientDuck | null;
   if (!client) {
     return { success: false, synced: 0, errors: ['Mautic not configured'] };
@@ -19,39 +22,63 @@ export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boo
     return { success: false, synced: 0, errors: ['Database not available'] };
   }
 
-  syncStatus.status = 'running';
-  syncStatus.errors = [];
+  const state = getSyncStatus(tenantId);
+  state.status = 'running';
+  state.errors = [];
   let synced = 0;
   const errors: string[] = [];
 
   try {
-    const since = syncStatus.last_sync || new Date(Date.now() - 3600000).toISOString();
+    const since = state.last_sync || new Date(Date.now() - 3600000).toISOString();
+    const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const isWildcard = normalizedTenant === '*';
+    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    const tenantParams = isWildcard ? [] : [normalizedTenant];
 
     let results: CustomerContact[] = [];
     try {
       const res = await db.prepare(
-        `SELECT id, name, phone, email, tier, total_spent, visit_count,
-          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
-         FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
-      ).bind(since).all<CustomerContact>();
-      results = res.results || [];
+        `SELECT id, name, phone, email, tier, total_spent, visit_count, tenant_id,
+          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(orders.tenant_id, ''), 'default') = COALESCE(NULLIF(customers.tenant_id, ''), 'default')) as last_visit
+         FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
+      ).bind(since, ...tenantParams).all<CustomerContact>();
+      results = (res.results || []).filter((r) =>
+        matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+      );
     } catch (colErr) {
       const msg = String((colErr as Error)?.message || '');
       if (msg.includes('no such column')) {
-        const fallback = await db.prepare(
-          `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count,
-            (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
-           FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
-        ).bind(since).all<CustomerContact>();
-        results = fallback.results || [];
+        try {
+          const fallbackTenant = await db.prepare(
+            `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count, tenant_id,
+              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(orders.tenant_id, ''), 'default') = COALESCE(NULLIF(customers.tenant_id, ''), 'default')) as last_visit
+             FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
+          ).bind(since, ...tenantParams).all<CustomerContact>();
+          results = (fallbackTenant.results || []).filter((r) =>
+            matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+          );
+        } catch {
+          if (isWildcard || normalizedTenant === 'default') {
+            const fallback = await db.prepare(
+              `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count,
+                (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
+               FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
+            ).bind(since).all<CustomerContact>();
+            results = (fallback.results || []).filter((r) =>
+              matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+            );
+          } else {
+            results = [];
+          }
+        }
       } else {
         throw colErr;
       }
     }
 
     if (!results || results.length === 0) {
-      syncStatus.status = 'completed';
-      syncStatus.last_sync = new Date().toISOString();
+      state.status = 'completed';
+      state.last_sync = new Date().toISOString();
       return { success: true, synced: 0, errors: [] };
     }
 
@@ -80,15 +107,15 @@ export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boo
       }
     }
 
-    syncStatus.contacts_synced += synced;
-    syncStatus.status = 'completed';
-    syncStatus.last_sync = new Date().toISOString();
+    state.contacts_synced += synced;
+    state.status = 'completed';
+    state.last_sync = new Date().toISOString();
 
     return { success: true, synced, errors };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    syncStatus.status = 'failed';
-    syncStatus.errors.push({ customer_id: 'batch', error: msg });
+    state.status = 'failed';
+    state.errors.push({ customer_id: 'batch', error: msg });
     return { success: false, synced, errors: [...errors, msg] };
   }
 }

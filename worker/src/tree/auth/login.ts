@@ -84,11 +84,47 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       let tier: string | undefined;
       try {
         const db = (env as unknown as Env).AURA_DB;
-        const row = await db.prepare('SELECT tenant_id FROM users WHERE id = ?').bind(user.id).first<{ tenant_id: string | null }>();
+        const row = await db.prepare('SELECT tenant_id FROM users WHERE id = ?').bind(user.id).first<{ tenant_id: string | null }>().catch(() => null);
         tenantId = row?.tenant_id || undefined;
         if (!tenantId) {
-          const tenant = await db.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>();
+          const tenant = await db.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>().catch(() => null);
           tenantId = tenant?.id; tier = tenant?.tier;
+        }
+        const defaultPilotTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
+          ? env.PILOT_TENANT_ID.trim()
+          : 'default';
+        if (!tenantId) {
+          tenantId = (user.tenant_id && !String(user.tenant_id).startsWith('tenant_')) ? String(user.tenant_id) : defaultPilotTenant;
+        }
+        if (db?.prepare) {
+          const existingCust = await db.prepare(
+            'SELECT id, tenant_id FROM customers WHERE id = ? OR lower(email) = lower(?) OR (? != \'\' AND phone = ?) LIMIT 1'
+          ).bind(user.id, email, user.phone || '', user.phone || '').first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+          if (existingCust?.id) {
+            user.id = existingCust.id;
+            if (existingCust.tenant_id && String(existingCust.tenant_id).trim()) {
+              tenantId = String(existingCust.tenant_id).trim();
+            }
+          } else {
+            const nowIso = new Date().toISOString();
+            try {
+              await db.prepare(
+                'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', tenantId || defaultPilotTenant, nowIso, nowIso).run();
+            } catch {
+              await db.prepare(
+                'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', nowIso).run().catch(() => {});
+            }
+            const walletId = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+            await db.prepare(
+              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
+            ).bind(walletId, user.id, tenantId || defaultPilotTenant, nowIso, nowIso).run().catch(async () => {
+              await db.prepare(
+                'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+              ).bind(walletId, user.id, nowIso, nowIso).run().catch(() => {});
+            });
+          }
         }
       } catch { /* Customer enrichment keeps its pre-existing optional contract. */ }
       const authVersion = Number(user.auth_version || 1);

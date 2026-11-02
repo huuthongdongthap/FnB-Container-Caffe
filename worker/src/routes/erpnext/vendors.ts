@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId, matchesTenantRow } from '../../lib/db';
 import { createErpnextClient } from '../../clients/erpnext-client';
 
 const VendorSyncSchema = z.object({
@@ -18,7 +19,7 @@ const VendorSyncSchema = z.object({
 });
 
 
-const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
+const allow = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
 
 export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/vendors — list vendors
@@ -29,36 +30,36 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
         return c.json({ success: false, error: 'Database not available' }, 503);
       }
 
+      const tenantId = getTenantId(c);
       const parsedLimit = parseInt(c.req.query('limit') || '100', 10);
-      const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1), 500);
+      const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 500);
 
       let results: any[] = [];
       try {
         const res = await db
           .prepare(
-            'SELECT id, name, tax_id, address, phone, is_active, created_at, updated_at FROM suppliers ORDER BY created_at DESC LIMIT ?'
+            'SELECT * FROM suppliers ORDER BY created_at DESC LIMIT ?'
           )
-          .bind(limit)
-          .all();
-        results = res.results || [];
+          .bind(500)
+          .all<Record<string, unknown>>();
+        results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId)).slice(0, limit);
       } catch {
         try {
           const res = await db
             .prepare(
-              'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
+              'SELECT * FROM vendors ORDER BY created_at DESC LIMIT ?'
             )
-            .bind(limit)
-            .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
-          results = res.results || [];
+            .bind(500)
+            .all<Record<string, unknown>>();
+          results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId)).slice(0, limit);
         } catch {
           results = [];
         }
       }
 
       return c.json({ success: true, data: results });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to list vendors' }, 500);
     }
   });
 
@@ -84,9 +85,8 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
       const result = await client.create('Supplier', { supplier_name: data.name, tax_id: data.tax_id || '', address_line1: data.address || '', mobile_no: data.phone || '' });
 
       return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to sync vendor' }, 500);
     }
   });
 }

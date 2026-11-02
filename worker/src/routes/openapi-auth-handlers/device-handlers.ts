@@ -20,7 +20,7 @@ async function writeDeviceAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -45,6 +45,26 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
+    const normalizedEmail = String(body.email || '').trim().toLowerCase();
+    const clientIp =
+      c.req.header('CF-Connecting-IP') ||
+      c.req.header('X-Forwarded-For') ||
+      normalizedEmail ||
+      'ip';
+
+    if (c.env?.AUTH_KV) {
+      const rlKey = `rate:reset-password:${clientIp}`;
+      const emailRlKey = normalizedEmail ? `rate:reset-password:email:${normalizedEmail}` : null;
+      const count = Number((await c.env.AUTH_KV.get(rlKey).catch(() => null)) || 0);
+      const emailCount = emailRlKey ? Number((await c.env.AUTH_KV.get(emailRlKey).catch(() => null)) || 0) : 0;
+      if (count >= 5 || emailCount >= 5) {
+        return c.json({ success: false, error: 'Too many password reset requests' }, 429);
+      }
+      await c.env.AUTH_KV.put(rlKey, String(count + 1), { expirationTtl: 300 }).catch(() => {});
+      if (emailRlKey) {
+        await c.env.AUTH_KV.put(emailRlKey, String(emailCount + 1), { expirationTtl: 300 }).catch(() => {});
+      }
+    }
 
     let user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
     if (!user) {
@@ -217,8 +237,42 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(user.id).run().catch(() => {});
     await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run().catch(() => {});
     if (user.role !== 'customer') {
-      await db.prepare('DELETE FROM staff_devices WHERE staff_id = ?').bind(user.id).run().catch(() => {});
+      try {
+        await db.prepare('DELETE FROM staff_devices WHERE staff_id = ?').bind(user.id).run();
+        await db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run();
+      } catch {
+        return c.json({ success: false, code: 'REVOKE_FAILED', error: 'Failed to revoke staff devices' }, 500);
+      }
+    } else {
       await db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
+      if (c.env.AUTH_KV) {
+        try {
+          let nextVersion = Number(user.authVersion || 1) + 1;
+          if (user.email) {
+            const rawUser = await c.env.AUTH_KV.get(`user:${user.email}`);
+            if (rawUser) {
+              const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+              const currentVer = Number(parsed.auth_version || 1);
+              nextVersion = Math.max(nextVersion, currentVer + 1);
+              parsed.auth_version = nextVersion;
+              parsed.updated_at = now;
+              await c.env.AUTH_KV.put(`user:${user.email}`, JSON.stringify(parsed));
+            }
+          }
+          if (user.id) {
+            const rawCustVer = await c.env.AUTH_KV.get(`cust_auth_ver:${user.id}`);
+            if (rawCustVer) {
+              const currentCustVer = Number(rawCustVer);
+              if (Number.isFinite(currentCustVer) && currentCustVer >= nextVersion) {
+                nextVersion = currentCustVer + 1;
+              }
+            }
+            await c.env.AUTH_KV.put(`cust_auth_ver:${user.id}`, String(nextVersion));
+          }
+        } catch {
+          return c.json({ success: false, code: 'REVOKE_FAILED', error: 'Failed to revoke customer sessions' }, 500);
+        }
+      }
     }
     const token = getAuthToken(c.req.raw);
     if (token && c.env.AUTH_KV) {

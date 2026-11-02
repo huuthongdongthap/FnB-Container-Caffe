@@ -6,7 +6,7 @@ import { readClientSession, storedDevice, saveClientSession, invalidateClientSes
 
 interface AuthState { user: ClientSessionUser | null; token: string | null; deviceToken: string | null; loading: boolean; error: string | null }
 interface AuthContextType extends AuthState {
-  login: (tokenOrDevice: string, userOrPin: string | ClientSessionUser) => Promise<boolean>;
+  login: (tokenOrDevice: string, userOrPin: string | ClientSessionUser, explicitDevice?: string | null) => Promise<boolean>;
   logout: () => void; forgetDevice: () => void; refresh: () => Promise<boolean>; isAuthenticated: boolean;
 }
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -52,9 +52,9 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     return () => clearTimeout(timer);
   }, [state.token]);
 
-  const login = useCallback(async (tokenOrDevice: string, userOrPin: string | ClientSessionUser) => {
+  const login = useCallback(async (tokenOrDevice: string, userOrPin: string | ClientSessionUser, explicitDevice?: string | null) => {
     if (typeof userOrPin === 'object') {
-      saveClientSession(tokenOrDevice, userOrPin, storedDevice());
+      saveClientSession(tokenOrDevice, userOrPin, explicitDevice ?? storedDevice());
       return true;
     }
     const attempt = beginClientLogin();

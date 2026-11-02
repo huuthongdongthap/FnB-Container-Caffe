@@ -22,7 +22,8 @@ export interface PresenceTriggerPayload {
 export async function dispatchDiningPresence(
   env: Record<string, unknown>,
   event: DiningPresenceEvent,
-  payload: PresenceTriggerPayload = {}
+  payload: PresenceTriggerPayload = {},
+  tenantId?: string
 ): Promise<{ success: boolean; event: DiningPresenceEvent; result: unknown }> {
   log.info('dispatch_dining_presence', { event, table: payload.table_id ?? payload.table_number });
 
@@ -34,7 +35,7 @@ export async function dispatchDiningPresence(
     timestamp: new Date().toISOString()
   };
 
-  const response = await triggerAutomation(env, automationId, triggerPayload);
+  const response = await triggerAutomation(env, automationId, triggerPayload, tenantId);
   const json = await response.json();
 
   return {

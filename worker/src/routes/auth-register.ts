@@ -37,8 +37,46 @@ export async function registerWithVerification(request: Request, env: Record<str
     }
 
     const hashedPassword = await hashPassword(password);
-    const userId = generateId('USR_');
+    let userId = generateId('USR_');
     const now = new Date().toISOString();
+    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const rawPilotTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
+      ? env.PILOT_TENANT_ID.trim()
+      : 'default';
+
+    if (db?.prepare) {
+      try {
+        const existingCustomer = await db.prepare(
+          'SELECT id FROM customers WHERE lower(email) = lower(?) OR (? != \'\' AND phone = ?) LIMIT 1'
+        ).bind(email, phone || '', phone || '').first<{ id: string }>().catch(() => null);
+        if (existingCustomer?.id) {
+          userId = existingCustomer.id;
+          await db.prepare(
+            'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), name = COALESCE(NULLIF(name, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), updated_at = ? WHERE id = ?'
+          ).bind(email, name || 'Thành viên', phone || '', now, userId).run().catch(() => {});
+        } else {
+          try {
+            await db.prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+            ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', rawPilotTenant, now, now).run();
+          } catch {
+            await db.prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+            ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', now).run().catch(() => {});
+          }
+          const walletId = generateId('wal_');
+          await db.prepare(
+            'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
+          ).bind(walletId, userId, rawPilotTenant, now, now).run().catch(async () => {
+            await db.prepare(
+              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+            ).bind(walletId, userId, now, now).run().catch(() => {});
+          });
+        }
+      } catch {
+        // Optional D1 customer provisioning on registration
+      }
+    }
 
     const user = {
       id: userId,
@@ -47,6 +85,7 @@ export async function registerWithVerification(request: Request, env: Record<str
       phone: phone || '',
       password: hashedPassword,
       role: 'customer',
+      tenant_id: rawPilotTenant,
       email_verified: false,
       created_at: now,
       updated_at: now
@@ -54,7 +93,6 @@ export async function registerWithVerification(request: Request, env: Record<str
 
     await authKV.put(`user:${email}`, JSON.stringify(user));
 
-    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const verifyId = generateId('EV_');
     const code = generateVerifyToken();
     const expiresAt = expiresAtFromNow();

@@ -12,11 +12,12 @@ import type { Env } from '../types/env';
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 const VALID_NAMES = ['LCP', 'FID', 'CLS', 'INP', 'TTFB', 'FCP'] as const;
+const VALID_RATINGS = ['good', 'needs-improvement', 'needsImprovement', 'poor'] as const;
 
 const vitalsSchema = z.object({
   name: z.enum(VALID_NAMES, { message: 'name must be one of: LCP, FID, CLS, INP, TTFB, FCP' }),
-  value: z.number({ message: 'value must be a number' }),
-  rating: z.string({ message: 'rating must be a string' }).min(1, 'rating cannot be empty')
+  value: z.number({ message: 'value must be a number' }).finite('value must be finite').min(0, 'value cannot be negative').max(600000, 'value exceeds maximum bound'),
+  rating: z.enum(VALID_RATINGS, { message: 'rating must be one of: good, needs-improvement, poor' })
 });
 
 // ─── Router ─────────────────────────────────────────────────────────────────

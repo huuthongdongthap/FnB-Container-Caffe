@@ -20,6 +20,7 @@ export interface PlaceOrderInput {
   channel: FulfillmentChannel;
   items: OrderItemInput[];
   notes?: string;
+  tenantId?: string;
   kv?: import('@cloudflare/workers-types').KVNamespace;
 }
 
@@ -94,19 +95,31 @@ export async function placeOrder(
       return { ok: false, code: 'invalid_quantity', error: `invalid quantity for item ${line.menuItemId}` };
     }
 
-    let row: { id: string; name: string; price: number; available: number | boolean } | null;
+    let row: { id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null } | null;
     try {
       row = await db
-        .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+        .prepare('SELECT id, name, price, available, tenant_id FROM menu_items WHERE id = ?')
         .bind(line.menuItemId)
-        .first<{ id: string; name: string; price: number; available: number | boolean }>()
-        .catch(() => null);
+        .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
+        .catch(() =>
+          db
+            .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+            .bind(line.menuItemId)
+            .first<{ id: string; name: string; price: number; available: number | boolean }>()
+            .catch(() => null)
+        );
       if (!row) {
         row = await db
-          .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+          .prepare('SELECT id, name, price, is_available as available, tenant_id FROM products WHERE id = ?')
           .bind(line.menuItemId)
-          .first<{ id: string; name: string; price: number; available: number | boolean }>()
-          .catch(() => null);
+          .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
+          .catch(() =>
+            db
+              .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+              .bind(line.menuItemId)
+              .first<{ id: string; name: string; price: number; available: number | boolean }>()
+              .catch(() => null)
+          );
       }
     } catch (e) {
       return { ok: false, code: 'd1_error', error: `failed to read menu item: ${(e as Error).message}` };
@@ -114,6 +127,12 @@ export async function placeOrder(
 
     if (!row) {
       return { ok: false, code: 'invalid_item', error: `menu item not found: ${line.menuItemId}` };
+    }
+    if (input.tenantId && input.tenantId !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
+      const itemTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+      if (itemTenant !== input.tenantId) {
+        return { ok: false, code: 'invalid_item', error: `menu item not found: ${line.menuItemId}` };
+      }
     }
     if (row.available === 0 || row.available === false) {
       return { ok: false, code: 'invalid_item', error: `menu item unavailable: ${line.menuItemId}` };
@@ -144,32 +163,54 @@ export async function placeOrder(
     note: i.note,
   })));
 
+  const targetTenant = input.tenantId && input.tenantId !== '*' ? input.tenantId : 'default';
   try {
-    await db.prepare(`
-      INSERT INTO orders (
-        id, items, total, status, customer_name, customer_phone,
-        order_type, notes, customer_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      orderId,
-      itemsJson,
-      totalCents,
-      'pending',
-      input.customerName ?? null,
-      input.customerPhone,
-      input.channel,
-      input.notes ?? null,
-      input.customerId,
-      now,
-    ).run();
+    if (targetTenant !== 'default') {
+      await db.prepare(`
+        INSERT INTO orders (
+          id, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, tenant_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId,
+        itemsJson,
+        totalCents,
+        'pending',
+        input.customerName ?? null,
+        input.customerPhone,
+        input.channel,
+        input.notes ?? null,
+        input.customerId,
+        targetTenant,
+        now,
+      ).run();
+    } else {
+      await db.prepare(`
+        INSERT INTO orders (
+          id, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId,
+        itemsJson,
+        totalCents,
+        'pending',
+        input.customerName ?? null,
+        input.customerPhone,
+        input.channel,
+        input.notes ?? null,
+        input.customerId,
+        now,
+      ).run();
+    }
   } catch {
     try {
       const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
       await db.prepare(`
         INSERT INTO orders (
           id, order_number, items, total, status, customer_name, customer_phone,
-          order_type, notes, customer_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          order_type, notes, customer_id, tenant_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         orderId,
         orderNumber,
@@ -181,11 +222,35 @@ export async function placeOrder(
         input.channel,
         input.notes ?? null,
         input.customerId,
+        targetTenant,
         now,
         now,
       ).run();
-    } catch (e) {
-      return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+    } catch {
+      try {
+        const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
+        await db.prepare(`
+          INSERT INTO orders (
+            id, order_number, items, total, status, customer_name, customer_phone,
+            order_type, notes, customer_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          orderId,
+          orderNumber,
+          itemsJson,
+          totalCents,
+          'pending',
+          input.customerName ?? null,
+          input.customerPhone,
+          input.channel,
+          input.notes ?? null,
+          input.customerId,
+          now,
+          now,
+        ).run();
+      } catch (e) {
+        return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+      }
     }
   }
 

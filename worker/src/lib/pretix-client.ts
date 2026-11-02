@@ -46,6 +46,15 @@ export interface PretixClient {
 export function createPretixClient(apiUrl: string, apiToken: string, options: PretixClientOptions = {}): PretixClient {
   const baseUrl = apiUrl.replace(/\/+$/, '');
   const retryDelay = options.retryDelay || 2000;
+  const safeSegmentRe = /^[A-Za-z0-9._-]{1,128}$/;
+
+  function encSeg(seg: string | number): string {
+    const str = String(seg);
+    if (!safeSegmentRe.test(str) || str === '.' || str === '..') {
+      throw new PretixApiError(400, 'Invalid path segment', str);
+    }
+    return encodeURIComponent(str);
+  }
 
   async function request(method: string, endpoint: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
     const url = `${baseUrl}${endpoint}`;
@@ -92,46 +101,46 @@ export function createPretixClient(apiUrl: string, apiToken: string, options: Pr
 
   return {
     async listEvents(organizer: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/`);
     },
 
     async getEvent(organizer: string, eventSlug: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/${eventSlug}/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/`);
     },
 
     async createEvent(organizer: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
-      return request('POST', `/api/v1/organizers/${organizer}/events/`, data);
+      return request('POST', `/api/v1/organizers/${encSeg(organizer)}/events/`, data);
     },
 
     async listItems(organizer: string, eventSlug: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/${eventSlug}/items/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/items/`);
     },
 
     async getItem(organizer: string, eventSlug: string, itemId: number): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/${eventSlug}/items/${itemId}/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/items/${encSeg(itemId)}/`);
     },
 
     async listOrders(organizer: string, eventSlug: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/${eventSlug}/orders/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/orders/`);
     },
 
     async getOrder(organizer: string, eventSlug: string, code: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/events/${eventSlug}/orders/${code}/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/orders/${encSeg(code)}/`);
     },
 
     async redeemCheckin(organizer: string, eventSlug: string, listId: number, secret: string): Promise<Record<string, unknown>> {
       return request(
         'POST',
-        `/api/v1/organizers/${organizer}/events/${eventSlug}/checkinlists/${listId}/positions/${secret}/redeem/?untrusted_input=true`
+        `/api/v1/organizers/${encSeg(organizer)}/events/${encSeg(eventSlug)}/checkinlists/${encSeg(listId)}/positions/${encSeg(secret)}/redeem/?untrusted_input=true`
       );
     },
 
     async listWebhooks(organizer: string): Promise<Record<string, unknown>> {
-      return request('GET', `/api/v1/organizers/${organizer}/webhooks/`);
+      return request('GET', `/api/v1/organizers/${encSeg(organizer)}/webhooks/`);
     },
 
     async createWebhook(organizer: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
-      return request('POST', `/api/v1/organizers/${organizer}/webhooks/`, data);
+      return request('POST', `/api/v1/organizers/${encSeg(organizer)}/webhooks/`, data);
     }
   };
 }

@@ -48,43 +48,64 @@ export async function getCustomerAccount(
   customerId: string,
   opts: AccountOptions = {},
 ): Promise<CustomerAccount> {
-  const orderLimit = Math.min(opts.orderLimit ?? 10, 50);
+  const rawLimit = Number(opts.orderLimit ?? 10);
+  const orderLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, Math.floor(rawLimit)), 50) : 10;
 
   try {
     const customer = await db
-      .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points FROM customers WHERE id = ?')
+      .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points, tenant_id FROM customers WHERE id = ?')
       .bind(customerId)
-      .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null }>();
+      .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null; tenant_id?: string | null }>()
+      .catch(() =>
+        db
+          .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points FROM customers WHERE id = ?')
+          .bind(customerId)
+          .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null; tenant_id?: string | null }>(),
+      );
 
     if (!customer) {
       return { ...EMPTY, customerId };
     }
 
+    const customerTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
+    const nonEmptyPhone = customer.phone && customer.phone.trim() ? customer.phone.trim() : null;
+
     const [orders, consents, policy] = await Promise.all([
       db
         .prepare(
           `SELECT * FROM orders
-           WHERE customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone = ?)
+           WHERE (customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?))
+             AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
            ORDER BY created_at DESC LIMIT ?`,
         )
-        .bind(customerId, customer.phone ?? '', orderLimit)
+        .bind(customerId, nonEmptyPhone, customerTenant, orderLimit)
         .all<Record<string, unknown>>()
         .catch(() =>
           db
             .prepare(
-              `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
-               WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+              `SELECT * FROM orders
+               WHERE customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?)
+               ORDER BY created_at DESC LIMIT ?`,
             )
-            .bind(customer.phone, orderLimit)
+            .bind(customerId, nonEmptyPhone, orderLimit)
             .all<Record<string, unknown>>()
             .catch(() =>
               db
                 .prepare(
-                  `SELECT id, total, status, created_at FROM orders
-                   WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                  `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
+                   WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
                 )
-                .bind(customer.phone, orderLimit)
-                .all<Record<string, unknown>>(),
+                .bind(nonEmptyPhone, orderLimit)
+                .all<Record<string, unknown>>()
+                .catch(() =>
+                  db
+                    .prepare(
+                      `SELECT id, total, status, created_at FROM orders
+                       WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                    )
+                    .bind(nonEmptyPhone, orderLimit)
+                    .all<Record<string, unknown>>(),
+                ),
             ),
         ),
 
@@ -120,12 +141,14 @@ export async function getCustomerAccount(
       points: customer.loyalty_points ?? 0,
       lifetimePoints,
       nextTier,
-      recentOrders: (orders.results || []).map((o) => ({
-        id: String(o.id ?? ''),
-        totalCents: Number(o.total_cents ?? o.total ?? o.total_amount ?? 0),
-        status: String(o.status ?? 'pending'),
-        placedAt: String(o.created_at ?? o.placed_at ?? ''),
-      })),
+      recentOrders: (orders.results || [])
+        .filter((o) => !('tenant_id' in o) || o.tenant_id === undefined || ((String(o.tenant_id ?? '').trim() || 'default') === customerTenant))
+        .map((o) => ({
+          id: String(o.id ?? ''),
+          totalCents: Number(o.total_cents ?? o.total ?? o.total_amount ?? 0),
+          status: String(o.status ?? 'pending'),
+          placedAt: String(o.created_at ?? o.placed_at ?? ''),
+        })),
       consents: (consents.results || []).map((c) => ({
         purpose: c.purpose,
         granted: c.granted === 1,

@@ -13,8 +13,9 @@ import { requireAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
 
 function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (tenantId === '*') return true;
   if (!row) return false;
-  if (!('tenant_id' in row) || row.tenant_id === undefined) return true;
+  if (!('tenant_id' in row) || row.tenant_id === undefined) return tenantId === 'default';
   const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
   return rowTenant === tenantId;
 }
@@ -38,7 +39,7 @@ export interface FloorPlanTable {
 }
 
 const floorPlanRouter = new Hono<{ Bindings: Env }>();
-floorPlanRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter', 'cashier']));
+floorPlanRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'supervisor', 'admin', 'waiter', 'cashier']));
 
 // GET /api/floor-plan — live floor plan with active session linkage
 floorPlanRouter.get('/', async (c) => {
@@ -59,7 +60,7 @@ floorPlanRouter.get('/', async (c) => {
          s.customer_name AS session_customer_name
        FROM cafe_tables t
        LEFT JOIN table_sessions s
-         ON s.table_id = t.id AND s.status = 'active'
+         ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paid'))
        WHERE 1=1${filterSql}${orderSql}`;
 
   let results: Record<string, unknown>[] = [];
@@ -76,7 +77,7 @@ floorPlanRouter.get('/', async (c) => {
            NULL AS session_customer_name
          FROM cafe_tables t
          LEFT JOIN table_sessions s
-           ON s.table_id = t.id AND s.status = 'active'
+           ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paid'))
          WHERE 1=1${filterSql}${orderSql}`;
       const stmt = params.length ? db.prepare(fallbackQuery).bind(...params) : db.prepare(fallbackQuery);
       const res = await stmt.all<Record<string, unknown>>();
@@ -137,15 +138,19 @@ floorPlanRouter.get('/summary', async (c) => {
   let rows: { results: { status: string; c: number }[] };
   try {
     rows = await db.prepare(
-      'SELECT status, COUNT(*) AS c FROM cafe_tables WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) GROUP BY status'
-    ).bind(tenantId, tenantId).all<{ status: string; c: number }>();
+      'SELECT status, COUNT(*) AS c FROM cafe_tables WHERE (? = \'*\' OR tenant_id = ? OR (? = \'default\' AND (tenant_id IS NULL OR tenant_id = \'\'))) GROUP BY status'
+    ).bind(tenantId, tenantId, tenantId).all<{ status: string; c: number }>();
   } catch (err) {
     if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
       throw err;
     }
-    rows = await db.prepare(
-      'SELECT status, COUNT(*) AS c FROM cafe_tables GROUP BY status'
-    ).all<{ status: string; c: number }>();
+    if (tenantId !== 'default' && tenantId !== '*') {
+      rows = { results: [] };
+    } else {
+      rows = await db.prepare(
+        'SELECT status, COUNT(*) AS c FROM cafe_tables GROUP BY status'
+      ).all<{ status: string; c: number }>();
+    }
   }
   const counts: Record<string, number> = {};
   for (const r of rows.results) counts[r.status] = Number(r.c);

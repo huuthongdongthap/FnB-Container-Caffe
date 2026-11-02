@@ -5,7 +5,7 @@
 
 import { createErpnextClient, ErpnextClient } from '../clients/erpnext-client';
 import { createErpnextProductClient, type ProductEnv } from '../clients/erpnext-product-client';
-import { erpnextSalesOrderSchema, erpnextPosWebhookSchema } from '../lib/validators';
+import { erpnextSalesOrderSchema, erpnextPosWebhookSchema, erpnextProductsBatchSyncSchema } from '../lib/validators';
 
 interface PosEnv {
   AURA_DB?: D1Database;
@@ -13,6 +13,20 @@ interface PosEnv {
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;
   ERPNEXT_API_SECRET?: string;
+  ERPNEXT_WEBHOOK_SECRET?: string;
+  ENVIRONMENT?: string;
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  const maxLen = Math.max(aBytes.length, bBytes.length);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return diff === 0;
 }
 
 interface _SalesOrderInput { // eslint-disable-line no-unused-vars
@@ -33,10 +47,16 @@ function getClient(env: PosEnv): ErpnextClient | null {
   return createErpnextClient(env);
 }
 
-export async function handleErpnextPosRequest(request: Request, env: PosEnv): Promise<Response> {
+export async function handleErpnextPosRequest(
+  request: Request,
+  env: PosEnv,
+  resolvedTenantId?: string,
+): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace('/api/erpnext-pos', '');
   const method = request.method;
+  const rawTenantHeader = (request.headers.get('X-Tenant-ID') || request.headers.get('x-tenant-id') || '').trim();
+  const tenantId = resolvedTenantId ?? (rawTenantHeader && rawTenantHeader !== '*' ? rawTenantHeader : 'default');
 
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
@@ -90,7 +110,7 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
-      const availability = await productClient.getProductAvailability(itemCode);
+      const availability = await productClient.getProductAvailability(itemCode, tenantId);
       return json({ success: true, data: availability });
     }
 
@@ -113,13 +133,33 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
-      const body = await request.json() as { products: Array<{ name: string; item_code: string; item_name: string; modified: string | null }> };
-      const result = await productClient.syncProductsToLocal(env as unknown as ProductEnv, body.products);
+      const body = await request.json().catch(() => null);
+      const parsed = erpnextProductsBatchSyncSchema.safeParse(body);
+      if (!parsed.success) {
+        return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      }
+      const result = await productClient.syncProductsToLocal(env as unknown as ProductEnv, parsed.data.products);
       return json({ success: true, data: result });
     }
 
     // POST /api/erpnext-pos/webhook — receive ERPNext webhooks
     if (method === 'POST' && path === '/webhook') {
+      const webhookSecret = env.ERPNEXT_WEBHOOK_SECRET?.trim() || '';
+      const isProd = env.ENVIRONMENT === 'production';
+      if (isProd && !webhookSecret) {
+        return json({ success: false, error: 'ERPNext webhook secret not configured' }, 503);
+      }
+      if (webhookSecret) {
+        const providedSecret = (
+          request.headers.get('x-erpnext-webhook-secret') ||
+          request.headers.get('x-frappe-webhook-signature') ||
+          ''
+        ).trim();
+        if (!providedSecret || !constantTimeEqual(providedSecret, webhookSecret)) {
+          return json({ success: false, error: 'Invalid webhook secret' }, 401);
+        }
+      }
+
       const body = await request.json() as Record<string, unknown>;
       const parsed = erpnextPosWebhookSchema.safeParse(body);
       if (!parsed.success) {

@@ -20,20 +20,45 @@ export interface ResolveOwnershipInput {
   clientSuppliedCustomerId?: string | null;
   customerPhone?: string | null;
   db?: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T = unknown>() => Promise<T | null> } } };
+  tenantId?: string;
 }
 
 export async function findCustomerByIdentifier(
   db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T = unknown>() => Promise<T | null> } } },
-  phone: string
+  phone: string,
+  tenantId?: string,
 ): Promise<string | null> {
   const digits = normalizePhone(phone);
   if (!isPlausibleVnPhone(digits)) return null;
+  const scopedTenant = tenantId !== undefined && tenantId !== '*' ? (String(tenantId).trim() || 'default') : null;
   try {
-    const idRow = await db.prepare(
-      "SELECT customer_id FROM customer_identities WHERE identifier_type = 'phone' AND identifier_value = ? LIMIT 1"
-    ).bind(digits).first<{ customer_id: string }>();
-    if (idRow?.customer_id) return idRow.customer_id;
+    if (!scopedTenant) {
+      const idRow = await db.prepare(
+        "SELECT customer_id FROM customer_identities WHERE identifier_type = 'phone' AND identifier_value = ? LIMIT 1"
+      ).bind(digits).first<{ customer_id: string }>();
+      if (idRow?.customer_id) return idRow.customer_id;
+    } else {
+      try {
+        const idRow = await db.prepare(
+          "SELECT ci.customer_id FROM customer_identities ci JOIN customers c ON c.id = ci.customer_id WHERE ci.identifier_type = 'phone' AND ci.identifier_value = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(digits, scopedTenant).first<{ customer_id: string }>();
+        if (idRow?.customer_id) return idRow.customer_id;
+      } catch {
+        const idRow = await db.prepare(
+          "SELECT customer_id FROM customer_identities WHERE identifier_type = 'phone' AND identifier_value = ? LIMIT 1"
+        ).bind(digits).first<{ customer_id: string }>();
+        if (idRow?.customer_id) return idRow.customer_id;
+      }
+    }
 
+    if (scopedTenant) {
+      try {
+        const custRow = await db.prepare(
+          "SELECT id FROM customers WHERE (phone = ? OR phone = ?) AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+        ).bind(digits, phone, scopedTenant, scopedTenant).first<{ id: string }>();
+        return custRow?.id ?? null;
+      } catch { /* Fallback when customers lacks tenant_id */ }
+    }
     const custRow = await db.prepare(
       'SELECT id FROM customers WHERE phone = ? OR phone = ? LIMIT 1'
     ).bind(digits, phone).first<{ id: string }>();
@@ -59,7 +84,7 @@ const PRIVILEGED_STAFF_ROLES = [
 export async function resolveServerOrderOwnership(
   input: ResolveOwnershipInput
 ): Promise<OrderOwnershipResolution> {
-  const { actor, clientSuppliedCustomerId, customerPhone, db } = input;
+  const { actor, clientSuppliedCustomerId, customerPhone, db, tenantId } = input;
   const role = actor?.role;
 
   if (role && PRIVILEGED_STAFF_ROLES.includes(role)) {
@@ -67,7 +92,7 @@ export async function resolveServerOrderOwnership(
       return { customerId: clientSuppliedCustomerId, stage: 'customer_profile', isGuest: false, resolvedVia: 'staff_override' };
     }
     if (customerPhone && db) {
-      const existing = await findCustomerByIdentifier(db, customerPhone);
+      const existing = await findCustomerByIdentifier(db, customerPhone, tenantId);
       if (existing) {
         return { customerId: existing, stage: 'customer_profile', isGuest: false, resolvedVia: 'deterministic_identifier' };
       }
@@ -141,11 +166,17 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
     return { success: false, error: 'Order not found', statusCode: 404 };
   }
 
-  if (tenantId && tenantId !== '*') {
+  if (tenantId !== undefined && tenantId !== '*') {
+    const callerTenant = String(tenantId).trim() || 'default';
     try {
       const tenantRow = await db.prepare('SELECT tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ tenant_id?: string | null }>();
-      if (tenantRow?.tenant_id && tenantRow.tenant_id !== tenantId) {
-        return { success: false, error: 'Order not found', statusCode: 404 };
+      if (tenantRow && 'tenant_id' in tenantRow && tenantRow.tenant_id !== undefined) {
+        const rowTenant = typeof tenantRow.tenant_id === 'string' && tenantRow.tenant_id.trim()
+          ? tenantRow.tenant_id.trim()
+          : 'default';
+        if (rowTenant !== callerTenant) {
+          return { success: false, error: 'Order not found', statusCode: 404 };
+        }
       }
     } catch {
       // Allow fallback when minimal schema omits tenant_id

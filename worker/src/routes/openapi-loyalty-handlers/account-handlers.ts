@@ -2,6 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import {
   getLoyaltyAccountWithFallback,
   recordLoyaltyTransactionDualWrite,
@@ -14,8 +15,9 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.get as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    const tenantId = getTenantId(c);
 
-    const { account } = await getLoyaltyAccountWithFallback(db, user.customerId || user.id);
+    const { account } = await getLoyaltyAccountWithFallback(db, user.customerId || user.id, new Date().toISOString(), tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'Account not found' }, 404);
@@ -39,10 +41,11 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.transactions as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const query = c.req.valid('query');
     const customerId = String(user.customerId || user.id);
 
-    const { account } = await getLoyaltyAccountWithFallback(db, customerId);
+    const { account } = await getLoyaltyAccountWithFallback(db, customerId, new Date().toISOString(), tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'Account not found' }, 404);
@@ -112,13 +115,14 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.claimBirthdayBonus as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const body = c.req.valid('json');
     const now = new Date().toISOString();
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = String(new Date().getFullYear());
     const customerId = String(user.customerId || user.id);
 
-    const { account } = await getLoyaltyAccountWithFallback(db, customerId, now);
+    const { account } = await getLoyaltyAccountWithFallback(db, customerId, now, tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
@@ -126,22 +130,35 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const accountCustomerId = String(account.customer_id ?? customerId);
 
-    // Check if already claimed this month
+    // Verify customer birth month if birthday/date_of_birth is recorded on the customer profile
+    let birthDateRaw = account.birthday || account.date_of_birth || null;
+    if (!birthDateRaw) {
+      const custRow = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(accountCustomerId).first().catch(() => null);
+      birthDateRaw = custRow?.birthday || custRow?.date_of_birth || null;
+    }
+    if (typeof birthDateRaw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(birthDateRaw)) {
+      const birthMonth = parseInt(birthDateRaw.slice(5, 7), 10);
+      if (Number.isFinite(birthMonth) && birthMonth !== currentMonth) {
+        return c.json({ success: false, error: 'Birthday bonus is only available during your birth month' }, 400);
+      }
+    }
+
+    // Check if already claimed this year
     let existingClaim: any = null;
     try {
       existingClaim = await db.prepare(
         `SELECT * FROM loyalty_transactions
-         WHERE (account_id = ? OR customer_id = ?) AND type = 'birthday' AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?`
-      ).bind(account.id, accountCustomerId, String(currentMonth).padStart(2, '0'), currentYear).first();
+         WHERE (account_id = ? OR customer_id = ?) AND type = 'birthday' AND strftime('%Y', created_at) = ?`
+      ).bind(account.id, accountCustomerId, currentYear).first();
     } catch {
       existingClaim = await db.prepare(
         `SELECT * FROM loyalty_transactions
-         WHERE customer_id = ? AND (type = 'birthday' OR reason = 'Birthday bonus') AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?`
-      ).bind(accountCustomerId, String(currentMonth).padStart(2, '0'), currentYear).first().catch(() => null);
+         WHERE customer_id = ? AND (type = 'birthday' OR reason = 'Birthday bonus') AND strftime('%Y', created_at) = ?`
+      ).bind(accountCustomerId, currentYear).first().catch(() => null);
     }
 
     if (existingClaim) {
-      return c.json({ success: false, error: 'Birthday bonus already claimed this month' }, 400);
+      return c.json({ success: false, error: 'Birthday bonus already claimed this year' }, 400);
     }
 
     // Birthday bonus: configurable via tier config with null-fallback to tier_configs
@@ -159,7 +176,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const birthdayPoints = Number(tierConfig?.birthday_bonus || 500);
 
     const transactionId = crypto.randomUUID();
-    const idempotencyKey = body.idempotencyKey || `bday_${account.id}_${now.slice(0, 7)}`;
+    const idempotencyKey = body.idempotencyKey || `bday_${account.id}_${currentYear}`;
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
     const newBalance = currentPoints + birthdayPoints;
 

@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { executeKdsStatusTransition } from './kds-status-transition';
-import { getTenantId } from 'worker/src/middleware/tenant';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import { isTerminal } from '../../order/model/order-state-machine';
 import {
   buildIndexFromDbRows,
@@ -19,15 +19,24 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
   const db = c.env.AURA_DB;
   const stationId = c.req.param('id');
   const tenantId = getTenantId(c);
-  const tenantClause = tenantId === '*' ? '' : ' AND o.tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
-  const station = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(stationId).first<{ id: string }>();
-  if (!station) return c.json({ success: false, error: 'Station not found' }, 404);
+  const station = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(stationId).first<Record<string, unknown>>();
+  if (!station || !matchesTenantRow(station, tenantId)) return c.json({ success: false, error: 'Station not found' }, 404);
 
-  const { results: mappings } = await db.prepare(
-    'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
-  ).all<Record<string, unknown>>();
-  const categoryIndex = buildIndexFromDbRows(mappings || []);
+  const { results: rawMappings } = await db.prepare(
+    'SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id AS tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+  ).all<Record<string, unknown>>().catch(() =>
+    db.prepare(
+      'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+    ).all<Record<string, unknown>>()
+  );
+  const mappings = (rawMappings || []).filter((r) => matchesTenantRow(r, tenantId));
+  const categoryIndex = buildIndexFromDbRows(mappings);
 
   let activeOrders: Array<Record<string, unknown>> | undefined;
   try {
@@ -60,7 +69,7 @@ stationTicketsRouter.get('/:id/tickets', async (c) => {
       status: order.status,
       created_at: order.created_at,
       items: itemsForStation.map((i: Record<string, unknown>) => ({
-        id: i.id || i.menuItemId || i.productId || null,
+        id: i.id || i.menuItemId || i.productId || i.product_id || null,
         name: i.name,
         qty: i.qty || i.quantity || 1,
         price: i.price || 0,
@@ -77,13 +86,21 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => 
   const db = c.env.AURA_DB;
   const orderId = c.req.param('orderId');
   const tenantId = getTenantId(c);
-  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
   const role = c.get('user')?.role;
   const itemId = c.req.param('itemId');
   const stationId = c.req.query('station_id');
   if (!stationId) return c.json({ success: false, error: 'station_id query param is required' }, 400);
 
+  const stationRow = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(stationId).first<Record<string, unknown>>().catch(() => null);
+  if ((stationRow && !matchesTenantRow(stationRow, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !stationRow)) {
+    return c.json({ success: false, error: 'Station not found' }, 404);
+  }
   const order = await db.prepare(`SELECT id, status FROM orders WHERE id = ?${tenantClause}`).bind(orderId, ...tenantBinds).first<{ id: string; status: string }>();
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
   if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
@@ -110,13 +127,21 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
   const db = c.env.AURA_DB;
   const orderId = c.req.param('orderId');
   const tenantId = getTenantId(c);
-  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
   const role = c.get('user')?.role;
   const itemId = c.req.param('itemId');
   const stationId = c.req.query('station_id');
   if (!stationId) return c.json({ success: false, error: 'station_id query param is required' }, 400);
 
+  const stationRow = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(stationId).first<Record<string, unknown>>().catch(() => null);
+  if ((stationRow && !matchesTenantRow(stationRow, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !stationRow)) {
+    return c.json({ success: false, error: 'Station not found' }, 404);
+  }
   const order = await db.prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`).bind(orderId, ...tenantBinds).first<{ id: string; status: string; items: string }>();
   if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
   if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
@@ -131,13 +156,13 @@ stationTicketsRouter.post('/tickets/:orderId/items/:itemId/ready', async (c) => 
   let allReady = items.length > 0;
   for (let idx = 0; idx < items.length; idx++) {
     const it = items[idx];
-    const idKey = (it.id || it.menuItemId || it.productId || '') as string;
+    const idKey = (it.id || it.menuItemId || it.productId || it.product_id || '') as string;
     const compositeKey = idKey
       ? (idKey.startsWith(`${orderId}:`) ? idKey : `${orderId}:${idKey}`)
       : `${orderId}:${idx}`;
     const itemReady = await db.prepare(
       'SELECT ready_at FROM order_item_stations WHERE (order_item_id = ? OR order_item_id = ?) AND ready_at IS NOT NULL LIMIT 1'
-    ).bind(compositeKey, idKey || compositeKey).first<{ ready_at: string }>();
+    ).bind(compositeKey, compositeKey).first<{ ready_at: string }>();
     if (!itemReady?.ready_at) {
       allReady = false;
       break;

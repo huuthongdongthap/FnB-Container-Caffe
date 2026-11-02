@@ -3,11 +3,21 @@ import type { Env } from '../../types/env';
 import { getTenantId } from '../../middleware/tenant';
 import type { GroupedSalesGroup, RevenueOverviewData } from './types';
 
+function buildTenantFilter(tenantId: string, alias?: string): { clause: string; binds: string[] } {
+  if (tenantId === '*') {
+    return { clause: '', binds: [] };
+  }
+  const col = alias ? `${alias}.tenant_id` : 'tenant_id';
+  if (tenantId === 'default') {
+    return { clause: ` AND (${col} = ? OR ${col} IS NULL)`, binds: [tenantId] };
+  }
+  return { clause: ` AND ${col} = ?`, binds: [tenantId] };
+}
+
 export async function handleOverview(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c);
-  const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
-  const tenantBinds = tenantId === '*' ? [] : [tenantId];
+  const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId);
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const from = c.req.query('from') || todayStr;
@@ -60,8 +70,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/sales-by-hour', async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
-    const tenantBinds = tenantId === '*' ? [] : [tenantId];
+    const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId);
     const from = c.req.query('from') || new Date().toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -91,8 +100,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/sales-by-day', async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
-    const tenantBinds = tenantId === '*' ? [] : [tenantId];
+    const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -111,9 +119,8 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/sales-by-category', async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const tenantOrderClause = tenantId === '*' ? '' : ' AND (o.tenant_id = ? OR o.tenant_id IS NULL)';
-    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
-    const tenantBinds = tenantId === '*' ? [] : [tenantId];
+    const { clause: tenantOrderClause } = buildTenantFilter(tenantId, 'o');
+    const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -174,8 +181,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/sales-by-payment', async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const tenantClause = tenantId === '*' ? '' : ' AND (tenant_id = ? OR tenant_id IS NULL)';
-    const tenantBinds = tenantId === '*' ? [] : [tenantId];
+    const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 

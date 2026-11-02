@@ -9,7 +9,8 @@ import type { Env } from '../../types/env';
 import {
   getDeviceState,
   toggleDevice,
-  getZoneDevices
+  getZoneDevices,
+  matchesHaTenant
 } from '../../tree/homeassistant/devices';
 import {
   triggerAutomation,
@@ -21,6 +22,7 @@ import {
   type DiningPresenceEvent
 } from '../../tree/homeassistant/presence';
 import { requireAuth as jwtRequireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 import { z } from 'zod';
 
@@ -53,7 +55,7 @@ const DispatchPresenceSchema = z.object({
 });
 
 export function createHARouter() {
-  const auth = requireAuth(['owner', 'admin', 'manager', 'staff']);
+  const auth = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
   const app = new Hono<{ Bindings: Env }>();
 
   // ── Devices ──
@@ -64,17 +66,29 @@ export function createHARouter() {
       const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
       const mockMode = c.env.HA_MOCK === 'true';
 
-      const { results } = await db
-        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states ORDER BY entity_id')
-        .all<{ entity_id: string; state: string; attributes: string | null; last_changed: string; last_updated: string }>();
+      const tenantId = getTenantId(c);
+      let results: Array<{ entity_id: string; state: string; attributes: string | null; last_changed: string; last_updated: string; tenant_id?: string | null }> = [];
+      try {
+        const res = await db
+          .prepare('SELECT entity_id, state, attributes, last_changed, last_updated, tenant_id FROM ha_device_states ORDER BY entity_id')
+          .all<{ entity_id: string; state: string; attributes: string | null; last_changed: string; last_updated: string; tenant_id?: string | null }>();
+        results = res.results || [];
+      } catch {
+        const res = await db
+          .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states ORDER BY entity_id')
+          .all<{ entity_id: string; state: string; attributes: string | null; last_changed: string; last_updated: string }>();
+        results = res.results || [];
+      }
 
-      const devices = results.map((r) => ({
-        entity_id: r.entity_id,
-        state: r.state,
-        attributes: r.attributes ? JSON.parse(r.attributes) : null,
-        last_changed: r.last_changed,
-        last_updated: r.last_updated
-      }));
+      const devices = (results || [])
+        .filter((r) => matchesHaTenant(r as unknown as Record<string, unknown>, tenantId))
+        .map((r) => ({
+          entity_id: r.entity_id,
+          state: r.state,
+          attributes: r.attributes ? JSON.parse(r.attributes) : null,
+          last_changed: r.last_changed,
+          last_updated: r.last_updated
+        }));
 
       if (mockMode) {
         return c.json({ mock: true, devices });
@@ -89,7 +103,7 @@ export function createHARouter() {
   // GET /api/ha/devices/:entityId — single device state
   app.get('/devices/:entityId', auth, async(c) => {
     const entityId = c.req.param('entityId');
-    return getDeviceState(c.env, entityId);
+    return getDeviceState(c.env, entityId, getTenantId(c));
   });
 
   // POST /api/ha/devices/:entityId/toggle — toggle device
@@ -103,7 +117,7 @@ export function createHARouter() {
       }
       const on = parsed.data.action === 'on';
       const entityId = c.req.param('entityId');
-      return toggleDevice(c.env, entityId, on);
+      return toggleDevice(c.env, entityId, on, getTenantId(c));
     } catch {
       return c.json({ error: 'Invalid JSON body' }, 400);
     }
@@ -112,7 +126,7 @@ export function createHARouter() {
   // GET /api/ha/devices/zone/:zone — devices by zone
   app.get('/devices/zone/:zone', auth, async(c) => {
     const zone = c.req.param('zone');
-    return getZoneDevices(c.env, zone);
+    return getZoneDevices(c.env, zone, getTenantId(c));
   });
 
   // ── Automations ──
@@ -126,7 +140,12 @@ export function createHARouter() {
         const first = parsed.error.issues[0];
         return c.json({ error: `${first.path.join('.')}: ${first.message}` }, 400);
       }
-      return triggerAutomation(c.env, parsed.data.automation_id, parsed.data.payload ?? { trigger_entity: parsed.data.trigger_entity });
+      return triggerAutomation(
+        c.env,
+        parsed.data.automation_id,
+        parsed.data.payload ?? { trigger_entity: parsed.data.trigger_entity },
+        getTenantId(c)
+      );
     } catch {
       return c.json({ error: 'Invalid JSON body' }, 400);
     }
@@ -134,8 +153,9 @@ export function createHARouter() {
 
   // GET /api/ha/automations/log — recent automation execution log
   app.get('/automations/log', auth, async(c) => {
-    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
-    return getAutomationLog(c.env, limit);
+    const rawLimit = parseInt(c.req.query('limit') || '50', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+    return getAutomationLog(c.env, limit, getTenantId(c));
   });
 
   // ── Dining Presence ──
@@ -152,7 +172,8 @@ export function createHARouter() {
       const result = await dispatchDiningPresence(
         c.env as Record<string, unknown>,
         parsed.data.event as DiningPresenceEvent,
-        parsed.data.payload ?? {}
+        parsed.data.payload ?? {},
+        getTenantId(c)
       );
       return c.json({ ...result, success: true });
     } catch (err) {
@@ -177,7 +198,10 @@ export function createHARouter() {
         return c.json({ error: 'HA webhook secret not configured' }, 503);
       }
       if (secret) {
-        const token = c.req.header('x-ha-token') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? c.req.query('token');
+        const token =
+          c.req.header('x-ha-token') ??
+          c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ??
+          (!isProd ? c.req.query('token') : undefined);
         const enc = new TextEncoder();
         const aBytes = enc.encode(token ?? '');
         const bBytes = enc.encode(secret);

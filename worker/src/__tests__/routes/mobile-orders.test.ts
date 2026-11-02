@@ -486,4 +486,48 @@ describe('getOrderDetail', () => {
     const body: any = await authRes.json();
     expect(body.order.id).toBe('ORD_1');
   });
+
+  it('allows supervisor role on mobile orders and enforces strict tenant clause for non-default tenants', async () => {
+    const supCreateCtx: any = mockOrdersContext({
+      role: 'supervisor',
+      method: 'POST',
+      body: {
+        table_id: 'TBL_1',
+        items: [{ product_id: 'coffee', name: 'Cà phê sữa', qty: 2, price: 25000 }],
+      },
+    });
+    const supCreateRes = await createOrderMobile(supCreateCtx);
+    expect(supCreateRes.status).toBe(201);
+
+    let capturedSql = '';
+    let capturedBinds: unknown[] = [];
+    const spyDb: any = {
+      prepare: (sql: string) => {
+        capturedSql = sql;
+        return {
+          bind: (...args: unknown[]) => {
+            capturedBinds = args;
+            return {
+              first: async () => null,
+              all: async () => ({ results: [], success: true }),
+            };
+          },
+        };
+      },
+    };
+    const foreignDetailCtx: any = {
+      ...mockOrdersContext({ role: 'supervisor', orderId: 'ORD_1' }),
+      env: { AURA_DB: spyDb, AUTH_KV: createMockKV(), JWT_SECRET: TEST_JWT_SECRET },
+      get: (key: string) => {
+        if (key === 'user') return { id: 'USR_SUP_B', role: 'supervisor', tenantId: 'cafe-b' };
+        if (key === 'tenant_id') return 'cafe-b';
+        return undefined;
+      },
+    };
+    const detailRes = await getOrderDetail(foreignDetailCtx);
+    expect(detailRes.status).toBe(404);
+    expect(capturedSql).toContain('AND tenant_id = ?');
+    expect(capturedSql).not.toContain('IS NULL');
+    expect(capturedBinds).toEqual(['ORD_1', 'cafe-b']);
+  });
 });

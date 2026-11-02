@@ -41,7 +41,9 @@ export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters' | 
 
   const alias = opts.tableAlias ?? 'o';
   if (opts.tenantId && opts.tenantId !== '*') {
-    clause += ` AND ${alias}.tenant_id = ?`;
+    clause += opts.tenantId === 'default'
+      ? ` AND (${alias}.tenant_id = ? OR ${alias}.tenant_id IS NULL OR ${alias}.tenant_id = '')`
+      : ` AND ${alias}.tenant_id = ?`;
     params.push(opts.tenantId);
   }
 

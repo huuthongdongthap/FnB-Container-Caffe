@@ -46,6 +46,7 @@ export async function createOrder(
     const snapshot = await calculateCheckoutSnapshot(db, {
       items: data.items, order_type: orderType, shipping_fee: data.shipping_fee,
       discount: data.discount, service_fee: data.service_fee, tip_amount: data.tip_amount,
+      tenantId,
     });
     if (snapshot.rejected) return errorResponse(snapshot.rejected.message, 400);
     const resolvedTableId = await resolveOrderCreationTable(db, data.table_id, tenantId);
@@ -53,7 +54,7 @@ export async function createOrder(
       return errorResponse('dine_in orders require a valid table_id (table_number from QR)', 400);
     }
     const ownership = await resolveServerOrderOwnership({
-      actor, clientSuppliedCustomerId: data.customer_id || null, customerPhone: data.customer_phone || null, db,
+      actor, clientSuppliedCustomerId: data.customer_id || null, customerPhone: data.customer_phone || null, db, tenantId,
     });
     const resolvedCustomerId = ownership.customerId;
     const now = new Date().toISOString();
@@ -61,18 +62,21 @@ export async function createOrder(
     let appliedPromo: { id: string; code: string; discountAmount: number; reservedInPlace?: boolean } | null = null;
     if (rawPromoCode) {
       const isWelcome = rawPromoCode === 'WELCOME';
-      let promo = await db.prepare(
-        'SELECT * FROM promotions WHERE UPPER(code) = ?'
-      ).bind(rawPromoCode).first<{
+      type PromoRow = {
         id: string; code: string; percent: number; max_discount: number; min_order: number;
         starts_at?: string | null; expires_at?: string | null; usage_limit: number; usage_count: number;
         is_active?: number; tenant_id?: string | null;
-      }>().catch(() => null);
-      if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
-        return errorResponse('Mã khuyến mãi không tồn tại hoặc không thuộc cửa hàng hiện tại', 400);
-      }
-      if (promo && promo.tenant_id === 'default' && tenantId !== 'default' && tenantId !== '*') {
-        return errorResponse('Mã khuyến mãi không tồn tại hoặc không thuộc cửa hàng hiện tại', 400);
+      };
+      let promo = await db.prepare(
+        "SELECT * FROM promotions WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+      ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
+        db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?').bind(rawPromoCode).first<PromoRow>().catch(() => null)
+      );
+      if (promo && 'tenant_id' in promo && promo.tenant_id !== undefined && tenantId !== '*') {
+        const promoTenant = (promo.tenant_id && String(promo.tenant_id).trim()) || 'default';
+        if (promoTenant !== tenantId) {
+          return errorResponse('Mã khuyến mãi không tồn tại hoặc không thuộc cửa hàng hiện tại', 400);
+        }
       }
       if (promo && Number(promo.is_active ?? 1) === 0) {
         return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
@@ -91,8 +95,12 @@ export async function createOrder(
           return errorResponse('Mã WELCOME yêu cầu khách hàng mới để lại thông tin đăng ký', 400);
         }
         const prior = await db.prepare(
-          "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
-        ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null);
+          "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND status NOT IN ('cancelled', 'failed')"
+        ).bind(resolvedCustomerId, normalizedPhone, tenantId).first<{ cnt?: number }>().catch(() =>
+          db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
+          ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+        );
         if (Number(prior?.cnt ?? 0) > 0) {
           return errorResponse('Mã WELCOME chỉ áp dụng cho khách hàng mới lần đầu đến quán', 400);
         }
@@ -100,8 +108,12 @@ export async function createOrder(
       let reservedInPlace = false;
       if (!isWelcome || promo.id !== 'promo_welcome') {
         const reserveRes = await db.prepare(
-          'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
-        ).bind(promo.code).run().catch(() => null) as { meta?: { changes?: number }; changes?: number } | null;
+          "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
+        ).bind(promo.code, tenantId).run().catch(() =>
+          db.prepare(
+            'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+          ).bind(promo.code).run().catch(() => null)
+        ) as { meta?: { changes?: number }; changes?: number } | null;
         const changes = reserveRes?.meta?.changes ?? reserveRes?.changes;
         if (changes !== undefined && Number(changes) < 1) {
           return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
@@ -154,8 +166,8 @@ export async function createOrder(
         .bind(generateId('PAY_'), orderId, 'cod', snapshot.total, 'pending', now, now));
     }
     if (resolvedTableId) {
-      statements.push(db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND tenant_id = ? AND status = 'Available'")
-        .bind(resolvedTableId, tenantId));
+      const tblClause = tenantId === 'default' ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')" : 'AND tenant_id = ?';
+      statements.push(db.prepare(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND status = 'Available'`).bind(resolvedTableId, tenantId));
     }
     try { await db.batch(statements); }
     catch (error) {
@@ -197,7 +209,7 @@ export async function createOrder(
         if (ctx?.waitUntil) ctx.waitUntil(broadcast); else await broadcast;
       }
       await runPostOrderSideEffects({
-        db, env, ctx, orderId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId,
+        db, env, ctx, orderId, tenantId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId,
       });
     } catch (error) {
       log.warn('Order side effect failed after persistence', { orderId, message: (error as Error).message });

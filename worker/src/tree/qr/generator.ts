@@ -35,9 +35,16 @@ export async function bulkGenerateSlugs(
   const result = new Map<number | string, string>();
 
   for (const table of tables) {
-    const parsedNum = typeof table.id === 'string' ? parseInt(table.id, 10) : Number(table.id);
-    const idKey: number | string = !Number.isNaN(parsedNum) ? parsedNum : String(table.id);
-    const desiredSlug = generateSlug(table.table_number, table.zone);
+    const rawId = String(table.id);
+    const idKey: number | string = typeof table.id === 'number'
+      ? table.id
+      : (/^\d+$/.test(rawId) ? parseInt(rawId, 10) : rawId);
+    const baseSlug = generateSlug(table.table_number, table.zone);
+    const rawTenant = (table as unknown as Record<string, unknown>).tenant_id;
+    const tenantPrefix = typeof rawTenant === 'string' && rawTenant.trim() && rawTenant.trim() !== 'default'
+      ? `${rawTenant.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-`
+      : '';
+    const desiredSlug = `${tenantPrefix}${baseSlug}`;
 
     // Try to find existing slug for this table
     let existing: { slug: string } | null = null;

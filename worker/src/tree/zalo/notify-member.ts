@@ -7,6 +7,15 @@ interface CustomerRecord {
   name: string;
   phone: string;
   zalo: string | null;
+  tenant_id?: string | null;
+}
+
+function matchesCustomerTenant(customer: CustomerRecord, tenantId?: string): boolean {
+  if (!tenantId || tenantId === '*') return true;
+  if ('tenant_id' in customer && customer.tenant_id !== undefined && customer.tenant_id !== null && String(customer.tenant_id).trim() !== '') {
+    return String(customer.tenant_id).trim() === tenantId;
+  }
+  return tenantId === 'default';
 }
 
 /**
@@ -18,11 +27,21 @@ export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: 
   if (env.AURA_DB) {
     try {
       customer = await env.AURA_DB.prepare(
-        'SELECT id, name, phone, zalo FROM customers WHERE id = ?'
+        'SELECT id, name, phone, zalo, tenant_id FROM customers WHERE id = ?'
       ).bind(params.customer_id).first<CustomerRecord>();
     } catch {
-      /* db error — graceful */
+      try {
+        customer = await env.AURA_DB.prepare(
+          'SELECT id, name, phone, zalo FROM customers WHERE id = ?'
+        ).bind(params.customer_id).first<CustomerRecord>();
+      } catch {
+        /* db error — graceful */
+      }
     }
+  }
+
+  if (customer && !matchesCustomerTenant(customer, params.tenantId)) {
+    customer = null;
   }
 
   if (!customer) {

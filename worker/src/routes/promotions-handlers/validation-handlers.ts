@@ -1,9 +1,19 @@
 import type { Hono } from 'hono';
 import type { D1Database } from '@cloudflare/workers-types';
 import { validatePromotionSchema, redeemPromotionSchema } from '../../lib/validators';
+import { optionalAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import type { PromotionCode } from './types';
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 const DEFAULT_WELCOME_PROMO: PromotionCode = {
   id: 'promo_welcome',
@@ -25,6 +35,7 @@ export async function checkWelcomeNewCustomerEligibility(
     customer_phone?: string;
     customer_name?: string;
     is_new_customer?: boolean;
+    tenant_id?: string;
   }
 ): Promise<{ eligible: boolean; reason?: string }> {
   if (opts.is_new_customer === false) {
@@ -43,17 +54,30 @@ export async function checkWelcomeNewCustomerEligibility(
     };
   }
 
+  const targetTenant = opts.tenant_id && opts.tenant_id !== '*' ? opts.tenant_id : null;
+
   if (opts.customer_id) {
     try {
       const cust = await db.prepare(
-        'SELECT id, total_orders FROM customers WHERE id = ? LIMIT 1'
-      ).bind(opts.customer_id).first<{ id: string; total_orders?: number }>();
-      if (cust && Number(cust.total_orders ?? 0) > 0) {
+        'SELECT id, total_orders, tenant_id FROM customers WHERE id = ? LIMIT 1'
+      ).bind(opts.customer_id).first<{ id: string; total_orders?: number; tenant_id?: string | null }>().catch(() =>
+        db.prepare('SELECT id, total_orders FROM customers WHERE id = ? LIMIT 1').bind(opts.customer_id).first<{ id: string; total_orders?: number }>()
+      );
+      if (cust && (!targetTenant || matchesTenantRow(cust as unknown as Record<string, unknown>, targetTenant)) && Number(cust.total_orders ?? 0) > 0) {
         return { eligible: false, reason: 'Mã WELCOME chỉ áp dụng cho khách hàng mới chưa từng có đơn hàng' };
       }
-      const priorOrder = await db.prepare(
-        "SELECT COUNT(*) AS cnt FROM orders WHERE customer_id = ? AND status NOT IN ('cancelled', 'failed')"
-      ).bind(opts.customer_id).first<{ cnt?: number }>();
+      const priorOrder = await (targetTenant
+        ? db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE customer_id = ? AND status NOT IN ('cancelled', 'failed') AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+          ).bind(opts.customer_id, targetTenant).first<{ cnt?: number }>().catch(() =>
+            db.prepare(
+              "SELECT COUNT(*) AS cnt FROM orders WHERE customer_id = ? AND status NOT IN ('cancelled', 'failed')"
+            ).bind(opts.customer_id).first<{ cnt?: number }>()
+          )
+        : db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE customer_id = ? AND status NOT IN ('cancelled', 'failed')"
+          ).bind(opts.customer_id).first<{ cnt?: number }>()
+      );
       if (Number(priorOrder?.cnt ?? 0) > 0) {
         return { eligible: false, reason: 'Mã WELCOME chỉ áp dụng cho khách hàng mới chưa từng có đơn hàng' };
       }
@@ -64,15 +88,31 @@ export async function checkWelcomeNewCustomerEligibility(
 
   if (normalizedPhone) {
     try {
-      const custByPhone = await db.prepare(
-        'SELECT id, total_orders FROM customers WHERE phone = ? LIMIT 1'
-      ).bind(normalizedPhone).first<{ id: string; total_orders?: number }>();
-      if (custByPhone && Number(custByPhone.total_orders ?? 0) > 0) {
+      const custByPhone = await (targetTenant
+        ? db.prepare(
+            "SELECT id, total_orders, tenant_id FROM customers WHERE phone = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? LIMIT 1"
+          ).bind(normalizedPhone, targetTenant).first<{ id: string; total_orders?: number; tenant_id?: string | null }>().catch(() =>
+            db.prepare('SELECT id, total_orders FROM customers WHERE phone = ? LIMIT 1').bind(normalizedPhone).first<{ id: string; total_orders?: number }>()
+          )
+        : db.prepare(
+            'SELECT id, total_orders FROM customers WHERE phone = ? LIMIT 1'
+          ).bind(normalizedPhone).first<{ id: string; total_orders?: number }>()
+      );
+      if (custByPhone && (!targetTenant || matchesTenantRow(custByPhone as unknown as Record<string, unknown>, targetTenant)) && Number(custByPhone.total_orders ?? 0) > 0) {
         return { eligible: false, reason: 'Mã WELCOME chỉ áp dụng cho khách hàng mới chưa từng có đơn hàng' };
       }
-      const priorByPhone = await db.prepare(
-        "SELECT COUNT(*) AS cnt FROM orders WHERE customer_phone = ? AND status NOT IN ('cancelled', 'failed')"
-      ).bind(normalizedPhone).first<{ cnt?: number }>();
+      const priorByPhone = await (targetTenant
+        ? db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE customer_phone = ? AND status NOT IN ('cancelled', 'failed') AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+          ).bind(normalizedPhone, targetTenant).first<{ cnt?: number }>().catch(() =>
+            db.prepare(
+              "SELECT COUNT(*) AS cnt FROM orders WHERE customer_phone = ? AND status NOT IN ('cancelled', 'failed')"
+            ).bind(normalizedPhone).first<{ cnt?: number }>()
+          )
+        : db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE customer_phone = ? AND status NOT IN ('cancelled', 'failed')"
+          ).bind(normalizedPhone).first<{ cnt?: number }>()
+      );
       if (Number(priorByPhone?.cnt ?? 0) > 0) {
         return { eligible: false, reason: 'Mã WELCOME chỉ áp dụng cho khách hàng mới chưa từng có đơn hàng' };
       }
@@ -86,7 +126,7 @@ export async function checkWelcomeNewCustomerEligibility(
 
 export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env }>): void {
   // POST /api/promotions/validate — validate discount code
-  router.post('/validate', async (c) => {
+  router.post('/validate', optionalAuth(), async (c) => {
     const db = c.env.AURA_DB;
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = validatePromotionSchema.safeParse(body);
@@ -97,14 +137,20 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const upperCode = data.code.trim().toUpperCase();
     const isWelcome = upperCode === 'WELCOME';
 
+    const tenantId = getTenantId(c);
     let promo = await db.prepare(
       'SELECT * FROM promotions WHERE UPPER(code) = ?'
     ).bind(upperCode).first<PromotionCode & { tenant_id?: string | null }>();
 
-    const tenantId = getTenantId(c);
-    if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
-      promo = null;
-    } else if (promo && Number(promo.is_active ?? 1) === 0) {
+    if (promo && !matchesTenantRow(promo as unknown as Record<string, unknown>, tenantId)) {
+      const scoped = tenantId !== '*'
+        ? await db.prepare(
+            "SELECT * FROM promotions WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+          ).bind(upperCode, tenantId).first<PromotionCode & { tenant_id?: string | null }>().catch(() => null)
+        : null;
+      promo = scoped && matchesTenantRow(scoped as unknown as Record<string, unknown>, tenantId) ? scoped : null;
+    }
+    if (promo && Number(promo.is_active ?? 1) === 0) {
       promo = null;
     } else if (!promo && isWelcome) {
       promo = DEFAULT_WELCOME_PROMO;
@@ -145,7 +191,8 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         customer_id: data.customer_id,
         customer_phone: data.customer_phone,
         customer_name: data.customer_name,
-        is_new_customer: data.is_new_customer
+        is_new_customer: data.is_new_customer,
+        tenant_id: tenantId,
       });
       if (!welcomeCheck.eligible) {
         return c.json({
@@ -175,7 +222,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
   });
 
   // POST /api/promotions/redeem — redeem discount code
-  router.post('/redeem', async (c) => {
+  router.post('/redeem', optionalAuth(), async (c) => {
     const db = c.env.AURA_DB;
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = redeemPromotionSchema.safeParse(body);
@@ -186,14 +233,20 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const upperCode = data.code.trim().toUpperCase();
     const isWelcome = upperCode === 'WELCOME';
 
+    const tenantId = getTenantId(c);
     let promo = await db.prepare(
       'SELECT * FROM promotions WHERE UPPER(code) = ?'
     ).bind(upperCode).first<PromotionCode & { tenant_id?: string | null }>();
 
-    const tenantId = getTenantId(c);
-    if (promo && promo.tenant_id && promo.tenant_id !== 'default' && promo.tenant_id !== tenantId) {
-      promo = null;
-    } else if (promo && Number(promo.is_active ?? 1) === 0) {
+    if (promo && !matchesTenantRow(promo as unknown as Record<string, unknown>, tenantId)) {
+      const scoped = tenantId !== '*'
+        ? await db.prepare(
+            "SELECT * FROM promotions WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+          ).bind(upperCode, tenantId).first<PromotionCode & { tenant_id?: string | null }>().catch(() => null)
+        : null;
+      promo = scoped && matchesTenantRow(scoped as unknown as Record<string, unknown>, tenantId) ? scoped : null;
+    }
+    if (promo && Number(promo.is_active ?? 1) === 0) {
       promo = null;
     } else if (!promo && isWelcome) {
       promo = DEFAULT_WELCOME_PROMO;
@@ -223,7 +276,8 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         customer_id: data.customer_id,
         customer_phone: data.customer_phone,
         customer_name: data.customer_name,
-        is_new_customer: data.is_new_customer
+        is_new_customer: data.is_new_customer,
+        tenant_id: tenantId,
       });
       if (!welcomeCheck.eligible) {
         return c.json({ success: false, error: welcomeCheck.reason || 'Mã WELCOME chỉ áp dụng cho khách hàng mới' }, 400);
@@ -233,7 +287,17 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const percent = isWelcome ? (promo.percent || 10) : promo.percent;
     const maxDiscount = isWelcome ? (promo.max_discount || 30000) : promo.max_discount;
 
-    // Idempotent check by order_id so retrying redemption for the same order does not double-increment usage_count
+    const orderRow = await db.prepare(
+      'SELECT id, tenant_id, status FROM orders WHERE id = ? LIMIT 1'
+    ).bind(data.order_id).first<{ id?: string; tenant_id?: string | null; status?: string }>().catch(() => null);
+    if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+    if (orderRow && typeof orderRow.status === 'string' && ['cancelled', 'failed'].includes(orderRow.status.toLowerCase())) {
+      return c.json({ success: false, error: 'Cannot redeem promotion on a cancelled order' }, 409);
+    }
+
+    // Idempotent check by order_id after verifying tenant ownership
     try {
       const existingRedemption = await db.prepare(
         'SELECT order_id, discount_amount FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
@@ -254,18 +318,12 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       // promotion_redemptions table is optional in partial schemas
     }
 
-    if (!isWelcome && promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) {
-      return c.json({ success: false, error: 'Usage limit reached' }, 400);
-    }
-
-    const orderRow = await db.prepare(
-      'SELECT id, tenant_id, status FROM orders WHERE id = ? LIMIT 1'
-    ).bind(data.order_id).first<{ id?: string; tenant_id?: string | null; status?: string }>().catch(() => null);
     if (!orderRow || !orderRow.id) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
-    if (orderRow.tenant_id && orderRow.tenant_id !== 'default' && orderRow.tenant_id !== tenantId) {
-      return c.json({ success: false, error: 'Order not found' }, 404);
+
+    if (!isWelcome && promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) {
+      return c.json({ success: false, error: 'Usage limit reached' }, 400);
     }
 
     const rawDiscount = Math.round(data.order_total * percent / 100);
@@ -274,20 +332,36 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       : rawDiscount;
 
     // Increment usage with atomic conditional guard
-    try {
+    if (!isWelcome && promo.usage_limit && promo.usage_limit > 0) {
+      let usageRes: { meta?: { changes?: number } } | null = null;
       if (promo.id !== undefined && promo.id !== null) {
-        await db.prepare(
-          'UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+        usageRes = await db.prepare(
+          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
         ).bind(promo.id).run();
       } else {
-        await db.prepare(
-          'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+        usageRes = await db.prepare(
+          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
         ).bind(promo.code).run();
       }
-    } catch {
-      await db.prepare(
-        'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ?'
-      ).bind(promo.code).run().catch(() => {});
+      if ((usageRes?.meta?.changes ?? 1) === 0) {
+        return c.json({ success: false, error: 'Usage limit reached' }, 409);
+      }
+    } else {
+      try {
+        if (promo.id !== undefined && promo.id !== null) {
+          await db.prepare(
+            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ?'
+          ).bind(promo.id).run();
+        } else {
+          await db.prepare(
+            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ?'
+          ).bind(promo.code).run();
+        }
+      } catch {
+        await db.prepare(
+          'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ?'
+        ).bind(promo.code).run().catch(() => {});
+      }
     }
 
     // Log redemption

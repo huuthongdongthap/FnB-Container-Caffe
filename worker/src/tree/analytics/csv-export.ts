@@ -21,16 +21,24 @@ export interface OrderExportRow {
 export async function getOrdersInRange(
   db: import('@cloudflare/workers-types').D1Database,
   start: string,
-  end: string
+  end: string,
+  tenantId?: string
 ): Promise<OrderExportRow[]> {
+  const hasTenant = Boolean(tenantId && tenantId !== '*');
+  const tenantClause = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const binds = hasTenant && tenantId ? [start, end, tenantId] : [start, end];
   const { results } = await db.prepare(`
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
     FROM orders
     WHERE status != 'cancelled'
       AND created_at >= ? || ' 00:00:00'
-      AND created_at <= ? || ' 23:59:59'
+      AND created_at <= ? || ' 23:59:59'${tenantClause}
     ORDER BY created_at ASC
-  `).bind(start, end).all<OrderExportRow>();
+  `).bind(...binds).all<OrderExportRow>();
 
   return results || [];
 }
@@ -89,7 +97,7 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
  * if it contains comma, newline, semicolon, or double-quote.
  */
 function escapeCsvField(value: string): string {
-  const sanitized = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const sanitized = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value;
   if (sanitized.includes(',') || sanitized.includes('\n') || sanitized.includes('"') || sanitized.includes(';')) {
     return `"${sanitized.replace(/"/g, '""')}"`;
   }

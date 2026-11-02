@@ -1,44 +1,99 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import type { DailyReport, SummaryReport } from './types';
+
+export function buildTenantClause(tenantId: string): { where: string; and: string; binds: string[] } {
+  if (!tenantId || tenantId === '*') {
+    return { where: '', and: '', binds: [] };
+  }
+  if (tenantId === 'default') {
+    return {
+      where: " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')",
+      and: " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')",
+      binds: [tenantId],
+    };
+  }
+  return {
+    where: ' WHERE tenant_id = ?',
+    and: ' AND tenant_id = ?',
+    binds: [tenantId],
+  };
+}
+
+export function buildCustomerJoinTenantClause(tenantId: string): { join: string; and: string; binds: string[] } {
+  if (!tenantId || tenantId === '*') {
+    return { join: '', and: '', binds: [] };
+  }
+  if (tenantId === 'default') {
+    return {
+      join: ' LEFT JOIN customers c ON c.id = t.customer_id',
+      and: " AND (c.tenant_id = ? OR c.tenant_id IS NULL OR c.tenant_id = '')",
+      binds: [tenantId],
+    };
+  }
+  return {
+    join: ' JOIN customers c ON c.id = t.customer_id',
+    and: ' AND c.tenant_id = ?',
+    binds: [tenantId],
+  };
+}
 
 export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/daily — daily metrics for date range
   app.get('/daily', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tf = buildTenantClause(tenantId);
+    const cjf = buildCustomerJoinTenantClause(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return c.json({ success: false, error: 'Invalid date format (YYYY-MM-DD required)' }, 400);
+    }
+    const startMs = Date.parse(`${from}T00:00:00.000Z`);
+    const endMs = Date.parse(`${to}T00:00:00.000Z`);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) {
+      return c.json({ success: false, error: 'Invalid date range' }, 400);
+    }
+    const daySpan = Math.floor((endMs - startMs) / 86400000) + 1;
+    if (daySpan > 366) {
+      return c.json({ success: false, error: 'Date range cannot exceed 366 days' }, 400);
+    }
 
     // Signups by day
     const { results: signups } = await db.prepare(
       `SELECT DATE(created_at) as date, COUNT(*) as count
-       FROM customers WHERE DATE(created_at) BETWEEN ? AND ?
+       FROM customers WHERE DATE(created_at) BETWEEN ? AND ?${tf.and}
        GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all<{ date: string; count: number }>();
+    ).bind(from, to, ...tf.binds).all<{ date: string; count: number }>();
 
     // Orders by day
     const { results: orders } = await db.prepare(
       `SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+       FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}
        GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all<{ date: string; count: number; revenue: number }>();
+    ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
 
     // Cashback earned by day
     let cashbackEarned: { date: string; amount: number }[] = [];
     try {
       const res = await db.prepare(
-        `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
-         FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
-         GROUP BY DATE(created_at) ORDER BY date`
-      ).bind(from, to).all<{ date: string; amount: number }>();
+        `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+         FROM checkins t${cjf.join}
+         WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.status = 'approved'${cjf.and}
+         GROUP BY DATE(t.created_at) ORDER BY date`
+      ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
       cashbackEarned = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as amount
-           FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'earn'
-           GROUP BY DATE(created_at) ORDER BY date`
-        ).bind(from, to).all<{ date: string; amount: number }>();
+          `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.amount), 0) as amount
+           FROM cashback_transactions t${cjf.join}
+           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'earn'${cjf.and}
+           GROUP BY DATE(t.created_at) ORDER BY date`
+        ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
         cashbackEarned = res.results || [];
       } catch {
         cashbackEarned = [];
@@ -49,18 +104,20 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     let cashbackRedeemed: { date: string; amount: number }[] = [];
     try {
       const res = await db.prepare(
-        `SELECT DATE(created_at) as date, COALESCE(SUM(discount_amount), 0) as amount
-         FROM promotion_redemptions WHERE DATE(created_at) BETWEEN ? AND ?
-         GROUP BY DATE(created_at) ORDER BY date`
-      ).bind(from, to).all<{ date: string; amount: number }>();
+        `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+         FROM promotion_redemptions t${cjf.join}
+         WHERE DATE(t.created_at) BETWEEN ? AND ?${cjf.and}
+         GROUP BY DATE(t.created_at) ORDER BY date`
+      ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
       cashbackRedeemed = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(created_at) as date, COALESCE(SUM(ABS(amount)), 0) as amount
-           FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'spend'
-           GROUP BY DATE(created_at) ORDER BY date`
-        ).bind(from, to).all<{ date: string; amount: number }>();
+          `SELECT DATE(t.created_at) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+           FROM cashback_transactions t${cjf.join}
+           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
+           GROUP BY DATE(t.created_at) ORDER BY date`
+        ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
         cashbackRedeemed = res.results || [];
       } catch {
         cashbackRedeemed = [];
@@ -99,6 +156,15 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/summary — overall summary KPIs
   app.get('/summary', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tf = buildTenantClause(tenantId);
+    const cjf = buildCustomerJoinTenantClause(tenantId);
+    const runFirst = <T>(sql: string, extraBinds: unknown[] = []) => {
+      const stmt = db.prepare(sql);
+      const allBinds = [...extraBinds, ...tf.binds];
+      return allBinds.length > 0 ? stmt.bind(...allBinds).first<T>() : stmt.first<T>();
+    };
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
     const [
       totalCustomers,
@@ -108,28 +174,40 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       active30d,
       totalActive
     ] = await Promise.all([
-      db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
-      db.prepare(
-        'SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != \'cancelled\''
-      ).first<{ total: number }>(),
-      db.prepare(
-        'SELECT COUNT(*) as count FROM orders WHERE status != \'cancelled\''
-      ).first<{ count: number }>(),
-      db.prepare(
-        'SELECT COALESCE(SUM(reward_amount), 0) as total FROM checkins WHERE status = \'approved\''
-      ).first<{ total: number }>().catch(() =>
-        db.prepare(
-          'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE type = \'earn\''
-        ).first<{ total: number }>().catch(() => ({ total: 0 }))
+      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
+      runFirst<{ total: number }>(
+        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'${tf.and}`
       ),
-      db.prepare(
-        'SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?'
-      ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>().catch(() =>
-        db.prepare(
-          'SELECT COUNT(*) as count FROM customers WHERE created_at >= ?'
-        ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>().catch(() => ({ count: 0 }))
+      runFirst<{ count: number }>(
+        `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'${tf.and}`
       ),
-      db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>()
+      (async () => {
+        try {
+          const stmt = db.prepare(
+            `SELECT COALESCE(SUM(t.reward_amount), 0) as total FROM checkins t${cjf.join} WHERE t.status = 'approved'${cjf.and}`
+          );
+          return cjf.binds.length > 0 ? await stmt.bind(...cjf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
+        } catch {
+          try {
+            const stmt = db.prepare(
+              `SELECT COALESCE(SUM(t.amount), 0) as total FROM cashback_transactions t${cjf.join} WHERE t.type = 'earn'${cjf.and}`
+            );
+            return cjf.binds.length > 0 ? await stmt.bind(...cjf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
+          } catch {
+            return { total: 0 };
+          }
+        }
+      })(),
+      runFirst<{ count: number }>(
+        `SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?${tf.and}`,
+        [thirtyDaysAgo]
+      ).catch(() =>
+        runFirst<{ count: number }>(
+          `SELECT COUNT(*) as count FROM customers WHERE created_at >= ?${tf.and}`,
+          [thirtyDaysAgo]
+        ).catch(() => ({ count: 0 }))
+      ),
+      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`)
     ]);
 
     const activeCount = active30d?.count || 0;
@@ -150,14 +228,15 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/orders — order metrics
   app.get('/orders', async (c) => {
     const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
     const { results } = await db.prepare(
       `SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(created_at) BETWEEN ? AND ?
+       FROM orders WHERE DATE(created_at) BETWEEN ? AND ?${tf.and}
        GROUP BY status ORDER BY revenue DESC`
-    ).bind(from, to).all<{ status: string; count: number; revenue: number }>();
+    ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
 
     return c.json({ success: true, data: results || [] });
   });
@@ -165,13 +244,14 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/top-products — top selling products by quantity in date range
   app.get('/top-products', async (c) => {
     const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
     const { results } = await db.prepare(
       `SELECT items FROM orders
-       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'`
-    ).bind(from, to).all<{ items: string }>();
+       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}`
+    ).bind(from, to, ...tf.binds).all<{ items: string }>();
 
     // Aggregate by product name (parse JSON in JS for safety)
     const productMap = new Map<string, { qty: number; revenue: number }>();
@@ -195,7 +275,8 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       }
     }
 
-    const limit = parseInt(c.req.query('limit') || '10', 10);
+    const rawLimit = parseInt(c.req.query('limit') || '10', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 10;
     const topProducts = [...productMap.entries()]
       .map(([name, data]) => ({ name, qty: data.qty, revenue: data.revenue }))
       .sort((a, b) => b.qty - a.qty)
@@ -207,6 +288,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/peak-hours — hourly order distribution, zero-filled
   app.get('/peak-hours', async (c) => {
     const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
@@ -215,9 +297,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
               COUNT(*) as order_count,
               COALESCE(SUM(total), 0) as revenue
        FROM orders
-       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
+       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}
        GROUP BY hour ORDER BY hour`
-    ).bind(from, to).all<{ hour: number; order_count: number; revenue: number }>();
+    ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
 
     // Build zero-filled 24-hour array
     const peakHours: { hour: number; order_count: number; revenue: number }[] = [];
@@ -237,6 +319,12 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/customer-metrics — aggregate customer KPIs
   app.get('/customer-metrics', async (c) => {
     const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
+    const runFirst = <T>(sql: string, extraBinds: unknown[] = []) => {
+      const stmt = db.prepare(sql);
+      const allBinds = [...extraBinds, ...tf.binds];
+      return allBinds.length > 0 ? stmt.bind(...allBinds).first<T>() : stmt.first<T>();
+    };
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
@@ -248,21 +336,20 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       totalOrders,
       orderCustomers
     ] = await Promise.all([
-      db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
-      db.prepare('SELECT COUNT(*) as count FROM customers WHERE created_at >= ?')
-        .bind(thirtyDaysAgo).first<{ count: number }>(),
-      db.prepare(
-        "SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND customer_id != '' AND customer_id != 'guest' GROUP BY customer_id HAVING COUNT(*) > 1)"
-      ).first<{ count: number }>(),
-      db.prepare(
-        'SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != \'cancelled\''
-      ).first<{ total: number }>(),
-      db.prepare(
-        'SELECT COUNT(*) as count FROM orders WHERE status != \'cancelled\''
-      ).first<{ count: number }>(),
-      db.prepare(
-        'SELECT COUNT(DISTINCT customer_id) as count FROM orders WHERE status != \'cancelled\''
-      ).first<{ count: number }>()
+      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
+      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers WHERE created_at >= ?${tf.and}`, [thirtyDaysAgo]),
+      runFirst<{ count: number }>(
+        `SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND customer_id != '' AND customer_id != 'guest'${tf.and} GROUP BY customer_id HAVING COUNT(*) > 1)`
+      ),
+      runFirst<{ total: number }>(
+        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'${tf.and}`
+      ),
+      runFirst<{ count: number }>(
+        `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'${tf.and}`
+      ),
+      runFirst<{ count: number }>(
+        `SELECT COUNT(DISTINCT customer_id) as count FROM orders WHERE status != 'cancelled'${tf.and}`
+      )
     ]);
 
     const totalCust = totalCustomers?.count || 0;

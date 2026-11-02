@@ -2,7 +2,7 @@
 import type { StaffAccount } from './staff-session';
 import { staffTenant } from './staff-session';
 
-const managed = new Set(['staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef']);
+const managed = new Set(['supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper']);
 export function staffManagementDenial(actor: { role?: string; tenantId?: string }, target: StaffAccount, nextRole?: string) {
   if (staffTenant(target) !== (actor.tenantId || 'default')) return 'Không đủ quyền truy cập cửa hàng';
   if ((target.role === 'owner' || nextRole === 'owner') && actor.role !== 'owner') return 'Chỉ owner được thay đổi tài khoản owner';

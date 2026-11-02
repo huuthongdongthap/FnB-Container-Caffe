@@ -4,10 +4,18 @@
  */
 import type { Context } from 'hono';
 import { spendCashbackSchema } from '../../lib/validators';
+import { resolvePilotStore } from '../../lib/pilot-store';
 import type { Env } from '../../types/env';
 import type { Customer, CashbackWallet } from '../../types/models';
 
 const MIN_ORDER_TO_SPEND = 20000;
+
+function makeCashbackTxId(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `cb_${Date.now()}_${rand}`;
+}
 
 export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   const cust = c.get('customer') as unknown as Customer;
@@ -19,6 +27,18 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   }
   const { order_id, amount } = parsed.data;
 
+  const custAny = cust as unknown as { tenant_id?: string | null; tenantId?: string | null };
+  const custTenantRaw = custAny.tenant_id ?? custAny.tenantId;
+  const custTenant = (custTenantRaw && String(custTenantRaw).trim()) || '';
+  let storeTenant = custTenant || 'default';
+  if (c.env?.PILOT_TENANT_ID) {
+    try {
+      storeTenant = resolvePilotStore(c.env as unknown as Record<string, unknown>);
+    } catch {
+      // keep fallback
+    }
+  }
+
   const existingSpend = await db.prepare(
     'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'spend\' LIMIT 1'
   ).bind(order_id).first<{ id: string }>();
@@ -26,12 +46,24 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
 
-  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first<{ total_amount?: number; total?: number; customer_id?: string | null }>();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(order_id).first<{ total_amount?: number; total?: number; customer_id?: string | null; tenant_id?: string | null }>();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
   if (order.customer_id && order.customer_id !== cust.id) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+  if ('tenant_id' in order && order.tenant_id !== undefined) {
+    const orderTenant = (order.tenant_id && String(order.tenant_id).trim()) || 'default';
+    if (custTenantRaw !== undefined) {
+      const normalizedCustTenant = custTenant || 'default';
+      if (orderTenant !== normalizedCustTenant) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+    }
+    if ((c.env.PILOT_TENANT_ID || custTenantRaw === undefined) && (c.env.PILOT_TENANT_ID || (order.tenant_id && String(order.tenant_id).trim())) && orderTenant !== storeTenant) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
   }
 
   const orderTotal = Number(order.total_amount ?? order.total ?? 0);
@@ -49,7 +81,13 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Toi da 50% gia tr? don hang', max_allowed: maxAllowed }, 400);
   }
 
-  const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<CashbackWallet>();
+  let wallet: CashbackWallet | null = null;
+  try {
+    wallet = await db.prepare("SELECT * FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(cust.id, storeTenant).first<CashbackWallet>();
+  } catch {
+    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<CashbackWallet>();
+  }
   if (!wallet) {
     return c.json({ success: false, error: 'Vi khong ton tai', balance: 0 }, 400);
   }
@@ -60,9 +98,16 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   }
 
   const now = new Date().toISOString();
-  const updateResult = await db.prepare(
-    'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
-  ).bind(amount, amount, now, cust.id, amount).run();
+  let updateResult;
+  try {
+    updateResult = await db.prepare(
+      "UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND balance >= ?"
+    ).bind(amount, amount, now, cust.id, storeTenant, amount).run();
+  } catch {
+    updateResult = await db.prepare(
+      'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
+    ).bind(amount, amount, now, cust.id, amount).run();
+  }
 
   if ((updateResult.meta?.changes ?? (updateResult as unknown as { changes?: number }).changes) === 0) {
     return c.json({ success: false, error: 'So du khong du (race condition)', balance: wallet.balance }, 400);
@@ -73,14 +118,15 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   } catch {
     await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => {});
   }
+  const txId = makeCashbackTxId();
   try {
     await db.prepare(
       'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, ?, \'spend\', ?, ?, ?)'
-    ).bind(`cb_${Date.now()}`, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, now).run();
+    ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, now).run();
   } catch {
     await db.prepare(
       'INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, \'spend\', ?, ?, ?)'
-    ).bind(`cb_${Date.now()}`, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
+    ).bind(txId, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
   }
   try {
     await db.prepare(
@@ -90,6 +136,12 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     // loyalty_audit_log table is optional in canonical D1 schema
   }
 
-  const updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
+  let updatedWallet: { balance: number } | null = null;
+  try {
+    updatedWallet = await db.prepare("SELECT balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(cust.id, storeTenant).first<{ balance: number }>();
+  } catch {
+    updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
+  }
   return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet?.balance || 0 } });
 }

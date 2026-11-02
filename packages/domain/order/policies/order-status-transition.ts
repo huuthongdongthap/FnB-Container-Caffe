@@ -37,7 +37,11 @@ export async function transitionOrderStatus(
   } = {},
 ): Promise<OrderStatusResult> {
   const tenantId = options.tenantId ?? 'default';
-  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
   const order = options.currentOrder ?? await db
     .prepare(`SELECT id, status FROM orders WHERE id = ?${tenantClause}`)

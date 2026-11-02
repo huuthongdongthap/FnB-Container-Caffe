@@ -64,8 +64,13 @@ export async function executeKdsStatusTransition(
         } | undefined;
         if (broadcaster?.idFromName && broadcaster?.get) {
           const tenantId = options?.tenantId ?? 'default';
+          const tenantClause = tenantId === '*'
+            ? ''
+            : tenantId === 'default'
+              ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+              : ' AND tenant_id = ?';
           const row = await db.prepare(`SELECT id, items, total, payment_status, customer_name, customer_phone, table_id, created_at
-            FROM orders WHERE id = ?${tenantId === '*' ? '' : ' AND tenant_id = ?'}`)
+            FROM orders WHERE id = ?${tenantClause}`)
             .bind(orderId, ...(tenantId === '*' ? [] : [tenantId])).first<{
               items: string | unknown[]; total: number; payment_status: string;
               customer_name: string; customer_phone: string; table_id?: string | null; created_at: string;

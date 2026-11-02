@@ -56,8 +56,26 @@ export async function resetPassword(request: Request, env: Record<string, unknow
       token = session.token; responseUser = session.user;
       await authKV.put(`user:${email}`, JSON.stringify(user)).catch(() => {});
     } else {
+      user.auth_version = Number(user.auth_version || 1) + 1;
       await authKV.put(`user:${email}`, JSON.stringify(user));
-      token = await generateJWT({ email, name: user.name, id: user.id, role: 'customer' }, env.JWT_SECRET as string, env.JWT_EXPIRY_SECONDS as string);
+      if (user.id) {
+        const existingById = await authKV.get(`user:${user.id}`).catch(() => null);
+        if (existingById) {
+          await authKV.put(`user:${user.id}`, JSON.stringify(user)).catch(() => {});
+        }
+        if (env.AURA_DB) {
+          await (env.AURA_DB as import('@cloudflare/workers-types').D1Database)
+            .prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
+            .bind(user.updated_at, user.id)
+            .run()
+            .catch(() => {});
+        }
+      }
+      token = await generateJWT(
+        { email, name: user.name, id: user.id, role: 'customer', authVersion: user.auth_version },
+        env.JWT_SECRET as string,
+        env.JWT_EXPIRY_SECONDS as string
+      );
     }
 
     return jsonResponse({

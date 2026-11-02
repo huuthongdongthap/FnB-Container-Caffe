@@ -21,6 +21,7 @@ export interface AccrualInput {
   orderTotalVnd: number;
   /** Cashback already used on this order (cashback_used column). */
   cashbackUsedVnd?: number;
+  tenantId?: string;
   actorId?: string;
   actorRole?: string;
 }
@@ -116,21 +117,53 @@ export async function applyAccrual(
     loyalty_points: number;
     lifetime_points: number;
     loyalty_tier: string | null;
+    tenant_id?: string | null;
   }
+  const effectiveTenant =
+    input.tenantId && input.tenantId !== '*'
+      ? input.tenantId.trim() || 'default'
+      : null;
+
   let customer: CustomerRow | null = null;
   try {
-    customer = await db
-      .prepare(
-        `SELECT id, loyalty_points, lifetime_points, loyalty_tier
-         FROM customers WHERE id = ?`,
-      )
-      .bind(customerId)
-      .first<CustomerRow>();
+    if (effectiveTenant) {
+      try {
+        customer = await db
+          .prepare(
+            `SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id
+             FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+          )
+          .bind(customerId, effectiveTenant)
+          .first<CustomerRow>();
+      } catch {
+        customer = await db
+          .prepare(
+            `SELECT id, loyalty_points, lifetime_points, loyalty_tier
+             FROM customers WHERE id = ?`,
+          )
+          .bind(customerId)
+          .first<CustomerRow>();
+      }
+    } else {
+      customer = await db
+        .prepare(
+          `SELECT id, loyalty_points, lifetime_points, loyalty_tier
+           FROM customers WHERE id = ?`,
+        )
+        .bind(customerId)
+        .first<CustomerRow>();
+    }
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `failed to read customer: ${(e as Error).message}` };
   }
   if (!customer) {
     return { ok: false, reason: 'customer_not_found' };
+  }
+  if (effectiveTenant && 'tenant_id' in customer && customer.tenant_id !== undefined) {
+    const custTenant = String(customer.tenant_id ?? '').trim() || 'default';
+    if (custTenant !== effectiveTenant) {
+      return { ok: false, reason: 'customer_not_found' };
+    }
   }
 
   const tier = tierByName(policy, customer.loyalty_tier);
@@ -150,10 +183,24 @@ export async function applyAccrual(
   // ── Ensure wallet exists ──
   let wallet: { id: string; balance: number } | null = null;
   try {
-    wallet = await db
-      .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
-      .bind(customer.id)
-      .first<{ id: string; balance: number }>();
+    if (effectiveTenant) {
+      try {
+        wallet = await db
+          .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(customer.id, effectiveTenant)
+          .first<{ id: string; balance: number }>();
+      } catch {
+        wallet = await db
+          .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+          .bind(customer.id)
+          .first<{ id: string; balance: number }>();
+      }
+    } else {
+      wallet = await db
+        .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+        .bind(customer.id)
+        .first<{ id: string; balance: number }>();
+    }
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `failed to read wallet: ${(e as Error).message}` };
   }
@@ -164,14 +211,36 @@ export async function applyAccrual(
     walletId = genId('wal_');
     newBalance = cashback;
     try {
-      await db
-        .prepare(
-          `INSERT INTO cashback_wallets
-           (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
-           VALUES (?, ?, 0, 0, 0, ?, ?)`,
-        )
-        .bind(walletId, customer.id, now, now)
-        .run();
+      if (effectiveTenant) {
+        try {
+          await db
+            .prepare(
+              `INSERT INTO cashback_wallets
+               (id, customer_id, balance, total_earned, total_spent, created_at, updated_at, tenant_id)
+               VALUES (?, ?, 0, 0, 0, ?, ?, ?)`,
+            )
+            .bind(walletId, customer.id, now, now, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare(
+              `INSERT INTO cashback_wallets
+               (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
+               VALUES (?, ?, 0, 0, 0, ?, ?)`,
+            )
+            .bind(walletId, customer.id, now, now)
+            .run();
+        }
+      } else {
+        await db
+          .prepare(
+            `INSERT INTO cashback_wallets
+             (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
+             VALUES (?, ?, 0, 0, 0, ?, ?)`,
+          )
+          .bind(walletId, customer.id, now, now)
+          .run();
+      }
     } catch (e) {
       return { ok: false, reason: 'd1_error', error: `failed to create wallet: ${(e as Error).message}` };
     }
@@ -184,14 +253,24 @@ export async function applyAccrual(
   const newLifetimePoints = (customer.lifetime_points ?? 0) + points;
 
   // ── Batch: wallet + transaction + customer + point log + audit + order ──
+  const walletUpdateStmt = effectiveTenant
+    ? db
+        .prepare(
+          `UPDATE cashback_wallets
+           SET balance = ?, total_earned = total_earned + ?, updated_at = ?
+           WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+        )
+        .bind(newBalance, cashback, now, customer.id, effectiveTenant)
+    : db
+        .prepare(
+          `UPDATE cashback_wallets
+           SET balance = ?, total_earned = total_earned + ?, updated_at = ?
+           WHERE customer_id = ?`,
+        )
+        .bind(newBalance, cashback, now, customer.id);
+
   const stmts = [
-    db
-      .prepare(
-        `UPDATE cashback_wallets
-         SET balance = ?, total_earned = total_earned + ?, updated_at = ?
-         WHERE customer_id = ?`,
-      )
-      .bind(newBalance, cashback, now, customer.id),
+    walletUpdateStmt,
     db
       .prepare(
         `INSERT INTO cashback_transactions

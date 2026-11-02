@@ -4,10 +4,13 @@
  */
 
 import { getMauticClient } from './client-factory';
-import { syncStatus } from './sync-state';
+import { getSyncStatus, matchesMauticTenant } from './sync-state';
 import type { MauticBridgeEnv, MauticClientDuck } from './types';
 
-export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: boolean; enrolled: number; errors: string[] }> {
+export async function enrollCampaigns(
+  env: MauticBridgeEnv,
+  tenantId?: string
+): Promise<{ success: boolean; enrolled: number; errors: string[] }> {
   const client = getMauticClient(env) as MauticClientDuck | null;
   if (!client) {
     return { success: false, enrolled: 0, errors: ['Mautic not configured'] };
@@ -18,23 +21,50 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
     return { success: false, enrolled: 0, errors: ['Database not available'] };
   }
 
+  const state = getSyncStatus(tenantId);
   let enrolled = 0;
   const errors: string[] = [];
 
   try {
+    const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const isWildcard = normalizedTenant === '*';
+    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    const tenantParams = isWildcard ? [] : [normalizedTenant];
+
     let masterCustomers: Array<{ id: string; email: string; phone: string }> = [];
     try {
-      const res = await db.prepare(
-        'SELECT id, email, phone FROM customers WHERE tier = \'MASTER\' AND (email != \'\' OR phone != \'\') LIMIT 100'
-      ).all<{ id: string; email: string; phone: string }>();
-      masterCustomers = res.results || [];
+      const stmt = db.prepare(
+        `SELECT id, email, phone, tenant_id FROM customers WHERE tier = 'MASTER' AND (email != '' OR phone != '')${tenantSql} LIMIT 100`
+      );
+      const bound = tenantParams.length > 0 && typeof (stmt as any).bind === 'function' ? stmt.bind(...tenantParams) : stmt;
+      const res = await bound.all<{ id: string; email: string; phone: string }>();
+      masterCustomers = (res.results || []).filter((r) =>
+        matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+      );
     } catch (colErr) {
       const msg = String((colErr as Error)?.message || '');
       if (msg.includes('no such column')) {
-        const fallback = await db.prepare(
-          'SELECT id, email, phone FROM customers WHERE LOWER(loyalty_tier) IN (\'platinum\', \'master\') AND (email != \'\' OR phone != \'\') LIMIT 100'
-        ).all<{ id: string; email: string; phone: string }>();
-        masterCustomers = fallback.results || [];
+        try {
+          const stmt = db.prepare(
+            `SELECT id, email, phone, tenant_id FROM customers WHERE LOWER(loyalty_tier) IN ('platinum', 'master') AND (email != '' OR phone != '')${tenantSql} LIMIT 100`
+          );
+          const bound = tenantParams.length > 0 && typeof (stmt as any).bind === 'function' ? stmt.bind(...tenantParams) : stmt;
+          const fallbackTenant = await bound.all<{ id: string; email: string; phone: string }>();
+          masterCustomers = (fallbackTenant.results || []).filter((r) =>
+            matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+          );
+        } catch {
+          if (isWildcard || normalizedTenant === 'default') {
+            const fallback = await db.prepare(
+              'SELECT id, email, phone FROM customers WHERE LOWER(loyalty_tier) IN (\'platinum\', \'master\') AND (email != \'\' OR phone != \'\') LIMIT 100'
+            ).all<{ id: string; email: string; phone: string }>();
+            masterCustomers = (fallback.results || []).filter((r) =>
+              matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+            );
+          } else {
+            masterCustomers = [];
+          }
+        }
       } else {
         throw colErr;
       }
@@ -51,9 +81,25 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
     }
 
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const { results: newCustomers } = await db.prepare(
-      'SELECT id, email, phone FROM customers WHERE created_at >= ? AND (email != \'\' OR phone != \'\') LIMIT 100'
-    ).bind(weekAgo).all<{ id: string; email: string; phone: string }>();
+    let newCustomersRaw: Array<{ id: string; email: string; phone: string }> | undefined;
+    try {
+      const res = await db.prepare(
+        `SELECT id, email, phone, tenant_id FROM customers WHERE created_at >= ? AND (email != '' OR phone != '')${tenantSql} LIMIT 100`
+      ).bind(weekAgo, ...tenantParams).all<{ id: string; email: string; phone: string }>();
+      newCustomersRaw = res.results;
+    } catch {
+      if (isWildcard || normalizedTenant === 'default') {
+        const res = await db.prepare(
+          'SELECT id, email, phone FROM customers WHERE created_at >= ? AND (email != \'\' OR phone != \'\') LIMIT 100'
+        ).bind(weekAgo).all<{ id: string; email: string; phone: string }>();
+        newCustomersRaw = res.results;
+      } else {
+        newCustomersRaw = [];
+      }
+    }
+    const newCustomers = (newCustomersRaw || []).filter((r) =>
+      matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+    );
 
     for (const customer of newCustomers || []) {
       try {
@@ -65,7 +111,7 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
       }
     }
 
-    syncStatus.campaigns_enrolled += enrolled;
+    state.campaigns_enrolled += enrolled;
 
     return { success: true, enrolled, errors };
   } catch (e: unknown) {

@@ -8,7 +8,7 @@ export { authenticateRequest };
 
 export interface AuthUser {
   id: string; email: string; name: string;
-  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef';
+  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'supervisor' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef' | 'shipper';
   tenantId?: string; tier?: string;
 }
 declare module 'hono' {

@@ -1,16 +1,40 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { TableZoneRoutes } from '../../schemas/tables';
-import { formatZone, writeTableAuditLog } from './helpers';
+import { formatZone, isAllowedLocationForTenant, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+function matchesZoneTenant(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  if ('location_id' in row && row.location_id !== undefined) {
+    const rowLoc = (row.location_id && String(row.location_id).trim()) || 'default';
+    return rowLoc === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/table-zones - List table zones
   app.openapi(TableZoneRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const query = (typeof c.req.valid === 'function' ? c.req.valid('query') : undefined) || c.req.query() || {};
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const { sort = 'sort_order', order = 'asc', locationId, isActive, search } = query;
 
     let whereClause = 'WHERE 1=1';
@@ -32,6 +56,8 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const offset = (page - 1) * limit;
+    const fetchLimit = tenantId === '*' ? limit : Math.max(limit + offset, 200);
+    const fetchOffset = tenantId === '*' ? offset : 0;
     const allowedSorts: Record<string, string> = {
       sort_order: 'sort_order',
       sortOrder: 'sort_order',
@@ -47,18 +73,35 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       if (isActive !== undefined && !isActiveBool) {
         return { total: 0, zoneRows: [] as any[] };
       }
-      const distinctRows = (await db.prepare(
-        'SELECT DISTINCT zone FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
-      ).all()) as { results: Array<{ zone: string }> };
-      const derived = (distinctRows.results || [])
+      let rawRows: Array<Record<string, unknown>> = [];
+      try {
+        const res = (await db.prepare(
+          'SELECT zone, tenant_id FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
+        ).all()) as { results: Array<Record<string, unknown>> };
+        rawRows = res.results || [];
+      } catch {
+        const res = (await db.prepare(
+          'SELECT DISTINCT zone FROM cafe_tables WHERE zone IS NOT NULL AND zone != \'\' ORDER BY zone ASC'
+        ).all()) as { results: Array<Record<string, unknown>> };
+        rawRows = res.results || [];
+      }
+      const seen = new Set<string>();
+      const derived = rawRows
+        .filter((r) => matchesTenantRow(r, tenantId))
+        .filter((r) => {
+          const z = String(r.zone || '');
+          if (!z || seen.has(z)) return false;
+          seen.add(z);
+          return true;
+        })
         .map((r, idx) => ({
-          id: r.zone,
-          slug: r.zone,
-          name: r.zone,
+          id: String(r.zone),
+          slug: String(r.zone),
+          name: String(r.zone),
           description: null,
           sort_order: idx,
           is_active: 1,
-          location_id: locationId || null,
+          location_id: locationId || (tenantId === '*' ? null : tenantId),
         }))
         .filter((z) => !search || z.name.toLowerCase().includes(String(search).toLowerCase()));
       return {
@@ -77,17 +120,26 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
       const rows = (await db.prepare(
         `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
-      zoneRows = rows.results || [];
+      ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+      const rawZoneRows = rows.results || [];
+      if (tenantId === '*') {
+        zoneRows = rawZoneRows;
+      } else {
+        const filteredZoneRows = rawZoneRows.filter((r) => matchesZoneTenant(r, tenantId));
+        total = filteredZoneRows.length;
+        zoneRows = filteredZoneRows.slice(offset, offset + limit);
+      }
 
       if (total === 0) {
         const allZonesCount = (await db.prepare(
           'SELECT COUNT(*) as total FROM table_zones'
         ).first().catch(() => null)) as { total: number } | null;
-        if (!allZonesCount || allZonesCount.total === 0) {
+        if (!allZonesCount || allZonesCount.total === 0 || zoneRows.length === 0) {
           const fallback = await deriveZonesFromCafeTables().catch(() => ({ total: 0, zoneRows: [] }));
-          total = fallback.total;
-          zoneRows = fallback.zoneRows;
+          if (fallback.total > 0 || !allZonesCount || allZonesCount.total === 0) {
+            total = fallback.total;
+            zoneRows = fallback.zoneRows;
+          }
         }
       }
     } catch {
@@ -112,22 +164,34 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/table-zones/:id - Get table zone by ID
   app.openapi(TableZoneRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
 
     let row: any = null;
     try {
       row = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+      if (row && !matchesZoneTenant(row, tenantId)) {
+        row = null;
+      }
     } catch {
       row = null;
     }
     if (!row) {
       try {
-        const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first() as { zone?: string } | null;
-        if (cafeTable) {
-          row = { id, slug: id, name: cafeTable.zone || id, description: null, sort_order: 0, is_active: 1, location_id: null };
+        const cafeTables = (await db.prepare('SELECT zone, tenant_id FROM cafe_tables WHERE LOWER(zone) = LOWER(?)').bind(id).all()) as { results: Array<Record<string, unknown>> };
+        const matched = (cafeTables.results || []).find((r) => matchesTenantRow(r, tenantId));
+        if (matched) {
+          row = { id, slug: id, name: String(matched.zone || id), description: null, sort_order: 0, is_active: 1, location_id: tenantId === '*' ? null : tenantId };
         }
       } catch {
-        row = null;
+        try {
+          const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first() as { zone?: string } | null;
+          if (cafeTable && (tenantId === '*' || tenantId === 'default')) {
+            row = { id, slug: id, name: cafeTable.zone || id, description: null, sort_order: 0, is_active: 1, location_id: null };
+          }
+        } catch {
+          row = null;
+        }
       }
     }
 
@@ -139,24 +203,23 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let tableResults: any[] = [];
     try {
       const tables = (await db.prepare(
-        `SELECT id, COALESCE(code, CAST(table_number AS TEXT)) as code, name, capacity, status, COALESCE(position_x, 0) as position_x, COALESCE(position_y, 0) as position_y, COALESCE(width, 80) as width, COALESCE(height, 80) as height, COALESCE(rotation, 0) as rotation
+        `SELECT id, COALESCE(code, CAST(table_number AS TEXT)) as code, name, capacity, status, COALESCE(position_x, 0) as position_x, COALESCE(position_y, 0) as position_y, COALESCE(width, 80) as width, COALESCE(height, 80) as height, COALESCE(rotation, 0) as rotation, tenant_id
          FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?) ORDER BY name`
       ).bind(id, id).all()) as { results: any[] };
-      tableResults = tables.results || [];
+      tableResults = (tables.results || []).filter((t) => matchesTenantRow(t, tenantId));
     } catch {
       try {
         const tables = (await db.prepare(
-          `SELECT id, code, name, capacity, status, position_x, position_y, width, height, rotation
-           FROM tables WHERE zone_id = ? ORDER BY name`
+          `SELECT * FROM tables WHERE zone_id = ? ORDER BY name`
         ).bind(id).all()) as { results: any[] };
-        tableResults = tables.results || [];
+        tableResults = (tables.results || []).filter((t) => matchesTenantRow(t, tenantId));
       } catch {
         try {
           const tables = (await db.prepare(
-            `SELECT id, CAST(table_number AS TEXT) as code, name, capacity, status, 0 as position_x, 0 as position_y, 80 as width, 80 as height, 0 as rotation
+            `SELECT *, CAST(table_number AS TEXT) as code, 0 as position_x, 0 as position_y, 80 as width, 80 as height, 0 as rotation
              FROM cafe_tables WHERE zone = ? ORDER BY name`
           ).bind(id).all()) as { results: any[] };
-          tableResults = tables.results || [];
+          tableResults = (tables.results || []).filter((t) => matchesTenantRow(t, tenantId));
         } catch {
           tableResults = [];
         }
@@ -182,13 +245,19 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/table-zones - Create table zone
   app.openapi(TableZoneRoutes.create as any, async (c: any) => {
     const db = getDatabase(c);
+    const rawTenantId = getTenantId(c);
+    const writeTenant = rawTenantId === '*' ? 'default' : rawTenantId;
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
 
-    const locationId = body.locationId || 'default';
+    if (body.locationId !== undefined && !(await isAllowedLocationForTenant(db, body.locationId, rawTenantId))) {
+      return c.json({ success: false, error: 'Invalid location for tenant' }, 403);
+    }
+
+    const locationId = rawTenantId !== '*' && rawTenantId !== 'default' ? (body.locationId || rawTenantId) : (body.locationId || writeTenant);
     const sortOrder = body.sortOrder ?? body.displayOrder ?? 0;
 
     // Check slug uniqueness
@@ -262,6 +331,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/table-zones/:id - Update table zone
   app.openapi(TableZoneRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -271,18 +341,26 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let usingFallback = false;
     try {
       existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+      if (existing && !matchesZoneTenant(existing, tenantId)) {
+        existing = null;
+      }
     } catch {
       usingFallback = true;
     }
     if (!existing) {
-      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first().catch(() => null) as { zone?: string } | null;
-      if (cafeTable) {
+      const cafeTables = (await db.prepare('SELECT zone, tenant_id FROM cafe_tables WHERE LOWER(zone) = LOWER(?)').bind(id).all().catch(() => ({ results: [] }))) as { results: Array<Record<string, unknown>> };
+      const matched = (cafeTables.results || []).find((r) => matchesTenantRow(r, tenantId));
+      if (matched) {
         usingFallback = true;
-        existing = { id, slug: id, name: cafeTable.zone || id, is_active: 1, location_id: null };
+        existing = { id, slug: id, name: String(matched.zone || id), is_active: 1, location_id: tenantId === '*' ? null : tenantId };
       }
     }
     if (!existing) {
       return c.json({ success: false, error: 'Table zone not found' }, 404);
+    }
+
+    if (body.locationId !== undefined && !(await isAllowedLocationForTenant(db, body.locationId, tenantId))) {
+      return c.json({ success: false, error: 'Invalid location for tenant' }, 403);
     }
 
     const updates: string[] = [];
@@ -346,6 +424,7 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // DELETE /api/table-zones/:id - Delete table zone
   app.openapi(TableZoneRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
     const now = new Date().toISOString();
@@ -354,14 +433,18 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let usingFallback = false;
     try {
       existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
+      if (existing && !matchesZoneTenant(existing, tenantId)) {
+        existing = null;
+      }
     } catch {
       usingFallback = true;
     }
     if (!existing) {
-      const cafeTable = await db.prepare('SELECT zone FROM cafe_tables WHERE LOWER(zone) = LOWER(?) LIMIT 1').bind(id).first().catch(() => null) as { zone?: string } | null;
-      if (cafeTable) {
+      const cafeTables = (await db.prepare('SELECT zone, tenant_id FROM cafe_tables WHERE LOWER(zone) = LOWER(?)').bind(id).all().catch(() => ({ results: [] }))) as { results: Array<Record<string, unknown>> };
+      const matched = (cafeTables.results || []).find((r) => matchesTenantRow(r, tenantId));
+      if (matched) {
         usingFallback = true;
-        existing = { id, name: cafeTable.zone || id };
+        existing = { id, name: String(matched.zone || id) };
       }
     }
     if (!existing) {
@@ -371,7 +454,16 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Check for tables in zone
     let tables: { count: number } | null = null;
     try {
-      tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
+      if (tenantId === '*') {
+        tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
+      } else {
+        const rows = (await db.prepare('SELECT id, tenant_id FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).all()) as { results: Array<Record<string, unknown>> };
+        if (rows && Array.isArray(rows.results) && rows.results.length > 0) {
+          tables = { count: rows.results.filter((r) => matchesTenantRow(r, tenantId)).length };
+        } else {
+          tables = (await db.prepare('SELECT COUNT(*) as count FROM cafe_tables WHERE zone_id = ? OR LOWER(zone) = LOWER(?)').bind(id, id).first()) as { count: number } | null;
+        }
+      }
     } catch {
       try {
         tables = (await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first()) as { count: number } | null;

@@ -5,19 +5,22 @@ import { getTenantId } from '../../middleware/tenant';
 import type { TableSession } from './types';
 
 function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (tenantId === '*') return true;
   if (!row) return false;
-  if (!('tenant_id' in row) || row.tenant_id === undefined) return true;
+  if (!('tenant_id' in row) || row.tenant_id === undefined) return tenantId === 'default';
   const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
   return rowTenant === tenantId;
 }
 
-async function isTableAccessibleByTenant(db: D1Database, tableId: string, tenantId: string): Promise<boolean> {
+async function isTableAccessibleByTenant(db: D1Database, tableId: string | undefined, tenantId: string): Promise<boolean> {
+  if (tenantId === '*') return true;
+  if (!tableId) return tenantId === 'default';
   try {
     const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(tableId).first<Record<string, unknown>>();
-    if (!table) return true;
+    if (!table) return tenantId === 'default';
     return matchesTenantRow(table, tenantId);
   } catch {
-    return true;
+    return tenantId === 'default';
   }
 }
 
@@ -53,6 +56,10 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     }
     if (order.status === 'cancelled') {
       return c.json({ success: false, error: 'Cannot attach cancelled order to session' }, 409);
+    }
+    // Prevent cross-table order hijacking: reject if order is already assigned to a different table
+    if (order.table_id && order.table_id !== session.table_id) {
+      return c.json({ success: false, error: 'Order already attached to another table' }, 409);
     }
     if (order.table_id && order.table_id === session.table_id) {
       return c.json({ success: true, data: session, idempotent: true });

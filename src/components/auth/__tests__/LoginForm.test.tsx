@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@/test-utils';
 import { LoginForm } from '@/components/auth/LoginForm';
+import { AccountNotLoggedIn } from '@/pages/account/account-not-logged-in';
+import * as apiClient from '@/lib/api-client';
+import * as clientSession from '@/lib/client-session';
 
 // All mock state in vi.hoisted so it's available within vi.mock's hoisted factory
 const { mockLogin, mockStore, mockUseAuthStore } = vi.hoisted(() => {
@@ -88,5 +91,39 @@ describe('LoginForm', () => {
     mockStore.error = 'Invalid email or password';
     render(<LoginForm />);
     expect(screen.getByText(/Invalid email or password/i)).toBeDefined();
+  });
+
+  it('completes self-service customer Phone OTP and Email login in AccountNotLoggedIn', async () => {
+    const fetchSpy = vi.spyOn(apiClient, 'apiFetch')
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({
+        success: true,
+        token: 'cust-jwt-1',
+        customer: { id: 'c-1', name: 'Lan', phone: '0901234567', email: 'lan@aura.vn' },
+      });
+    const saveSpy = vi.spyOn(clientSession, 'saveClientSession').mockImplementation(() => {});
+
+    render(<AccountNotLoggedIn />);
+    fireEvent.change(screen.getByLabelText('Số điện thoại'), { target: { value: '0901234567' } });
+    fireEvent.click(screen.getByRole('button', { name: /Nhận mã OTP/i }));
+
+    await waitFor(() => expect(screen.getByLabelText('Mã OTP')).toBeDefined());
+    fireEvent.change(screen.getByLabelText('Mã OTP'), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận OTP/i }));
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith('cust-jwt-1', expect.objectContaining({
+        id: 'c-1', phone: '0901234567', role: 'customer',
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Email & Mật khẩu/i }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'lan@aura.vn' } });
+    fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'Pass123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /Đăng nhập bằng Email/i }));
+
+    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('lan@aura.vn', 'Pass123!'));
+    fetchSpy.mockRestore();
+    saveSpy.mockRestore();
   });
 });

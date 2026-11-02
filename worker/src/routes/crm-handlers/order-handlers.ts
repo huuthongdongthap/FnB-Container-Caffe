@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { publishOrderEvent } from '@aura/domain-order';
 import {
   placeOrder,
@@ -19,7 +20,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    *         channel: 'pickup' | 'delivery',
    *         customerId?, customerPhone?, customerName?, notes? }
    */
-  router.post('/orders', requireAuth(['customer', 'staff', 'manager', 'admin', 'owner']), async (c) => {
+  router.post('/orders', requireAuth(['customer', 'staff', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -48,6 +49,26 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // Customer role: use own id. Staff/owner: must pass customerId in body.
     const customerId = user.role === 'customer' ? user.id : (body.customerId ?? user.id);
+    const tenantId = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
+    if (user.role !== 'customer' && body.customerId) {
+      if (tenantId !== '*') {
+        try {
+          const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(body.customerId).first<{ tenant_id?: string | null }>();
+          if (custRow) {
+            const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+            if (custTenant !== tenantId) {
+              return c.json({ success: false, error: 'Forbidden' }, 403);
+            }
+          } else if (tenantId !== 'default') {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
+        } catch (err) {
+          if (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default') {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
+        }
+      }
+    }
     const customerPhone = body.customerPhone;
 
     const result = await placeOrder(db, {
@@ -57,6 +78,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       channel: body.channel as 'pickup' | 'delivery',
       items: body.items,
       notes: body.notes,
+      tenantId,
     });
 
     if (!result.ok) {
@@ -101,9 +123,9 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
   /**
    * GET /api/crm/orders/:id/fulfillment
    * Fulfillment status + ETA for one order.
-   * Auth: owner/staff (any order) or customer (own orders only).
+   * Auth: owner/staff/supervisor (same tenant) or customer (own orders only).
    */
-  router.get('/orders/:id/fulfillment', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
+  router.get('/orders/:id/fulfillment', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -116,11 +138,37 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'order id is required' }, 400);
     }
 
-    // Customer role is scoped to own orders; staff/owner can read any.
+    const tenantId = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
+    if (user.role !== 'customer') {
+      if (tenantId !== '*') {
+        try {
+          const orderRow = await db.prepare('SELECT tenant_id, customer_id FROM orders WHERE id = ? LIMIT 1').bind(orderId).first<{ tenant_id?: string | null; customer_id?: string | null }>();
+          if (orderRow) {
+            let orderTenant = (orderRow.tenant_id && String(orderRow.tenant_id).trim()) || '';
+            if (!orderTenant && orderRow.customer_id) {
+              const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(orderRow.customer_id).first<{ tenant_id?: string | null }>().catch(() => null);
+              if (custRow?.tenant_id) {
+                orderTenant = String(custRow.tenant_id).trim();
+              }
+            }
+            const resolvedTenant = orderTenant || 'default';
+            if (resolvedTenant !== tenantId) {
+              return c.json({ success: false, error: 'Forbidden' }, 403);
+            }
+          }
+        } catch (err) {
+          if (!/no such column:\s*tenant_id/i.test(String(err)) && tenantId !== 'default') {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
+        }
+      }
+    }
+
+    // Customer role is scoped to own orders; staff/owner can read any in their tenant.
     const customerScope = user.role === 'customer' ? user.id : undefined;
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
 
-    const result = await getFulfillment(db, orderId, customerScope, kv);
+    const result = await getFulfillment(db, orderId, customerScope, kv, tenantId);
 
     if (!result.ok) {
       const err = result as { ok: false; error: string; code: 'not_found' | 'forbidden' | 'd1_error' };

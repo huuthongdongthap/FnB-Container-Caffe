@@ -42,8 +42,11 @@ export async function getAuthSession(request: Request, env: Record<string, unkno
             .bind(payload.id)
             .first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null }>();
           if (customer?.id) {
-            if (payload.tenantId && customer.tenant_id && customer.tenant_id !== payload.tenantId) {
-              return errorResponse('Tài khoản thuộc cửa hàng khác', 403);
+            if (payload.tenantId && 'tenant_id' in customer && customer.tenant_id !== undefined) {
+              const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
+              if (custTenant !== payload.tenantId) {
+                return errorResponse('Tài khoản thuộc cửa hàng khác', 403);
+              }
             }
             return jsonResponse({
               success: true,

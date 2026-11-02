@@ -294,4 +294,38 @@ describe('updateTableStatus', () => {
     expect(body.table).toBeDefined();
     expect(body.table.status).toBe('occupied');
   });
+
+  it('prevents non-default tenant from listing or updating default/null-tenant tables and allows supervisor role', async () => {
+    const foreignListCtx: any = {
+      ...mockTablesContext({ role: 'supervisor' }),
+      get: (key: string) => {
+        if (key === 'user') return { id: 'USR_SUP_B', role: 'supervisor', tenantId: 'cafe-b' };
+        if (key === 'tenant_id') return 'cafe-b';
+        return undefined;
+      },
+    };
+    const foreignListRes = await getTablesMobile(foreignListCtx);
+    expect(foreignListRes.status).toBe(200);
+    const foreignListBody = await foreignListRes.json();
+    expect(foreignListBody.tables).toEqual([]);
+
+    const foreignPatchCtx: any = {
+      ...mockTablesContext({ role: 'supervisor', tableId: 'TBL_1', body: { status: 'occupied' } }),
+      get: (key: string) => {
+        if (key === 'user') return { id: 'USR_SUP_B', role: 'supervisor', tenantId: 'cafe-b' };
+        if (key === 'tenant_id') return 'cafe-b';
+        return undefined;
+      },
+    };
+    const foreignPatchRes = await updateTableStatus(foreignPatchCtx);
+    expect(foreignPatchRes.status).toBe(404);
+
+    const defaultSupPatchCtx: any = mockTablesContext({
+      role: 'supervisor',
+      tableId: 'TBL_1',
+      body: { status: 'occupied' },
+    });
+    const defaultSupPatchRes = await updateTableStatus(defaultSupPatchCtx);
+    expect(defaultSupPatchRes.status).toBe(200);
+  });
 });

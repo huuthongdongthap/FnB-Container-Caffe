@@ -6,9 +6,26 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
+import { optionalAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
 
 export const customerAssistantRouter = new Hono<{ Bindings: Env }>();
+
+customerAssistantRouter.use('/*', async (c, next) => {
+  if (!c.get('user' as never) && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    return optionalAuth()(c, next);
+  }
+  return next();
+});
+
+function resolveAssistantTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  if (c.get?.('user')) {
+    return getTenantId(c);
+  }
+  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
+  if (!raw || raw === '*') return 'default';
+  return raw;
+}
 
 const querySchema = z.object({
   query: z.string().min(1).max(500),
@@ -28,6 +45,28 @@ const STATUS_MAP: Record<string, string> = {
   cancelled: 'đã hủy'
 };
 
+function makeInteractionId(): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `cs_${Date.now().toString(36)}_${rand}`;
+}
+
+function maskCustomerName(name?: string | null): string {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return 'bạn';
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return `${trimmed.slice(0, 1)}***`;
+  }
+  return `${parts[0]} ***`;
+}
+
+function maskOrderId(orderId: string): string {
+  if (orderId.length <= 4) return `***${orderId}`;
+  return `***${orderId.slice(-4)}`;
+}
+
 export async function processCustomerQuery(
   db: import('@cloudflare/workers-types').D1Database,
   aiBinding: unknown,
@@ -45,39 +84,47 @@ export async function processCustomerQuery(
   } else if (q.includes('đơn') || q.includes('order') || q.includes('giao') || q.includes('làm xong') || data.order_id) {
     intent = 'order_status';
     let orderRow: { id: string; status: string; total: number } | null = null;
-    const extractedId = data.order_id || q.match(/#?([a-zA-Z0-9_-]{5,32})/)?.[1];
+    const extractedId = data.order_id?.trim() || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[1]
+      || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[2];
 
     if (extractedId) {
       try {
         orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (id = ? OR id LIKE ?) LIMIT 1'
-        ).bind(tenantId, tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>();
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1"
+        ).bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        orderRow = /no such column:\s*tenant_id/i.test(msg)
-          ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (id = ? OR id LIKE ?) LIMIT 1')
-              .bind(extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null)
-          : await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (id = ? OR id LIKE ?) LIMIT 1')
-              .bind(tenantId, tenantId, extractedId, `%${extractedId}%`).first<{ id: string; status: string; total: number }>().catch(() => null);
+        if (/no such column:\s*tenant_id/i.test(msg)) {
+          orderRow = (tenantId === 'default' || tenantId === '*')
+            ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE LOWER(id) = LOWER(?) LIMIT 1')
+                .bind(extractedId).first<{ id: string; status: string; total: number }>().catch(() => null)
+            : null;
+        } else {
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1")
+            .bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number }>().catch(() => null);
+        }
       }
     } else if (data.phone) {
       try {
         orderRow = await db.prepare(
-          'SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1'
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1"
         ).bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         orderRow = /no such column:\s*tenant_id/i.test(msg)
-          ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1')
-              .bind(data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
-          : await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1')
-              .bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
+          ? (tenantId === 'default' || tenantId === '*'
+              ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT 1')
+                  .bind(data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
+              : null)
+          : await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? ORDER BY created_at DESC LIMIT 1")
+              .bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
       }
     }
 
     if (orderRow) {
       const st = STATUS_MAP[orderRow.status] || orderRow.status;
-      reply = `Đơn hàng #${orderRow.id} (${Number(orderRow.total || 0).toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
+      const displayId = extractedId || data.channel === 'zalo' ? orderRow.id : maskOrderId(orderRow.id);
+      reply = `Đơn hàng #${displayId} (${Number(orderRow.total || 0).toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
     } else {
       reply = 'AURA chưa tìm thấy đơn hàng tương ứng. Bạn vui lòng cung cấp mã đơn hoặc số điện thoại đã đặt nhé!';
     }
@@ -91,7 +138,8 @@ export async function processCustomerQuery(
           `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
            FROM orders o
            LEFT JOIN cafe_tables t ON o.table_id = t.id
-           WHERE (o.tenant_id = ? OR (? = 'default' AND o.tenant_id IS NULL))
+             AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')
+           WHERE (? = '*' OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?)
              AND (o.table_number = ? OR t.table_number = ? OR o.table_id = ?)
              AND o.status NOT IN ('completed', 'cancelled')
            ORDER BY o.created_at DESC
@@ -100,14 +148,16 @@ export async function processCustomerQuery(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (/no such column:\s*(?:o\.)?tenant_id/i.test(msg)) {
-          activeOrder = await db.prepare(
-            `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
-             WHERE (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?) AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
-          ).bind(String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null);
+          activeOrder = (tenantId === 'default' || tenantId === '*')
+            ? await db.prepare(
+                `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
+                 WHERE (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?) AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
+              ).bind(String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null)
+            : null;
         } else {
           activeOrder = await db.prepare(
             `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
-             WHERE (o.tenant_id = ? OR (? = 'default' AND o.tenant_id IS NULL)) AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
+             WHERE (? = '*' OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?) AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
                AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
           ).bind(tenantId, tenantId, String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null);
         }
@@ -126,16 +176,18 @@ export async function processCustomerQuery(
       let cust: { name: string; loyalty_points: number; loyalty_tier: string } | null = null;
       try {
         cust = await db.prepare(
-          'SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? AND (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL)) LIMIT 1'
+          "SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
         ).bind(data.phone, tenantId, tenantId).first<{ name: string; loyalty_points: number; loyalty_tier: string }>();
       } catch (err) {
         if (/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
-          cust = await db.prepare('SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? LIMIT 1')
-            .bind(data.phone).first<{ name: string; loyalty_points: number; loyalty_tier: string }>().catch(() => null);
+          cust = (tenantId === 'default' || tenantId === '*')
+            ? await db.prepare('SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? LIMIT 1')
+                .bind(data.phone).first<{ name: string; loyalty_points: number; loyalty_tier: string }>().catch(() => null)
+            : null;
         }
       }
       if (cust) {
-        reply = `Chào ${cust.name || 'bạn'}, bạn đang có ${cust.loyalty_points || 0} điểm tích lũy (Hạng: ${(cust.loyalty_tier || 'bronze').toUpperCase()}).`;
+        reply = `Chào ${maskCustomerName(cust.name)}, bạn đang có ${cust.loyalty_points || 0} điểm tích lũy (Hạng: ${(cust.loyalty_tier || 'bronze').toUpperCase()}).`;
       } else {
         reply = `Số điện thoại ${data.phone} chưa đăng ký thành viên. Bạn có thể đăng ký ngay tại quầy hoặc trên ứng dụng AURA!`;
       }
@@ -172,12 +224,13 @@ export async function processCustomerQuery(
 
   // Non-blocking interaction log
   try {
-    const id = `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = makeInteractionId();
+    const logTenantId = tenantId === '*' ? 'default' : tenantId;
     await db.prepare(`
       INSERT INTO customer_support_interactions (
         id, tenant_id, channel, customer_phone, user_query, detected_intent, bot_response, engine_used
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(id, tenantId, data.channel, data.phone || null, data.query, intent, reply, engine).run();
+    `).bind(id, logTenantId, data.channel, data.phone || null, data.query, intent, reply, engine).run();
   } catch { /* non-blocking log error */ }
 
   return { intent, reply, engine };
@@ -191,7 +244,7 @@ customerAssistantRouter.post('/', async (c) => {
     return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid input' }, 400);
   }
 
-  const tenantId = getTenantId(c);
+  const tenantId = resolveAssistantTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 

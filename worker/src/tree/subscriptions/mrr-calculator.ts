@@ -4,19 +4,41 @@ import { today, nowStr } from './helpers';
 
 export async function updateMRRSnapshot(db: import('@cloudflare/workers-types').D1Database): Promise<void> {
   const date = today();
-  const activeSubs = await db.prepare(
-    'SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = \'active\''
-  ).first<{ count: number; mrr: number }>();
+  let activeSubs: { count: number; mrr: number } | null = null;
+  try {
+    activeSubs = await db.prepare(
+      "SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+    ).first<{ count: number; mrr: number }>();
+  } catch {
+    activeSubs = await db.prepare(
+      'SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = \'active\''
+    ).first<{ count: number; mrr: number }>();
+  }
 
   const monthStart = new Date();
   monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-  const churned = await db.prepare(
-    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
-  ).bind(monthStart.toISOString()).first<{ count: number }>();
+  const monthStartIso = monthStart.toISOString();
+  let churned: { count: number } | null = null;
+  try {
+    churned = await db.prepare(
+      "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+    ).bind(monthStartIso).first<{ count: number }>();
+  } catch {
+    churned = await db.prepare(
+      'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
+    ).bind(monthStartIso).first<{ count: number }>();
+  }
 
-  const newSubs = await db.prepare(
-    'SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ?'
-  ).bind(monthStart.toISOString()).first<{ count: number }>();
+  let newSubs: { count: number } | null = null;
+  try {
+    newSubs = await db.prepare(
+      "SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+    ).bind(monthStartIso).first<{ count: number }>();
+  } catch {
+    newSubs = await db.prepare(
+      'SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ?'
+    ).bind(monthStartIso).first<{ count: number }>();
+  }
 
   const mrr = activeSubs?.mrr || 0;
   const active = activeSubs?.count || 0;

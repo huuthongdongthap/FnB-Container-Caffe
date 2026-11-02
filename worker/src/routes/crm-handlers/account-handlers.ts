@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import {
   getCustomerAccount,
   updateConsent,
@@ -13,7 +14,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    * Returns the authenticated customer's own account view.
    * Auth: any authenticated user (customer sees own, staff sees any via :id).
    */
-  router.get('/account/me', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
+  router.get('/account/me', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -31,7 +32,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    * staff/owner can update any customer's (pass customerId in body).
    * Body: { purpose: string, granted: boolean, policyVersion?: string }
    */
-  router.patch('/account/consent', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'manager', 'admin', 'owner']), async (c) => {
+  router.patch('/account/consent', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
 
@@ -47,14 +48,24 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // Customer role can only update their own consents.
     const targetCustomerId = user.role === 'customer' ? user.id : (body.customerId ?? user.id);
-    if (user.role !== 'customer' && user.tenantId) {
-      try {
-        const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(targetCustomerId).first<{ tenant_id?: string | null }>();
-        if (custRow && custRow.tenant_id && custRow.tenant_id !== user.tenantId) {
-          return c.json({ success: false, error: 'Forbidden' }, 403);
+    if (user.role !== 'customer') {
+      const tenantId = getTenantId(c as any);
+      if (tenantId !== '*') {
+        try {
+          const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(targetCustomerId).first<{ tenant_id?: string | null }>();
+          if (custRow) {
+            const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+            if (custTenant !== tenantId) {
+              return c.json({ success: false, error: 'Forbidden' }, 403);
+            }
+          } else if (tenantId !== 'default') {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
+        } catch (err) {
+          if (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default') {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
         }
-      } catch {
-        // Optional tenant_id column in partial schemas
       }
     }
 
@@ -65,7 +76,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
       source: user.role === 'customer' ? 'customer_portal' : 'staff_action',
       policyVersion: body.policyVersion,
       actorId: user.id,
-      actorRole: (user.role === 'customer' ? 'customer' : user.role === 'owner' ? 'owner' : 'staff') as 'customer' | 'staff' | 'owner',
+      actorRole: (user.role === 'customer' ? 'customer' : user.role) as import('@aura/domain-crm').ConsentUpdate['actorRole'],
     });
 
     if (!result.ok) {

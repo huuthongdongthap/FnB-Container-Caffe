@@ -22,7 +22,25 @@ state: string;
 attributes: Record<string, unknown> | null;
 }
 
-export async function getDeviceState(env: Record<string, unknown>, entityId: string): Promise<Response> {
+const ZONE_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
+
+export function matchesHaTenant(
+  row: Record<string, unknown> | null | undefined,
+  tenantId?: string
+): boolean {
+  if (!row) return false;
+  if (!tenantId || tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
+    return String(row.tenant_id).trim() === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+export async function getDeviceState(
+  env: Record<string, unknown>,
+  entityId: string,
+  tenantId?: string
+): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
@@ -40,12 +58,20 @@ export async function getDeviceState(env: Record<string, unknown>, entityId: str
       });
     }
 
-    const row = await db
-      .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id = ?')
-      .bind(entityId)
-      .first<DeviceState>();
+    let row: (DeviceState & { tenant_id?: string | null }) | null = null;
+    try {
+      row = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated, tenant_id FROM ha_device_states WHERE entity_id = ?')
+        .bind(entityId)
+        .first<DeviceState & { tenant_id?: string | null }>();
+    } catch {
+      row = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id = ?')
+        .bind(entityId)
+        .first<DeviceState>();
+    }
 
-    if (!row) {
+    if (!row || !matchesHaTenant(row as unknown as Record<string, unknown>, tenantId)) {
       return errorResponse('Device not found', 404);
     }
 
@@ -64,7 +90,12 @@ export async function getDeviceState(env: Record<string, unknown>, entityId: str
   }
 }
 
-export async function toggleDevice(env: Record<string, unknown>, entityId: string, on: boolean): Promise<Response> {
+export async function toggleDevice(
+  env: Record<string, unknown>,
+  entityId: string,
+  on: boolean,
+  tenantId?: string
+): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
@@ -81,24 +112,39 @@ export async function toggleDevice(env: Record<string, unknown>, entityId: strin
       });
     }
 
-    await db
-      .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ?")
-      .bind(newState, entityId)
-      .run();
+    let existing: { entity_id: string; state: string; attributes: string | null; tenant_id?: string | null } | null = null;
+    try {
+      existing = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated, tenant_id FROM ha_device_states WHERE entity_id = ?')
+        .bind(entityId)
+        .first<{ entity_id: string; state: string; attributes: string | null; tenant_id?: string | null }>();
+    } catch {
+      existing = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id = ?')
+        .bind(entityId)
+        .first<{ entity_id: string; state: string; attributes: string | null }>();
+    }
 
-    const row = await db
-      .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id = ?')
-      .bind(entityId)
-      .first<{ entity_id: string; state: string; attributes: string | null }>();
-
-    if (!row) {
+    if (!existing || !matchesHaTenant(existing as unknown as Record<string, unknown>, tenantId)) {
       return errorResponse('Device not found', 404);
     }
 
+    if ('tenant_id' in existing && existing.tenant_id !== undefined && tenantId && tenantId !== '*') {
+      await db
+        .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+        .bind(newState, entityId, tenantId)
+        .run();
+    } else {
+      await db
+        .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ?")
+        .bind(newState, entityId)
+        .run();
+    }
+
     const result: ToggleResult = {
-      entity_id: row.entity_id,
-      state: row.state,
-      attributes: row.attributes ? JSON.parse(row.attributes as unknown as string) : null
+      entity_id: existing.entity_id,
+      state: newState,
+      attributes: existing.attributes ? JSON.parse(existing.attributes as unknown as string) : null
     };
 
     return jsonResponse({ result });
@@ -108,8 +154,15 @@ export async function toggleDevice(env: Record<string, unknown>, entityId: strin
   }
 }
 
-export async function getZoneDevices(env: Record<string, unknown>, zone: string): Promise<Response> {
+export async function getZoneDevices(
+  env: Record<string, unknown>,
+  zone: string,
+  tenantId?: string
+): Promise<Response> {
   try {
+    if (!ZONE_ID_REGEX.test(zone)) {
+      return errorResponse('Invalid zone identifier', 400);
+    }
     const mockMode = env.HA_MOCK === 'true';
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
 
@@ -119,18 +172,30 @@ export async function getZoneDevices(env: Record<string, unknown>, zone: string)
 
     const likePattern = `%.${zone}%`;
 
-    const { results } = await db
-      .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id LIKE ?')
-      .bind(likePattern)
-      .all<DeviceState>();
+    let results: Array<DeviceState & { tenant_id?: string | null }> = [];
+    try {
+      const res = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated, tenant_id FROM ha_device_states WHERE entity_id LIKE ?')
+        .bind(likePattern)
+        .all<DeviceState & { tenant_id?: string | null }>();
+      results = res.results || [];
+    } catch {
+      const res = await db
+        .prepare('SELECT entity_id, state, attributes, last_changed, last_updated FROM ha_device_states WHERE entity_id LIKE ?')
+        .bind(likePattern)
+        .all<DeviceState>();
+      results = res.results || [];
+    }
 
-    const devices = results.map((r) => ({
-      entity_id: r.entity_id,
-      state: r.state,
-      attributes: r.attributes ? JSON.parse((r.attributes as unknown) as string) : null,
-      last_changed: r.last_changed,
-      last_updated: r.last_updated
-    }));
+    const devices = (results || [])
+      .filter((r) => matchesHaTenant(r as unknown as Record<string, unknown>, tenantId))
+      .map((r) => ({
+        entity_id: r.entity_id,
+        state: r.state,
+        attributes: r.attributes ? JSON.parse((r.attributes as unknown) as string) : null,
+        last_changed: r.last_changed,
+        last_updated: r.last_updated
+      }));
 
     return jsonResponse({ zone, devices });
   } catch (err) {
@@ -139,9 +204,29 @@ export async function getZoneDevices(env: Record<string, unknown>, zone: string)
   }
 }
 
-export async function cacheDeviceState(env: Record<string, unknown>, device: DeviceState): Promise<void> {
+export async function cacheDeviceState(env: Record<string, unknown>, device: DeviceState, tenantId?: string): Promise<void> {
   try {
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
+    const effectiveTenant = tenantId && tenantId !== '*' && tenantId.trim() ? tenantId.trim() : null;
+    if (effectiveTenant) {
+      try {
+        await db
+          .prepare(
+            "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated, tenant_id) VALUES (?, ?, ?, ?, datetime('now'), ?)"
+          )
+          .bind(
+            device.entity_id,
+            device.state,
+            JSON.stringify(device.attributes ?? {}),
+            device.last_changed,
+            effectiveTenant
+          )
+          .run();
+        return;
+      } catch {
+        // Fallback when tenant_id column is absent
+      }
+    }
     await db
       .prepare(
         "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"

@@ -23,4 +23,5 @@ export interface ZnsNotifyInput {
   customer_id: string;
   template_key: string;
   data: ZnsData;
+  tenantId?: string;
 }

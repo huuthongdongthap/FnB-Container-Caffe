@@ -2,6 +2,18 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
+
+const PROMO_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff'];
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 async function writePromotionAuditLog(
   db: any,
@@ -15,7 +27,7 @@ async function writePromotionAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'promotion', entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'promotion', entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -60,6 +72,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions - List promotions
   app.openapi(PromotionRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -87,23 +100,42 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let promotionResults: any[] = [];
-    try {
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+    if (tenantId !== '*') {
+      let allRows: any[] = [];
+      try {
+        const promotions = (await db.prepare(
+          `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC`
+        ).bind(...params).all()) as { results: any[] };
+        allRows = promotions.results || [];
+      } catch {
+        const canonicalWhere = whereClause.replace('AND type = ?', 'AND discount_type = ?');
+        const promotions = (await db.prepare(
+          `SELECT * FROM promotions ${canonicalWhere} ORDER BY created_at DESC`
+        ).bind(...params).all().catch(() => ({ results: [] }))) as { results: any[] };
+        allRows = promotions.results || [];
+      }
+      const filtered = allRows.filter((p) => matchesTenantRow(p, tenantId));
+      total = filtered.length;
+      promotionResults = filtered.slice(offset, offset + limit);
+    } else {
+      try {
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${whereClause}`).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const promotions = (await db.prepare(
-        `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
-      promotionResults = promotions.results || [];
-    } catch {
-      const canonicalWhere = whereClause.replace('AND type = ?', 'AND discount_type = ?');
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
-      total = countResult?.total || 0;
+        const promotions = (await db.prepare(
+          `SELECT * FROM promotions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()) as { results: any[] };
+        promotionResults = promotions.results || [];
+      } catch {
+        const canonicalWhere = whereClause.replace('AND type = ?', 'AND discount_type = ?');
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM promotions ${canonicalWhere}`).bind(...params).first().catch(() => null)) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const promotions = (await db.prepare(
-        `SELECT * FROM promotions ${canonicalWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
-      promotionResults = promotions.results || [];
+        const promotions = (await db.prepare(
+          `SELECT * FROM promotions ${canonicalWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
+        promotionResults = promotions.results || [];
+      }
     }
 
     return c.json({
@@ -118,11 +150,12 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions/{id} - Get promotion by ID
   app.openapi(PromotionRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
 
     const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
 
-    if (!promotion) {
+    if (!promotion || !matchesTenantRow(promotion, tenantId)) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
 
@@ -135,8 +168,10 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions - Create promotion
   app.openapi(PromotionRoutes.create as any, async (c: any) => {
     const db = getDatabase(c);
+    const rawTenantId = getTenantId(c);
+    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const body = c.req.valid('json');
@@ -146,8 +181,8 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     try {
       await db.prepare(
-        `INSERT INTO promotions (id, name, description, code, type, discount_value, discount_type, max_uses, current_uses, min_order_value, max_discount_value, valid_from, valid_to, is_active, applicable_items, excluded_items, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO promotions (id, name, description, code, type, discount_value, discount_type, max_uses, current_uses, min_order_value, max_discount_value, valid_from, valid_to, is_active, applicable_items, excluded_items, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
         body.name,
@@ -165,43 +200,91 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.isActive !== false ? 1 : 0,
         body.applicableItems ? JSON.stringify(body.applicableItems) : null,
         body.excludedItems ? JSON.stringify(body.excludedItems) : null,
+        tenantId,
         now,
         now
       ).run();
     } catch {
-      const canonicalDiscountType = body.discountType === 'percentage' ? 'percent' : (body.discountType || 'fixed');
       try {
         await db.prepare(
-          `INSERT INTO promotions (id, code, name, description, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, is_active, expires_at, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+          `INSERT INTO promotions (id, name, description, code, type, discount_value, discount_type, max_uses, current_uses, min_order_value, max_discount_value, valid_from, valid_to, is_active, applicable_items, excluded_items, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           id,
-          body.code.toUpperCase(),
           body.name,
           body.description || null,
-          canonicalDiscountType,
+          body.code.toUpperCase(),
+          body.type,
           body.discountValue,
-          body.minOrderValue || 0,
-          body.maxDiscountValue || null,
+          body.discountType,
           body.maxUses || null,
-          body.isActive !== false ? 1 : 0,
+          0,
+          body.minOrderValue || null,
+          body.maxDiscountValue || null,
+          body.validFrom || null,
           body.validTo || null,
+          body.isActive !== false ? 1 : 0,
+          body.applicableItems ? JSON.stringify(body.applicableItems) : null,
+          body.excludedItems ? JSON.stringify(body.excludedItems) : null,
+          now,
           now
         ).run();
       } catch {
-        await db.prepare(
-          `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active, created_at)
-           VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
-        ).bind(
-          body.code.toUpperCase(),
-          body.discountValue ?? 0,
-          body.maxDiscountValue || 0,
-          body.minOrderValue || 0,
-          body.maxUses || 100,
-          body.validTo || null,
-          body.isActive !== false ? 1 : 0,
-          now
-        ).run();
+        const canonicalDiscountType = body.discountType === 'percentage' ? 'percent' : (body.discountType || 'fixed');
+        try {
+          await db.prepare(
+            `INSERT INTO promotions (id, code, name, description, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, is_active, expires_at, tenant_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
+          ).bind(
+            id,
+            body.code.toUpperCase(),
+            body.name,
+            body.description || null,
+            canonicalDiscountType,
+            body.discountValue,
+            body.minOrderValue || 0,
+            body.maxDiscountValue || null,
+            body.maxUses || null,
+            body.isActive !== false ? 1 : 0,
+            body.validTo || null,
+            tenantId,
+            now
+          ).run();
+        } catch {
+          try {
+            await db.prepare(
+              `INSERT INTO promotions (id, code, name, description, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, is_active, expires_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+            ).bind(
+              id,
+              body.code.toUpperCase(),
+              body.name,
+              body.description || null,
+              canonicalDiscountType,
+              body.discountValue,
+              body.minOrderValue || 0,
+              body.maxDiscountValue || null,
+              body.maxUses || null,
+              body.isActive !== false ? 1 : 0,
+              body.validTo || null,
+              now
+            ).run();
+          } catch {
+            await db.prepare(
+              `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
+            ).bind(
+              body.code.toUpperCase(),
+              body.discountValue ?? 0,
+              body.maxDiscountValue || 0,
+              body.minOrderValue || 0,
+              body.maxUses || 100,
+              body.validTo || null,
+              body.isActive !== false ? 1 : 0,
+              now
+            ).run();
+          }
+        }
       }
     }
 
@@ -218,8 +301,9 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/promotions/{id} - Update promotion
   app.openapi(PromotionRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const { id } = c.req.valid('param');
@@ -227,7 +311,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
-    if (!existing) {
+    if (!existing || !matchesTenantRow(existing, tenantId)) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
 
@@ -314,15 +398,16 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // DELETE /api/promotions/{id} - Delete promotion
   app.openapi(PromotionRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !['owner', 'manager', 'admin', 'staff'].includes(user.role))) {
+    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const { id } = c.req.valid('param');
     const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
-    if (!existing) {
+    if (!existing || !matchesTenantRow(existing, tenantId)) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
 

@@ -8,9 +8,21 @@ import { createLogger } from 'worker/src/middleware/logger';
 
 const log = createLogger({ route: 'orders' });
 
-export async function getStats(request: Request, env: Record<string, unknown>) {
+export async function getStats(request: Request, env: Record<string, unknown>, tenantId?: string) {
   try {
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
+    const hasTenant = Boolean(tenantId && tenantId !== '*');
+    const tenantWhere = !hasTenant
+      ? ''
+      : tenantId === 'default'
+        ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' WHERE tenant_id = ?';
+    const tenantAnd = !hasTenant
+      ? ''
+      : tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
+    const tenantBinds = hasTenant && tenantId ? [tenantId] : [];
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStartParam = todayStart.toISOString().slice(0, 10) + ' 00:00:00';
@@ -20,32 +32,38 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
       const res = await db.prepare(`
         SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'
-      `).bind(todayStartParam).all<{ total: number; revenue: number }>();
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+      `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
       ordersTodayResult = res.results || [];
     } catch {
       const res = await db.prepare(`
         SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'
-      `).bind(todayStartParam).all<{ total: number; revenue: number }>();
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+      `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
       ordersTodayResult = res.results || [];
     }
 
-    const { results: statusResult } = await db.prepare(`
+    const statusStmt = db.prepare(`
       SELECT status, COUNT(*) as count
-      FROM orders
+      FROM orders${tenantWhere}
       GROUP BY status
-    `).all<{ status: string; count: number }>();
+    `);
+    const { results: statusResult } = tenantBinds.length > 0
+      ? await statusStmt.bind(...tenantBinds).all<{ status: string; count: number }>()
+      : await statusStmt.all<{ status: string; count: number }>();
 
-    const { results: topProducts } = await db.prepare(`
+    const topProductsStmt = db.prepare(`
       SELECT items, COUNT(*) as order_count
       FROM orders
-      WHERE status != 'cancelled'
+      WHERE status != 'cancelled'${tenantAnd}
       GROUP BY items
       ORDER BY order_count DESC
       LIMIT 10
-    `).all<{ items: string; order_count: number }>();
+    `);
+    const { results: topProducts } = tenantBinds.length > 0
+      ? await topProductsStmt.bind(...tenantBinds).all<{ items: string; order_count: number }>()
+      : await topProductsStmt.all<{ items: string; order_count: number }>();
 
     const productStats: Record<string, number> = {};
     topProducts.forEach(row => {
@@ -75,19 +93,19 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
       const res = await db.prepare(`
         SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `).bind(sevenDaysAgoParam).all<{ date: string; revenue: number }>();
+      `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
       revenueResult = res.results || [];
     } catch {
       const res = await db.prepare(`
         SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `).bind(sevenDaysAgoParam).all<{ date: string; revenue: number }>();
+      `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
       revenueResult = res.results || [];
     }
 

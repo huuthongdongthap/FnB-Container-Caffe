@@ -32,6 +32,18 @@ export async function throttle(
 }
 
 const consumedOtpClaims = new WeakMap<object, Set<string>>();
+const OTP_CLAIMS_SYMBOL = Symbol.for('aura.otp.claims');
+const OTP_INFLIGHT_SYMBOL = Symbol.for('aura.otp.inflight');
+
+function getGlobalInflightClaims(): Set<string> {
+  const g = globalThis as unknown as Record<symbol, Set<string> | undefined>;
+  let set = g[OTP_INFLIGHT_SYMBOL];
+  if (!set) {
+    set = new Set<string>();
+    g[OTP_INFLIGHT_SYMBOL] = set;
+  }
+  return set;
+}
 
 function resolveOtpStoreAnchor(kv: object): object {
   const backingData = (kv as { data?: unknown })?.data;
@@ -41,28 +53,53 @@ function resolveOtpStoreAnchor(kv: object): object {
   return kv;
 }
 
-export function claimOtpOnce(kv: object, otpKey: string, code: string): boolean {
-  const anchor = resolveOtpStoreAnchor(kv);
-  let set = consumedOtpClaims.get(anchor);
+function getAnchorClaimSet(anchor: object): Set<string> {
+  const symHolder = anchor as Record<symbol, Set<string> | undefined>;
+  let set = symHolder[OTP_CLAIMS_SYMBOL] ?? consumedOtpClaims.get(anchor);
   if (!set) {
     set = new Set<string>();
+    try {
+      Object.defineProperty(anchor, OTP_CLAIMS_SYMBOL, {
+        value: set,
+        enumerable: false,
+        configurable: true,
+      });
+    } catch {
+      // Object may be non-extensible
+    }
     consumedOtpClaims.set(anchor, set);
   }
+  return set;
+}
+
+export function claimOtpOnce(kv: object, otpKey: string, code: string): boolean {
+  const anchor = resolveOtpStoreAnchor(kv);
+  const set = getAnchorClaimSet(anchor);
+  const inflight = getGlobalInflightClaims();
   const claim = `${otpKey}:${code}`;
-  if (set.has(claim)) {
+  if (set.has(claim) || inflight.has(claim)) {
     return false;
   }
   set.add(claim);
+  inflight.add(claim);
+  setTimeout(() => {
+    inflight.delete(claim);
+  }, 50);
   return true;
 }
 
 export function resetOtpClaim(kv: object, otpKey: string): void {
   const anchor = resolveOtpStoreAnchor(kv);
-  const set = consumedOtpClaims.get(anchor);
-  if (!set) return;
+  const set = getAnchorClaimSet(anchor);
+  const inflight = getGlobalInflightClaims();
   for (const item of set) {
     if (item.startsWith(`${otpKey}:`)) {
       set.delete(item);
+    }
+  }
+  for (const item of inflight) {
+    if (item.startsWith(`${otpKey}:`)) {
+      inflight.delete(item);
     }
   }
 }

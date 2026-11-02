@@ -132,6 +132,22 @@ describe('getKdsMobile', () => {
     expect(res.status).toBe(200);
   });
 
+  it('200 for supervisor role and scopes cafe_tables join by tenant_id', async () => {
+    const preparedSql: string[] = [];
+    const baseDb = makeDb(sampleOrders);
+    const spyDb = {
+      ...baseDb,
+      prepare: (sql: string) => {
+        preparedSql.push(sql);
+        return baseDb.prepare(sql);
+      },
+    };
+    const ctx: any = makeCtx('supervisor', 'USR_SUP', '/mobile/kds/orders', 'GET', undefined, spyDb);
+    const res = await getKdsMobile(ctx);
+    expect(res.status).toBe(200);
+    expect(preparedSql[0]).toContain("COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')");
+  });
+
   it('items are JSON-parsed and malformed items degrade gracefully to empty array', async () => {
     const ordersWithItems: any[] = [
       {
@@ -193,6 +209,14 @@ describe('updateKdsStatus', () => {
   it('200 on status = ready', async () => {
     const db = makeDb([], true, 'preparing');
     const ctx: any = makeCtx('staff', 'USR_KITCHEN', '/mobile/kds/orders/ORD_1/status', 'PATCH', { status: 'ready' }, db);
+    ctx.req.param = (n: string) => (n === 'id' ? 'ORD_1' : '');
+    const res = await updateKdsStatus(ctx);
+    expect(res.status).toBe(200);
+  });
+
+  it('200 on status update by supervisor', async () => {
+    const db = makeDb([], true, 'confirmed');
+    const ctx: any = makeCtx('supervisor', 'USR_SUP', '/mobile/kds/orders/ORD_1/status', 'PATCH', { status: 'preparing' }, db);
     ctx.req.param = (n: string) => (n === 'id' ? 'ORD_1' : '');
     const res = await updateKdsStatus(ctx);
     expect(res.status).toBe(200);

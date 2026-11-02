@@ -24,7 +24,7 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const conditions = ['1=1'];
     const params: (string | number)[] = [];
     const tenant = paymentTenantScope(c);
-    if (tenant !== null) { conditions.push("COALESCE(o.tenant_id, 'default') = ?"); params.push(tenant); }
+    if (tenant !== null) { conditions.push("COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?"); params.push(tenant); }
     const user = c.get('user');
     if (!user) return c.json({ success: false, error: 'Unauthorized' }, 401);
     if (user.role === 'customer') { conditions.push('o.customer_id = ?'); params.push(user.id); }

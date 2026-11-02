@@ -8,19 +8,21 @@ import {
 } from './types';
 
 function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (tenantId === '*') return true;
   if (!row) return false;
-  if (!('tenant_id' in row) || row.tenant_id === undefined) return true;
+  if (!('tenant_id' in row) || row.tenant_id === undefined) return tenantId === 'default';
   const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
   return rowTenant === tenantId;
 }
 
 async function isTableAccessibleByTenant(db: D1Database, tableId: string, tenantId: string): Promise<boolean> {
+  if (tenantId === '*') return true;
   try {
     const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(tableId).first<Record<string, unknown>>();
-    if (!table) return true;
+    if (!table) return tenantId === 'default';
     return matchesTenantRow(table, tenantId);
   } catch {
-    return true;
+    return tenantId === 'default';
   }
 }
 
@@ -62,16 +64,27 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     const tenantId = getTenantId(c);
     try {
       const tablesRes = await db.prepare('SELECT * FROM cafe_tables').all<Record<string, unknown>>();
+      const allTables = tablesRes.results || [];
       const foreignTableIds = new Set(
-        (tablesRes.results || [])
+        allTables
           .filter((t) => !matchesTenantRow(t, tenantId))
           .map((t) => String(t.id))
       );
       if (foreignTableIds.size > 0) {
         results = results.filter((s) => !foreignTableIds.has(String(s.table_id)));
       }
+      if (tenantId !== 'default' && tenantId !== '*') {
+        const allowedTableIds = new Set(
+          allTables
+            .filter((t) => matchesTenantRow(t, tenantId))
+            .map((t) => String(t.id))
+        );
+        results = results.filter((s) => allowedTableIds.has(String(s.table_id)));
+      }
     } catch {
-      // Optional cafe_tables table
+      if (tenantId !== 'default' && tenantId !== '*') {
+        results = [];
+      }
     }
     return c.json({ success: true, data: results });
   });
@@ -104,16 +117,21 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'table_id is required' }, 400);
     }
 
-    // Refuse to open a second active session on the same table.
+    const tenantId = getTenantId(c);
+
+    // Refuse to open a second open session on the same table (active, ordering, paid all count).
     let existing: { id: string } | null = null;
     try {
       existing = await db.prepare(
-        'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+        "SELECT id FROM table_sessions WHERE table_id = ? AND (status = 'active' OR status IN ('ordering', 'paid'))"
       ).bind(tableId).first<{ id: string }>();
     } catch {
       existing = null;
     }
     if (existing) {
+      if (!(await isTableAccessibleByTenant(db, tableId, tenantId))) {
+        return c.json({ success: false, error: 'Table not found' }, 404);
+      }
       return c.json(
         { success: false, error: `Table ${tableId} already has an active session (${existing.id}). Close it first.` },
         409
@@ -121,7 +139,6 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     // Verify the table exists and belongs to the current tenant.
-    const tenantId = getTenantId(c);
     const table = await db.prepare(
       'SELECT * FROM cafe_tables WHERE id = ?'
     ).bind(tableId).first<Record<string, unknown>>();
@@ -205,6 +222,11 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     }
     if (!session || !(await isTableAccessibleByTenant(db, session.table_id, tenantId))) {
       return c.json({ success: false, error: 'Session not found' }, 404);
+    }
+
+    // Reject updates on terminal sessions (already closed or no_show)
+    if (session.status === 'closed' || session.status === 'no_show') {
+      return c.json({ success: false, error: 'Session already ended' }, 409);
     }
 
     const nextStatus = String(body.status || '').trim();

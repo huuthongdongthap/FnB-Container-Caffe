@@ -60,6 +60,7 @@ interface OrderRow {
   channel: string;
   customer_id: string | null;
   created_at: string;
+  tenant_id?: string | null;
 }
 
 /**
@@ -82,19 +83,44 @@ export async function getFulfillment(
   orderId: string,
   viewerCustomerId?: string,
   kv?: KVNamespace,
+  tenantId?: string,
 ): Promise<GetFulfillmentResult> {
   let row: OrderRow | null;
   try {
     row = await db
-      .prepare('SELECT id, status, order_type AS channel, customer_id, created_at FROM orders WHERE id = ?')
+      .prepare('SELECT id, status, order_type AS channel, customer_id, created_at, tenant_id FROM orders WHERE id = ?')
       .bind(orderId)
-      .first<OrderRow>();
+      .first<OrderRow>()
+      .catch(() =>
+        db
+          .prepare('SELECT id, status, order_type AS channel, customer_id, created_at FROM orders WHERE id = ?')
+          .bind(orderId)
+          .first<OrderRow>(),
+      );
   } catch (e) {
     return { ok: false, code: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
   }
 
   if (!row) {
     return { ok: false, code: 'not_found', error: `order not found: ${orderId}` };
+  }
+
+  if (tenantId && tenantId !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
+    let rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || '';
+    if (!rowTenant && row.customer_id) {
+      const custRow = await db
+        .prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1')
+        .bind(row.customer_id)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      if (custRow?.tenant_id) {
+        rowTenant = String(custRow.tenant_id).trim();
+      }
+    }
+    const resolvedTenant = rowTenant || 'default';
+    if (resolvedTenant !== tenantId) {
+      return { ok: false, code: 'forbidden', error: 'order belongs to another store' };
+    }
   }
 
   // Customer-scoped: a customer may only read their own fulfillment.
@@ -108,10 +134,22 @@ export async function getFulfillment(
   let queueDepth = 0;
   if (!isSettled) {
     try {
-      const q = await db
-        .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
-        .bind('pending', row.created_at)
-        .first<{ c: number }>();
+      const q = await (tenantId && tenantId !== '*'
+        ? db
+            .prepare("SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+            .bind('pending', row.created_at, tenantId)
+            .first<{ c: number }>()
+            .catch(() =>
+              db
+                .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
+                .bind('pending', row.created_at)
+                .first<{ c: number }>()
+            )
+        : db
+            .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
+            .bind('pending', row.created_at)
+            .first<{ c: number }>()
+      );
       queueDepth = q?.c ?? 0;
     } catch {
       queueDepth = 0;

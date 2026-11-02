@@ -2,6 +2,37 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+async function checkIngredientTenant(
+  db: any,
+  id: string,
+  row: Record<string, unknown>,
+  tenantId: string
+): Promise<boolean> {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    return matchesTenantRow(row, tenantId);
+  }
+  const invRow = (await db
+    .prepare('SELECT id, tenant_id FROM inventory_items WHERE id = ?')
+    .bind(id)
+    .first()
+    .catch(() => null)) as Record<string, unknown> | null;
+  if (invRow && 'tenant_id' in invRow && invRow.tenant_id !== undefined) {
+    return matchesTenantRow(invRow, tenantId);
+  }
+  return tenantId === 'default';
+}
 
 function mapToCanonicalTxType(type: string, quantity: number): string {
   if (type === 'in' || type === 'out' || type === 'waste' || type === 'reserve' || type === 'release') {
@@ -32,11 +63,14 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/movements - List stock movements
   app.openapi(InventoryRoutes.movements.list as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
     const limit = query.limit || 20;
     const offset = (page - 1) * limit;
+    const fetchLimit = tenantId === '*' ? limit : Math.max(limit * 10, 500);
+    const fetchOffset = tenantId === '*' ? offset : 0;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -83,13 +117,13 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
            LEFT JOIN inventory_items ii ON sm.ingredient_id = ii.id
            ${aliasWhere}
            ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
-        ).bind(...params, limit, offset).all()) as { results: any[] };
+        ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
         itemsResults = items.results || [];
       } catch {
         try {
           const items = (await db.prepare(
             `SELECT * FROM stock_movements ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-          ).bind(...params, limit, offset).all()) as { results: any[] };
+          ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
           itemsResults = items.results || [];
         } catch {
           itemsResults = [];
@@ -114,12 +148,24 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
              LEFT JOIN inventory_items i ON sm.item_id = i.id
              ${aliasWhere}
              ORDER BY sm.created_at DESC LIMIT ? OFFSET ?`
-          ).bind(...canonicalParams, limit, offset).all()) as { results: any[] };
+          ).bind(...canonicalParams, fetchLimit, fetchOffset).all()) as { results: any[] };
           itemsResults = items.results || [];
         } catch {
           itemsResults = [];
         }
       }
+    }
+
+    if (tenantId !== '*' && itemsResults.length > 0) {
+      const checked: any[] = [];
+      for (const row of itemsResults) {
+        const ingId = String(row.ingredient_id || row.item_id || '');
+        if (!ingId || (await checkIngredientTenant(db, ingId, row, tenantId))) {
+          checked.push(row);
+        }
+      }
+      total = checked.length;
+      itemsResults = checked.slice(offset, offset + limit);
     }
 
     return c.json({
@@ -132,6 +178,7 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/inventory/movements - Create stock movement (adjustment)
   app.openapi(InventoryRoutes.movements.create as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -149,7 +196,7 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         usingCanonical = true;
       }
     }
-    if (!ingredient) {
+    if (!ingredient || !(await checkIngredientTenant(db, body.ingredientId, ingredient, tenantId))) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
 
@@ -159,11 +206,31 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Insufficient stock' }, 400);
     }
 
-    const id = `mov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const movRand = new Uint8Array(4);
+    crypto.getRandomValues(movRand);
+    const id = `mov_${Date.now()}_${Array.from(movRand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
     const canonicalTxType = mapToCanonicalTxType(body.type, body.quantity);
     const canonicalRefType = mapToCanonicalRefType(body.referenceType);
 
     if (!usingCanonical) {
+      if (body.quantity < 0) {
+        const upd = await db.prepare(
+          'UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
+        ).bind(body.quantity, now, body.ingredientId, body.quantity).run();
+        if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          return c.json({ success: false, error: 'Insufficient stock' }, 400);
+        }
+        await db.prepare(
+          'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
+        ).bind(body.quantity, now, body.ingredientId, body.quantity).run().catch(() => {});
+      } else {
+        await db.prepare('UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?')
+          .bind(newStock, now, body.ingredientId).run();
+
+        await db.prepare('UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?')
+          .bind(newStock, now, body.ingredientId).run().catch(() => {});
+      }
+
       await db.prepare(
         `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -178,12 +245,6 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         user.id,
         now
       ).run();
-
-      await db.prepare('UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?')
-        .bind(newStock, now, body.ingredientId).run();
-
-      await db.prepare('UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?')
-        .bind(newStock, now, body.ingredientId).run().catch(() => {});
 
       await db.prepare(
         `INSERT OR IGNORE INTO inventory_transactions (
@@ -203,6 +264,18 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.ingredientId
       ).run().catch(() => {});
     } else {
+      if (body.quantity < 0) {
+        const upd = await db.prepare(
+          'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
+        ).bind(body.quantity, now, body.ingredientId, body.quantity).run();
+        if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          return c.json({ success: false, error: 'Insufficient stock' }, 400);
+        }
+      } else {
+        await db.prepare('UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?')
+          .bind(newStock, now, body.ingredientId).run();
+      }
+
       await db.prepare(
         `INSERT INTO inventory_transactions (
           id, item_id, type, quantity, reference_type, reference_id, notes, created_at
@@ -217,9 +290,6 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         body.notes || body.type || null,
         now
       ).run();
-
-      await db.prepare('UPDATE inventory_items SET current_stock = ?, updated_at = ? WHERE id = ?')
-        .bind(newStock, now, body.ingredientId).run();
     }
 
     const metaStr = JSON.stringify(body);
@@ -233,7 +303,7 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         await db.prepare(
           `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(`audit_${Date.now()}`, user.id, 'stock_movement_create', 'stock_movement', id, metaStr, now).run();
+        ).bind(`audit_${crypto.randomUUID()}`, user.id, 'stock_movement_create', 'stock_movement', id, metaStr, now).run();
       } catch {
         try {
           await db.prepare(

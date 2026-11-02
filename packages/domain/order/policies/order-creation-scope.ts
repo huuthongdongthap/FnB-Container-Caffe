@@ -41,23 +41,26 @@ export async function resolveOrderCreationScope(
 export async function resolveOrderCreationTable(db: D1Like, tableId: string | undefined, tenantId: string) {
   if (!tableId?.trim()) return null;
   const code = tableId.trim();
-  const byNumber = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+  const tenantClause = tenantId === 'default'
+    ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+    : 'AND tenant_id = ?';
+  const byNumber = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
     .bind(code, tenantId).first<{ id: string }>();
   let table = byNumber || (code !== code.toUpperCase()
-    ? await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+    ? await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
       .bind(code.toUpperCase(), tenantId).first<{ id: string }>() : null)
-    || await db.prepare('SELECT id FROM cafe_tables WHERE id = ? AND tenant_id = ?')
+    || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
       .bind(code, tenantId).first<{ id: string }>();
   if (!table) {
     const slugOrPaddedMatch = code.match(/^[tT]?0*([1-9]\d*)(?:-[a-z0-9-]+)?$/i);
     if (slugOrPaddedMatch) {
       const normalizedNumber = slugOrPaddedMatch[1];
       const paddedId = `t${normalizedNumber.padStart(2, '0')}`;
-      table = await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+      table = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
         .bind(normalizedNumber, tenantId).first<{ id: string }>()
-        || await db.prepare('SELECT id FROM cafe_tables WHERE table_number = ? AND tenant_id = ?')
+        || await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
           .bind(Number(normalizedNumber), tenantId).first<{ id: string }>()
-        || await db.prepare('SELECT id FROM cafe_tables WHERE id = ? AND tenant_id = ?')
+        || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
           .bind(paddedId, tenantId).first<{ id: string }>();
     }
   }

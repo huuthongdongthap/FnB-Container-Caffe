@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId, matchesTenantRow } from '../../lib/db';
 import { createErpnextClient } from '../../clients/erpnext-client';
 import type { Env } from '../../types/env';
 
@@ -17,7 +18,7 @@ const CustomerSyncSchema = z.object({
   tax_id: z.string().optional().or(z.literal(''))
 });
 
-const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
+const allow = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
 
 export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/customers — list with pagination
@@ -28,31 +29,46 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
         return c.json({ success: false, error: 'Database not available' }, 503);
       }
 
-      const page = parseInt(c.req.query('page') || '1', 10);
-      const limit = parseInt(c.req.query('limit') || '50', 10);
+      const tenantId = getTenantId(c);
+      const rawPage = parseInt(c.req.query('page') || '1', 10);
+      const rawLimit = parseInt(c.req.query('limit') || '50', 10);
+      const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+      const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 200) : 50;
       const offset = (page - 1) * limit;
 
       let results: any[] = [];
       let total = 0;
       try {
-        const res = await db
-          .prepare(
-            'SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
-          )
-          .bind(limit, offset)
-          .all<{ id: string; name: string; phone: string | null; email: string | null; tax_id: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
-        results = res.results || [];
-        const countRes = await db.prepare('SELECT COUNT(*) as total FROM customers').first<{ total: number }>();
-        total = Number(countRes?.total ?? 0);
-      } catch {
-        try {
+        if (tenantId !== '*') {
           const res = await db
             .prepare(
-              'SELECT id, name, phone, email, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
+              "SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, tenant_id, created_at, updated_at FROM customers WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            )
+            .bind(tenantId, limit, offset)
+            .all<Record<string, unknown>>();
+          results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
+          const countRes = await db.prepare("SELECT COUNT(*) as total FROM customers WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ total: number }>();
+          total = Number(countRes?.total ?? results.length);
+        } else {
+          const res = await db
+            .prepare(
+              'SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, created_at, updated_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
             )
             .bind(limit, offset)
             .all();
           results = res.results || [];
+          const countRes = await db.prepare('SELECT COUNT(*) as total FROM customers').first<{ total: number }>();
+          total = Number(countRes?.total ?? 0);
+        }
+      } catch {
+        try {
+          const res = await db
+            .prepare(
+              'SELECT * FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
+            )
+            .bind(limit, offset)
+            .all<Record<string, unknown>>();
+          results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
           total = results.length;
         } catch {
           results = [];
@@ -61,9 +77,8 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
       }
 
       return c.json({ success: true, data: results, pagination: { page, limit, total } });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to list customers' }, 500);
     }
   });
 
@@ -76,6 +91,7 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
         return c.json({ success: false, error: 'Validation failed', details: parsed.error.flatten() }, 400);
       }
       const data = parsed.data;
+      const tenantId = getTenantId(c);
 
       if (c.env.ERPNEXT_MOCK === 'true') {
         return c.json({
@@ -94,19 +110,29 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
 
       const db = c.env.AURA_DB;
       if (db && data.name) {
-        c.executionCtx.waitUntil(
-          db
-            .prepare('UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ?')
-            .bind((result.data as Record<string, string>)?.name || null, 'synced', data.name)
-            .run()
-            .catch(() => {})
-        );
+        const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+        const updatePromise = db
+          .prepare("UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+          .bind((result.data as Record<string, string>)?.name || null, 'synced', data.name, effectiveTenant)
+          .run()
+          .catch(() =>
+            effectiveTenant === 'default'
+              ? db.prepare('UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ?')
+                  .bind((result.data as Record<string, string>)?.name || null, 'synced', data.name)
+                  .run()
+                  .catch(() => {})
+              : undefined
+          );
+        try {
+          c.executionCtx.waitUntil(updatePromise);
+        } catch {
+          await updatePromise;
+        }
       }
 
       return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to sync customer' }, 500);
     }
   });
 
@@ -114,24 +140,24 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
   app.get('/api/erpnext/customers/:id', allow, async(c) => {
     try {
       const id = c.req.param('id');
+      const tenantId = getTenantId(c);
       const db = c.env.AURA_DB;
       if (!db) {
         return c.json({ success: false, error: 'Database not available' }, 503);
       }
 
       const customer = await db
-        .prepare('SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, erpnext_last_synced, created_at, updated_at FROM customers WHERE id = ?')
+        .prepare('SELECT * FROM customers WHERE id = ?')
         .bind(id)
-        .first<Record<string, string | number | null>>();
+        .first<Record<string, unknown>>();
 
-      if (!customer) {
+      if (!customer || !matchesTenantRow(customer, tenantId)) {
         return c.json({ success: false, error: 'Customer not found' }, 404);
       }
 
       return c.json({ success: true, data: customer });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to fetch customer' }, 500);
     }
   });
 }

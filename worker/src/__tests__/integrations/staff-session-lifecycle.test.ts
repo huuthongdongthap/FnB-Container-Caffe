@@ -78,9 +78,18 @@ describe('canonical Staff authentication', () => {
     expect((await f.request('/api/kds/orders', await generateJWT({ ...claims, authTime: now - 28800 }, TEST_JWT_SECRET, 28800, now - 28800))).status).toBe(401);
     expect((await f.request('/api/kds/orders')).status).toBe(401);
   });
-  it.each(['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef'])('keeps operational role %s usable', async role => {
+  it.each(['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef'])('keeps operational role %s usable', async role => {
     f.sqlite.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, 'staff');
     expect((await f.request('/api/kds/orders', await f.token())).status).toBe(200);
+  });
+  it('supports canonical shipper staff session on /mobile/me and /api/orders while blocking KDS queue', async () => {
+    f.sqlite.prepare('UPDATE users SET role = ? WHERE id = ?').run('shipper', 'staff');
+    const tok = await f.token('staff');
+    const claims = await verifyJWT(tok, TEST_JWT_SECRET);
+    expect(claims!.exp! - claims!.iat!).toBe(28800);
+    expect((await f.request('/mobile/me', tok)).status).toBe(200);
+    expect((await f.request('/api/orders', tok)).status).toBe(200);
+    expect((await f.request('/api/kds/orders', tok)).status).toBe(403);
   });
   it('detects tenant and role changes even when an old updater forgot to bump the version', async () => {
     const token = await f.token();

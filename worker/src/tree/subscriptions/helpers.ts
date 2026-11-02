@@ -1,7 +1,10 @@
 // Extracted helper functions from routes/subscriptions.ts
 
 export function generateId(prefix: string, len = 8): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 2 + len);
+  const bytes = new Uint8Array(Math.max(4, Math.ceil(len / 2)));
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, len);
+  return prefix + Date.now().toString(36) + rand;
 }
 
 export function today(): string {

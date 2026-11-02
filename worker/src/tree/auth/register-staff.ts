@@ -38,6 +38,7 @@ export async function registerStaff(request: Request, env: Record<string, unknow
     const normalizedRoleInput = (role || '').trim().toLowerCase();
     const allowedStaffRoles = new Set([
       'manager',
+      'supervisor',
       'waiter',
       'staff',
       'kitchen',
@@ -49,6 +50,9 @@ export async function registerStaff(request: Request, env: Record<string, unknow
     const assignedRole = allowedStaffRoles.has(normalizedRoleInput)
       ? normalizedRoleInput
       : 'staff';
+    if (assignedRole === 'admin' && session.account.role !== 'admin') {
+      return errorResponse('Không đủ quyền tạo tài khoản admin', 403);
+    }
     const effectiveTenantId = actorTenant;
     const now = new Date().toISOString();
 

@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId, matchesTenantRow } from '../../lib/db';
 import { createErpnextClient } from '../../clients/erpnext-client';
 import type { Env } from '../../types/env';
 
@@ -18,7 +19,9 @@ const ExpenseSyncSchema = z.object({
 });
 
 
-const allow = requireAuth(['owner', 'manager', 'staff', 'admin']);
+const DATE_FILTER_REGEX = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+const allow = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
 
 export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/expenses — list expenses with date filter
@@ -29,11 +32,16 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
         return c.json({ success: false, error: 'Database not available' }, 503);
       }
 
+      const tenantId = getTenantId(c);
       const from = c.req.query('from');
       const to = c.req.query('to');
-      const limit = parseInt(c.req.query('limit') || '100', 10);
+      if ((from && !DATE_FILTER_REGEX.test(from)) || (to && !DATE_FILTER_REGEX.test(to))) {
+        return c.json({ success: false, error: 'Invalid date filter' }, 400);
+      }
+      const rawLimit = parseInt(c.req.query('limit') || '100', 10);
+      const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 500) : 100;
 
-      let query = 'SELECT id, amount, category, date, description, erpnext_id, sync_status, created_at FROM expenses WHERE 1=1';
+      let query = 'SELECT * FROM expenses WHERE 1=1';
       const binds: unknown[] = [];
 
       if (from) {
@@ -51,16 +59,15 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
       let results: any[] = [];
       try {
         const stmt = db.prepare(query).bind(...binds);
-        const res = await stmt.all<{ id: string; amount: number; category: string; date: string; description: string | null; erpnext_id: string | null; sync_status: string; created_at: string }>();
-        results = res.results || [];
+        const res = await stmt.all<Record<string, unknown>>();
+        results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
       } catch {
         results = [];
       }
 
       return c.json({ success: true, data: results });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to list expenses' }, 500);
     }
   });
 
@@ -100,9 +107,8 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
       });
 
       return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg }, 500);
+    } catch {
+      return c.json({ success: false, error: 'Failed to sync expense' }, 500);
     }
   });
 }

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
-import { queryFirst, execute } from '../../lib/db';
+import { queryFirst, execute, getTenantId, matchesTenantRow as dbMatchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
 import {
   dindinCheckoutSchema,
@@ -14,15 +14,19 @@ import {
   type DindinContext,
 } from './types';
 
+function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  return dbMatchesTenantRow(row as Record<string, unknown>, tenantId);
+}
+
 export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /checkouts ──────────────────────────────────────────────────────────
   router.get('/checkouts', async (c) => {
     const statusFilter = c.req.query('status');
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
     let checkouts: Array<Record<string, unknown>> = [];
     try {
-      const { results } = await c.env.AURA_DB.prepare(
-        "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
-      ).all<{
+      let rows: Array<{
         id: string;
         customer_name: string | null;
         customer_phone: string | null;
@@ -31,9 +35,24 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         total: number | null;
         status: string | null;
         created_at: string | null;
-      }>();
+        tenant_id?: string | null;
+      }> = [];
+      try {
+        const res = await c.env.AURA_DB.prepare(
+          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+        ).all<typeof rows[number]>();
+        rows = res.results || [];
+      } catch {
+        const res = await c.env.AURA_DB.prepare(
+          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+        ).all<typeof rows[number]>();
+        rows = res.results || [];
+      }
 
-      for (const row of results || []) {
+      for (const row of rows) {
+        if (!matchesTenantRow(row, tenantId)) {
+          continue;
+        }
         const rowStatus = row.status || 'pending';
         if (statusFilter && statusFilter !== 'all' && rowStatus !== statusFilter) {
           continue;
@@ -83,6 +102,16 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
   // ── POST /checkout/:orderId/print ───────────────────────────────────────────
   router.post('/checkout/:orderId/print', async (c) => {
     const { orderId } = c.req.param();
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    let ordRow: { id: string; tenant_id?: string | null } | null = null;
+    try {
+      ordRow = await c.env.AURA_DB.prepare('SELECT id, tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      ordRow = await c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>().catch(() => null);
+    }
+    if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
     const printedAt = new Date().toISOString();
     await kvSet(c.env.AUTH_KV, `dindin:print:${orderId}`, JSON.stringify({ printed: true, printedAt }), 86400);
     return c.json({ success: true, orderId, printed: true, printedAt });
@@ -91,6 +120,16 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
   // ── POST /checkout/:orderId/qc ──────────────────────────────────────────────
   router.post('/checkout/:orderId/qc', async (c) => {
     const { orderId } = c.req.param();
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    let ordRow: { id: string; tenant_id?: string | null } | null = null;
+    try {
+      ordRow = await c.env.AURA_DB.prepare('SELECT id, tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      ordRow = await c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>().catch(() => null);
+    }
+    if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
     const checkedAt = new Date().toISOString();
     await kvSet(c.env.AUTH_KV, `dindin:qc:${orderId}`, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
     try {
@@ -205,7 +244,10 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         );
       }
 
-      const orderId = `DIN${Date.now().toString(36).toUpperCase()}`;
+      const randBytes = new Uint8Array(3);
+      crypto.getRandomValues(randBytes);
+      const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const orderId = `DIN${Date.now().toString(36).toUpperCase()}${randHex}`;
       const itemsJson = JSON.stringify(
         cart.items.map((i) => ({
           product_id: i.id ?? `dindin_${(i.name ?? '').replace(/\s+/g, '_').toLowerCase()}`,

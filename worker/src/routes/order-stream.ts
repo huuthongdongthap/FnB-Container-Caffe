@@ -13,6 +13,7 @@
 
 import { authenticateRequest } from '../lib/staff-session-auth';
 import { StaffSessionError } from '../lib/staff-session';
+import { getTenantId } from '../middleware/tenant';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { isTerminal, canAccessOrder, projectCustomerOrderPayload } from '@aura/domain-order';
@@ -38,8 +39,13 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
   if (!kv) return c.json({ error: 'KV not available' }, 500);
 
   const user = c.get('user') as { id?: string; role?: string; tenantId?: string } | undefined;
-  const staffTenant = user && user.role !== 'customer' ? (user.tenantId || 'default') : undefined;
-  const scope = staffTenant === undefined ? '' : ' AND tenant_id = ?';
+  const resolvedTenant = user && user.role !== 'customer' ? getTenantId(c) : undefined;
+  const staffTenant = resolvedTenant === '*' ? undefined : resolvedTenant;
+  const scope = staffTenant === undefined
+    ? ''
+    : staffTenant === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const values = staffTenant === undefined ? [orderId] : [orderId, staffTenant];
   const order = await db.prepare(`SELECT id, customer_id, status FROM orders WHERE id = ?${scope}`)
     .bind(...values).first<{ id: string; customer_id?: string | null; status: string }>();

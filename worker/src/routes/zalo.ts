@@ -26,7 +26,7 @@ interface ZaloEnv {
 
 // ── Router handler for /api/zalo webhooks ──
 
-export async function handleZaloRequest(request: Request, env: ZaloEnv): Promise<Response> {
+export async function handleZaloRequest(request: Request, env: ZaloEnv, resolvedTenantId?: string): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace('/api/zalo', '');
   const method = request.method;
@@ -50,7 +50,8 @@ export async function handleZaloRequest(request: Request, env: ZaloEnv): Promise
       const result = await notifyMember(env, {
         customer_id,
         template_key,
-        data
+        data,
+        tenantId: resolvedTenantId
       });
       return json({ success: result.ok, data: result });
     }

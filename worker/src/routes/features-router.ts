@@ -6,7 +6,7 @@ import { handleUpdateOrderStatus } from './orders-hono-handlers/kds-handlers';
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
-import { tenantMiddleware } from '../middleware/tenant';
+import { getTenantId, tenantMiddleware } from '../middleware/tenant';
 import { getAdminOrders, getStats } from '@aura/domain-order';
 import { paymentRouter, nowPaymentsIPN } from '@aura/domain-payment';
 import { refundRouter } from './refunds';
@@ -77,8 +77,8 @@ import type { Env } from '../types/env';
 
 export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Admin Protected (Kitchen/Barista/Chef scoped strictly to /api/admin/orders*)
-  const adminOrderAuth = requireAuth(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']);
-  const adminGeneralAuth = requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']);
+  const adminOrderAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier', 'shipper']);
+  const adminGeneralAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']);
   app.use('/api/admin/*', async (c, next) => {
     if (c.req.path === '/api/admin/orders' || c.req.path.startsWith('/api/admin/orders/')) {
       return adminOrderAuth(c, next);
@@ -87,31 +87,20 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   });
   app.get('/api/admin/orders', (c) => {
     const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
-    const isHQ = user?.role === 'owner' && (!user?.tenantId || user?.tenantId === 'default' || user?.tenantId === 'hq');
-    const effectiveTenant = isHQ ? (c.req.query('tenant_id') || undefined) : user?.tenantId;
+    const isHQ = (user?.role === 'owner' || user?.role === 'admin') && (!user?.tenantId || user?.tenantId === 'default' || user?.tenantId === 'hq');
+    const requestedTenant = c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || undefined;
+    const effectiveTenant = isHQ ? requestedTenant : (user?.tenantId || getTenantId(c));
     return getAdminOrders(c.req.raw, c.env, effectiveTenant);
   });
   // Every alias uses the same tenant-scoped state machine and compare-and-set.
   app.patch('/api/admin/orders/:id/status', handleUpdateOrderStatus);
   app.post('/api/admin/orders/:id/complete', (c) => handleUpdateOrderStatus(c, 'completed'));
-  app.get('/api/admin/customers', (c) => {
-    const user = c.get('user' as any) as { tenantId?: string } | undefined;
-    return getAdminCustomers(c.req.raw, c.env, user?.tenantId);
-  });
-  app.post('/api/admin/customers', requireAuth(['owner', 'manager', 'admin']), (c) => {
-    const user = c.get('user' as any) as { tenantId?: string } | undefined;
-    return createAdminCustomer(c.req.raw, c.env, user?.tenantId);
-  });
-  app.patch('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'admin']), (c) => {
-    const user = c.get('user' as any) as { tenantId?: string } | undefined;
-    return updateAdminCustomer(c.req.raw, c.env, c.req.param('id'), user?.tenantId);
-  });
-  app.delete('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'admin']), (c) => {
-    const user = c.get('user' as any) as { tenantId?: string } | undefined;
-    return deleteAdminCustomer(c.env, c.req.param('id'), user?.tenantId);
-  });
-  app.get('/api/admin/payments/stuck', requireAuth(['owner', 'manager', 'admin']), (c) => getStuckPayments(c.req.raw, c.env));
-  app.post('/api/admin/payments/:id/reconcile', requireAuth(['owner', 'admin', 'manager', 'cashier']), audit('payment_reconcile'), manualReconcilePayment);
+  app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env, getTenantId(c)));
+  app.post('/api/admin/customers', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => createAdminCustomer(c.req.raw, c.env, getTenantId(c)));
+  app.patch('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => updateAdminCustomer(c.req.raw, c.env, c.req.param('id'), getTenantId(c)));
+  app.delete('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => deleteAdminCustomer(c.env, c.req.param('id'), getTenantId(c)));
+  app.get('/api/admin/payments/stuck', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => getStuckPayments(c.req.raw, c.env, getTenantId(c)));
+  app.post('/api/admin/payments/:id/reconcile', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'cashier']), audit('payment_reconcile'), manualReconcilePayment);
   app.route('/api/admin/dindin', dindinRouter);
   app.route('/api/admin/sales', adminSalesRouter);
   app.route('/api/admin/metrics', adminMetrics);
@@ -119,9 +108,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   registerCronAdminRoutes(app);
 
   // Stats & Dashboard Overview
-  app.use('/api/stats', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
-  app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
-  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/stats', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.get('/api/stats', (c) => getStats(c.req.raw, c.env, getTenantId(c)));
+  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
   app.get('/api/dashboard/overview', handleOverview);
 
   // Payment & Refunds
@@ -135,7 +124,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/products', productsRouter);
   app.route('/api/catalog', catalogRouter);
   app.route('/api/tables', tablesRouter);
-  app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter', 'cashier']));
+  app.use('/api/table-sessions', requireAuth(['owner', 'staff', 'manager', 'supervisor', 'admin', 'waiter', 'cashier']));
+  app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager', 'supervisor', 'admin', 'waiter', 'cashier']));
   app.route('/api/table-sessions', tableSessionsRouter);
   app.route('/api/menu-modifiers', menuModifiersRouter);
   app.route('/api/kitchen-stations', kitchenStationsRouter);
@@ -155,17 +145,18 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/promotions', promotionsRouter);
   app.route('/api/signage', signageRouter);
   app.route('/api/pretix', pretixRouter);
-  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier']));
+  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']));
   reconciliationRoutes(app as any);
   app.route('/api/shifts', shiftsRouter);
-  app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));
+  app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));
   app.route('/api/campaigns', campaignsRouter);
-  app.use('/api/broadcast/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/broadcast/*', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
   app.route('/api/broadcast', broadcastRouter);
   app.route('/api/chat', chatRouter);
 
   // Analytics & Observability
-  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/analytics', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
   app.route('/api/analytics', analyticsRouter);
   registerVitalsRoute(app);
 
@@ -188,26 +179,34 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/loyalty', loyaltyRouter);
   app.route('/api/admin/loyalty', adminLoyaltyRouter);
   app.route('/api/admin-loyalty', adminLoyaltyRouter);
-  app.get('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'admin']), async (c) => {
-    const raw = await c.env.AUTH_KV?.get('config:notification_settings');
+  app.get('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
+    const rawTenant = getTenantId(c);
+    const effectiveTenant = rawTenant === '*' ? 'default' : rawTenant;
+    const tenantKey = `config:notification_settings:${effectiveTenant}`;
+    const raw =
+      (await c.env.AUTH_KV?.get(tenantKey)) ??
+      (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get('config:notification_settings') : null);
     const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     return c.json({
       autoNotifyNewOrder: Boolean(parsed.autoNotifyNewOrder),
       soundAlerts: Boolean(parsed.soundAlerts),
     });
   });
-  app.patch('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+  app.patch('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
+    const rawTenant = getTenantId(c);
+    const effectiveTenant = rawTenant === '*' ? 'default' : rawTenant;
+    const key = effectiveTenant === 'default' ? 'config:notification_settings' : `config:notification_settings:${effectiveTenant}`;
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-    const raw = await c.env.AUTH_KV?.get('config:notification_settings');
+    const raw = await c.env.AUTH_KV?.get(key);
     const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     const next = {
       autoNotifyNewOrder: typeof body.autoNotifyNewOrder === 'boolean' ? body.autoNotifyNewOrder : Boolean(prev.autoNotifyNewOrder),
       soundAlerts: typeof body.soundAlerts === 'boolean' ? body.soundAlerts : Boolean(prev.soundAlerts),
     };
-    await c.env.AUTH_KV?.put('config:notification_settings', JSON.stringify(next));
+    await c.env.AUTH_KV?.put(key, JSON.stringify(next));
     return c.json({ success: true, ...next });
   });
-  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier']), async (c) => {
+  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), async (c) => {
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
     const user = (c as unknown as { get: (k: string) => { id?: string } | undefined }).get('user');
     const key = `config:staff_notification_settings:${user?.id || 'default'}`;
@@ -220,12 +219,13 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     await c.env.AUTH_KV?.put(key, JSON.stringify(next));
     return c.json({ success: true, ...next });
   });
-  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/reports', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
   app.route('/api/reports', reportsRouter);
 
   // Inventory Items (domain-inventory)
   const inventoryItemsApp = new Hono<{ Bindings: Env }>();
-  inventoryItemsApp.use('/*', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
+  inventoryItemsApp.use('/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'admin']));
   inventoryCRUD(inventoryItemsApp as any);
   inventoryTransactions(inventoryItemsApp as any);
   inventorySnapshots(inventoryItemsApp as any);

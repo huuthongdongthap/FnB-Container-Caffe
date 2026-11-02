@@ -15,7 +15,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'customer' | 'staff' | 'manager' | 'owner' | 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'barista' | 'chef';
+  role: 'customer' | 'staff' | 'supervisor' | 'manager' | 'owner' | 'admin' | 'cashier' | 'waiter' | 'shipper' | 'kitchen' | 'barista' | 'chef';
   tenantId?: string;
   phone?: string;
 }

@@ -37,11 +37,14 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   const now = new Date().toISOString();
 
   // Atomic batch: seat the guest + create placeholder order together.
+  const tblTenantClause = tenantId === 'default'
+    ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+    : 'AND tenant_id = ?';
   let batchResult: unknown[];
   try {
     batchResult = await db.batch([
       db.prepare(
-        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND status = \'Available\''
+        `UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? ${tblTenantClause} AND status = 'Available'`
       ).bind(tableRow.id, tenantId),
       db.prepare(
         `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
@@ -55,7 +58,7 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   } catch {
     batchResult = await db.batch([
       db.prepare(
-        'UPDATE cafe_tables SET status = \'Occupied\' WHERE id = ? AND tenant_id = ? AND status = \'Available\''
+        `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblTenantClause} AND status = 'Available'`
       ).bind(tableRow.id, tenantId),
       db.prepare(
         `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)

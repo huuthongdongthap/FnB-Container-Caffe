@@ -11,7 +11,7 @@ import { requireStaff } from '../middleware/staff-auth';
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/pos/customer?phone=09xxxxxxxx
-posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
+posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
   const phone = c.req.query('phone')?.trim();
   if (!phone) {
     return errorResponse('Thiếu số điện thoại', 400);
@@ -23,9 +23,13 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
   }
 
   const db = c.env.AURA_DB;
-  const staff = c.get('staff' as any) as { tenantId?: string } | undefined;
-  const user = c.get('user' as any) as { tenantId?: string } | undefined;
-  const tenantId = staff?.tenantId || user?.tenantId || (typeof c.env.PILOT_TENANT_ID === 'string' && c.env.PILOT_TENANT_ID.trim() ? c.env.PILOT_TENANT_ID.trim() : 'default');
+  const staff = c.get('staff' as any) as { tenantId?: string; role?: string } | undefined;
+  const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
+  const actorRole = String(staff?.role || user?.role || '').toLowerCase();
+  const baseTenant = staff?.tenantId || user?.tenantId || (typeof c.env.PILOT_TENANT_ID === 'string' && c.env.PILOT_TENANT_ID.trim() ? c.env.PILOT_TENANT_ID.trim() : 'default');
+  const requestedTenant = c.req.query('tenant_id')?.trim() || c.req.header('X-Tenant-ID')?.trim();
+  const isHqSuperAdmin = (actorRole === 'owner' || actorRole === 'admin') && (baseTenant === 'default' || baseTenant === 'hq');
+  const tenantId = isHqSuperAdmin && requestedTenant ? requestedTenant : baseTenant;
 
   // Query customer + cashback wallet
   type PosCustomerRow = {
@@ -53,15 +57,15 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_earned, 0) AS total_earned,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND (? = '*' OR o.tenant_id = ? OR (? = 'default' AND (o.tenant_id IS NULL OR o.tenant_id = '')))) AS visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-        WHERE c.phone = ? AND (c.tenant_id = ? OR (? = 'default' AND c.tenant_id IS NULL))
+        WHERE c.phone = ? AND (? = '*' OR c.tenant_id = ? OR (? = 'default' AND (c.tenant_id IS NULL OR c.tenant_id = '')))
       `)
-      .bind(normalizedPhone, tenantId, tenantId)
+      .bind(tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId, tenantId)
       .first<PosCustomerRow>();
   } catch (err) {
-    const missingTenant = /no such column:\s*(?:c\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
+    const missingTenant = /no such column:\s*(?:c\.|o\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
     row = missingTenant
       ? await db
           .prepare(`
@@ -89,12 +93,12 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'staff', 'waiter', 
                    (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
             FROM customers c
             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-            WHERE c.phone = ? AND (c.tenant_id = ? OR (? = 'default' AND c.tenant_id IS NULL))
+            WHERE c.phone = ? AND (? = '*' OR c.tenant_id = ? OR (? = 'default' AND (c.tenant_id IS NULL OR c.tenant_id = '')))
           `)
-          .bind(normalizedPhone, tenantId, tenantId)
+          .bind(normalizedPhone, tenantId, tenantId, tenantId)
           .first<PosCustomerRow>();
   }
-  if (row && 'tenant_id' in row && row.tenant_id !== undefined && (row.tenant_id || 'default') !== tenantId) {
+  if (tenantId !== '*' && row && 'tenant_id' in row && row.tenant_id !== undefined && (row.tenant_id || 'default') !== tenantId) {
     row = null;
   }
 

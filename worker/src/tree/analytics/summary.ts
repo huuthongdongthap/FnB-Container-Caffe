@@ -24,6 +24,17 @@ export type GroupBy = 'hour' | 'day' | 'category' | 'payment';
 
 // ───── Queries ─────
 
+function buildTenantFilter(tenantId?: string, tableAlias?: string): { clause: string; binds: string[] } {
+  if (!tenantId || tenantId === '*') {
+    return { clause: '', binds: [] };
+  }
+  const col = tableAlias ? `${tableAlias}.tenant_id` : 'tenant_id';
+  if (tenantId === 'default') {
+    return { clause: ` AND (${col} = ? OR ${col} IS NULL)`, binds: [tenantId] };
+  }
+  return { clause: ` AND ${col} = ?`, binds: [tenantId] };
+}
+
 const AGGREGATE_SQL = `
   SELECT
     COUNT(*) AS total_orders,
@@ -40,9 +51,11 @@ const AGGREGATE_SQL = `
  */
 export async function getSummary(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number
+  days: number,
+  tenantId?: string
 ): Promise<SummaryMetrics> {
-  const row = await db.prepare(AGGREGATE_SQL).bind(days).first<SummaryMetrics>();
+  const tf = buildTenantFilter(tenantId);
+  const row = await db.prepare(`${AGGREGATE_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>();
   return {
     total_orders: row?.total_orders ?? 0,
     total_revenue: row?.total_revenue ?? 0,
@@ -58,10 +71,12 @@ export async function getSummary(
  */
 export async function getSummaryCompare(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number
+  days: number,
+  tenantId?: string
 ): Promise<{ current: SummaryMetrics; previous: SummaryMetrics }> {
+  const tf = buildTenantFilter(tenantId);
   const [current, previous] = await Promise.all([
-    db.prepare(AGGREGATE_SQL).bind(days).first<SummaryMetrics>(),
+    db.prepare(`${AGGREGATE_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>(),
     db.prepare(`
       SELECT
         COUNT(*) AS total_orders,
@@ -71,8 +86,8 @@ export async function getSummaryCompare(
       FROM orders
       WHERE status != 'cancelled'
         AND created_at >= datetime('now', '-' || ? || ' days')
-        AND created_at < datetime('now', '-' || ? || ' days')
-    `).bind(days * 2, days).first<SummaryMetrics>()
+        AND created_at < datetime('now', '-' || ? || ' days')${tf.clause}
+    `).bind(days * 2, days, ...tf.binds).first<SummaryMetrics>()
   ]);
 
   return {
@@ -150,25 +165,29 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
 export async function getGrouped(
   db: import('@cloudflare/workers-types').D1Database,
   groupBy: GroupBy,
-  days: number
+  days: number,
+  tenantId?: string
 ): Promise<GroupRow[]> {
-  const sql = GROUP_QUERIES[groupBy];
-  if (!sql) {
+  const baseSql = GROUP_QUERIES[groupBy];
+  if (!baseSql) {
     throw new Error(`Unknown group: ${groupBy}`);
   }
+  const tf = buildTenantFilter(tenantId, groupBy === 'category' ? 'o' : undefined);
+  const sql = tf.clause ? baseSql.replace(/GROUP BY/, `${tf.clause}\n    GROUP BY`) : baseSql;
 
   let rows: GroupRow[] = [];
   try {
-    const { results } = await db.prepare(sql).bind(days).all<GroupRow>();
+    const { results } = await db.prepare(sql).bind(days, ...tf.binds).all<GroupRow>();
     rows = results || [];
   } catch {
     if (groupBy === 'category') {
       try {
+        const orderTf = buildTenantFilter(tenantId);
         const { results: orderRows } = await db.prepare(`
           SELECT items FROM orders
           WHERE status != 'cancelled'
-            AND created_at >= datetime('now', '-' || ? || ' days')
-        `).bind(days).all<{ items: string }>();
+            AND created_at >= datetime('now', '-' || ? || ' days')${orderTf.clause}
+        `).bind(days, ...orderTf.binds).all<{ items: string }>();
         const catMap = new Map<string, { value: number; count: number }>();
         for (const r of orderRows || []) {
           try {

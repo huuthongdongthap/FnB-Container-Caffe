@@ -11,6 +11,7 @@
 
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import { requireStaff } from 'worker/src/middleware/staff-auth';
 import { stationTicketsRouter } from './kitchen-station-tickets';
 
@@ -39,7 +40,7 @@ export interface OrderItemStation {
 const kitchenStationsRouter = new Hono<{ Bindings: Env }>();
 
 // All station management + KDS views require staff auth.
-kitchenStationsRouter.use('/*', requireStaff(['owner', 'manager', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']));
+kitchenStationsRouter.use('/*', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'waiter', 'cashier']));
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);
@@ -52,14 +53,18 @@ function makeId(prefix: string): string {
 
 kitchenStationsRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const { results } = await db.prepare(
     'SELECT * FROM kitchen_stations ORDER BY sort_order, name'
   ).all<KitchenStation>();
-  return c.json({ success: true, data: results });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  return c.json({ success: true, data: filtered });
 });
 
-kitchenStationsRouter.post('/', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
+kitchenStationsRouter.post('/', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
+  const rawTenantId = getTenantId(c);
+  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json() as Record<string, unknown>;
   const name = String(body.name || '').trim();
   const slug = String(body.slug || '').trim();
@@ -67,19 +72,29 @@ kitchenStationsRouter.post('/', requireStaff(['owner', 'manager', 'staff', 'admi
   if (!slug) return c.json({ success: false, error: 'slug is required' }, 400);
   const id = makeId('KS');
   const now = new Date().toISOString();
-  await db.prepare(
-    `INSERT INTO kitchen_stations (id, name, slug, sort_order, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, name, slug, Number(body.sort_order) || 0, body.active === false ? 0 : 1, now, now).run();
+  const sortOrder = Number(body.sort_order) || 0;
+  const active = body.active === false ? 0 : 1;
+  try {
+    await db.prepare(
+      `INSERT INTO kitchen_stations (id, name, slug, sort_order, active, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, name, slug, sortOrder, active, tenantId, now, now).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO kitchen_stations (id, name, slug, sort_order, active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, name, slug, sortOrder, active, now, now).run();
+  }
   const st = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<KitchenStation>();
   return c.json({ success: true, data: st }, 201);
 });
 
-kitchenStationsRouter.patch('/:id', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
+kitchenStationsRouter.patch('/:id', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
-  const existing = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<KitchenStation>();
-  if (!existing) return c.json({ success: false, error: 'Station not found' }, 404);
+  const existing = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!existing || !matchesTenantRow(existing, tenantId)) return c.json({ success: false, error: 'Station not found' }, 404);
   const body = await c.req.json() as Record<string, unknown>;
   const now = new Date().toISOString();
   const activeVal =
@@ -105,11 +120,14 @@ kitchenStationsRouter.patch('/:id', requireStaff(['owner', 'manager', 'staff', '
   return c.json({ success: true, data: st });
 });
 
-kitchenStationsRouter.delete('/:id', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
+kitchenStationsRouter.delete('/:id', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
-  const existing = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(c.req.param('id')).first<{ id: string }>();
-  if (!existing) return c.json({ success: false, error: 'Station not found' }, 404);
-  await db.prepare('DELETE FROM kitchen_stations WHERE id = ?').bind(c.req.param('id')).run();
+  const tenantId = getTenantId(c);
+  const id = c.req.param('id');
+  const existing = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!existing || !matchesTenantRow(existing, tenantId)) return c.json({ success: false, error: 'Station not found' }, 404);
+  await db.prepare('DELETE FROM category_stations WHERE station_id = ?').bind(id).run().catch(() => null);
+  await db.prepare('DELETE FROM kitchen_stations WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
 
@@ -117,36 +135,57 @@ kitchenStationsRouter.delete('/:id', requireStaff(['owner', 'manager', 'staff', 
 
 kitchenStationsRouter.get('/categories', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const { results } = await db.prepare(
-    `SELECT cs.category_id, cs.station_id, ks.name AS station_name
+    `SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id AS tenant_id
      FROM category_stations cs
      JOIN kitchen_stations ks ON ks.id = cs.station_id
      ORDER BY ks.name, cs.category_id`
-  ).all<{ category_id: string; station_id: string; station_name: string }>();
-  return c.json({ success: true, data: results });
+  ).all<Record<string, unknown>>().catch(() =>
+    db.prepare(
+      `SELECT cs.category_id, cs.station_id, ks.name AS station_name
+       FROM category_stations cs
+       JOIN kitchen_stations ks ON ks.id = cs.station_id
+       ORDER BY ks.name, cs.category_id`
+    ).all<Record<string, unknown>>()
+  );
+  const filtered = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+  return c.json({ success: true, data: filtered });
 });
 
-kitchenStationsRouter.post('/categories', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
+kitchenStationsRouter.post('/categories', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const body = await c.req.json() as Record<string, unknown>;
   const categoryId = String(body.category_id || '').trim();
   const stationId = String(body.station_id || '').trim();
   if (!categoryId || !stationId) {
     return c.json({ success: false, error: 'category_id and station_id are required' }, 400);
   }
-  const station = await db.prepare('SELECT id FROM kitchen_stations WHERE id = ?').bind(stationId).first<{ id: string }>();
-  if (!station) return c.json({ success: false, error: 'Station not found' }, 404);
+  const station = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(stationId).first<Record<string, unknown>>();
+  if (!station || !matchesTenantRow(station, tenantId)) return c.json({ success: false, error: 'Station not found' }, 404);
+  const category = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).first<Record<string, unknown>>().catch(() => null);
+  if (category && !matchesTenantRow(category, tenantId)) {
+    return c.json({ success: false, error: 'Category not found' }, 404);
+  }
   await db.prepare(
     'INSERT OR REPLACE INTO category_stations (category_id, station_id) VALUES (?, ?)'
   ).bind(categoryId, stationId).run();
   return c.json({ success: true });
 });
 
-kitchenStationsRouter.delete('/categories/:categoryId/:stationId', requireStaff(['owner', 'manager', 'staff', 'admin']), async (c) => {
+kitchenStationsRouter.delete('/categories/:categoryId/:stationId', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+  const categoryId = c.req.param('categoryId');
+  const stationId = c.req.param('stationId');
+  const station = await db.prepare('SELECT * FROM kitchen_stations WHERE id = ?').bind(stationId).first<Record<string, unknown>>().catch(() => null);
+  if (!station || !matchesTenantRow(station, tenantId)) {
+    return c.json({ success: false, error: 'Station not found' }, 404);
+  }
   await db.prepare(
     'DELETE FROM category_stations WHERE category_id = ? AND station_id = ?'
-  ).bind(c.req.param('categoryId'), c.req.param('stationId')).run();
+  ).bind(categoryId, stationId).run();
   return c.json({ success: true });
 });
 

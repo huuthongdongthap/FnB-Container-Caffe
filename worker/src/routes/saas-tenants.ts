@@ -31,7 +31,10 @@ function mapRow(row: Record<string, unknown>): SaasTenant {
 }
 
 function generateId(): string {
-  return `tenant_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `tenant_${Date.now()}_${rand}`;
 }
 
 function generateSlug(name: string): string {

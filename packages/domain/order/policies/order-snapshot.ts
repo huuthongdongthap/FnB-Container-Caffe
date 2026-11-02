@@ -68,6 +68,7 @@ export async function calculateOrderSnapshot(
         modifiers: rawItem.modifiers,
         now,
         channelDeltas: input.channelDeltas,
+        tenantId: input.tenantId,
       });
 
       if (!resolved.available) {

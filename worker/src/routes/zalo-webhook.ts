@@ -16,20 +16,28 @@ const log = createLogger({ route: 'zalo-webhook' });
 export const zaloWebhookRouter = new Hono<{ Bindings: Env }>();
 
 const zaloWebhookSchema = z.object({
-  event_name: z.string().default('user_send_text'),
-  app_id: z.string().optional(),
+  event_name: z.string().max(64).default('user_send_text'),
+  app_id: z.string().max(64).optional(),
   sender: z.object({
-    id: z.string()
+    id: z.string().max(64)
   }).optional(),
   recipient: z.object({
-    id: z.string()
+    id: z.string().max(64)
   }).optional(),
   message: z.object({
-    text: z.string().default(''),
-    msg_id: z.string().optional()
+    text: z.string().max(1000).default(''),
+    msg_id: z.string().max(64).optional()
   }).optional(),
-  user_phone: z.string().optional()
+  user_phone: z.string().max(20).optional()
 });
+
+const zaloSimulateSchema = z.object({
+  text: z.string().max(500).optional(),
+  phone: z.string().max(20).optional(),
+  user_id: z.string().max(64).optional()
+});
+
+const ZALO_CHALLENGE_RE = /^[A-Za-z0-9._-]{1,128}$/;
 
 function constantTimeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
@@ -83,7 +91,11 @@ async function verifyZaloSignature(
 // GET /api/webhooks/zalo — Webhook verification challenge
 zaloWebhookRouter.get('/', (c) => {
   const challenge = c.req.query('challenge');
-  if (challenge) {
+  if (challenge !== undefined) {
+    if (!ZALO_CHALLENGE_RE.test(challenge)) {
+      return c.json({ success: false, error: 'Invalid challenge' }, 400);
+    }
+    c.header('X-Content-Type-Options', 'nosniff');
     return c.text(challenge);
   }
   return c.json({ success: true, status: 'Zalo webhook active' });
@@ -137,7 +149,10 @@ zaloWebhookRouter.post('/', async (c) => {
     return c.json({ success: true, message: 'Event ignored or empty text' });
   }
 
-  const tenantId = getTenantId(c);
+  const rawTenant = c.get('user' as never)
+    ? getTenantId(c)
+    : (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+  const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 
@@ -185,13 +200,20 @@ zaloWebhookRouter.post(
     const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
     const isExplicitDev = !isProd && (c.env?.ENVIRONMENT === 'development' || c.env?.ENVIRONMENT === 'test');
     if (!isExplicitDev || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'staff', 'admin'])(c, next);
+      return requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin'])(c, next);
     }
     return next();
   },
   async (c) => {
-    const body = await c.req.json().catch(() => ({})) as { text?: string; phone?: string; user_id?: string };
-    const tenantId = getTenantId(c);
+    const rawBody = await c.req.json().catch(() => ({}));
+    const parsed = zaloSimulateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid simulation payload' }, 400);
+    }
+    const body = parsed.data;
+    const tenantId = c.get('user' as never)
+      ? getTenantId(c)
+      : ((c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim() || 'default');
     const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
     const aiBinding = (c.env as Record<string, unknown>).AI;
 

@@ -213,6 +213,8 @@ export async function createLocalRuntime() {
       ['staff-default', 'staff', 'default'],
       ['cashier-default', 'cashier', 'default'],
       ['kitchen-default', 'kitchen', 'default'],
+      ['supervisor-default', 'supervisor', 'default'],
+      ['shipper-default', 'shipper', 'default'],
       ['staff-a', 'staff', 'cafe-a'],
       ['cashier-a', 'cashier', 'cafe-a'],
     ];
@@ -222,6 +224,17 @@ export async function createLocalRuntime() {
       await db.prepare('INSERT INTO users (id,name,role,tenant_id) VALUES (?,?,?,?)').bind(id, id, role, tenantId).run();
       await kv.put(`user:${id}@local-review.test`, JSON.stringify({ id, email: `${id}@local-review.test`, name: id, role, password }));
     }
+    const pinSalt = Buffer.from('1122334455667788', 'hex');
+    const pinHash = `pin$pbkdf2$100000$${pinSalt.toString('base64')}$${pbkdf2Sync('1234', pinSalt, 100000, 32, 'sha256').toString('base64')}`;
+    await db.prepare('INSERT INTO staff_devices (id,staff_id,device_name,device_token,pin_hash,role) VALUES (?,?,?,?,?,?)')
+      .bind('dev-staff-1', 'staff-default', 'Staff Pad', 'audit-device-staff', pinHash, 'staff').run();
+    await db.prepare('INSERT INTO staff_devices (id,staff_id,device_name,device_token,pin_hash,role) VALUES (?,?,?,?,?,?)')
+      .bind('dev-sup-1', 'supervisor-default', 'Supervisor Pad', 'audit-device-supervisor', pinHash, 'supervisor').run();
+    await db.prepare('INSERT INTO customers (id,email,name,phone,loyalty_points,loyalty_tier,tenant_id) VALUES (?,?,?,?,?,?,?)')
+      .bind('cust-review-1', 'customer-default@local-review.test', 'Khách Kiểm Thử', '0908887776', 120, 'silver', 'default').run();
+    await kv.put('user:customer-default@local-review.test', JSON.stringify({
+      id: 'cust-review-1', email: 'customer-default@local-review.test', name: 'Khách Kiểm Thử', role: 'customer', password,
+    }));
     return { mf, url, db, kv, scratch, providerRequests, deniedNetwork,
       setProviderDelay: ms => { providerDelayMs = ms; }, close: () => mf.dispose() };
   } catch (error) {

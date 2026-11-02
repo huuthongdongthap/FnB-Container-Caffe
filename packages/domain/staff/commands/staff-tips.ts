@@ -10,14 +10,16 @@
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { requireAuth } from 'worker/src/middleware/auth';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import type { StaffTipRow } from '../model/staff-types';
 
 const staffTipsRouter = new Hono<{ Bindings: Env }>();
-staffTipsRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'admin', 'waiter', 'cashier', 'barista', 'chef', 'kitchen']));
+staffTipsRouter.use('/*', requireAuth(['owner', 'staff', 'manager', 'supervisor', 'admin', 'waiter', 'cashier', 'barista', 'chef', 'kitchen']));
 
 // GET /api/staff-tips — daily tip rollup, filterable by staff / date
 staffTipsRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const date = c.req.query('date') || new Date().toISOString().slice(0, 10);
   const staffId = c.req.query('staff_id');
 
@@ -36,6 +38,10 @@ staffTipsRouter.get('/', async (c) => {
     LEFT JOIN users u ON u.id = o.updated_by
     WHERE date(o.created_at) = ? AND o.tip_amount > 0`;
   const params: unknown[] = [date, date];
+  if (tenantId !== '*') {
+    query += " AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?";
+    params.push(tenantId);
+  }
   if (staffId) { query += ' AND o.updated_by = ?'; params.push(staffId); }
   query += ' GROUP BY COALESCE(o.updated_by, \'unassigned\') ORDER BY tip_total DESC';
 
@@ -47,6 +53,7 @@ staffTipsRouter.get('/', async (c) => {
     return c.json({ success: true, data: rows, summary: { date, tip_total: tipTotal, staff_count: rows.length } });
   } catch {
     try {
+      const fallbackParams: unknown[] = [date, date];
       let fallbackQuery = `SELECT
           COALESCE(o.updated_by, 'unassigned') AS staff_id,
           COALESCE(u.name, u.full_name, u.username, 'Unassigned') AS staff_name,
@@ -57,10 +64,10 @@ staffTipsRouter.get('/', async (c) => {
         FROM orders o
         LEFT JOIN users u ON u.id = o.updated_by
         WHERE date(o.created_at) = ? AND o.tip_amount > 0`;
-      if (staffId) fallbackQuery += ' AND o.updated_by = ?';
+      if (staffId) { fallbackQuery += ' AND o.updated_by = ?'; fallbackParams.push(staffId); }
       fallbackQuery += ' GROUP BY COALESCE(o.updated_by, \'unassigned\') ORDER BY tip_total DESC';
-      const { results } = await db.prepare(fallbackQuery).bind(...params).all<StaffTipRow>();
-      const rows = results || [];
+      const { results } = await db.prepare(fallbackQuery).bind(...fallbackParams).all<StaffTipRow>();
+      const rows = tenantId === 'default' || tenantId === '*' ? (results || []) : [];
       const tipTotal = rows.reduce((sum, r) => sum + Number(r.tip_total), 0);
       return c.json({ success: true, data: rows, summary: { date, tip_total: tipTotal, staff_count: rows.length } });
     } catch {
@@ -72,30 +79,62 @@ staffTipsRouter.get('/', async (c) => {
 // GET /api/staff-tips/:staffId — single staff member's tip history
 staffTipsRouter.get('/:staffId', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const staffId = c.req.param('staffId');
   const days = Number(c.req.query('days') || '30');
+  const today = new Date().toISOString().slice(0, 10);
   try {
-    const { results } = await db.prepare(
-      `SELECT date(o.created_at) AS date,
-              COALESCE(SUM(o.tip_amount), 0) AS tip_total,
-              COUNT(DISTINCT o.id) AS order_count
-       FROM orders o
-       WHERE o.updated_by = ? AND o.tip_amount > 0
-         AND date(o.created_at) >= date(?, '-' || ? || ' days')
-       GROUP BY date(o.created_at)
-       ORDER BY date DESC`
-    ).bind(staffId, new Date().toISOString().slice(0, 10), String(days)).all<{ date: string; tip_total: number; order_count: number }>();
+    const query = tenantId !== '*'
+      ? `SELECT date(o.created_at) AS date,
+                COALESCE(SUM(o.tip_amount), 0) AS tip_total,
+                COUNT(DISTINCT o.id) AS order_count
+         FROM orders o
+         WHERE o.updated_by = ? AND o.tip_amount > 0
+           AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?
+           AND date(o.created_at) >= date(?, '-' || ? || ' days')
+         GROUP BY date(o.created_at)
+         ORDER BY date DESC`
+      : `SELECT date(o.created_at) AS date,
+                COALESCE(SUM(o.tip_amount), 0) AS tip_total,
+                COUNT(DISTINCT o.id) AS order_count
+         FROM orders o
+         WHERE o.updated_by = ? AND o.tip_amount > 0
+           AND date(o.created_at) >= date(?, '-' || ? || ' days')
+         GROUP BY date(o.created_at)
+         ORDER BY date DESC`;
+    const binds = tenantId !== '*' ? [staffId, tenantId, today, String(days)] : [staffId, today, String(days)];
+    const { results } = await db.prepare(query).bind(...binds).all<{ date: string; tip_total: number; order_count: number }>();
     const rows = results || [];
     const total = rows.reduce((s, r) => s + Number(r.tip_total), 0);
     return c.json({ success: true, data: rows, staff_id: staffId, total_tip: total, days });
   } catch {
-    return c.json({ success: true, data: [], staff_id: staffId, total_tip: 0, days });
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: true, data: [], staff_id: staffId, total_tip: 0, days });
+    }
+    try {
+      const { results } = await db.prepare(
+        `SELECT date(o.created_at) AS date,
+                COALESCE(SUM(o.tip_amount), 0) AS tip_total,
+                COUNT(DISTINCT o.id) AS order_count
+         FROM orders o
+         WHERE o.updated_by = ? AND o.tip_amount > 0
+           AND date(o.created_at) >= date(?, '-' || ? || ' days')
+         GROUP BY date(o.created_at)
+         ORDER BY date DESC`
+      ).bind(staffId, today, String(days)).all<{ date: string; tip_total: number; order_count: number }>();
+      const rows = results || [];
+      const total = rows.reduce((s, r) => s + Number(r.tip_total), 0);
+      return c.json({ success: true, data: rows, staff_id: staffId, total_tip: total, days });
+    } catch {
+      return c.json({ success: true, data: [], staff_id: staffId, total_tip: 0, days });
+    }
   }
 });
 
 // POST /api/staff-tips/assign — attribute a tip to a staff member at checkout
 staffTipsRouter.post('/assign', async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const body = await c.req.json() as Record<string, unknown>;
   const orderId = String(body.order_id || '').trim();
   const staffId = String(body.staff_id || '').trim();
@@ -104,13 +143,10 @@ staffTipsRouter.post('/assign', async (c) => {
   if (!staffId) return c.json({ success: false, error: 'staff_id is required' }, 400);
   if (isNaN(tipAmount) || tipAmount < 0) return c.json({ success: false, error: 'tip_amount must be a non-negative number' }, 400);
 
-  let order: { id: string; tip_amount?: number } | null = null;
-  try {
-    order = await db.prepare('SELECT id, tip_amount FROM orders WHERE id = ?').bind(orderId).first<{ id: string; tip_amount: number }>();
-  } catch {
-    order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>().catch(() => null);
+  if (!order || !matchesTenantRow(order, tenantId)) {
+    return c.json({ success: false, error: 'Order not found' }, 404);
   }
-  if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
 
   const now = new Date().toISOString();
   try {

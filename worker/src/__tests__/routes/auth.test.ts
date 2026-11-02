@@ -289,4 +289,126 @@ describe('verifyEmail & registerWithVerification hardening', () => {
     );
     expect(meRes.status).toBe(200);
   });
+
+  it('getCurrentUser prevents conflicting KV email hijack and rejects cross-store D1 customer row', async() => {
+    const f = staffSessionFixture(); sqliteDatabases.push(f.sqlite);
+    f.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        email TEXT,
+        name TEXT,
+        phone TEXT,
+        tenant_id TEXT
+      );
+    `);
+    f.sqlite.prepare('INSERT INTO customers (id, email, name, phone, tenant_id) VALUES (?, ?, ?, ?, ?)')
+      .run('cust-canonical', 'member@aura.vn', 'Canonical Member', '0909000111', 'cafe-a');
+
+    await f.env.AUTH_KV.put(
+      'user:member@aura.vn',
+      JSON.stringify({ id: 'USR_impostor', email: 'member@aura.vn', name: 'Impostor', role: 'customer' })
+    );
+    const { generateJWT } = await import('../../lib/jwt');
+    const custToken = await generateJWT(
+      { id: 'cust-canonical', email: 'member@aura.vn', name: 'Canonical Member', role: 'customer', tenantId: 'cafe-a' },
+      f.env.JWT_SECRET,
+      '3600'
+    );
+
+    const sameStoreMe = await getCurrentUser(
+      mockRequestWithHeader('GET', '/api/auth/me', { Authorization: `Bearer ${custToken}` }),
+      f.env
+    );
+    expect(sameStoreMe.status).toBe(200);
+    const sameStoreBody = await sameStoreMe.json() as { user: { id: string; tenantId: string } };
+    expect(sameStoreBody.user.id).toBe('cust-canonical');
+    expect(sameStoreBody.user.tenantId).toBe('cafe-a');
+
+    f.sqlite.prepare('UPDATE customers SET tenant_id = ? WHERE id = ?').run('cafe-b', 'cust-canonical');
+    const crossStoreMe = await getCurrentUser(
+      mockRequestWithHeader('GET', '/api/auth/me', { Authorization: `Bearer ${custToken}` }),
+      f.env
+    );
+    expect(crossStoreMe.status).toBe(403);
+  });
+
+  it('resetPassword increments customer auth_version and revokes pre-reset customer JWTs', async() => {
+    const { resetPassword } = await import('../../routes/auth');
+    const env = createMockEnv({ RESET_KEY: 'test-reset-secret-key' });
+    const regRes = await registerUser(
+      mockRequest('POST', '/api/auth/register', { email: 'cust.reset@aura.vn', password: 'OldPassword1!', name: 'Reset Customer' }),
+      env
+    );
+    expect(regRes.status).toBe(201);
+    const { token: preResetToken } = await regRes.json() as { token: string };
+
+    const resetRes = await resetPassword(
+      mockRequestWithHeader(
+        'POST',
+        '/api/auth/reset-password',
+        { 'X-Reset-Key': 'test-reset-secret-key' },
+        { email: 'cust.reset@aura.vn', newPassword: 'NewPassword2!' }
+      ),
+      env
+    );
+    expect(resetRes.status).toBe(200);
+    const { token: postResetToken } = await resetRes.json() as { token: string };
+
+    const oldTokenMe = await getCurrentUser(
+      mockRequestWithHeader('GET', '/api/auth/me', { Authorization: `Bearer ${preResetToken}` }),
+      env
+    );
+    expect(oldTokenMe.status).toBe(401);
+
+    const newTokenMe = await getCurrentUser(
+      mockRequestWithHeader('GET', '/api/auth/me', { Authorization: `Bearer ${postResetToken}` }),
+      env
+    );
+    expect(newTokenMe.status).toBe(200);
+  });
+
+  it('OpenAPI login rejects inactive staff accounts and caps staff session TTL at 8h while keeping customer TTL separate', async() => {
+    const f = staffSessionFixture(); sqliteDatabases.push(f.sqlite);
+    const { openApiAuthRouter } = await import('../../routes/openapi-auth');
+    const ownerToken = await f.token('owner');
+
+    const regStaffRes = await openApiAuthRouter.request(
+      '/api/auth/register-staff',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'TTL Staff', email: 'ttl.staff@aura.vn', password: 'StaffPass123!', role: 'cashier' }),
+      },
+      f.env
+    );
+    expect(regStaffRes.status).toBe(201);
+    const { data: staffData } = (await regStaffRes.json()) as { data: { id: string } };
+
+    const staffLoginRes = await openApiAuthRouter.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'ttl.staff@aura.vn', password: 'StaffPass123!', rememberMe: true }),
+      },
+      f.env
+    );
+    expect(staffLoginRes.status).toBe(200);
+    const staffLoginBody = (await staffLoginRes.json()) as { data: { session: { expiresAt: string } } };
+    const staffTtlMs = new Date(staffLoginBody.data.session.expiresAt).getTime() - Date.now();
+    expect(staffTtlMs).toBeLessThanOrEqual(8 * 60 * 60 * 1000 + 5_000);
+    expect(staffTtlMs).toBeGreaterThan(7 * 60 * 60 * 1000);
+
+    f.sqlite.prepare('UPDATE users SET is_active = 0 WHERE id = ?').run(staffData.id);
+    const inactiveLoginRes = await openApiAuthRouter.request(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'ttl.staff@aura.vn', password: 'StaffPass123!' }),
+      },
+      f.env
+    );
+    expect(inactiveLoginRes.status).toBe(403);
+  });
 });

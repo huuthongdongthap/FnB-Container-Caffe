@@ -6,8 +6,17 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'tables-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'waiter', 'admin', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 const D1_TO_MOBILE_STATUS: Record<string, 'free' | 'occupied' | 'reserved'> = {
   available: 'free',
@@ -75,9 +84,7 @@ export async function getTablesMobile(
       const rawCafeRows = (cafeRes.results as Array<Record<string, unknown>>) || [];
       cafeTablesSucceeded = true;
       cafeTablesTotalRows = rawCafeRows.length;
-      rows = rawCafeRows.filter(
-        (r) => tenantId === '*' || !r.tenant_id || String(r.tenant_id) === tenantId
-      );
+      rows = rawCafeRows.filter((r) => matchesTenantRow(r, tenantId));
     } catch (err) {
       if (!String((err as Error)?.message || '').includes('no such table')) {
         throw err;
@@ -90,9 +97,7 @@ export async function getTablesMobile(
           .prepare('SELECT * FROM tables ORDER BY table_number ASC')
           .all();
         const rawLegacyRows = (legacyRes.results as Array<Record<string, unknown>>) || [];
-        rows = rawLegacyRows.filter(
-          (r) => tenantId === '*' || !r.tenant_id || String(r.tenant_id) === tenantId
-        );
+        rows = rawLegacyRows.filter((r) => matchesTenantRow(r, tenantId));
       } catch (err) {
         if (!String((err as Error)?.message || '').includes('no such table')) {
           throw err;
@@ -151,12 +156,12 @@ export async function updateTableStatus(
 
     if (!existing && useLegacyTable) {
       existing = await context.env.AURA_DB
-        .prepare('SELECT id, name, status, capacity FROM tables WHERE id = ?')
+        .prepare('SELECT * FROM tables WHERE id = ?')
         .bind(tableId)
         .first<Record<string, unknown>>();
     }
 
-    if (!existing || (tenantId !== '*' && existing.tenant_id && String(existing.tenant_id) !== tenantId)) {
+    if (!existing || !matchesTenantRow(existing, tenantId)) {
       return errorResponse('Bàn không tồn tại', 404);
     }
 

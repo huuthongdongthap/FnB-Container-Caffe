@@ -48,15 +48,28 @@ export interface StockDeductionResult {
 
 export async function getCanonicalRecipe(
   db: D1Database,
-  productId: string
+  productId: string,
+  tenantId?: string
 ): Promise<CanonicalRecipe | null> {
+  const effectiveTenant = tenantId && tenantId.trim() ? tenantId.trim() : undefined;
   let recipe: any = null;
-  try {
-    recipe = await db.prepare(
-      'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
-    ).bind(productId).first<any>();
-  } catch {
-    // Fallback when is_active column is absent
+  if (effectiveTenant && effectiveTenant !== '*') {
+    try {
+      recipe = await db.prepare(
+        "SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? LIMIT 1"
+      ).bind(productId, effectiveTenant).first<any>();
+    } catch {
+      // Fallback when is_active or tenant_id column is absent
+    }
+  }
+  if (!recipe) {
+    try {
+      recipe = await db.prepare(
+        'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+      ).bind(productId).first<any>();
+    } catch {
+      // Fallback when is_active column is absent
+    }
   }
   if (!recipe) {
     recipe = await db.prepare(
@@ -65,6 +78,10 @@ export async function getCanonicalRecipe(
   }
 
   if (!recipe) return null;
+  if (effectiveTenant && effectiveTenant !== '*' && 'tenant_id' in recipe && recipe.tenant_id !== undefined) {
+    const recTenant = recipe.tenant_id && String(recipe.tenant_id).trim() ? String(recipe.tenant_id).trim() : 'default';
+    if (recTenant !== effectiveTenant) return null;
+  }
 
   const rows = await db.prepare(
     `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
@@ -95,7 +112,8 @@ export async function getCanonicalRecipe(
 
 export async function calculateOrderConsumption(
   db: D1Database,
-  orderItems: Array<{ productId: string; quantity: number; sellingPrice?: number }>
+  orderItems: Array<{ productId: string; quantity: number; sellingPrice?: number }>,
+  tenantId?: string
 ): Promise<OrderConsumptionCalculation> {
   const depletionsMap = new Map<string, {
     productId?: string;
@@ -116,7 +134,7 @@ export async function calculateOrderConsumption(
     if (typeof item.sellingPrice === 'number' && Number.isFinite(item.sellingPrice) && item.sellingPrice >= 0) {
       realizedRevenue += item.sellingPrice * item.quantity;
     }
-    const recipe = await getCanonicalRecipe(db, item.productId);
+    const recipe = await getCanonicalRecipe(db, item.productId, tenantId);
     if (!recipe || recipe.components.length === 0) continue; // No BOM -> 0 consumption
 
     for (const comp of recipe.components) {
@@ -151,7 +169,7 @@ export async function deductOrderStock(
   db: D1Database,
   orderId: string,
   orderItems: Array<{ productId: string; quantity: number }>,
-  options?: { allowNegative?: boolean }
+  options?: { allowNegative?: boolean; tenantId?: string }
 ): Promise<StockDeductionResult> {
   if (!orderId || typeof orderId !== 'string' || !orderId.trim()) {
     return { ok: false, alreadyDeducted: false, depletions: [], error: 'invalid_order_id' };
@@ -159,6 +177,7 @@ export async function deductOrderStock(
   if (!Array.isArray(orderItems) || orderItems.some(i => !i || typeof i.quantity !== 'number' || !Number.isFinite(i.quantity) || i.quantity <= 0)) {
     return { ok: false, alreadyDeducted: false, depletions: [], error: 'invalid_order_items' };
   }
+  const effectiveTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : undefined;
   // 1. Idempotency Guard
   const existing = await db.prepare(
     `SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' LIMIT 1`
@@ -169,7 +188,7 @@ export async function deductOrderStock(
   }
 
   // 2. Calculate Server-Side BOM Consumption
-  const { depletions } = await calculateOrderConsumption(db, orderItems);
+  const { depletions } = await calculateOrderConsumption(db, orderItems, effectiveTenant);
   if (depletions.length === 0) {
     return { ok: true, alreadyDeducted: false, depletions: [] };
   }
@@ -193,9 +212,21 @@ export async function deductOrderStock(
   const now = new Date().toISOString();
   for (const d of depletions) {
     const movId = `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    await db.prepare(
-      'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
-    ).bind(d.quantity, now, d.ingredientId).run();
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        await db.prepare(
+          "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+        ).bind(d.quantity, now, d.ingredientId, effectiveTenant).run();
+      } catch {
+        await db.prepare(
+          'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
+        ).bind(d.quantity, now, d.ingredientId).run();
+      }
+    } else {
+      await db.prepare(
+        'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
+      ).bind(d.quantity, now, d.ingredientId).run();
+    }
 
     await db.prepare(
       `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)

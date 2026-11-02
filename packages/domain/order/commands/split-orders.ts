@@ -37,7 +37,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     if (!tableId) return errorResponse('A valid table_id in this store is required', 400);
     // Validate the entire bill before any table, order or ledger write.
     const snapshots = await Promise.all(parsed.data.orders.map(order => calculateCheckoutSnapshot(db, {
-      items: order.items, order_type: 'dine_in', tip_amount: order.tip,
+      items: order.items, order_type: 'dine_in', tip_amount: order.tip, tenantId,
     })));
     const rejected = snapshots.find(snapshot => snapshot.rejected)?.rejected;
     if (rejected) return errorResponse(rejected.message, 400);
@@ -76,7 +76,8 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         notes: order.notes || null, table_id: tableId, created_at: now,
       };
     });
-    statements.push(db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND tenant_id = ? AND status = 'Available'")
+    const tblClause = tenantId === 'default' ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')" : 'AND tenant_id = ?';
+    statements.push(db.prepare(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND status = 'Available'`)
       .bind(tableId, tenantId));
     // D1 rolls back the whole group if any sub-order or ledger write fails.
     await db.batch(statements);

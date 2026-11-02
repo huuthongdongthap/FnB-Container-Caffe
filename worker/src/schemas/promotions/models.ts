@@ -128,7 +128,13 @@ export const PromotionUsageListResponseSchema = z.object({
 
 export const ValidatePromotionSchema = z.object({
   code: z.string().min(3).max(50),
-  orderAmount: MoneySchema,
+  orderAmount: MoneySchema.optional(),
+  orderValue: MoneySchema.optional(),
+  items: z.array(z.object({
+    menuItemId: z.string().min(1),
+    quantity: z.number().int().positive(),
+    price: z.number().nonnegative(),
+  })).max(200).optional(),
   productIds: z.array(z.string().uuid()).max(200).optional(),
   categoryIds: z.array(z.string().uuid()).max(200).optional(),
   customerId: z.string().uuid().optional(),

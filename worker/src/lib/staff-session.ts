@@ -5,7 +5,7 @@ import { generateJWT } from './jwt';
 
 export const STAFF_SESSION_MAX_AGE_SECONDS = 28_800;
 // The domain's UI role list has four entries; operational sessions support all nine.
-export const STAFF_SESSION_ROLES = ['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef'];
+export const STAFF_SESSION_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper'];
 export const isStaffRole = (role: unknown): role is string => typeof role === 'string' && STAFF_SESSION_ROLES.includes(role);
 export const isStaffIdentity = (claims: Partial<StaffSession>) => claims.role !== 'customer' || Boolean(claims.sessionType);
 

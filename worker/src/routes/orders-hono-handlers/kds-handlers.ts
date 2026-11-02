@@ -26,7 +26,11 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const statement = db.prepare(
     `SELECT * FROM orders WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
   );
@@ -130,8 +134,8 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   }
   if (!result.idempotent) {
     try {
-      const orderRow = await c.env.AURA_DB.prepare(
-        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
+      let orderRow = await c.env.AURA_DB.prepare(
+        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ?'
       ).bind(id).first<{
         id: string;
         total?: number | null;
@@ -139,16 +143,40 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
         customer_id?: string | null;
         customer_phone?: string | null;
         customer_email?: string | null;
+        tenant_id?: string | null;
       }>().catch(() => null);
+      if (!orderRow) {
+        orderRow = await c.env.AURA_DB.prepare(
+          'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
+        ).bind(id).first<{
+          id: string;
+          total?: number | null;
+          total_amount?: number | null;
+          customer_id?: string | null;
+          customer_phone?: string | null;
+          customer_email?: string | null;
+          tenant_id?: string | null;
+        }>().catch(() => null);
+      }
       if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
         const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
         await creditLoyaltyIfEligible(c.env.AURA_DB, c.env as unknown as Record<string, unknown>, id).catch(() => {});
         let refCustomerId = orderRow.customer_id || null;
         if (!refCustomerId && (orderRow.customer_phone || orderRow.customer_email)) {
           const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
-          const cust = await c.env.AURA_DB.prepare(
-            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-          ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+          const orderTenant = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
+            ? orderRow.tenant_id.trim()
+            : getTenantId(c);
+          let cust: { id: string } | null = null;
+          try {
+            cust = await c.env.AURA_DB.prepare(
+              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+            ).bind(orderRow.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant).first<{ id: string }>();
+          } catch {
+            cust = await c.env.AURA_DB.prepare(
+              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+            ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+          }
           refCustomerId = cust?.id ?? null;
         }
         const orderTotal = Number(orderRow.total ?? orderRow.total_amount ?? 0);
@@ -170,10 +198,10 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
  * Single source of truth — the mounts in index.ts and orders-unified.ts, the
  * KDS queue router, and this file all guard with the same set.
  */
-export const KDS_ROLES = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
+export const KDS_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
-  app.patch('/:id/status', requireAuth(KDS_ROLES), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
-  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+  app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
+  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'supervisor', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 }

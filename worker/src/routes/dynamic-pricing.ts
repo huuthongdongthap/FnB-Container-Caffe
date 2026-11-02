@@ -6,25 +6,43 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
+import { matchesTenantRow } from '../lib/db';
 import type { DynamicPricingRule as DynamicPricingRuleRow } from '../types/api';
 
 export const dynamicPricingRouter = new Hono<{ Bindings: Env }>();
 
+dynamicPricingRouter.use('/*', async (c, next) => {
+  if (!c.get('user' as never) && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    return optionalAuth()(c, next);
+  }
+  return next();
+});
+
+function resolvePricingTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  if (c.get?.('user')) {
+    return getTenantId(c);
+  }
+  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
+  if (!raw || raw === '*') return 'default';
+  return raw;
+}
+
 export function getVietnamTime(date: Date): { day: number; minutes: number } {
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Ho_Chi_Minh', hour12: false, weekday: 'short', hour: 'numeric', minute: 'numeric'
-  }).formatToParts(date);
+  }).formatToParts(safeDate);
   let h = 0;
   let m = 0;
-  let day = date.getDay();
+  let day = safeDate.getDay();
   for (const p of parts) {
     if (p.type === 'hour') h = parseInt(p.value, 10);
     if (p.type === 'minute') m = parseInt(p.value, 10);
     if (p.type === 'weekday') day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.value);
   }
-  return { day: day === -1 ? date.getDay() : day, minutes: (h % 24) * 60 + m };
+  return { day: day === -1 ? safeDate.getDay() : day, minutes: (h % 24) * 60 + m };
 }
 
 export function isRuleActiveAt(rule: DynamicPricingRuleRow, date: Date = new Date()): boolean {
@@ -56,7 +74,7 @@ const createRuleSchema = z.object({
   target_category: z.string().optional(),
   target_product_id: z.string().optional(),
   min_margin_percent: z.number().min(0).max(100).default(30),
-  days_of_week: z.string().default('1,2,3,4,5'),
+  days_of_week: z.string().regex(/^[0-6](\s*,\s*[0-6])*$/).default('1,2,3,4,5'),
   start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
   end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
   is_active: z.boolean().default(true)
@@ -64,15 +82,21 @@ const createRuleSchema = z.object({
 
 // GET /api/pricing/dynamic/active
 dynamicPricingRouter.get('/active', async (c) => {
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const tenantId = resolvePricingTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-  const date = c.req.query('timestamp') ? new Date(c.req.query('timestamp')!) : new Date();
+  const rawTs = c.req.query('timestamp');
+  const date = rawTs ? new Date(rawTs) : new Date();
+  if (rawTs && Number.isNaN(date.getTime())) {
+    return c.json({ success: false, error: 'Invalid timestamp' }, 400);
+  }
 
   const { results: rules } = await db.prepare(
-    'SELECT * FROM dynamic_pricing_rules WHERE tenant_id = ? AND is_active = 1'
-  ).bind(tenantId).all<DynamicPricingRuleRow>();
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND is_active = 1"
+  ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>().catch(() => ({ results: [] }));
 
-  const active = (rules || []).filter((r) => isRuleActiveAt(r, date));
+  const active = (rules || [])
+    .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+    .filter((r) => isRuleActiveAt(r, date));
   return c.json({ success: true, count: active.length, data: active });
 });
 
@@ -85,15 +109,37 @@ dynamicPricingRouter.post('/calculate', async (c) => {
   }
 
   const { items, timestamp } = parsed.data;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePricingTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const evalDate = timestamp ? new Date(timestamp) : new Date();
+  if (timestamp && Number.isNaN(evalDate.getTime())) {
+    return c.json({ success: false, error: 'Invalid timestamp' }, 400);
+  }
 
   const { results: rules } = await db.prepare(
-    'SELECT * FROM dynamic_pricing_rules WHERE tenant_id = ? AND is_active = 1'
-  ).bind(tenantId).all<DynamicPricingRuleRow>();
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND is_active = 1"
+  ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>().catch(() => ({ results: [] }));
 
-  const activeRules = (rules || []).filter((r) => isRuleActiveAt(r, evalDate));
+  const activeRules = (rules || [])
+    .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+    .filter((r) => isRuleActiveAt(r, evalDate));
+
+  const serverCostByProduct = new Map<string, number>();
+  for (const item of items) {
+    if ((item.unit_cost === undefined || item.unit_cost <= 0) && !serverCostByProduct.has(item.product_id)) {
+      try {
+        const stmt = db.prepare('SELECT id, cost_price, tenant_id FROM products WHERE id = ?').bind(item.product_id);
+        if (typeof (stmt as { first?: unknown }).first === 'function') {
+          const row = await stmt.first<{ id: string; cost_price?: number | null; tenant_id?: string | null }>();
+          if (row && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId) && Number(row.cost_price) > 0) {
+            serverCostByProduct.set(item.product_id, Number(row.cost_price));
+          }
+        }
+      } catch {
+        // Fallback if products table or cost_price column is unavailable
+      }
+    }
+  }
 
   let originalTotal = 0;
   let discountedTotal = 0;
@@ -113,10 +159,13 @@ dynamicPricingRouter.post('/calculate', async (c) => {
     }
 
     let discountPercent = matchedRule.discount_percent;
+    const effectiveUnitCost = item.unit_cost !== undefined && item.unit_cost > 0
+      ? item.unit_cost
+      : serverCostByProduct.get(item.product_id);
 
     // Margin Floor Protection: Final price cannot be below unit_cost * (1 + min_margin / 100)
-    if (item.unit_cost !== undefined && item.unit_cost > 0) {
-      const minAllowablePrice = item.unit_cost * (1 + (matchedRule.min_margin_percent / 100));
+    if (effectiveUnitCost !== undefined && effectiveUnitCost > 0) {
+      const minAllowablePrice = effectiveUnitCost * (1 + (matchedRule.min_margin_percent / 100));
       const requestedPrice = item.price * (1 - discountPercent / 100);
       if (requestedPrice < minAllowablePrice) {
         const cappedDiscount = Math.max(0, ((item.price - minAllowablePrice) / item.price) * 100);
@@ -152,18 +201,19 @@ dynamicPricingRouter.post('/calculate', async (c) => {
 });
 
 // GET /api/pricing/dynamic/rules
-dynamicPricingRouter.get('/rules', requireAuth(['owner', 'admin', 'manager']), async (c) => {
+dynamicPricingRouter.get('/rules', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const { results } = await db.prepare(
-    'SELECT * FROM dynamic_pricing_rules WHERE tenant_id = ? ORDER BY created_at DESC'
-  ).bind(tenantId).all<DynamicPricingRuleRow>();
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) ORDER BY created_at DESC"
+  ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>();
 
-  return c.json({ success: true, data: results || [] });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  return c.json({ success: true, data: filtered });
 });
 
 // POST /api/pricing/dynamic/rules
-dynamicPricingRouter.post('/rules', requireAuth(['owner', 'admin', 'manager']), async (c) => {
+dynamicPricingRouter.post('/rules', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = createRuleSchema.safeParse(body);
   if (!parsed.success) {
@@ -171,9 +221,13 @@ dynamicPricingRouter.post('/rules', requireAuth(['owner', 'admin', 'manager']), 
   }
 
   const data = parsed.data;
-  const tenantId = getTenantId(c);
+  const rawTenant = getTenantId(c);
+  const tenantId = rawTenant === '*' ? 'default' : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-  const ruleId = `rule_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const randBytes = new Uint8Array(3);
+  crypto.getRandomValues(randBytes);
+  const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const ruleId = `rule_${Date.now().toString(36)}_${randHex}`;
 
   await db.prepare(`
     INSERT INTO dynamic_pricing_rules (

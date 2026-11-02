@@ -16,7 +16,7 @@ import { resetOtpClaim, throttle } from './helpers';
 
 const log = createLogger({ route: 'loyalty-otp' });
 const OTP_TTL_SECONDS = 300;
-const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'cashier']);
+const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'cashier']);
 
 function generateSixDigitOtp(): string {
   const buf = new Uint32Array(1);
@@ -109,12 +109,18 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
     let customer: { id: string; name: string; phone: string; tenant_id?: string | null } | null = null;
     try {
       customer = await c.env.AURA_DB.prepare(
-        'SELECT id, name, phone, tenant_id FROM customers WHERE phone = ?'
-      ).bind(phone).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
+        "SELECT id, name, phone, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END LIMIT 1"
+      ).bind(phone, tenantId).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
     } catch {
-      customer = await c.env.AURA_DB.prepare(
-        'SELECT id, name, phone FROM customers WHERE phone = ?'
-      ).bind(phone).first<{ id: string; name: string; phone: string }>();
+      try {
+        customer = await c.env.AURA_DB.prepare(
+          'SELECT id, name, phone, tenant_id FROM customers WHERE phone = ?'
+        ).bind(phone).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
+      } catch {
+        customer = await c.env.AURA_DB.prepare(
+          'SELECT id, name, phone FROM customers WHERE phone = ?'
+        ).bind(phone).first<{ id: string; name: string; phone: string }>();
+      }
     }
 
     if (!customer) {
@@ -125,8 +131,11 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       });
     }
 
-    if (customer.tenant_id && customer.tenant_id !== tenantId) {
-      return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+    if ('tenant_id' in customer && customer.tenant_id !== undefined) {
+      const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
+      if (custTenant !== tenantId) {
+        return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+      }
     }
 
     const otp = generateSixDigitOtp();

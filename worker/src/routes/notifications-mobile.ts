@@ -124,6 +124,27 @@ export async function subscribePush(c: Context<{ Bindings: Env }>) {
   if (!endpoint || typeof endpoint !== 'string') {
     return errorResponse('Thiếu endpoint', 400);
   }
+  try {
+    const parsedEndpoint = new URL(endpoint);
+    const host = parsedEndpoint.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (
+      parsedEndpoint.protocol !== 'https:' ||
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return errorResponse('Endpoint push phải dùng HTTPS và host công khai', 400);
+    }
+  } catch {
+    return errorResponse('Endpoint push không hợp lệ', 400);
+  }
 
   try {
     const id = crypto.randomUUID();

@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { updateTableStatusSchema, zodErrorResponse } from 'worker/src/lib/validators';
 import { signQRUrl } from 'worker/src/tree/qr/signer';
 import type { Env } from 'worker/src/types/env';
-import { requireAuth } from 'worker/src/middleware/auth';
+import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId } from 'worker/src/middleware/tenant';
 import { audit } from 'worker/src/middleware/audit-log';
 import type { CafeTable, QrCodeRow } from '../model/table-types';
@@ -14,9 +14,19 @@ import { canTransitionTo, normalizeTableStatus } from '../policies/status';
 
 export const tablesRouter = new Hono<{ Bindings: Env }>();
 
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
 // GET /api/tables?zone=&status=
-tablesRouter.get('/', async (c) => {
+tablesRouter.get('/', optionalAuth(), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const zone = c.req.query('zone');
   const status = c.req.query('status');
   let query = 'SELECT * FROM cafe_tables WHERE 1=1';
@@ -35,12 +45,28 @@ tablesRouter.get('/', async (c) => {
     ? db.prepare(query).bind(...params)
     : db.prepare(query);
 
-  const { results: tables } = await stmt.all<CafeTable>();
+  const { results: rawTables } = await stmt.all<CafeTable>();
+  const tables = (rawTables || []).filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
 
-  // Lookup QR slugs for all tables
-  const baseUrl = c.req.header('x-forwarded-proto') === 'https'
-    ? `https://${c.req.header('host')}`
-    : `${c.req.header('x-forwarded-proto') || 'http'}://${c.req.header('host') || 'localhost:3000'}`;
+  // Lookup QR slugs for all tables using validated origin
+  const rawHost = (c.req.header('host') || '').trim().toLowerCase();
+  const rawProto = (c.req.header('x-forwarded-proto') || '').trim().toLowerCase();
+  const hostOnly = rawHost.replace(/:\d+$/, '');
+  const isAllowedHost = /^[a-z0-9.-]+(?::\d{1,5})?$/.test(rawHost) && (
+    hostOnly === 'localhost' ||
+    hostOnly === '127.0.0.1' ||
+    hostOnly === 'test.aura' ||
+    hostOnly === 'app.test' ||
+    hostOnly === 'auraspace.cafe' ||
+    hostOnly.endsWith('.auraspace.cafe') ||
+    hostOnly === 'auraspace.vn' ||
+    hostOnly.endsWith('.auraspace.vn')
+  );
+  const safeHost = isAllowedHost ? rawHost : 'localhost:3000';
+  const safeProto = rawProto === 'https' || rawProto === 'http'
+    ? rawProto
+    : (safeHost.startsWith('localhost') || safeHost.startsWith('127.0.0.1') ? 'http' : 'https');
+  const baseUrl = `${safeProto}://${safeHost}`;
   const qrSecret = c.env.QR_SIGNING_SECRET || '';
 
   const rows = qrSecret
@@ -49,8 +75,9 @@ tablesRouter.get('/', async (c) => {
   const slugMap = new Map<string | number, string>(rows.results.map((r) => [r.table_id, r.slug]));
 
   const data = await Promise.all(tables.map(async (t) => {
-    const idNum = parseInt(String(t.id).replace(/\D/g, ''), 10);
-    const slug = slugMap.get(t.id) ?? slugMap.get(idNum) ?? slugMap.get(Number(t.table_number));
+    const legacyIdMatch = /^(?:t)?(\d+)$/i.exec(String(t.id));
+    const idNum = legacyIdMatch ? parseInt(legacyIdMatch[1], 10) : NaN;
+    const slug = slugMap.get(t.id) ?? (!Number.isNaN(idNum) ? slugMap.get(idNum) : undefined);
     return {
       ...t,
       qr_code_url: slug && qrSecret
@@ -62,13 +89,14 @@ tablesRouter.get('/', async (c) => {
 });
 
 // GET /api/tables/:id
-tablesRouter.get('/:id', async (c) => {
+tablesRouter.get('/:id', optionalAuth(), async (c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const row = await db.prepare(
     'SELECT * FROM cafe_tables WHERE id = ?',
   ).bind(id).first<CafeTable>();
-  if (!row) {
+  if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
   return c.json({ success: true, data: row });
@@ -77,15 +105,18 @@ tablesRouter.get('/:id', async (c) => {
 // PATCH helper — read current row then update status, returning the row pre-update.
 async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenantId = '*') {
   const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable & { tenant_id?: string | null }>();
-  if (!table || (tenantId !== '*' && table.tenant_id && String(table.tenant_id) !== tenantId)) {
+  if (!table || !matchesTenantRow(table as unknown as Record<string, unknown>, tenantId)) {
     return null;
   }
   const normalizedTarget = normalizeTableStatus(status) ?? (status as CafeTable['status']);
   if (!canTransitionTo(table.status, normalizedTarget)) {
     return null;
   }
-  if (tenantId !== '*' && table.tenant_id) {
-    await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ? AND tenant_id = ?').bind(normalizedTarget, id, tenantId).run();
+  if (tenantId !== '*') {
+    const tblTenantClause = tenantId === 'default'
+      ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : 'AND tenant_id = ?';
+    await db.prepare(`UPDATE cafe_tables SET status = ? WHERE id = ? ${tblTenantClause}`).bind(normalizedTarget, id, tenantId).run();
   } else {
     await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind(normalizedTarget, id).run();
   }
@@ -93,7 +124,7 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenan
 }
 
 // PATCH /api/tables/:id/occupy — staff/manager-only (QR guests use guest-checkin instead)
-tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']), audit('table_occupy'), async (c) => {
+tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'cashier']), audit('table_occupy'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const table = await updateTable(db, id, 'Occupied', getTenantId(c));
@@ -104,7 +135,7 @@ tablesRouter.patch('/:id/occupy', requireAuth(['owner', 'manager', 'staff', 'adm
 });
 
 // PATCH /api/tables/:id/release — staff/manager-only
-tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']), audit('table_release'), async (c) => {
+tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'cashier']), audit('table_release'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const table = await updateTable(db, id, 'Available', getTenantId(c));
@@ -115,7 +146,7 @@ tablesRouter.patch('/:id/release', requireAuth(['owner', 'manager', 'staff', 'ad
 });
 
 // PATCH /api/tables/:id/status — set arbitrary status (staff/manager-only)
-tablesRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter', 'cashier']), audit('table_status_change'), async (c) => {
+tablesRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'cashier']), audit('table_status_change'), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;

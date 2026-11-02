@@ -5,6 +5,7 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
+import { matchesHaTenant } from './devices';
 
 const log = createLogger({ route: 'ha-automations' });
 
@@ -20,7 +21,12 @@ export interface AutomationLogEntry extends AutomationResult {
 id: number;
 }
 
-export async function triggerAutomation(env: Record<string, unknown>, automationId: string, payload: unknown): Promise<Response> {
+export async function triggerAutomation(
+  env: Record<string, unknown>,
+  automationId: string,
+  payload: unknown,
+  tenantId?: string
+): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
@@ -34,13 +40,23 @@ export async function triggerAutomation(env: Record<string, unknown>, automation
       : 'dispatched to HA webhook';
 
     const now = new Date().toISOString();
+    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
 
-    await db
-      .prepare(
-        'INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, ?)'
-      )
-      .bind(automationId, triggerEntity ?? null, JSON.stringify(payload), result, now)
-      .run();
+    try {
+      await db
+        .prepare(
+          'INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
+        )
+        .bind(automationId, triggerEntity ?? null, JSON.stringify(payload), result, now, effectiveTenant)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          'INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, ?)'
+        )
+        .bind(automationId, triggerEntity ?? null, JSON.stringify(payload), result, now)
+        .run();
+    }
 
     log.info('automation_triggered', { automation_id: automationId, trigger_entity: triggerEntity });
 
@@ -58,11 +74,15 @@ export async function triggerAutomation(env: Record<string, unknown>, automation
   }
 }
 
-export async function getAutomationLog(env: Record<string, unknown>, limit = 50): Promise<Response> {
+export async function getAutomationLog(
+  env: Record<string, unknown>,
+  limit = 50,
+  tenantId?: string
+): Promise<Response> {
   try {
     const mockMode = env.HA_MOCK === 'true';
     const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
-    const clamped = Math.min(limit, 200);
+    const clamped = Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 200) : 50;
 
     if (mockMode) {
       const mockEntries: AutomationLogEntry[] = Array.from({ length: Math.min(clamped, 3) }, (_, i) => ({
@@ -76,19 +96,31 @@ export async function getAutomationLog(env: Record<string, unknown>, limit = 50)
       return jsonResponse({ mock: true, entries: mockEntries });
     }
 
-    const { results } = await db
-      .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
-      .bind(clamped)
-      .all<AutomationLogEntry>();
+    let results: Array<AutomationLogEntry & { tenant_id?: string | null }> = [];
+    try {
+      const res = await db
+        .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at, tenant_id FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
+        .bind(clamped)
+        .all<AutomationLogEntry & { tenant_id?: string | null }>();
+      results = res?.results || [];
+    } catch {
+      const res = await db
+        .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
+        .bind(clamped)
+        .all<AutomationLogEntry>();
+      results = res?.results || [];
+    }
 
-    const entries = results.map((r) => ({
-      id: r.id,
-      automation_id: r.automation_id,
-      trigger_entity: r.trigger_entity,
-      payload: JSON.parse(r.payload as string),
-      result: r.result,
-      executed_at: r.executed_at
-    }));
+    const entries = (results || [])
+      .filter((r) => matchesHaTenant(r as unknown as Record<string, unknown>, tenantId))
+      .map((r) => ({
+        id: r.id,
+        automation_id: r.automation_id,
+        trigger_entity: r.trigger_entity,
+        payload: JSON.parse(r.payload as string),
+        result: r.result,
+        executed_at: r.executed_at
+      }));
 
     return jsonResponse({ entries });
   } catch (err) {

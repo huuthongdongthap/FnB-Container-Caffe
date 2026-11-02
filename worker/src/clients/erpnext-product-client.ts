@@ -86,12 +86,15 @@ export class ErpnextProductClient {
     this.cacheTtl = DEFAULT_CACHE_TTL;
   }
 
-  async getProductAvailability(itemCode: string): Promise<ProductAvailability> {
+  async getProductAvailability(itemCode: string, tenantId?: string): Promise<ProductAvailability> {
     if (!itemCode) {
       throw new Error('getProductAvailability: itemCode is required');
     }
 
-    const cacheKey = `erpnext:product:availability:${itemCode}`;
+    const normalizedTenant = tenantId && tenantId !== '*' && tenantId !== 'default' ? tenantId : '';
+    const cacheKey = normalizedTenant
+      ? `erpnext:product:availability:${normalizedTenant}:${itemCode}`
+      : `erpnext:product:availability:${itemCode}`;
 
     if (this.auraKv) {
       try {

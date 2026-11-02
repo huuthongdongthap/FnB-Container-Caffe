@@ -29,8 +29,8 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   const tier = url.searchParams.get('tier') || '';
   const offset = (page - 1) * limit;
 
-  const clauses: string[] = ["COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?"];
-  const params: unknown[] = [tenantId];
+  const clauses: string[] = ["(? = '*' OR COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?)"];
+  const params: unknown[] = [tenantId, tenantId];
 
   if (search) {
     clauses.push('(c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)');
@@ -44,7 +44,7 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
-  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) AS visit_count, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
   const canonicalCountQuery = `SELECT COUNT(*) as total FROM customers c${where}`;
 
   let results: unknown[] = [];
@@ -56,9 +56,9 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
     const totalRow = await db.prepare(canonicalCountQuery).bind(...params).first<{ total: number }>();
     total = totalRow?.total ?? 0;
   } catch (err) {
-    const missingTenantCol = /no such column:\s*(?:c\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
-    const legacyClauses: string[] = missingTenantCol ? [] : ["COALESCE(NULLIF(tenant_id, ''), 'default') = ?"];
-    const legacyParams: unknown[] = missingTenantCol ? [] : [tenantId];
+    const missingTenantCol = /no such column:\s*(?:c\.|o\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
+    const legacyClauses: string[] = missingTenantCol ? [] : ["(? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)"];
+    const legacyParams: unknown[] = missingTenantCol ? [] : [tenantId, tenantId];
     if (search) {
       legacyClauses.push('(name LIKE ? OR phone LIKE ? OR email LIKE ?)');
       const like = `%${search}%`;
@@ -94,7 +94,8 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
 
 export async function createAdminCustomer(request: Request, env: Record<string, unknown>, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
-  const tenantId = resolveEnvTenant(env, effectiveTenantId);
+  const rawTenantId = resolveEnvTenant(env, effectiveTenantId);
+  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     phone?: string;
@@ -203,8 +204,8 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
       canonicalUpdates.push('loyalty_tier = ?');
       canonicalParams.push(tierValue);
     }
-    canonicalParams.push(id, tenantId);
-    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...canonicalParams).run();
+    canonicalParams.push(id, tenantId, tenantId);
+    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...canonicalParams).run();
   } catch (err) {
     const missingTenantCol = /no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err));
     try {
@@ -218,8 +219,8 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         canonicalParams.push(id);
         await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
       } else {
-        canonicalParams.push(id, tenantId);
-        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...canonicalParams).run();
+        canonicalParams.push(id, tenantId, tenantId);
+        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...canonicalParams).run();
       }
     } catch (innerErr) {
       const innerMissingTenant = missingTenantCol || /no such column:\s*tenant_id/i.test(innerErr instanceof Error ? innerErr.message : String(innerErr));
@@ -233,8 +234,8 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         legacyParams.push(id);
         await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
       } else {
-        legacyParams.push(id, tenantId);
-        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`).bind(...legacyParams).run();
+        legacyParams.push(id, tenantId, tenantId);
+        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...legacyParams).run();
       }
     }
   }
@@ -245,7 +246,7 @@ export async function deleteAdminCustomer(env: Record<string, unknown>, id: stri
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const tenantId = resolveEnvTenant(env, effectiveTenantId);
   try {
-    await db.prepare("DELETE FROM customers WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(id, tenantId).run();
+    await db.prepare("DELETE FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(id, tenantId, tenantId).run();
   } catch (err) {
     if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
       throw err;
@@ -255,7 +256,7 @@ export async function deleteAdminCustomer(env: Record<string, unknown>, id: stri
   return Response.json({ success: true, id });
 }
 
-export async function getStuckPayments(request: Request, env: Record<string, unknown>) {
+export async function getStuckPayments(request: Request, env: Record<string, unknown>, callerTenantId?: string) {
   const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
   if (!kv) {
     return Response.json({ stuck: [], dlq: [], total: 0 });
@@ -266,7 +267,13 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
     (env as { role?: string })?.role === 'owner' ||
     (request as unknown as { user?: { role?: string } })?.user?.role === 'owner';
 
-  if (!isOwner) {
+  let tenantId =
+    callerTenantId ||
+    (env as { user?: { tenantId?: string } })?.user?.tenantId ||
+    (request as unknown as { user?: { tenantId?: string } })?.user?.tenantId ||
+    '';
+
+  if (!isOwner || !tenantId) {
     const authHeader = request?.headers?.get?.('Authorization') || request?.headers?.get?.('authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const secret = typeof env.JWT_SECRET === 'string' && env.JWT_SECRET ? env.JWT_SECRET : '';
@@ -276,17 +283,49 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
           if (payload?.role === 'owner') {
             isOwner = true;
           }
+          if (!tenantId && payload?.tenantId) {
+            tenantId = String(payload.tenantId);
+          }
         } catch {
           // Default to non-owner masking when token verification fails
         }
       }
     }
   }
+  if (!tenantId) {
+    tenantId = 'default';
+  }
 
   const stuckList = await kv.list({ prefix: 'payment:stuck:' });
   const dlqList = await kv.list({ prefix: 'webhook:dlq:' });
   const reviewList = await kv.list({ prefix: 'payment:review:' });
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
+
+  const belongsToTenant = async (item: Record<string, unknown> | null): Promise<boolean> => {
+    if (!item) return false;
+    if (tenantId === '*') return true;
+    const nested = (item.payload && typeof item.payload === 'object' ? item.payload : null) as Record<string, unknown> | null;
+    const explicitTenant = item.tenant_id ?? item.tenantId ?? nested?.tenant_id ?? nested?.tenantId;
+    if (explicitTenant !== undefined && explicitTenant !== null && String(explicitTenant).trim() !== '') {
+      return String(explicitTenant).trim() === tenantId;
+    }
+    const orderRef = (item.orderId ?? item.order_id ?? item.orderCode ?? nested?.orderId ?? nested?.order_id ?? nested?.orderCode) as string | number | undefined;
+    if (db && orderRef !== undefined && orderRef !== null && String(orderRef).trim() !== '') {
+      try {
+        const orderRow = await db
+          .prepare('SELECT tenant_id FROM orders WHERE id = ? OR order_code = ?')
+          .bind(String(orderRef), String(orderRef))
+          .first<{ tenant_id?: string | null }>();
+        if (orderRow) {
+          const rowTenant = orderRow.tenant_id ? String(orderRow.tenant_id) : 'default';
+          return rowTenant === tenantId;
+        }
+      } catch {
+        // Ignore optional order table / column lookup errors in partial test schemas
+      }
+    }
+    return tenantId === 'default';
+  };
 
   const stuck = await Promise.all(
     stuckList.keys.slice(0, 20).map(async(k) => {
@@ -346,6 +385,8 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
           paymentId,
           orderId: parsed.orderId ?? null,
           orderCode: parsed.orderCode ?? null,
+          ...(parsed.tenant_id ? { tenant_id: parsed.tenant_id } : {}),
+          ...(parsed.tenantId ? { tenantId: parsed.tenantId } : {}),
           ...(parsed.untrusted ? { untrusted: true } : {}),
           lastOutcome,
           reconcileStatus,
@@ -356,14 +397,36 @@ export async function getStuckPayments(request: Request, env: Record<string, unk
     })
   );
 
+  const validStuck: Record<string, unknown>[] = [];
+  for (const s of stuck) {
+    if (s && (await belongsToTenant(s))) {
+      validStuck.push(s);
+    }
+  }
+  const validDlq: Record<string, unknown>[] = [];
+  for (const d of dlq) {
+    if (d && (await belongsToTenant(d))) {
+      validDlq.push(d);
+    }
+  }
+  const validReviews: Record<string, unknown>[] = [];
+  for (const r of reviews) {
+    if (r && (await belongsToTenant(r))) {
+      validReviews.push(r);
+    }
+  }
+
   return Response.json({
-    stuck: (stuck.filter(Boolean) as Record<string, unknown>[]).map((s) =>
+    stuck: validStuck.map((s) =>
       isOwner
         ? s
         : { ...s, amount: '***', dbAmount: '***', webhookAmount: '***' }
     ),
-    dlq: dlq.filter(Boolean),
-    reviews: reviews.filter(Boolean),
-    total: stuckList.keys.length + dlqList.keys.length + reviewList.keys.length
+    dlq: validDlq,
+    reviews: validReviews,
+    total:
+      tenantId === '*' || (tenantId === 'default' && validStuck.length === stuck.filter(Boolean).length && validDlq.length === dlq.filter(Boolean).length && validReviews.length === reviews.filter(Boolean).length)
+        ? stuckList.keys.length + dlqList.keys.length + reviewList.keys.length
+        : validStuck.length + validDlq.length + validReviews.length
   });
 }

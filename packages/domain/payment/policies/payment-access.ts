@@ -18,7 +18,8 @@ export function paymentTenantScope(c: any): string | null {
 export function canAccessPaymentOrder(c: any, order: PaymentOrderIdentity, allowGuest = false): boolean {
   const user = c.get('user') as { id?: string; role?: string } | undefined;
   const tenant = paymentTenantScope(c);
-  if (tenant !== null && (order.tenant_id || 'default') !== tenant) return false;
+  const orderTenant = order.tenant_id && String(order.tenant_id).trim() ? String(order.tenant_id).trim() : 'default';
+  if (tenant !== null && orderTenant !== tenant) return false;
   if (!user) return allowGuest && !order.customer_id;
   if (user.role === 'customer') return Boolean(user.id && order.customer_id === user.id);
   return Boolean(user.id && user.role && PAYMENT_ROLES.includes(user.role));

@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
 import { getDatabase } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
+import { getTenantId } from '../../middleware/tenant';
 import { loadStaffAccount, SessionUnavailableError } from '../../lib/staff-session';
 import { staffManagementDenial, staffMutationGuard } from '../../lib/staff-account-mutation';
 import { createStaffIdentity, staffEmailInUse } from '../../lib/staff-login-identity';
@@ -26,7 +27,7 @@ async function writeStaffAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -49,11 +50,16 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
   app.openapi(StaffRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
 
-    let whereClause = "WHERE role != 'customer' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
-    const params: (string | number)[] = [c.get('user')?.tenantId || 'default'];
+    let whereClause = "WHERE role != 'customer'";
+    const params: (string | number)[] = [];
+    if (tenantId !== '*') {
+      whereClause += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      params.push(tenantId);
+    }
 
     if (role) {
       whereClause += ' AND role = ?';
@@ -98,8 +104,12 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       ).bind(...params, limit, offset).all()) as { results: any[] };
       rawRows = rows.results || [];
     } catch {
-      let canonicalWhere = "WHERE role != 'customer' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
-      const canonicalParams: (string | number)[] = [c.get('user')?.tenantId || 'default'];
+      let canonicalWhere = "WHERE role != 'customer'";
+      const canonicalParams: (string | number)[] = [];
+      if (tenantId !== '*') {
+        canonicalWhere += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+        canonicalParams.push(tenantId);
+      }
       if (role) {
         canonicalWhere += ' AND role = ?';
         canonicalParams.push(role);
@@ -146,9 +156,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff/:id - Get staff by ID
   app.openapi(StaffRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
     const account = await loadStaffAccount(db, id);
-    if (!account.ok || (account.account.tenant_id || 'default') !== (c.get('user')?.tenantId || 'default')) return c.json({ success: false, error: 'Staff not found' }, 404);
+    if (!account.ok || (tenantId !== '*' && (account.account.tenant_id || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
 
 
     let staff: any = null;
@@ -197,8 +208,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    if (body.role === 'owner' && user?.role !== 'owner') {
+    if (!['owner', 'manager', 'admin'].includes(user?.role)) {
+      return c.json({ success: false, error: 'Không đủ quyền tạo tài khoản nhân viên' }, 403);
+    }
+    if (body.role === 'owner' && user?.role !== 'owner' && user?.role !== 'admin') {
       return c.json({ success: false, error: 'Only owners can create owner accounts' }, 403);
+    }
+    if (body.role === 'admin' && user?.role !== 'admin') {
+      return c.json({ success: false, error: 'Only admins can create admin accounts' }, 403);
     }
     if (user?.role === 'manager' && ['owner', 'admin', 'manager'].includes(body.role)) {
       return c.json({ success: false, error: 'Manager không được tạo tài khoản quản lý' }, 403);
@@ -219,15 +236,17 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
+    const rawTenantId = getTenantId(c);
+    const staffTenant = rawTenantId === '*' ? (user?.tenantId || user?.tenant_id || 'default') : rawTenantId;
 
     if (!await createStaffIdentity(c.env, { id, name: body.name, email: body.email,
-      phone: body.phone || '', role: body.role, tenant_id: user.tenantId || 'default',
+      phone: body.phone || '', role: body.role, tenant_id: staffTenant,
       password: passwordHash, active: body.isActive !== false })) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
     if (c.env.AUTH_KV) {
       const credential = JSON.stringify({ id, name: body.name, email: body.email, role: body.role,
-        phone: body.phone || '', password: passwordHash, tenant_id: user.tenantId || 'default', active: body.isActive !== false });
+        phone: body.phone || '', password: passwordHash, tenant_id: staffTenant, active: body.isActive !== false, auth_version: 1 });
       await c.env.AUTH_KV.put(`user:${body.email}`, credential).catch(() => {});
       await c.env.AUTH_KV.put(`user:${id}`, credential).catch(() => {});
     }
@@ -397,6 +416,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           if (rawById) kvUser = JSON.parse(rawById);
         }
         if (kvUser) {
+          const nextAuthVersion = invalidatesSession
+            ? Number(kvUser.auth_version ?? existing.auth_version ?? 1) + 1
+            : Number(kvUser.auth_version ?? existing.auth_version ?? 1);
           const updatedKv = {
             ...kvUser,
             name: body.name !== undefined ? body.name : kvUser.name,
@@ -406,6 +428,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             active: body.isActive !== undefined ? body.isActive : (kvUser.active ?? kvUser.isActive),
             isActive: body.isActive !== undefined ? body.isActive : (kvUser.isActive ?? kvUser.active),
             email: newEmail,
+            auth_version: nextAuthVersion,
             updated_at: now,
           };
           if (newEmail !== oldEmail) {
@@ -478,6 +501,36 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         .bind(now, ...guard.values).run();
     } catch { throw new SessionUnavailableError(); }
     if (!result.meta.changes) return c.json({ success: false, error: 'Không thể vô hiệu hóa owner cuối cùng hoặc trạng thái đã đổi' }, 409);
+
+    try {
+      await db.prepare('UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+    } catch {
+      // staff_users table optional
+    }
+
+    if (c.env.AUTH_KV) {
+      try {
+        const emailKey = existing.email ? `user:${existing.email}` : null;
+        const rawByEmail = emailKey ? await c.env.AUTH_KV.get(emailKey) : null;
+        const rawById = await c.env.AUTH_KV.get(`user:${id}`);
+        const baseKv = rawByEmail ? JSON.parse(rawByEmail) : (rawById ? JSON.parse(rawById) : existing);
+        const disabledKv = JSON.stringify({
+          ...baseKv,
+          id,
+          active: false,
+          isActive: false,
+          is_active: 0,
+          auth_version: Number(baseKv?.auth_version ?? existing.auth_version ?? 1) + 1,
+          updated_at: now,
+        });
+        if (emailKey) {
+          await c.env.AUTH_KV.put(emailKey, disabledKv).catch(() => {});
+        }
+        await c.env.AUTH_KV.put(`user:${id}`, disabledKv).catch(() => {});
+      } catch {
+        // Non-blocking KV sync failure
+      }
+    }
 
     // Audit log
     await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now);

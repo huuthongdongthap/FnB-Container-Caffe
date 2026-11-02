@@ -96,15 +96,32 @@ export async function findOrCreateCustomerByIdentifier(input: {
   identifierValue: string;
   name?: string | null;
   source?: string | null;
+  tenantId?: string | null;
 }): Promise<{ customerId: string; created: boolean }> {
-  const { db, identifierType, source } = input;
+  const { db, identifierType, source, tenantId } = input;
   const rawValue = input.identifierValue.trim();
   const normalized = identifierType === 'phone' ? normalizePhone(rawValue) : rawValue.toLowerCase();
+  const scopedTenant = tenantId !== undefined && tenantId !== null && tenantId !== '*'
+    ? (String(tenantId).trim() || 'default')
+    : null;
 
   // 1. Check customer_identities lookup
-  const matchedIdentity = await db.prepare(
-    'SELECT customer_id FROM customer_identities WHERE identifier_type = ? AND identifier_value = ? LIMIT 1'
-  ).bind(identifierType, normalized).first<{ customer_id: string }>();
+  let matchedIdentity: { customer_id: string } | null = null;
+  if (scopedTenant) {
+    try {
+      matchedIdentity = await db.prepare(
+        "SELECT ci.customer_id FROM customer_identities ci JOIN customers c ON c.id = ci.customer_id WHERE ci.identifier_type = ? AND ci.identifier_value = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ? LIMIT 1"
+      ).bind(identifierType, normalized, scopedTenant).first<{ customer_id: string }>();
+    } catch {
+      matchedIdentity = await db.prepare(
+        'SELECT customer_id FROM customer_identities WHERE identifier_type = ? AND identifier_value = ? LIMIT 1'
+      ).bind(identifierType, normalized).first<{ customer_id: string }>();
+    }
+  } else {
+    matchedIdentity = await db.prepare(
+      'SELECT customer_id FROM customer_identities WHERE identifier_type = ? AND identifier_value = ? LIMIT 1'
+    ).bind(identifierType, normalized).first<{ customer_id: string }>();
+  }
 
   if (matchedIdentity?.customer_id) {
     return { customerId: matchedIdentity.customer_id, created: false };
@@ -112,15 +129,28 @@ export async function findOrCreateCustomerByIdentifier(input: {
 
   // 2. Fallback check on primary customers table
   const col = identifierType === 'email' ? 'email' : 'phone';
-  const matchedCustomer = await db.prepare(
-    `SELECT id FROM customers WHERE ${col} = ? LIMIT 1`
-  ).bind(normalized).first<{ id: string }>();
+  let matchedCustomer: { id: string } | null = null;
+  if (scopedTenant) {
+    try {
+      matchedCustomer = await db.prepare(
+        `SELECT id FROM customers WHERE ${col} = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1`
+      ).bind(normalized, scopedTenant).first<{ id: string }>();
+    } catch {
+      matchedCustomer = await db.prepare(
+        `SELECT id FROM customers WHERE ${col} = ? LIMIT 1`
+      ).bind(normalized).first<{ id: string }>();
+    }
+  } else {
+    matchedCustomer = await db.prepare(
+      `SELECT id FROM customers WHERE ${col} = ? LIMIT 1`
+    ).bind(normalized).first<{ id: string }>();
+  }
 
   if (matchedCustomer?.id) {
     // Backfill customer_identities mapping without stamping verified_at without proof
     await db.prepare(
       'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at) VALUES (?, ?, ?, ?, 1, ?)'
-    ).bind(genCustomerId('ident_'), matchedCustomer.id, identifierType, normalized, null).run();
+    ).bind(genCustomerId('ident_'), matchedCustomer.id, identifierType, normalized, null).run().catch(() => {});
     return { customerId: matchedCustomer.id, created: false };
   }
 
@@ -130,14 +160,28 @@ export async function findOrCreateCustomerByIdentifier(input: {
   const emailVal = identifierType === 'email' ? normalized : `${newId}@guest.local`;
   const phoneVal = identifierType === 'phone' ? normalized : null;
 
-  await db.prepare(
-    `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?, ?, ?)`
-  ).bind(newId, emailVal, input.name ?? null, phoneVal, source ?? 'direct', now, now).run();
+  if (scopedTenant) {
+    try {
+      await db.prepare(
+        `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at, tenant_id)
+         VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?, ?, ?, ?)`
+      ).bind(newId, emailVal, input.name ?? null, phoneVal, source ?? 'direct', now, now, scopedTenant).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?, ?, ?)`
+      ).bind(newId, emailVal, input.name ?? null, phoneVal, source ?? 'direct', now, now).run();
+    }
+  } else {
+    await db.prepare(
+      `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?, ?, ?)`
+    ).bind(newId, emailVal, input.name ?? null, phoneVal, source ?? 'direct', now, now).run();
+  }
 
   await db.prepare(
     'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at) VALUES (?, ?, ?, ?, 1, ?)'
-  ).bind(genCustomerId('ident_'), newId, identifierType, normalized, null).run();
+  ).bind(genCustomerId('ident_'), newId, identifierType, normalized, null).run().catch(() => {});
 
   return { customerId: newId, created: true };
 }
@@ -145,17 +189,34 @@ export async function findOrCreateCustomerByIdentifier(input: {
 export async function mergeCustomerProfiles(
   input: CustomerMergeInput & { db: D1Database }
 ): Promise<CustomerMergeResult> {
-  const { db, primaryCustomerId, secondaryCustomerId, reason } = input;
+  const { db, primaryCustomerId, secondaryCustomerId, reason, tenantId } = input;
   if (primaryCustomerId === secondaryCustomerId) {
     return { ok: true, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0 };
   }
 
   try {
-    const priRow = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(primaryCustomerId).first<{ id: string }>();
+    const priRow = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(primaryCustomerId).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+      db.prepare('SELECT id FROM customers WHERE id = ?').bind(primaryCustomerId).first<{ id: string; tenant_id?: string | null }>()
+    );
     if (!priRow) return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Primary customer not found' };
 
-    const secRow = await db.prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?').bind(secondaryCustomerId).first<any>();
+    const secRow = await db.prepare('SELECT loyalty_points, lifetime_points, tenant_id FROM customers WHERE id = ?').bind(secondaryCustomerId).first<any>().catch(() =>
+      db.prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?').bind(secondaryCustomerId).first<any>()
+    );
     if (!secRow) return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Secondary customer not found' };
+
+    const hasTenantAttr = ('tenant_id' in priRow && priRow.tenant_id !== undefined) || ('tenant_id' in secRow && secRow.tenant_id !== undefined);
+    const priTenant = (priRow.tenant_id && String(priRow.tenant_id).trim()) || 'default';
+    const secTenant = (secRow.tenant_id && String(secRow.tenant_id).trim()) || 'default';
+    if (hasTenantAttr && priTenant !== secTenant) {
+      return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Cross-tenant customer merge forbidden' };
+    }
+    if (tenantId !== undefined && tenantId !== null && tenantId !== '*') {
+      const callerTenant = String(tenantId).trim() || 'default';
+      if (hasTenantAttr && (priTenant !== callerTenant || secTenant !== callerTenant)) {
+        return { ok: false, primaryCustomerId, mergedCustomerId: secondaryCustomerId, ordersReassigned: 0, visitsReassigned: 0, identitiesReassigned: 0, pointsMerged: 0, error: 'Cross-tenant customer merge forbidden' };
+      }
+    }
 
     const pts = secRow.loyalty_points ?? 0;
     const lpts = secRow.lifetime_points ?? 0;

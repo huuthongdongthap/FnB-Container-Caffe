@@ -1,8 +1,9 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
-import { formatJob } from './helpers';
+import { formatJob, checkCronJobTenant, isAllowedCronLocationForTenant } from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 
 async function writeCronJobAuditLog(
   db: any,
@@ -16,7 +17,7 @@ async function writeCronJobAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'cron_job', entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'cron_job', entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -60,12 +61,8 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let jobs: any[] = [];
+    const tenantId = getTenantId(c);
     try {
-      const countResult = (await db.prepare(
-        `SELECT COUNT(*) as total FROM cron_jobs ${whereClause}`
-      ).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
-
       const offset = (page - 1) * limit;
       const allowedSorts: Record<string, string> = {
         name: 'name',
@@ -80,11 +77,32 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const sortCol = allowedSorts[sort] || 'created_at';
       const sortDir = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
       const orderClause = `${sortCol} ${sortDir}`;
-      const rows = (await db.prepare(
-        `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
 
-      jobs = (rows.results || []).map(formatJob);
+      if (tenantId === '*') {
+        const countResult = (await db.prepare(
+          `SELECT COUNT(*) as total FROM cron_jobs ${whereClause}`
+        ).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
+
+        const rows = (await db.prepare(
+          `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()) as { results: any[] };
+
+        jobs = (rows.results || []).map(formatJob);
+      } else {
+        const rows = (await db.prepare(
+          `SELECT * FROM cron_jobs ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+        ).bind(...params, 1000, 0).all()) as { results: any[] };
+        const rawList = rows.results || [];
+        const scoped: any[] = [];
+        for (const r of rawList) {
+          if (await checkCronJobTenant(db, r, tenantId)) {
+            scoped.push(r);
+          }
+        }
+        total = scoped.length;
+        jobs = scoped.slice(offset, offset + limit).map(formatJob);
+      }
     } catch {
       total = 0;
       jobs = [];
@@ -100,6 +118,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(CronRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
+    const tenantId = getTenantId(c);
 
     let job: any = null;
     try {
@@ -108,7 +127,7 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       job = null;
     }
 
-    if (!job) {
+    if (!job || !(await checkCronJobTenant(db, job, tenantId))) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
 
@@ -123,6 +142,8 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const body = c.req.valid('json');
     const user = c.get('user');
+    const tenantId = getTenantId(c);
+    const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
     const now = new Date().toISOString();
 
     const cronExpression = body.cronExpression || body.schedule?.cronExpression || '';
@@ -132,6 +153,11 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const cronParts = cronExpression.trim().split(/\s+/);
     if (cronParts.length !== 5 && !cronExpression.startsWith('@')) {
       return c.json({ success: false, error: 'Invalid cron expression format (must have 5 parts)' }, 400);
+    }
+
+    const requestedLocationId = body.locationId || body.locationIds?.[0] || null;
+    if (requestedLocationId && !(await isAllowedCronLocationForTenant(db, requestedLocationId, tenantId))) {
+      return c.json({ success: false, error: 'Invalid location for tenant' }, 403);
     }
 
     const id = crypto.randomUUID();
@@ -161,7 +187,14 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ).run();
 
     // Audit log
-    await writeCronJobAuditLog(db, user.id, 'cron_job_create', id, JSON.stringify(body), now);
+    await writeCronJobAuditLog(
+      db,
+      user.id,
+      'cron_job_create',
+      id,
+      JSON.stringify({ ...body, tenant_id: effectiveTenant }),
+      now
+    );
 
     const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
@@ -177,10 +210,11 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const now = new Date().toISOString();
 
     const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null);
-    if (!existing) {
+    if (!existing || !(await checkCronJobTenant(db, existing as any, tenantId))) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
 
@@ -190,6 +224,10 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       if (cronParts.length !== 5) {
         return c.json({ success: false, error: 'Invalid cron expression format (must have 5 parts)' }, 400);
       }
+    }
+
+    if (body.locationId !== undefined && body.locationId !== null && !(await isAllowedCronLocationForTenant(db, body.locationId, tenantId))) {
+      return c.json({ success: false, error: 'Invalid location for tenant' }, 403);
     }
 
     const updates: string[] = [];
@@ -239,10 +277,11 @@ export function registerJobCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    const tenantId = getTenantId(c);
     const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first().catch(() => null)) as any;
-    if (!existing) {
+    if (!existing || !(await checkCronJobTenant(db, existing, tenantId))) {
       return c.json({ success: false, error: 'Cron job not found' }, 404);
     }
 

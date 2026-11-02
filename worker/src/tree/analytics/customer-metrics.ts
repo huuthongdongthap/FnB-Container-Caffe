@@ -17,18 +17,35 @@ export interface CustomerMetrics {
  * Runs four independent aggregation queries and combines results.
  */
 export async function getCustomerMetrics(
-  db: import('@cloudflare/workers-types').D1Database
+  db: import('@cloudflare/workers-types').D1Database,
+  tenantId?: string
 ): Promise<CustomerMetrics> {
+  const hasTenant = Boolean(tenantId && tenantId !== '*');
+  const tenantWhere = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' WHERE tenant_id = ?';
+  const tenantAnd = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const runFirst = <T>(sql: string) => {
+    const stmt = db.prepare(sql);
+    return hasTenant && tenantId ? stmt.bind(tenantId).first<T>() : stmt.first<T>();
+  };
+
   const [totalRow, newRow, repeatRow, avgRow] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS total_customers FROM customers').first<{ total_customers: number }>(),
-    db.prepare(
-      'SELECT COUNT(*) AS new_30d FROM customers WHERE created_at >= datetime(\'now\', \'-30 days\')'
-    ).first<{ new_30d: number }>(),
-    db.prepare(`
+    runFirst<{ total_customers: number }>(`SELECT COUNT(*) AS total_customers FROM customers${tenantWhere}`),
+    runFirst<{ new_30d: number }>(
+      `SELECT COUNT(*) AS new_30d FROM customers WHERE created_at >= datetime('now', '-30 days')${tenantAnd}`
+    ),
+    runFirst<{ repeat_rate: number }>(`
       WITH customer_orders AS (
         SELECT customer_phone, COUNT(*) AS cnt
         FROM orders
-        WHERE status != 'cancelled' AND customer_phone IS NOT NULL
+        WHERE status != 'cancelled' AND customer_phone IS NOT NULL${tenantAnd}
         GROUP BY customer_phone
       )
       SELECT
@@ -37,10 +54,10 @@ export async function getCustomerMetrics(
           ELSE 0
         END AS repeat_rate
       FROM customer_orders
-    `).first<{ repeat_rate: number }>(),
-    db.prepare(
-      'SELECT AVG(total) AS avg_order_value FROM orders WHERE status != \'cancelled\''
-    ).first<{ avg_order_value: number }>()
+    `),
+    runFirst<{ avg_order_value: number }>(
+      `SELECT AVG(total) AS avg_order_value FROM orders WHERE status != 'cancelled'${tenantAnd}`
+    )
   ]);
 
   return {

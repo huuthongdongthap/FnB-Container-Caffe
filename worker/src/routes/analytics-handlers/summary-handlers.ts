@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import {
   getSummary,
   getSummaryCompare,
@@ -25,7 +26,8 @@ export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
     const { days, compare, group } = parsed.data;
     const db = c.env.AURA_DB;
     const kv = c.env.AUTH_KV;
-    const cacheKey = `analytics:summary:${days}:${compare ?? false}:${group ?? 'none'}`;
+    const tenantId = getTenantId(c);
+    const cacheKey = `analytics:summary:${tenantId}:${days}:${compare ?? false}:${group ?? 'none'}`;
 
     // KV cache (30s TTL for the summary endpoint)
     if (kv) {
@@ -39,7 +41,7 @@ export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // compare=true — current + previous period
     if (compare) {
-      data = await getSummaryCompare(db, days);
+      data = await getSummaryCompare(db, days, tenantId);
 
       // Write cache
       if (kv) {
@@ -56,7 +58,7 @@ export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // group=hour|day|category|payment — grouped aggregation
     if (group) {
-      data = await getGrouped(db, group as GroupBy, days);
+      data = await getGrouped(db, group as GroupBy, days, tenantId);
 
       // Write cache
       if (kv) {
@@ -72,7 +74,7 @@ export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     // Default: plain aggregate for the period
-    data = await getSummary(db, days);
+    data = await getSummary(db, days, tenantId);
 
     // Write cache
     if (kv) {

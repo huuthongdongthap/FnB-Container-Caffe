@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
+import { optionalAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
 
 const VALID_RANGES = ['24h', '7d', '30d'] as const;
@@ -51,7 +52,7 @@ function formatDate(d: Date): string {
  * Escape a CSV field per RFC 4180 and neutralize spreadsheet formula triggers.
  */
 function escapeCsv(value: string): string {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const safe = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value;
   if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
@@ -59,6 +60,12 @@ function escapeCsv(value: string): string {
 }
 
 export const adminSalesRouter = new Hono<{ Bindings: Env }>();
+adminSalesRouter.use('*', async(c, next) => {
+  if (!c.get('user' as any) && c.req.header('Authorization')) {
+    return optionalAuth()(c, next);
+  }
+  await next();
+});
 
 adminSalesRouter.get('/csv', async(c) => {
   const parsed = salesCsvSchema.safeParse(c.req.query());
@@ -92,12 +99,12 @@ adminSalesRouter.get('/csv', async(c) => {
     const res = await db.prepare(`
       SELECT id, customer_name, items, total, payment_method, status, created_at
       FROM orders
-      WHERE (tenant_id = ? OR (? = 'default' AND tenant_id IS NULL))
+      WHERE (? = '*' OR tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '')))
         AND status != 'cancelled'
         AND created_at >= ? || ' 00:00:00'
         AND created_at <= ? || ' 23:59:59'
       ORDER BY created_at ASC
-    `).bind(tenantId, tenantId, startDate, endDate).all<SalesCsvRow>();
+    `).bind(tenantId, tenantId, tenantId, startDate, endDate).all<SalesCsvRow>();
     results = res.results;
   } catch (err) {
     if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {

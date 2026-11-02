@@ -2,15 +2,11 @@
 
 import { errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { getTenantId, matchesTenantRow } from '../lib/db';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'receipt' });
-
-function getTenantId(c: Context<{ Bindings: Env }>): string {
-  const user = (c as unknown as { get: (k: string) => { tenantId?: string } | undefined }).get('user');
-  return user?.tenantId || 'default';
-}
 
 export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
   try {
@@ -42,20 +38,24 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
       return errorResponse('Invoice not found', 404);
     }
 
-    const rawTenant = inv.subscription_tenant_id ?? inv.tenant_id;
-    if (rawTenant !== undefined) {
-      const rowTenant = typeof rawTenant === 'string' && rawTenant.trim() ? rawTenant.trim() : 'default';
-      if (rowTenant !== tenantId) {
-        return errorResponse('Invoice not found', 404);
-      }
-    } else if (tenantId !== 'default') {
+    const subTenant = inv.subscription_tenant_id !== undefined && inv.subscription_tenant_id !== null
+      ? String(inv.subscription_tenant_id).trim()
+      : '';
+    const invTenant = inv.tenant_id !== undefined && inv.tenant_id !== null
+      ? String(inv.tenant_id).trim()
+      : '';
+    const rawTenant = subTenant || invTenant || (inv.subscription_tenant_id !== undefined || inv.tenant_id !== undefined ? 'default' : undefined);
+    const rowForMatch = rawTenant !== undefined ? { tenant_id: rawTenant } : {};
+    if (!matchesTenantRow(rowForMatch, tenantId)) {
       return errorResponse('Invoice not found', 404);
     }
 
     const user = (c as unknown as { get: (k: string) => { id?: string; email?: string; role?: string } | undefined }).get('user');
-    if (user?.role === 'customer') {
-      const matchesId = Boolean(user.id && inv.customer_id && String(inv.customer_id) === String(user.id));
+    if (user?.role === 'customer' || user?.role === 'vendor') {
+      const hasCustomerId = Boolean(inv.customer_id && String(inv.customer_id).trim());
+      const matchesId = Boolean(user.id && hasCustomerId && String(inv.customer_id) === String(user.id));
       const matchesEmail = Boolean(
+        !hasCustomerId &&
         user.email &&
         inv.customer_email &&
         String(inv.customer_email).toLowerCase() === String(user.email).toLowerCase()
@@ -68,7 +68,8 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
     const amount = Number(inv.amount_vnd).toLocaleString('vi-VN');
     const periodStart = inv.period_start ? new Date(String(inv.period_start)).toLocaleDateString('vi-VN') : '—';
     const periodEnd = inv.period_end ? new Date(String(inv.period_end)).toLocaleDateString('vi-VN') : '—';
-    const invoiceNumber = inv.invoice_number || invoiceId;
+    const invoiceNumber = String(inv.invoice_number || invoiceId);
+    const safeFilenameInvoice = invoiceNumber.replace(/[^A-Za-z0-9._-]/g, '_');
     const paidAt = inv.paid_at ? new Date(String(inv.paid_at)).toLocaleString('vi-VN') : 'Chưa thanh toán';
 
     const lines = [
@@ -97,7 +98,7 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
     return new Response(lines.join('\n'), {
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
-        'Content-Disposition': `attachment; filename="receipt-${invoiceNumber}.txt"`,
+        'Content-Disposition': `attachment; filename="receipt-${safeFilenameInvoice}.txt"`,
       },
     });
   } catch (error) {

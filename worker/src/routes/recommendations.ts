@@ -5,10 +5,26 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
 
 export const recommendationsRouter = new Hono<{ Bindings: Env }>();
+
+recommendationsRouter.use('/*', async (c, next) => {
+  if (!c.get('user' as never) && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    return optionalAuth()(c, next);
+  }
+  return next();
+});
+
+function resolveRecommendationsTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  if (c.get?.('user')) {
+    return getTenantId(c);
+  }
+  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
+  if (!raw || raw === '*') return 'default';
+  return raw;
+}
 
 const FALLBACK_PAIRINGS = [
   { id: 'croissant_bo', name: 'Bánh sừng bò bơ Pháp', category: 'pastry', reason: 'Món ăn kèm hoàn hảo với cà phê' },
@@ -31,17 +47,18 @@ recommendationsRouter.get('/frequently-bought-together', async (c) => {
     return c.json({ success: false, error: 'item_id query parameter is required' }, 400);
   }
 
-  const limit = Math.min(10, Math.max(1, parseInt(c.req.query('limit') || '4', 10)));
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const rawLimit = parseInt(c.req.query('limit') || '4', 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 4;
+  const tenantId = resolveRecommendationsTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const { results: affinities } = await db.prepare(`
     SELECT item_b AS id, co_occurrence_count, affinity_score
     FROM ai_product_affinities
-    WHERE tenant_id = ? AND item_a = ?
+    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND item_a = ?
     ORDER BY affinity_score DESC, co_occurrence_count DESC
     LIMIT ?
-  `).bind(tenantId, itemId, limit).all<{ id: string; co_occurrence_count: number; affinity_score: number }>();
+  `).bind(tenantId, tenantId, itemId, limit).all<{ id: string; co_occurrence_count: number; affinity_score: number }>().catch(() => ({ results: [] }));
 
   if (affinities && affinities.length > 0) {
     const data = affinities.map(a => ({
@@ -65,16 +82,17 @@ recommendationsRouter.get('/frequently-bought-together', async (c) => {
 // GET /api/recommendations/trending
 recommendationsRouter.get('/trending', async (c) => {
   const range = c.req.query('range') === '24h' ? 24 : 168; // 24h or 7d
-  const limit = Math.min(10, Math.max(1, parseInt(c.req.query('limit') || '5', 10)));
-  const tenantId = c.req.query('tenant_id') || getTenantId(c);
+  const rawLimit = parseInt(c.req.query('limit') || '5', 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 5;
+  const tenantId = resolveRecommendationsTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const hoursAgo = new Date(Date.now() - range * 3600000).toISOString();
   const { results: orders } = await db.prepare(`
     SELECT items FROM orders
-    WHERE tenant_id = ? AND status != 'cancelled' AND created_at >= ?
+    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
     ORDER BY created_at DESC LIMIT 200
-  `).bind(tenantId, hoursAgo).all<{ items: string }>();
+  `).bind(tenantId, tenantId, hoursAgo).all<{ items: string }>().catch(() => ({ results: [] }));
 
   const counts = new Map<string, { count: number; name: string }>();
   for (const o of orders || []) {
@@ -103,15 +121,16 @@ recommendationsRouter.get('/trending', async (c) => {
 });
 
 // POST /api/recommendations/mine-affinities (Staff/Owner)
-recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'manager', 'staff']), async (c) => {
-  const tenantId = getTenantId(c);
+recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']), async (c) => {
+  const rawTenant = getTenantId(c);
+  const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const { results: orders } = await db.prepare(`
     SELECT items FROM orders
-    WHERE tenant_id = ? AND status != 'cancelled'
+    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND status != 'cancelled'
     ORDER BY created_at DESC LIMIT 500
-  `).bind(tenantId).all<{ items: string }>();
+  `).bind(rawTenant, rawTenant).all<{ items: string }>();
 
   const coOccur = new Map<string, Map<string, number>>();
   const itemCounts = new Map<string, number>();
@@ -138,7 +157,7 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'manager', 
     const totalA = itemCounts.get(itemA) || 1;
     for (const [itemB, count] of neighbors.entries()) {
       const score = Math.round((count / totalA) * 100) / 100;
-      const id = `${tenantId}_${itemA}_${itemB}`;
+      const id = `${targetTenant}_${itemA}_${itemB}`;
       statements.push(db.prepare(`
         INSERT INTO ai_product_affinities (id, tenant_id, item_a, item_b, co_occurrence_count, affinity_score, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -146,7 +165,7 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'manager', 
           co_occurrence_count = excluded.co_occurrence_count,
           affinity_score = excluded.affinity_score,
           updated_at = excluded.updated_at
-      `).bind(id, tenantId, itemA, itemB, count, score));
+      `).bind(id, targetTenant, itemA, itemB, count, score));
       minedPairs++;
     }
   }

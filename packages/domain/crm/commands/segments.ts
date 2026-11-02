@@ -57,6 +57,7 @@ export interface SegmentResult {
 export interface BuildOptions {
   limit?: number;
   offset?: number;
+  tenantId?: string;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -123,7 +124,7 @@ export async function loadSegmentDefinitions(
  * Lightweight customer scan: id, tier, lifetime_points, last_order_at.
  * Used to evaluate segment predicates in-memory.
  */
-async function scanCustomers(db: D1Database): Promise<
+async function scanCustomers(db: D1Database, tenantId?: string): Promise<
   Array<{
     id: string;
     name: string | null;
@@ -136,17 +137,26 @@ async function scanCustomers(db: D1Database): Promise<
   }>
 > {
   try {
-    const { results } = await db
-      .prepare(
+    const hasTenantFilter = Boolean(tenantId && tenantId !== '*');
+    const whereClause = hasTenantFilter
+      ? "WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?"
+      : '';
+    try {
+      const stmt = db.prepare(
         `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
                 MAX(o.created_at) as last_order_at,
                 MIN(o.created_at) as first_order_at,
                 COUNT(o.id) as order_count
          FROM customers c
-         LEFT JOIN orders o ON (o.customer_id = c.id OR o.customer_phone = c.phone) AND o.status != 'cancelled'
+         LEFT JOIN orders o
+           ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone))
+          AND o.status != 'cancelled'
+          AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')
+         ${whereClause}
          GROUP BY c.id`,
-      )
-      .all<{
+      );
+      const bound = hasTenantFilter && typeof stmt.bind === 'function' ? stmt.bind(tenantId!) : stmt;
+      const { results } = await bound.all<{
         id: string;
         name: string | null;
         phone: string | null;
@@ -156,7 +166,30 @@ async function scanCustomers(db: D1Database): Promise<
         first_order_at?: string | null;
         order_count?: number;
       }>();
-    return results ?? [];
+      return results ?? [];
+    } catch {
+      const { results } = await db
+        .prepare(
+          `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
+                  MAX(o.created_at) as last_order_at,
+                  MIN(o.created_at) as first_order_at,
+                  COUNT(o.id) as order_count
+           FROM customers c
+           LEFT JOIN orders o ON (o.customer_id = c.id OR o.customer_phone = c.phone) AND o.status != 'cancelled'
+           GROUP BY c.id`,
+        )
+        .all<{
+          id: string;
+          name: string | null;
+          phone: string | null;
+          tier: string;
+          lifetime_points: number;
+          last_order_at: string | null;
+          first_order_at?: string | null;
+          order_count?: number;
+        }>();
+      return results ?? [];
+    }
   } catch (err) {
     log.error('segment_scan_failed', { error: String(err) });
     return [];
@@ -218,7 +251,7 @@ export async function buildSegment(
   }
 
   const policy = await resolveBandPolicy(kv);
-  const all = await scanCustomers(db);
+  const all = await scanCustomers(db, options.tenantId);
   const matched: SegmentRow[] = [];
 
   for (const row of all) {
@@ -289,11 +322,12 @@ export async function listSegments(
   db: D1Database,
   kv?: KVNamespace,
   now: Date = new Date(),
+  options: BuildOptions = {},
 ): Promise<Array<SegmentResult>> {
   const definitions = await loadSegmentDefinitions(kv);
   const results: SegmentResult[] = [];
   for (const def of definitions) {
-    const full = await buildSegment(db, def.key, kv, { limit: 0 }, now);
+    const full = await buildSegment(db, def.key, kv, { ...options, limit: 0 }, now);
     results.push(full);
   }
   return results;

@@ -16,6 +16,7 @@ export interface ReversalInput {
   customerId: string;
   /** Refund amount in VND (may be partial). */
   refundAmountVnd: number;
+  tenantId?: string;
   reason?: string;
 }
 
@@ -72,17 +73,42 @@ export async function reverseAccrual(
   }
 
   // ── Load the original order ──
-  let order: { total: number; points_earned: number; cashback_earned?: number } | null = null;
+  let order: { total: number; points_earned: number; cashback_earned?: number; customer_id?: string | null; tenant_id?: string | null } | null = null;
   try {
     order = await db
       .prepare('SELECT total, points_earned FROM orders WHERE id = ?')
       .bind(orderId)
-      .first<{ total: number; points_earned: number; cashback_earned?: number }>();
+      .first<{ total: number; points_earned: number; cashback_earned?: number; customer_id?: string | null; tenant_id?: string | null }>();
+    if (order && order.cashback_earned === undefined && order.customer_id === undefined) {
+      const extra = await db
+        .prepare('SELECT cashback_earned, customer_id, tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ cashback_earned?: number; customer_id?: string | null; tenant_id?: string | null }>()
+        .catch(() => null);
+      if (extra) {
+        Object.assign(order, extra);
+      }
+    }
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
   }
   if (!order) {
     return { ok: false, reason: 'order_not_found' };
+  }
+  if (
+    typeof order.customer_id === 'string' &&
+    order.customer_id.trim() !== '' &&
+    order.customer_id !== 'guest' &&
+    order.customer_id !== customerId
+  ) {
+    return { ok: false, reason: 'order_not_found' };
+  }
+  if (input.tenantId && input.tenantId !== '*' && 'tenant_id' in order && order.tenant_id !== undefined) {
+    const reqTenant = input.tenantId.trim() || 'default';
+    const ordTenant = (order.tenant_id && String(order.tenant_id).trim()) || 'default';
+    if (ordTenant !== reqTenant) {
+      return { ok: false, reason: 'order_not_found' };
+    }
   }
 
   const pointsEarned = order.points_earned ?? 0;
@@ -101,21 +127,53 @@ export async function reverseAccrual(
     loyalty_points: number;
     lifetime_points: number;
     loyalty_tier: string | null;
+    tenant_id?: string | null;
   }
+  const effectiveTenant =
+    input.tenantId && input.tenantId !== '*'
+      ? input.tenantId.trim() || 'default'
+      : null;
+
   let customer: CustomerRow | null = null;
   try {
-    customer = await db
-      .prepare(
-        `SELECT id, loyalty_points, lifetime_points, loyalty_tier
-         FROM customers WHERE id = ?`,
-      )
-      .bind(customerId)
-      .first<CustomerRow>();
+    if (effectiveTenant) {
+      try {
+        customer = await db
+          .prepare(
+            `SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id
+             FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+          )
+          .bind(customerId, effectiveTenant)
+          .first<CustomerRow>();
+      } catch {
+        customer = await db
+          .prepare(
+            `SELECT id, loyalty_points, lifetime_points, loyalty_tier
+             FROM customers WHERE id = ?`,
+          )
+          .bind(customerId)
+          .first<CustomerRow>();
+      }
+    } else {
+      customer = await db
+        .prepare(
+          `SELECT id, loyalty_points, lifetime_points, loyalty_tier
+           FROM customers WHERE id = ?`,
+        )
+        .bind(customerId)
+        .first<CustomerRow>();
+    }
   } catch (e) {
     return { ok: false, reason: 'd1_error', error: `failed to read customer: ${(e as Error).message}` };
   }
   if (!customer) {
     return { ok: false, reason: 'customer_not_found' };
+  }
+  if (effectiveTenant && 'tenant_id' in customer && customer.tenant_id !== undefined) {
+    const custTenant = String(customer.tenant_id ?? '').trim() || 'default';
+    if (custTenant !== effectiveTenant) {
+      return { ok: false, reason: 'customer_not_found' };
+    }
   }
 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -176,14 +234,36 @@ export async function reverseAccrual(
     const cashbackEarned = Number(order.cashback_earned ?? 0);
     if (cashbackEarned > 0) {
       const cashbackToReverse = Math.max(1, Math.round(cashbackEarned * ratio));
-      await db
-        .prepare(
-          `UPDATE cashback_wallets
-           SET balance = MAX(0, balance - ?), updated_at = ?
-           WHERE customer_id = ?`,
-        )
-        .bind(cashbackToReverse, now, customer.id)
-        .run();
+      if (effectiveTenant) {
+        try {
+          await db
+            .prepare(
+              `UPDATE cashback_wallets
+               SET balance = MAX(0, balance - ?), updated_at = ?
+               WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+            )
+            .bind(cashbackToReverse, now, customer.id, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare(
+              `UPDATE cashback_wallets
+               SET balance = MAX(0, balance - ?), updated_at = ?
+               WHERE customer_id = ?`,
+            )
+            .bind(cashbackToReverse, now, customer.id)
+            .run();
+        }
+      } else {
+        await db
+          .prepare(
+            `UPDATE cashback_wallets
+             SET balance = MAX(0, balance - ?), updated_at = ?
+             WHERE customer_id = ?`,
+          )
+          .bind(cashbackToReverse, now, customer.id)
+          .run();
+      }
       await db
         .prepare(
           `UPDATE orders

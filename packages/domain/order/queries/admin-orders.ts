@@ -24,9 +24,6 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
     const filters: Array<[string, string]> = [];
-    if (resolvedTenant && resolvedTenant !== '*') {
-      filters.push(['o.tenant_id', resolvedTenant]);
-    }
     if (status) filters.push(['o.status', status]);
     if (paymentStatus) filters.push(['o.payment_status', paymentStatus]);
 
@@ -34,7 +31,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
        o.items, o.shipping_fee, o.discount,
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
      FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
-    const { clause, params } = buildOrderFilterClause({ filters });
+    const { clause, params } = buildOrderFilterClause({ tenantId: resolvedTenant, filters });
     const tail = buildOrderTail({
       sort: sortParam,
       order,
@@ -78,7 +75,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     });
 
     const countQuery = `SELECT COUNT(*) as total FROM orders WHERE 1=1${clause.replace(/o\./g, '')}`;
-    const countParams = filters.map(([, value]) => value);
+    const countParams = params;
 
     const { results: countResult } = await db.prepare(countQuery).bind(...countParams).all<{ total: number }>();
     const total = countResult[0]?.total || 0;

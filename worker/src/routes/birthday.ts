@@ -5,12 +5,36 @@
 
 import { Hono } from 'hono';
 import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
-import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { optionalAuth, requireAuth } from '../middleware/auth';
+import { getTenantId, matchesTenantRow } from '../lib/db';
 import type { Env } from '../types/env';
 
 
 export const birthdayRouter = new Hono<{ Bindings: Env }>();
+birthdayRouter.use('*', optionalAuth());
+
+function makeBirthdayRedemptionId(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `bday_${Date.now().toString(36)}${rand}`;
+}
+
+function resolveBirthdayConfigKey(tenantId: string): { effectiveTenant: string; key: string } {
+  const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+  return { effectiveTenant, key: `config:birthday:${effectiveTenant}` };
+}
+
+async function readBirthdayConfigRaw(kv: Env['AUTH_KV'] | undefined, tenantId: string): Promise<string | null> {
+  if (!kv) return null;
+  const { effectiveTenant, key } = resolveBirthdayConfigKey(tenantId);
+  const scoped = await kv.get(key);
+  if (scoped !== null && scoped !== undefined) return scoped;
+  if (effectiveTenant === 'default') {
+    return (await kv.get('config:birthday')) ?? null;
+  }
+  return null;
+}
 
 type BirthdayCustomerRow = {
   id: string;
@@ -30,20 +54,31 @@ async function findBirthdayCustomer(
   const val = by.id ?? by.phone ?? '';
   let row: BirthdayCustomerRow | null = null;
   try {
-    row = await db
-      .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
-      .bind(val)
-      .first<BirthdayCustomerRow>();
+    if (tenantId !== '*') {
+      row = await db
+        .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? THEN 0 ELSE 1 END`)
+        .bind(val, tenantId)
+        .first<BirthdayCustomerRow>();
+    } else {
+      row = await db
+        .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
+        .bind(val)
+        .first<BirthdayCustomerRow>();
+    }
   } catch {
-    row = await db
-      .prepare(`SELECT * FROM customers WHERE ${col} = ?`)
-      .bind(val)
-      .first<BirthdayCustomerRow>();
+    try {
+      row = await db
+        .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
+        .bind(val)
+        .first<BirthdayCustomerRow>();
+    } catch {
+      row = await db
+        .prepare(`SELECT * FROM customers WHERE ${col} = ?`)
+        .bind(val)
+        .first<BirthdayCustomerRow>();
+    }
   }
-  if (!row) return null;
-  if ('tenant_id' in row && row.tenant_id !== undefined && (row.tenant_id || 'default') !== tenantId) {
-    return null;
-  }
+  if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) return null;
   const resolvedBirthday = row.birthday ?? row.date_of_birth ?? '';
   return {
     id: row.id,
@@ -62,9 +97,18 @@ const DEFAULT_BIRTHDAY_CONFIG = {
 };
 
 // GET /api/admin/birthday/config — fetch birthday campaign configuration
-birthdayRouter.get('/config', async (c) => {
+birthdayRouter.get(
+  '/config',
+  async (c, next) => {
+    if (c.env?.JWT_SECRET || c.req.header('Authorization')) {
+      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
+    }
+    await next();
+  },
+  async (c) => {
   try {
-    const raw = await c.env.AUTH_KV?.get('config:birthday');
+    const tenantId = getTenantId(c);
+    const raw = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
     const parsed = raw ? (JSON.parse(raw) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>) : {};
     return c.json({
       discountPercent: Number(parsed.discountPercent ?? DEFAULT_BIRTHDAY_CONFIG.discountPercent),
@@ -82,14 +126,16 @@ birthdayRouter.get('/config', async (c) => {
 birthdayRouter.put(
   '/config',
   async (c, next) => {
-    if (c.env?.JWT_SECRET) {
-      return requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
+    if (c.env?.JWT_SECRET || c.req.header('Authorization')) {
+      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
     }
     await next();
   },
   async (c) => {
+  const tenantId = getTenantId(c);
+  const { effectiveTenant, key } = resolveBirthdayConfigKey(tenantId);
   const body = (await c.req.json().catch(() => ({}))) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>;
-  const raw = await c.env.AUTH_KV?.get('config:birthday');
+  const raw = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
   const prev = raw ? (JSON.parse(raw) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>) : {};
   const next = {
     discountPercent: typeof body.discountPercent === 'number' ? body.discountPercent : Number(prev.discountPercent ?? DEFAULT_BIRTHDAY_CONFIG.discountPercent),
@@ -98,7 +144,10 @@ birthdayRouter.put(
     lateWindowDays: typeof body.lateWindowDays === 'number' ? body.lateWindowDays : Number(prev.lateWindowDays ?? DEFAULT_BIRTHDAY_CONFIG.lateWindowDays),
     autoSendEnabled: typeof body.autoSendEnabled === 'boolean' ? body.autoSendEnabled : Boolean(prev.autoSendEnabled ?? DEFAULT_BIRTHDAY_CONFIG.autoSendEnabled),
   };
-  await c.env.AUTH_KV?.put('config:birthday', JSON.stringify(next));
+  await c.env.AUTH_KV?.put(key, JSON.stringify(next));
+  if (effectiveTenant === 'default') {
+    await c.env.AUTH_KV?.put('config:birthday', JSON.stringify(next));
+  }
   return c.json(next);
 });
 
@@ -129,7 +178,7 @@ birthdayRouter.get('/check', async(c) => {
     let lateWindowDays = 7;
     if (c.env.AUTH_KV) {
       try {
-        const rawCfg = await c.env.AUTH_KV.get('config:birthday');
+        const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
         if (rawCfg) {
           const cfg = JSON.parse(rawCfg);
           if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
@@ -204,7 +253,7 @@ birthdayRouter.post(
   async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production';
     if ((isProd && c.env?.JWT_SECRET) || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier', 'customer'])(c, next);
+      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'])(c, next);
     }
     await next();
   },
@@ -239,10 +288,29 @@ birthdayRouter.post(
     return c.json({ success: false, error: 'Already redeemed this year' }, 400);
   }
 
+  if (data.order_id) {
+    let orderRow: { id: string; tenant_id?: string | null } | null = null;
+    try {
+      orderRow = await db
+        .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
+        .bind(data.order_id)
+        .first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      orderRow = await db
+        .prepare('SELECT id FROM orders WHERE id = ?')
+        .bind(data.order_id)
+        .first<{ id: string }>()
+        .catch(() => null);
+    }
+    if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+  }
+
   let discountPercent = 15;
   if (c.env.AUTH_KV) {
     try {
-      const rawCfg = await c.env.AUTH_KV.get('config:birthday');
+      const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
       if (rawCfg) {
         const cfg = JSON.parse(rawCfg);
         if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
@@ -252,7 +320,7 @@ birthdayRouter.post(
     }
   }
 
-  const id = `bday_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const id = makeBirthdayRedemptionId();
   const now = new Date().toISOString();
 
   await db.prepare(

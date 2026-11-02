@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
+import { getTenantId } from '../../middleware/tenant';
 import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
@@ -26,7 +27,8 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const { limit } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const cacheKey = buildCacheKey('top-products', { limit: String(limit) });
+    const tenantId = getTenantId(c);
+    const cacheKey = buildCacheKey('top-products', { tenant: tenantId, limit: String(limit) });
 
     // Try cache first
     if (kv) {
@@ -36,7 +38,7 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
       }
     }
 
-    const data = await getTopProducts(c.env.AURA_DB, limit);
+    const data = await getTopProducts(c.env.AURA_DB, limit, tenantId);
 
     // Write cache
     if (kv) {
@@ -67,7 +69,8 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const { days } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const cacheKey = buildCacheKey('peak-hours', { days: String(days) });
+    const tenantId = getTenantId(c);
+    const cacheKey = buildCacheKey('peak-hours', { tenant: tenantId, days: String(days) });
 
     // Try cache first
     if (kv) {
@@ -77,7 +80,7 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
       }
     }
 
-    const data = await getPeakHours(c.env.AURA_DB, days);
+    const data = await getPeakHours(c.env.AURA_DB, days, tenantId);
 
     // Write cache
     if (kv) {
@@ -95,7 +98,8 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // GET /api/analytics/customer-metrics
   router.get('/customer-metrics', async (c) => {
-    const data = await getCustomerMetrics(c.env.AURA_DB);
+    const tenantId = getTenantId(c);
+    const data = await getCustomerMetrics(c.env.AURA_DB, tenantId);
     return c.json({ success: true, data });
   });
 
@@ -110,12 +114,13 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
     }
     const { days } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const cacheKey = buildCacheKey('zones', { days: String(days) });
+    const tenantId = getTenantId(c);
+    const cacheKey = buildCacheKey('zones', { tenant: tenantId, days: String(days) });
     if (kv) {
       const cached = await getCached<unknown[]>(kv, cacheKey);
       if (cached) return c.json({ success: true, data: cached.data, cached: true });
     }
-    const data = await getZoneStats(c.env.AURA_DB, days);
+    const data = await getZoneStats(c.env.AURA_DB, days, tenantId);
     if (kv) {
       const p = setCache(kv, cacheKey, data);
       try {
@@ -130,23 +135,34 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/payout - owner only: COD + PayOS net payout summary
   router.get('/payout', requireAuth(['owner']), async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const hasTenant = Boolean(tenantId && tenantId !== '*');
+    const tenantWhere = !hasTenant
+      ? ''
+      : tenantId === 'default'
+        ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' WHERE tenant_id = ?';
+    const runFirst = <T>(sql: string) => {
+      const stmt = db.prepare(sql);
+      return hasTenant ? stmt.bind(tenantId).first<T>() : stmt.first<T>();
+    };
     try {
       let row: { cod_total: number; payos_total: number; refunded_total: number; total_orders: number } | null = null;
       try {
-        row = await db.prepare(`SELECT
+        row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>(`SELECT
           COALESCE(SUM(CASE WHEN is_cod = 1 AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
           COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status = 'paid' THEN total ELSE 0 END), 0) AS payos_total,
           COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
           COUNT(*) AS total_orders
-          FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+          FROM orders${tenantWhere}`);
       } catch (queryErr) {
         if (String((queryErr as Error)?.message || '').includes('column')) {
-          row = await db.prepare(`SELECT
+          row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>(`SELECT
             COALESCE(SUM(CASE WHEN payment_method IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
             COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
             COALESCE(SUM(CASE WHEN status = 'refunded' OR payment_status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
             COUNT(*) AS total_orders
-            FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+            FROM orders${tenantWhere}`);
         } else {
           throw queryErr;
         }

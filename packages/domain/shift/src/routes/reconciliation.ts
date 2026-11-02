@@ -9,7 +9,7 @@ export function reconciliationRoutes(app: Hono<any>) {
     app[method](path, (c) => {
       const user = c.get('user');
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
-      if (!['owner', 'manager', 'staff', 'admin', 'cashier', 'waiter'].includes(user.role)) return c.json({ error: 'Forbidden' }, 403);
+      if (!['owner', 'manager', 'supervisor', 'staff', 'admin', 'cashier', 'waiter'].includes(user.role)) return c.json({ error: 'Forbidden' }, 403);
       return c.json({ success: false,
       code: 'PILOT_CASH_RECONCILIATION_DISABLED',
       error: 'Cash reconciliation is unavailable for the attendance pilot',

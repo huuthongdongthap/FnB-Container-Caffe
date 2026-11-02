@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 
 interface D1Database {
   prepare: (sql: string) => {
@@ -21,8 +22,26 @@ type AppContext = { Bindings: AppEnv };
 export function inventorySnapshots(app: Hono<AppContext>) {
   app.get('/:id/snapshots', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const itemId = c.req.param('id');
-    const limit = Math.min(parseInt(c.req.query('limit') || '30'), 100);
+    const rawLimit = parseInt(c.req.query('limit') || '30', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 30;
+
+    let item = await db
+      .prepare('SELECT * FROM inventory_items WHERE id = ?')
+      .bind(itemId)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (!item) {
+      item = await db
+        .prepare('SELECT * FROM ingredients WHERE id = ?')
+        .bind(itemId)
+        .first<Record<string, unknown>>()
+        .catch(() => null);
+    }
+    if (!item || !matchesTenantRow(item, tenantId)) {
+      return c.json({ error: 'Item không tồn tại' }, 404);
+    }
 
     let query = 'SELECT * FROM inventory_snapshots WHERE item_id = ?';
     const params: (string | number)[] = [itemId];
@@ -47,12 +66,13 @@ export function inventorySnapshots(app: Hono<AppContext>) {
 
   app.post('/:id/snapshots', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const itemId = c.req.param('id');
     const item = await db
-      .prepare('SELECT current_stock FROM inventory_items WHERE id = ?')
+      .prepare('SELECT * FROM inventory_items WHERE id = ?')
       .bind(itemId)
-      .first<{ current_stock: number }>();
-    if (!item) {
+      .first<{ current_stock: number; tenant_id?: string | null }>();
+    if (!item || !matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)) {
       return c.json({ error: 'Item không tồn tại' }, 404);
     }
 

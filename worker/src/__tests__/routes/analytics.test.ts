@@ -495,5 +495,119 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(typeof data.refunded).toBe('number');
     expect(typeof data.net).toBe('number');
   });
+
+  it('scopes KV cache keys and D1 tenant bindings per tenant across analytics routes and neutralizes leading-whitespace CSV formulas', async () => {
+    const boundArgsLog: Array<{ sql: string; args: unknown[] }> = [];
+    const accounts: Record<string, Record<string, unknown>> = {
+      u_1: { id: 'u_1', name: 'Owner Default', phone: null, role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 },
+      u_b: { id: 'u_b', name: 'Owner B', phone: null, role: 'owner', tenant_id: 'cafe-b', is_active: 1, auth_version: 1 },
+    };
+    const kvBacking = new Map<string, string>();
+    const kv = {
+      get: async (k: string) => kvBacking.get(k) ?? null,
+      put: async (k: string, v: string) => { kvBacking.set(k, v); },
+      delete: async (k: string) => { kvBacking.delete(k); },
+    };
+    const multiTenantEnv = createMockEnv({
+      AUTH_KV: kv as unknown as import('@cloudflare/workers-types').KVNamespace,
+      AURA_DB: {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => {
+            boundArgsLog.push({ sql, args });
+            return {
+              first: async () => {
+                if (/FROM users WHERE id = \?/i.test(sql)) {
+                  return accounts[String(args[0])] ?? null;
+                }
+                const isCafeB = args.includes('cafe-b');
+                return {
+                  total_orders: isCafeB ? 2 : 9,
+                  total_revenue: isCafeB ? 80000 : 450000,
+                  avg_order_value: 40000,
+                  total_customers: isCafeB ? 1 : 5,
+                  cod_total: isCafeB ? 80000 : 450000,
+                  payos_total: 0,
+                  refunded_total: 0,
+                };
+              },
+              all: async () => ({
+                results: args.includes('cafe-b')
+                  ? [{ product_name: 'Matcha B', total_qty: 2, revenue: 80000, hour: 9, order_count: 2, label: 'VIP', value: 80000, count: 2 }]
+                  : [{ product_name: 'Espresso Default', total_qty: 9, revenue: 450000, hour: 9, order_count: 9, label: 'Indoor', value: 450000, count: 9 }],
+                success: true,
+              }),
+              run: async () => ({ meta: { changes: 0 } }),
+            };
+          },
+        }),
+      } as unknown as import('@cloudflare/workers-types').D1Database,
+    });
+
+    const crypto = require('crypto');
+    const makeStaffBearer = (id: string, tenantId: string) => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+      const payload = Buffer.from(JSON.stringify({
+        id,
+        sub: id,
+        role: 'owner',
+        tenantId,
+        email: `${id}@test.aura`,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        authVersion: 1,
+        authTime: Math.floor(Date.now() / 1000),
+        sessionType: 'staff-web',
+      })).toString('base64url');
+      const sig = crypto.createHmac('sha256', 'test-jwt-secret-at-least-16-chars').update(`${header}.${payload}`).digest('base64url');
+      return `Bearer ${header}.${payload}.${sig}`;
+    };
+
+    const tokenDefault = makeStaffBearer('u_1', 'default');
+    const tokenCafeB = makeStaffBearer('u_b', 'cafe-b');
+
+    const resDefault = await analyticsRouter.fetch(
+      new Request('https://test.aura/?days=7', { headers: { Authorization: tokenDefault } }),
+      multiTenantEnv
+    );
+    const bodyDefault = await resDefault.json() as { data: { total_revenue: number }; cached: boolean };
+    expect(bodyDefault.data.total_revenue).toBe(450000);
+    expect(bodyDefault.cached).toBe(false);
+
+    const resCafeB = await analyticsRouter.fetch(
+      new Request('https://test.aura/?days=7', { headers: { Authorization: tokenCafeB } }),
+      multiTenantEnv
+    );
+    const bodyCafeB = await resCafeB.json() as { data: { total_revenue: number }; cached: boolean };
+    expect(bodyCafeB.data.total_revenue).toBe(80000);
+    expect(bodyCafeB.cached).toBe(false);
+    expect(kvBacking.has('analytics:summary:default:7:false:none')).toBe(true);
+    expect(kvBacking.has('analytics:summary:cafe-b:7:false:none')).toBe(true);
+
+    const topDefault = await analyticsRouter.fetch(
+      new Request('https://test.aura/top-products?limit=5', { headers: { Authorization: tokenDefault } }),
+      multiTenantEnv
+    );
+    const topCafeB = await analyticsRouter.fetch(
+      new Request('https://test.aura/top-products?limit=5', { headers: { Authorization: tokenCafeB } }),
+      multiTenantEnv
+    );
+    expect(((await topDefault.json()) as { data: Array<{ product_name: string }> }).data[0].product_name).toBe('Espresso Default');
+    expect(((await topCafeB.json()) as { data: Array<{ product_name: string }> }).data[0].product_name).toBe('Matcha B');
+
+    const csv = formatCsvRows([
+      {
+        id: 'ORD_CSV_1',
+        customer_name: ' =CMD|calc',
+        customer_phone: '\t+84900000000',
+        total: 50000,
+        status: 'completed',
+        payment_method: 'cod',
+        items: '[]',
+        created_at: '2026-10-30 10:00:00',
+      },
+    ]);
+    expect(csv).toContain("' =CMD|calc");
+    expect(csv).toContain("'\t+84900000000");
+  });
 });
 

@@ -1,6 +1,8 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
+import { getAuthToken, timingSafeEqualString } from '../../lib/jwt';
+import { isStaffRole, STAFF_SESSION_MAX_AGE_SECONDS } from '../../lib/staff-session';
 import { hashPassword, verifyPassword, generateToken } from './helpers';
 
 async function writeAuthAuditLog(
@@ -16,7 +18,7 @@ async function writeAuthAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -62,6 +64,16 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       'customer', body.locale || 'vi', 'bronze', 0, 0, null, now, now
     ).run();
 
+    try {
+      await db.prepare(
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+      ).bind(id, body.email, body.name || 'Thành viên', body.phone || '', 'bronze', 'default', now, now).run();
+    } catch {
+      await db.prepare(
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+      ).bind(id, body.email, body.name || 'Thành viên', body.phone || '', 'bronze', now).run().catch(() => {});
+    }
+
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -102,6 +114,14 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
+    const emailRateKey = `rl:login:email:${String(body.email || '').trim().toLowerCase()}`;
+    let failedAttempts = 0;
+    if (c.env?.AUTH_KV?.get) {
+      failedAttempts = Number((await c.env.AUTH_KV.get(emailRateKey).catch(() => null)) || 0);
+      if (failedAttempts >= 10) {
+        return c.json({ success: false, error: 'Too many failed login attempts' }, 429);
+      }
+    }
 
     let user = await db.prepare('SELECT * FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
     if (!user) {
@@ -110,13 +130,25 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       ).bind(body.email).first().catch(() => null);
     }
     if (!user || !await verifyPassword(body.password, user.password_hash)) {
+      if (c.env?.AUTH_KV?.put) {
+        await c.env.AUTH_KV.put(emailRateKey, String(failedAttempts + 1), { expirationTtl: 300 }).catch(() => {});
+      }
       return c.json({ success: false, error: 'Invalid credentials' }, 401);
+    }
+    if (user.is_active === 0 || user.is_active === false) {
+      return c.json({ success: false, error: 'Account is inactive', code: 'STAFF_ACCOUNT_INACTIVE' }, 403);
+    }
+    if (failedAttempts > 0 && c.env?.AUTH_KV?.delete) {
+      await c.env.AUTH_KV.delete(emailRateKey).catch(() => {});
     }
 
     const sessionId = crypto.randomUUID();
     const accessToken = generateToken();
     const refreshToken = generateToken();
-    const expiresAt = new Date(Date.now() + (body.rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000).toISOString();
+    const ttlMs = isStaffRole(String(user.role || ''))
+      ? STAFF_SESSION_MAX_AGE_SECONDS * 1000
+      : (body.rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
 
     let isTrustedDevice = false;
     if (body.deviceFingerprint) {
@@ -168,10 +200,13 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     const authHeader = c.req.header('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(c.req.raw) || authHeader?.replace(/^Bearer\s+/i, '');
 
     if (token) {
       await db.prepare('UPDATE sessions SET expires_at = ? WHERE access_token = ?').bind(now, token).run().catch(() => {});
+      if (c.env?.AUTH_KV?.put) {
+        await c.env.AUTH_KV.put('revoked:' + token, '1', { expirationTtl: 604800 }).catch(() => {});
+      }
     }
 
     await writeAuthAuditLog(db, user.id, 'logout', 'session', token || 'unknown', JSON.stringify({}), now);
@@ -229,13 +264,14 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(AuthRoutes.session as any, async (c: any) => {
     const db = c.env.AURA_DB;
     const user = c.get('user');
+    const now = new Date().toISOString();
 
     const authHeader = c.req.header('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = getAuthToken(c.req.raw) || authHeader?.replace(/^Bearer\s+/i, '');
 
     const session = await db.prepare(
-      'SELECT id, expires_at, is_trusted_device, device_name, last_used_at FROM sessions WHERE access_token = ?'
-    ).bind(token).first();
+      'SELECT id, expires_at, is_trusted_device, device_name, last_used_at FROM sessions WHERE access_token = ? AND user_id = ? AND expires_at > ?'
+    ).bind(token, user.id, now).first();
 
     if (!session) {
       return c.json({ success: false, error: 'Session not found' }, 404);
@@ -244,17 +280,20 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const fullUser = await db.prepare(
       'SELECT id, name, email, phone, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url FROM users WHERE id = ?'
     ).bind(user.id).first();
+    if (!fullUser) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
 
     return c.json({
       success: true,
       data: {
         user: {
-          ...fullUser!,
-          role: fullUser!.role,
-          locale: fullUser!.locale,
-          loyaltyTier: fullUser!.loyalty_tier,
-          loyaltyPoints: fullUser!.loyalty_points,
-          emailVerified: fullUser!.email_verified === 1,
+          ...fullUser,
+          role: fullUser.role,
+          locale: fullUser.locale,
+          loyaltyTier: fullUser.loyalty_tier,
+          loyaltyPoints: fullUser.loyalty_points,
+          emailVerified: fullUser.email_verified === 1,
         },
         session: {
           id: session.id,
@@ -272,19 +311,61 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const body = c.req.valid('json');
     const now = new Date().toISOString();
+    const normalizedEmail = String(body.email || '').trim().toLowerCase();
+    const attemptsKey = `verify_attempts:${normalizedEmail}`;
 
-    const verification = await db.prepare(
-      'SELECT * FROM email_verifications WHERE email = ? AND code = ? AND expires_at > ? AND used = 0'
-    ).bind(body.email, body.code, now).first();
+    if (c.env?.AUTH_KV?.get) {
+      const priorAttempts = Number((await c.env.AUTH_KV.get(attemptsKey).catch(() => null)) || 0);
+      if (priorAttempts >= 5) {
+        return c.json({ success: false, error: 'Too many verification attempts' }, 429);
+      }
+    }
 
-    if (!verification) {
+    let verification: any = null;
+    try {
+      verification = await db.prepare(
+        "SELECT * FROM email_verifications WHERE lower(email) = lower(?) AND expires_at > ? AND COALESCE(used, 0) = 0 AND COALESCE(type, 'email_verification') != 'password_reset' ORDER BY created_at DESC LIMIT 1"
+      ).bind(body.email, now).first();
+    } catch {
+      verification = await db.prepare(
+        'SELECT * FROM email_verifications WHERE lower(email) = lower(?) AND expires_at > ? ORDER BY created_at DESC LIMIT 1'
+      ).bind(body.email, now).first().catch(() => null);
+    }
+    if (verification && (verification.type === 'password_reset' || Number(verification.used || 0) === 1)) {
+      verification = null;
+    }
+
+    const storedCode = String(verification?.code ?? verification?.token ?? '');
+    if (!verification || !storedCode || !timingSafeEqualString(storedCode, String(body.code || ''))) {
+      let attempts = 1;
+      if (c.env?.AUTH_KV?.get && c.env?.AUTH_KV?.put) {
+        const prev = Number((await c.env.AUTH_KV.get(attemptsKey).catch(() => null)) || 0);
+        attempts = prev + 1;
+        await c.env.AUTH_KV.put(attemptsKey, String(attempts), { expirationTtl: 900 }).catch(() => {});
+      }
+      if (attempts >= 5) {
+        if (verification?.id) {
+          await db.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verification.id).run().catch(() => {});
+        }
+        return c.json({ success: false, error: 'Too many verification attempts' }, 429);
+      }
       return c.json({ success: false, error: 'Invalid or expired code' }, 400);
     }
 
-    await db.prepare('UPDATE email_verifications SET used = 1, verified_at = ? WHERE id = ?').bind(now, verification.id).run();
-    await db.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE email = ?').bind(now, body.email).run();
+    const user = await db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)').bind(body.email).first();
+    if (!user) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
+    if (user.is_active === 0 || user.is_active === false) {
+      return c.json({ success: false, error: 'Account is inactive' }, 403);
+    }
 
-    const user = await db.prepare('SELECT * FROM users WHERE email = ?').bind(body.email).first();
+    if (c.env?.AUTH_KV?.delete) {
+      await c.env.AUTH_KV.delete(attemptsKey).catch(() => {});
+    }
+    await db.prepare('UPDATE email_verifications SET used = 1, verified_at = ? WHERE id = ?').bind(now, verification.id).run();
+    await db.prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?').bind(now, user.id).run();
+
     const sessionId = crypto.randomUUID();
     const accessToken = generateToken();
     const refreshToken = generateToken();
@@ -293,26 +374,26 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     await db.prepare(
       `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, device_fingerprint, device_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(sessionId, user!.id, accessToken, refreshToken, expiresAt, 0, null, null, now, now).run();
+    ).bind(sessionId, user.id, accessToken, refreshToken, expiresAt, 0, null, null, now, now).run();
 
-    await writeAuthAuditLog(db, user!.id, 'verify_email', 'user', user!.id, JSON.stringify({}), now);
+    await writeAuthAuditLog(db, user.id, 'verify_email', 'user', user.id, JSON.stringify({}), now);
 
     return c.json({
       success: true,
       data: {
         user: {
-          id: user!.id,
-          name: user!.name,
-          email: user!.email,
-          phone: user!.phone,
-          role: user!.role,
-          locale: user!.locale,
-          loyaltyTier: user!.loyalty_tier,
-          loyaltyPoints: user!.loyalty_points,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          locale: user.locale,
+          loyaltyTier: user.loyalty_tier,
+          loyaltyPoints: user.loyalty_points,
           emailVerified: true,
-          avatarUrl: user!.avatar_url,
-          createdAt: user!.created_at,
-          updatedAt: user!.updated_at,
+          avatarUrl: user.avatar_url,
+          createdAt: user.created_at,
+          updatedAt: user.updated_at,
         },
         session: {
           id: sessionId,
@@ -325,23 +406,29 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 
-  // POST /api/auth/forgot-password - Request password reset with client-IP rate limiting
+  // POST /api/auth/forgot-password - Request password reset with client-IP and email rate limiting
   app.post('/api/auth/forgot-password', async (c: any) => {
     const db = c.env.AURA_DB;
     const data = (await c.req.json().catch(() => ({}))) as { email?: string };
+    const normalizedEmail = String(data.email || '').trim().toLowerCase();
     const clientIp =
       c.req.header('CF-Connecting-IP') ||
       c.req.header('X-Forwarded-For') ||
-      data.email ||
+      normalizedEmail ||
       'ip';
 
     if (c.env?.AUTH_KV) {
       const rlKey = `rate:forgot-password:${clientIp}`;
+      const emailRlKey = normalizedEmail ? `rate:forgot-password:email:${normalizedEmail}` : null;
       const count = Number((await c.env.AUTH_KV.get(rlKey)) || 0);
-      if (count >= 5) {
+      const emailCount = emailRlKey ? Number((await c.env.AUTH_KV.get(emailRlKey)) || 0) : 0;
+      if (count >= 5 || emailCount >= 5) {
         return c.json({ success: false, error: 'Too many password reset requests' }, 429);
       }
       await c.env.AUTH_KV.put(rlKey, String(count + 1), { expirationTtl: 300 });
+      if (emailRlKey) {
+        await c.env.AUTH_KV.put(emailRlKey, String(emailCount + 1), { expirationTtl: 300 });
+      }
     }
 
     if (!data.email) {

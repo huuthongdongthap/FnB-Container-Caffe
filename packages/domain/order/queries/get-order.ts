@@ -8,18 +8,37 @@ import { createLogger } from 'worker/src/middleware/logger';
 
 const log = createLogger({ route: 'orders' });
 
-export async function getOrder(request: Request, env: Record<string, unknown>, id: string) {
+export async function getOrder(
+  request: Request,
+  env: Record<string, unknown>,
+  id: string,
+  tenantId?: string,
+) {
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const hasTenantScope = Boolean(tenantId && tenantId !== '*');
+    const tenantClause = hasTenantScope
+      ? tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?'
+      : '';
+    const binds = hasTenantScope ? [id, tenantId!] : [id];
     let results: Record<string, unknown>[] = [];
     try {
       const res = await db.prepare(
-        'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
-      ).bind(id).all<Record<string, unknown>>();
+        `SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?${tenantClause}`
+      ).bind(...binds).all<Record<string, unknown>>();
       results = res.results ?? [];
     } catch {
-      const res = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).all<Record<string, unknown>>();
-      results = res.results ?? [];
+      try {
+        const res = await db.prepare(
+          'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
+        ).bind(id).all<Record<string, unknown>>();
+        results = res.results ?? [];
+      } catch {
+        const res = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).all<Record<string, unknown>>();
+        results = res.results ?? [];
+      }
     }
 
     if (!results || results.length === 0) {

@@ -2,14 +2,24 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
-import { formatOrder, fetchOrderItemsAndPayments } from './helpers';
+import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
 import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
 import { canAccessOrder } from '@aura/domain-customer';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import { handleCancelOrder } from './order-cancel-handlers';
 
 export { handleCancelOrder };
+
+function matchesOrderTenant(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
   const body = ((c.req as any).valid ? (c.req as any).valid('json') : null) || (await c.req.json());
@@ -50,8 +60,8 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
   const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { id: string; status: string; customer_id?: string | null } | null;
-  if (!existing) {
+  const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { id: string; status: string; customer_id?: string | null; tenant_id?: string | null } | null;
+  if (!existing || !matchesOrderTenant(existing as unknown as Record<string, unknown>, getTenantId(c))) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
   const access = canAccessOrder(user, existing);
@@ -138,7 +148,7 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, actorId, 'order_update', 'order', id, JSON.stringify(body), now).run();
   } catch {
     const metaStr = JSON.stringify(body);
     try {
@@ -157,15 +167,23 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const updated = await db.prepare(
-    `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o
-     LEFT JOIN cafe_tables t ON o.table_id = t.id
-     WHERE o.id = ?`
-  ).bind(id).first();
+  let updated: Record<string, any> | null = null;
+  try {
+    updated = await db.prepare(
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+       FROM orders o
+       LEFT JOIN cafe_tables t ON o.table_id = t.id
+       WHERE o.id = ?`
+    ).bind(id).first();
+  } catch {
+    updated = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+  }
 
   const { items, payments } = await fetchOrderItemsAndPayments(db, id);
-  return c.json({ success: true, data: formatOrder(updated!, items, payments) });
+  const projected = user?.role === 'customer'
+    ? formatCustomerOrder(updated!, items)
+    : formatOrder(updated!, items, payments);
+  return c.json({ success: true, data: projected });
 }
 
 export function registerOrderWriteHandlers(app: OpenAPIHono<{ Bindings: Env }>) {

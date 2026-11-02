@@ -6,8 +6,8 @@ import { registerExportHandler } from './export-handler';
 
 export const adminAuditLogsRouter = new Hono<{ Bindings: Env }>();
 
-// All routes require auth owner/manager/staff/admin
-adminAuditLogsRouter.use('*', requireAuth(['owner', 'manager', 'staff', 'admin']));
+// All routes require auth owner/manager/supervisor/staff/admin
+adminAuditLogsRouter.use('*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
 
 registerQueryHandler(adminAuditLogsRouter);
 registerExportHandler(adminAuditLogsRouter);

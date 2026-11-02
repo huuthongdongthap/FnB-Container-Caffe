@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../lib/db';
 import type { Env } from '../../types/env';
 import {
   claimReconcileJob,
@@ -16,9 +16,7 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
     return c.json({ outcome: 'not_found' }, 404);
   }
 
-  const user = c.get('user' as never) as { tenantId?: string } | undefined;
-  const rawTenant = user?.tenantId || getTenantId(c);
-  const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
+  const requestedTenant = getTenantId(c);
   const existing = await db.prepare(
     `SELECT p.id, p.order_id, p.transaction_id, o.tenant_id
      FROM payments p
@@ -26,9 +24,10 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
      WHERE p.id = ?`
   ).bind(paymentId).first<{ id: string; order_id: string; transaction_id: string | null; tenant_id: string | null }>();
 
-  if (!existing || (existing.tenant_id || 'default') !== tenantId) {
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, requestedTenant)) {
     return c.json({ outcome: 'not_found' }, 404);
   }
+  const tenantId = existing.tenant_id && String(existing.tenant_id).trim() ? String(existing.tenant_id).trim() : 'default';
 
   const clientId = String(c.env.PAYOS_CLIENT_ID ?? '');
   const apiKey = String(c.env.PAYOS_API_KEY ?? '');

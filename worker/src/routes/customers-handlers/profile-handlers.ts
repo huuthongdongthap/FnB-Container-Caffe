@@ -48,7 +48,8 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         ).bind(customerId).first<CustomerRecord>();
       }
       const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
-      if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
+      const resolvedRowTenant = typeof rowTenant === 'string' && rowTenant.trim() !== '' ? rowTenant.trim() : 'default';
+      if (tenantId !== '*' && resolvedRowTenant !== tenantId) {
         customer = null;
       }
     }
@@ -101,8 +102,9 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         `UPDATE customers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
       ).bind(...params, customerId, tenantId).run();
     } catch {
-      const existing = await db.prepare('SELECT tenant_id FROM customers WHERE id = ?').bind(customerId).first<{ tenant_id?: string | null }>().catch(() => null);
-      if (existing?.tenant_id && existing.tenant_id.trim() !== '' && existing.tenant_id !== tenantId) {
+      const existing = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(customerId).first<{ id?: string; tenant_id?: string | null }>().catch(() => null);
+      const existingTenant = existing?.tenant_id && existing.tenant_id.trim() !== '' ? existing.tenant_id.trim() : 'default';
+      if (tenantId !== '*' && ((!existing && tenantId !== 'default') || existingTenant !== tenantId)) {
         return c.json({ success: false, error: 'Customer not found' }, 404);
       }
       try {
@@ -132,7 +134,8 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         ).bind(customerId).first<CustomerRecord>();
       }
       const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
-      if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
+      const resolvedRowTenant = typeof rowTenant === 'string' && rowTenant.trim() !== '' ? rowTenant.trim() : 'default';
+      if (tenantId !== '*' && resolvedRowTenant !== tenantId) {
         customer = null;
       }
     }

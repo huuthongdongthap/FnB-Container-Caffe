@@ -59,6 +59,13 @@ function createTestEnv() {
     async get(k: string) { return kvData.get(k) ?? null; },
     async put(k: string, v: string) { kvData.set(k, v); },
     async delete(k: string) { kvData.delete(k); },
+    async list(opts?: { prefix?: string }) {
+      const prefix = opts?.prefix ?? '';
+      const keys = Array.from(kvData.keys())
+        .filter((k) => k.startsWith(prefix))
+        .map((name) => ({ name }));
+      return { keys, list_complete: true };
+    },
   };
   const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map(s => s.run())); } };
   const env: any = {
@@ -632,6 +639,4314 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const promoCodes = (promosBody.data || []).map((p: any) => p.code);
       expect(promoCodes).toContain('PROMODEF');
       expect(promoCodes).not.toContain('PROMOFOR');
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('enforces checkin CAS & tenant isolation, audit CSV neutralization, dindin order scoping, and review tenant isolation', async () => {
+    const { escapeCsv } = await import('../../routes/admin-audit-logs-handlers/csv-helper');
+    expect(escapeCsv("=cmd|'/C calc'!A0")).toBe("\"'=cmd|'/C calc'!A0\"");
+    expect(escapeCsv('+1+1')).toBe("\"'+1+1\"");
+
+    const { sql, env } = createTestEnv();
+    try {
+      const now = new Date().toISOString();
+      sql.exec(`
+        CREATE TABLE customers (id TEXT PRIMARY KEY, phone TEXT, name TEXT, email TEXT,
+          loyalty_points INTEGER DEFAULT 0, total_spent INTEGER DEFAULT 0, tenant_id TEXT, created_at TEXT);
+        CREATE TABLE checkins (id TEXT PRIMARY KEY, customer_id TEXT, customer_name TEXT,
+          checkin_date TEXT, checkin_time TEXT, reward_amount INTEGER, status TEXT, staff_id TEXT, created_at TEXT);
+        CREATE TABLE reviews (id TEXT PRIMARY KEY, order_id TEXT, rating INTEGER, comment TEXT,
+          customer_name TEXT, created_at TEXT);
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('mgr-ci-1','Manager CI','manager','default',1,1,'${now}');
+        INSERT INTO customers (id, phone, name, email, loyalty_points, total_spent, tenant_id, created_at)
+        VALUES
+          ('cust-ci-def', '0911111111', 'CI Default', 'cidef@example.com', 0, 0, 'default', '${now}'),
+          ('cust-ci-for', '0922222222', 'CI Foreign', 'cifor@example.com', 0, 0, 'store-foreign', '${now}');
+        INSERT INTO checkins (id, customer_id, customer_name, checkin_date, checkin_time, reward_amount, status, created_at)
+        VALUES
+          ('ci-def-1', 'cust-ci-def', 'CI Default', '2026-10-31', '${now}', 5000, 'pending', '${now}'),
+          ('ci-for-1', 'cust-ci-for', 'CI Foreign', '2026-10-31', '${now}', 5000, 'pending', '${now}');
+        INSERT INTO orders (id, customer_name, customer_phone, payment_method, items, total, status, tenant_id, created_at)
+        VALUES
+          ('DIN_DEF_01', 'DIN', 'sess-def', 'cod', '[]', 45000, 'pending', 'default', '${now}'),
+          ('DIN_FOR_01', 'DIN', 'sess-for', 'cod', '[]', 99000, 'pending', 'store-foreign', '${now}');
+        INSERT INTO reviews (id, order_id, rating, comment, customer_name, created_at)
+        VALUES
+          ('rev-def-1', 'DIN_DEF_01', 5, 'Great!', 'Alice', '${now}'),
+          ('rev-for-1', 'DIN_FOR_01', 1, 'Foreign review', 'Eve', '${now}');
+      `);
+
+      const mgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-ci-1'").get();
+      const { token: mgrToken } = await issueStaffSession(env, mgrAccount, { sessionType: 'staff-web' });
+
+      // 1. Checkin: approving foreign-tenant checkin returns 404
+      const foreignApprove = await app.fetch(
+        new Request('http://localhost/api/checkin/ci-for-1/approve', {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${mgrToken}` },
+        }),
+        env
+      );
+      expect(foreignApprove.status).toBe(404);
+
+      // List checkins only returns default-tenant checkin
+      const listCheckins = await app.fetch(
+        new Request('http://localhost/api/checkin', {
+          headers: { Authorization: `Bearer ${mgrToken}` },
+        }),
+        env
+      );
+      expect(listCheckins.status).toBe(200);
+      const listCheckinsBody: any = await listCheckins.json();
+      const checkinIds = (listCheckinsBody.data || []).map((c: any) => c.id);
+      expect(checkinIds).toContain('ci-def-1');
+      expect(checkinIds).not.toContain('ci-for-1');
+
+      // 2. DinDin: GET /checkouts only returns default-tenant order
+      const { dindinRouter } = await import('../../routes/dindin');
+      const dindinList = await dindinRouter.fetch(
+        new Request('http://localhost/checkouts', {
+          headers: { Authorization: `Bearer ${mgrToken}`, 'X-Tenant-ID': 'default' },
+        }),
+        env
+      );
+      expect(dindinList.status).toBe(200);
+      const dindinBody: any = await dindinList.json();
+      const dindinIds = (dindinBody.checkouts || []).map((o: any) => o.id);
+      expect(dindinIds).toContain('DIN_DEF_01');
+      expect(dindinIds).not.toContain('DIN_FOR_01');
+
+      // DinDin QC on foreign order returns 404
+      const foreignQc = await dindinRouter.fetch(
+        new Request('http://localhost/checkout/DIN_FOR_01/qc', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${mgrToken}`, 'X-Tenant-ID': 'default' },
+        }),
+        env
+      );
+      expect(foreignQc.status).toBe(404);
+
+      // 3. Reviews: submitting review for foreign order returns 404
+      const postForeignRev = await app.fetch(
+        new Request('http://localhost/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'default' },
+          body: JSON.stringify({ order_id: 'DIN_FOR_01', rating: 5, comment: 'Spoofed' }),
+        }),
+        env
+      );
+      expect(postForeignRev.status).toBe(404);
+
+      // GET /api/reviews and /api/reviews/stats exclude foreign-tenant order reviews
+      const getRevs = await app.fetch(
+        new Request('http://localhost/api/reviews', { headers: { 'X-Tenant-ID': 'default' } }),
+        env
+      );
+      expect(getRevs.status).toBe(200);
+      const getRevsBody: any = await getRevs.json();
+      expect(getRevsBody.data.map((r: any) => r.id)).toEqual(['rev-def-1']);
+
+      const revStats = await app.fetch(
+        new Request('http://localhost/api/reviews/stats', { headers: { 'X-Tenant-ID': 'default' } }),
+        env
+      );
+      expect(revStats.status).toBe(200);
+      const revStatsBody: any = await revStats.json();
+      expect(revStatsBody.data.total_reviews).toBe(1);
+      expect(revStatsBody.data.average_rating).toBe(5);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('enforces SSRF guards on ERPNext/Push endpoints, atomic CAS on loyalty-v2 & promotions, and tenant isolation across catalog/inventory/reservations/subscriptions', async () => {
+    const { sql, env } = createTestEnv();
+    try {
+      const now = new Date().toISOString();
+      sql.exec(`
+        CREATE TABLE loyalty_accounts (id TEXT PRIMARY KEY, customer_id TEXT, current_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0, tier TEXT DEFAULT 'bronze', last_activity_at TEXT, tenant_id TEXT, updated_at TEXT);
+        CREATE TABLE loyalty_rewards (id TEXT PRIMARY KEY, name TEXT, points_cost INTEGER, type TEXT,
+          value INTEGER, min_tier TEXT DEFAULT 'bronze', is_active INTEGER DEFAULT 1, active INTEGER DEFAULT 1,
+          stock INTEGER, max_redemptions INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0);
+        CREATE TABLE reward_redemptions (id TEXT PRIMARY KEY, account_id TEXT, reward_id TEXT, points_spent INTEGER,
+          voucher_code TEXT, status TEXT, expires_at TEXT);
+        CREATE TABLE loyalty_transactions (id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT, points INTEGER,
+          balance_after INTEGER, description TEXT, reason TEXT, reference_id TEXT, reward_id TEXT, order_id TEXT,
+          idempotency_key TEXT, created_by TEXT, created_at TEXT);
+        CREATE TABLE promotions (id TEXT PRIMARY KEY, code TEXT, type TEXT, percent INTEGER DEFAULT 10, value INTEGER, min_order INTEGER DEFAULT 0,
+          max_discount INTEGER DEFAULT 50000, usage_limit INTEGER DEFAULT 0, usage_count INTEGER DEFAULT 0, used_count INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1,
+          starts_at TEXT, expires_at TEXT, tenant_id TEXT);
+        CREATE TABLE subscriptions (id TEXT PRIMARY KEY, plan_id TEXT, customer_id TEXT, customer_name TEXT,
+          customer_phone TEXT, customer_email TEXT, status TEXT, billing_cycle TEXT, amount_vnd INTEGER,
+          current_period_start TEXT, current_period_end TEXT, next_billing_date TEXT, payment_method TEXT,
+          auto_renew INTEGER DEFAULT 1, cancelled_at TEXT, cancel_reason TEXT, tenant_id TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE subscription_plans (id TEXT PRIMARY KEY, name TEXT, slug TEXT, zone TEXT, container_size TEXT, features TEXT, active INTEGER DEFAULT 1);
+        CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT, slug TEXT, price INTEGER, category_id TEXT,
+          is_available INTEGER DEFAULT 1, sort_order INTEGER DEFAULT 0, tenant_id TEXT);
+        CREATE TABLE categories (id TEXT PRIMARY KEY, name TEXT, slug TEXT, sort_order INTEGER DEFAULT 0, tenant_id TEXT);
+        CREATE TABLE inventory_items (id TEXT PRIMARY KEY, sku TEXT, name TEXT, category TEXT, unit TEXT,
+          current_stock REAL DEFAULT 0, min_stock REAL DEFAULT 0, max_stock REAL DEFAULT 100, cost_per_unit REAL DEFAULT 0,
+          active INTEGER DEFAULT 1, tenant_id TEXT, updated_at TEXT);
+        CREATE TABLE reservations (id TEXT PRIMARY KEY, customer_name TEXT, customer_phone TEXT, party_size INTEGER,
+          date TEXT, time_slot TEXT, table_id TEXT, table_number INTEGER, status TEXT, confirmation_code TEXT,
+          tenant_id TEXT, created_at TEXT, updated_at TEXT);
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('owner-1','Owner Default','owner','default',1,1,'${now}');
+        INSERT INTO loyalty_accounts(id,customer_id,current_points,lifetime_points,tier,tenant_id,updated_at)
+          VALUES('la-1','owner-1',100,100,'bronze','default','${now}'),
+                ('la-for','cust-for',500,500,'gold','other-store','${now}');
+        INSERT INTO loyalty_rewards(id,name,points_cost,type,value,min_tier,is_active,active,stock,max_redemptions,current_redemptions,redeemed_count)
+          VALUES('rew-1','Free Espresso',100,'voucher',35000,'bronze',1,1,1,1,0,0);
+        INSERT INTO promotions(id,code,type,percent,value,min_order,max_discount,usage_limit,usage_count,used_count,is_active,tenant_id)
+          VALUES('promo-cap-1','ONEUSE50','fixed',50,50000,0,50000,1,0,0,1,'default');
+        INSERT INTO orders(id,customer_name,customer_phone,payment_method,items,total,status,tenant_id,created_at)
+          VALUES('ord-promo-1','Alice','0901111222','cod','[]',100000,'pending','default','${now}'),
+                ('ord-promo-2','Bob','0903333444','cod','[]',100000,'pending','default','${now}');
+        INSERT INTO subscription_plans(id,name,active) VALUES('plan-std','Standard Plan',1);
+        INSERT INTO subscriptions(id,plan_id,customer_id,customer_name,status,billing_cycle,amount_vnd,tenant_id,created_at,updated_at)
+          VALUES('sub-for-99','plan-std','cust-for','Foreign Sub','active','monthly',300000,'other-store','${now}','${now}');
+        INSERT INTO categories(id,name,slug,sort_order,tenant_id)
+          VALUES('cat-def','Coffee','coffee',1,'default'),
+                ('cat-for','Secret Foreign','secret-foreign',2,'other-store');
+        INSERT INTO products(id,name,slug,price,category_id,is_available,sort_order,tenant_id)
+          VALUES('prod-def','Espresso','espresso',35000,'cat-def',1,1,'default'),
+                ('prod-for','Foreign Brew','foreign-brew',95000,'cat-for',1,2,'other-store');
+        INSERT INTO inventory_items(id,sku,name,category,unit,current_stock,min_stock,max_stock,cost_per_unit,active,tenant_id)
+          VALUES('inv-def','SKU-DEF','Arabica','coffee','kg',10,2,50,200000,1,'default'),
+                ('inv-for','SKU-FOR','Foreign Bean','coffee','kg',25,2,50,200000,1,'other-store');
+        INSERT INTO reservations(id,customer_name,customer_phone,party_size,date,time_slot,status,confirmation_code,tenant_id,created_at,updated_at)
+          VALUES('res-for','Foreign Guest','0909999000',4,'2026-10-31','18:00','confirmed','CNF999','other-store','${now}','${now}');
+      `);
+
+      const ownerAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'owner-1'").get();
+      const { token: ownerToken } = await issueStaffSession(env, ownerAccount, { sessionType: 'staff-web' });
+      const headers = { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' };
+
+      // 1. SSRF guard on POST /api/erpnext/configure rejects private/metadata URLs
+      const ssrfErpRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/configure', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            baseUrl: 'http://169.254.169.254/latest/meta-data',
+            apiKey: 'key-123456',
+            apiSecret: 'secret-123456',
+          }),
+        }),
+        env
+      );
+      expect(ssrfErpRes.status).toBe(400);
+
+      // 2. Push subscribe SSRF guard rejects loopback/HTTP endpoints
+      const ssrfPushRes = await app.fetch(
+        new Request('http://localhost/api/push/subscribe', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            endpoint: 'http://127.0.0.1:8080/push',
+            keys: { p256dh: 'test-p256dh', auth: 'test-auth' },
+          }),
+        }),
+        env
+      );
+      expect(ssrfPushRes.status).toBe(400);
+
+      // 3. Loyalty atomic CAS: first redemption succeeds (100 -> 0 pts), second fails with 400
+      const redeem1 = await app.fetch(
+        new Request('http://localhost/api/loyalty/rewards/redeem', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ rewardId: 'rew-1', idempotencyKey: 'idem-redeem-1' }),
+        }),
+        env
+      );
+      expect(redeem1.status).toBe(200);
+      const redeem1Body: any = await redeem1.json();
+      expect(redeem1Body.data.newBalance).toBe(0);
+
+      const redeem2 = await app.fetch(
+        new Request('http://localhost/api/loyalty/rewards/redeem', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ rewardId: 'rew-1', idempotencyKey: 'idem-redeem-2' }),
+        }),
+        env
+      );
+      expect([400, 409]).toContain(redeem2.status);
+
+      // Foreign loyalty account is isolated from default tenant on admin point adjustment
+      const foreignLoyalty = await app.fetch(
+        new Request('http://localhost/api/loyalty/admin/adjust-points', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ customerId: 'cust-for', points: 50, reason: 'cross-tenant probe', idempotencyKey: 'idem-adj-1' }),
+        }),
+        env
+      );
+      expect(foreignLoyalty.status).toBe(404);
+
+      // 4. Promotion atomic cap enforcement: first order succeeds, second order is rejected when usage_limit=1 is reached
+      const promoRedeem1 = await app.fetch(
+        new Request('http://localhost/api/promotions/redeem', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ code: 'ONEUSE50', order_id: 'ord-promo-1', order_total: 100000 }),
+        }),
+        env
+      );
+      expect(promoRedeem1.status).toBe(200);
+
+      const promoRedeem2 = await app.fetch(
+        new Request('http://localhost/api/promotions/redeem', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ code: 'ONEUSE50', order_id: 'ord-promo-2', order_total: 100000 }),
+        }),
+        env
+      );
+      expect([400, 409]).toContain(promoRedeem2.status);
+
+      // 5. Subscription lifecycle tenant isolation
+      const getForeignSub = await app.fetch(
+        new Request('http://localhost/api/subscriptions/sub-for-99', { headers }),
+        env
+      );
+      expect(getForeignSub.status).toBe(404);
+
+      const cancelForeignSub = await app.fetch(
+        new Request('http://localhost/api/subscriptions/sub-for-99/cancel', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ reason: 'attempt cross-tenant cancel' }),
+        }),
+        env
+      );
+      expect(cancelForeignSub.status).toBe(404);
+
+      // 6. Catalog, Inventory & Reservations tenant isolation
+      const prodsRes = await app.fetch(new Request('http://localhost/api/products', { headers }), env);
+      const prodsBody: any = await prodsRes.json();
+      const prodIds = (prodsBody.data || []).map((p: any) => p.id);
+      expect(prodIds).toContain('prod-def');
+      expect(prodIds).not.toContain('prod-for');
+
+      const catsRes = await app.fetch(new Request('http://localhost/api/categories', { headers }), env);
+      const catsBody: any = await catsRes.json();
+      const catIds = (catsBody.data || []).map((c: any) => c.id);
+      expect(catIds).toContain('cat-def');
+      expect(catIds).not.toContain('cat-for');
+
+      const invForeignRes = await app.fetch(new Request('http://localhost/api/inventory/inv-for', { headers }), env);
+      expect(invForeignRes.status).toBe(404);
+
+      const resForeignGet = await app.fetch(new Request('http://localhost/api/reservations/res-for', { headers }), env);
+      expect(resForeignGet.status).toBe(404);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('enforces fail-closed tenant isolation across inventory forecasting, staff tips, ERPNext surfaces, cron jobs, catalog modifiers/happy-hour, and admin stuck-payments/notification-settings', async () => {
+    const { sql, env } = createTestEnv();
+    try {
+      const now = new Date().toISOString();
+      sql.exec(`
+        CREATE TABLE inventory_items (id TEXT PRIMARY KEY, sku TEXT, name TEXT, current_stock REAL DEFAULT 0,
+          min_stock REAL DEFAULT 0, unit TEXT DEFAULT 'kg', active INTEGER DEFAULT 1, tenant_id TEXT);
+        CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT, tax_id TEXT,
+          erpnext_id TEXT, sync_status TEXT, tenant_id TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE expenses (id TEXT PRIMARY KEY, amount REAL, category TEXT, date TEXT, description TEXT, tenant_id TEXT);
+        CREATE TABLE cron_jobs (id TEXT PRIMARY KEY, name TEXT, description TEXT, cron_expression TEXT,
+          handler TEXT, payload TEXT, is_active INTEGER DEFAULT 1, status TEXT DEFAULT 'idle',
+          location_id TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE cron_runs (id TEXT PRIMARY KEY, job_id TEXT, status TEXT, payload TEXT,
+          started_at TEXT, duration_ms INTEGER, error TEXT, created_at TEXT);
+        CREATE TABLE happy_hour_windows (id TEXT PRIMARY KEY, name TEXT, discount_percent INTEGER,
+          start_time TEXT, end_time TEXT, day_of_week INTEGER, active INTEGER DEFAULT 1, priority INTEGER DEFAULT 1,
+          tenant_id TEXT, created_at TEXT);
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('mgr-b','Manager Store B','manager','store-b',1,1,'${now}'),
+                ('mgr-def','Manager Default','manager','default',1,1,'${now}');
+        INSERT INTO inventory_items(id,sku,name,current_stock,min_stock,unit,active,tenant_id)
+          VALUES('item-def-only','SKU-DEF','Default Only Bean',50,10,'kg',1,'default');
+        ALTER TABLE orders ADD COLUMN tip_amount INTEGER DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN updated_by TEXT;
+        INSERT INTO orders(id,customer_name,customer_phone,payment_method,items,total,tip_amount,updated_by,status,tenant_id,created_at)
+          VALUES('ord-tip-def','Alice','0901111222','cod','[]',100000,15000,'mgr-def','completed','default','${now}');
+        INSERT INTO customers(id,name,phone,email,tax_id,tenant_id,created_at,updated_at)
+          VALUES('cust-erp-def','Default Corp','0901111111','def@corp.vn','TAX-DEF','default','${now}','${now}'),
+                ('cust-erp-b','Store B Corp','0902222222','b@corp.vn','TAX-B','store-b','${now}','${now}');
+        INSERT INTO expenses(id,amount,category,date,description,tenant_id)
+          VALUES('exp-def',500000,'utilities','2026-10-31','Default Elec','default'),
+                ('exp-b',300000,'utilities','2026-10-31','Store B Elec','store-b');
+        INSERT INTO cron_jobs(id,name,cron_expression,handler,is_active,status,location_id,created_at,updated_at)
+          VALUES('job-def','Default Nightly','0 0 * * *','sync',1,'idle','default','${now}','${now}'),
+                ('job-b','Store B Nightly','0 1 * * *','sync',1,'idle','store-b','${now}','${now}');
+        INSERT INTO happy_hour_windows(id,name,discount_percent,start_time,end_time,day_of_week,active,priority,tenant_id,created_at)
+          VALUES('hh-def','Default Afternoon',20,'14:00','17:00',1,1,1,'default','${now}'),
+                ('hh-b','Store B Afternoon',15,'14:00','17:00',1,1,1,'store-b','${now}');
+      `);
+
+      const mgrBAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b'").get();
+      const { token: mgrBToken } = await issueStaffSession(env, mgrBAccount, { sessionType: 'staff-web' });
+      const bHeaders = { Authorization: `Bearer ${mgrBToken}`, 'Content-Type': 'application/json' };
+
+      // 1. Inventory forecasting fail-closed when store-b has 0 items (must NOT fall back to default items)
+      const forecastB = await app.fetch(
+        new Request('http://localhost/api/inventory/forecasting/run-rate', { headers: bHeaders }),
+        env
+      );
+      expect(forecastB.status).toBe(200);
+      const forecastBBody: any = await forecastB.json();
+      expect(forecastBBody.data).toEqual([]);
+
+      // 2. Staff tips: store-b manager cannot see or reassign default-tenant order tips
+      const tipsB = await app.fetch(new Request('http://localhost/api/staff-tips', { headers: bHeaders }), env);
+      expect(tipsB.status).toBe(200);
+      const tipsBBody: any = await tipsB.json();
+      expect(tipsBBody.summary.tip_total).toBe(0);
+
+      const assignForeignTip = await app.fetch(
+        new Request('http://localhost/api/staff-tips/assign', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ order_id: 'ord-tip-def', staff_id: 'mgr-b', tip_amount: 50000 }),
+        }),
+        env
+      );
+      expect(assignForeignTip.status).toBe(404);
+
+      // 3. ERPNext customers & expenses scoped to store-b
+      const erpCustB = await app.fetch(new Request('http://localhost/api/erpnext/customers', { headers: bHeaders }), env);
+      expect(erpCustB.status).toBe(200);
+      const erpCustBBody: any = await erpCustB.json();
+      expect(erpCustBBody.data.map((c: any) => c.id)).toEqual(['cust-erp-b']);
+
+      const erpExpB = await app.fetch(new Request('http://localhost/api/erpnext/expenses', { headers: bHeaders }), env);
+      expect(erpExpB.status).toBe(200);
+      const erpExpBBody: any = await erpExpB.json();
+      expect(erpExpBBody.data.map((e: any) => e.id)).toEqual(['exp-b']);
+
+      // 4. Cron jobs scoped by location_id to store-b
+      const cronListB = await app.fetch(new Request('http://localhost/api/cron/jobs', { headers: bHeaders }), env);
+      expect(cronListB.status).toBe(200);
+      const cronListBBody: any = await cronListB.json();
+      expect(cronListBBody.data.jobs.map((j: any) => j.id)).toEqual(['job-b']);
+
+      const cronForeignGet = await app.fetch(new Request('http://localhost/api/cron/jobs/job-def', { headers: bHeaders }), env);
+      expect(cronForeignGet.status).toBe(404);
+
+      // 5. Happy-hour rules scoped to store-b
+      const hhListB = await app.fetch(new Request('http://localhost/api/menu-modifiers/happy-hour', { headers: bHeaders }), env);
+      expect(hhListB.status).toBe(200);
+      const hhListBBody: any = await hhListB.json();
+      expect(hhListBBody.data.map((h: any) => h.id)).toEqual(['hh-b']);
+
+      // 6. Admin notification-settings & stuck payments isolated per tenant
+      await env.AUTH_KV.put('config:notification_settings', JSON.stringify({ autoNotifyNewOrder: true, soundAlerts: true }));
+      await env.AUTH_KV.put('payment:stuck:def-1', JSON.stringify({ orderId: 'ord-tip-def', amount: 100000, tenant_id: 'default' }));
+
+      const notifB = await app.fetch(new Request('http://localhost/api/admin/notification-settings', { headers: bHeaders }), env);
+      expect(notifB.status).toBe(200);
+      const notifBBody: any = await notifB.json();
+      expect(notifBBody.autoNotifyNewOrder).toBe(false);
+
+      const stuckB = await app.fetch(new Request('http://localhost/api/admin/payments/stuck', { headers: bHeaders }), env);
+      expect(stuckB.status).toBe(200);
+      const stuckBBody: any = await stuckB.json();
+      expect(stuckBBody.stuck).toEqual([]);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 17 (P1..P4): isolates admin-loyalty widgets/top-customers, telegram-sim/dindin checkout mutations, birthday config/redemptions, and reports/checkin tenant boundaries', async () => {
+    const { sql, env } = createTestEnv();
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const bdayMonthDay = today.slice(5);
+      sql.exec(`
+        ALTER TABLE orders ADD COLUMN customer_id TEXT;
+        CREATE TABLE customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          points INTEGER DEFAULT 0,
+          loyalty_points INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'Bronze',
+          tier TEXT DEFAULT 'bronze',
+          total_spent REAL DEFAULT 0,
+          cashback_balance REAL DEFAULT 0,
+          date_of_birth TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE cashback_wallets (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          balance REAL DEFAULT 0,
+          total_earned REAL DEFAULT 0,
+          total_spent REAL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE checkins (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          customer_name TEXT,
+          checkin_date TEXT,
+          checkin_time TEXT,
+          reward_amount REAL DEFAULT 5000,
+          status TEXT DEFAULT 'pending',
+          staff_id TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE birthday_redemptions (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          discount_percent REAL,
+          order_id TEXT,
+          redeemed_at TEXT
+        );
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('mgr-b','Owner Store B','owner','store-b',1,1,'${today}T00:00:00Z');
+        INSERT INTO customers (id, name, phone, points, loyalty_points, total_spent, cashback_balance, date_of_birth, tenant_id, created_at)
+        VALUES
+          ('cust-def-1', 'Default VIP 1', '0901111111', 900, 900, 5000000, 100000, '1990-${bdayMonthDay}', 'default', '${today}T08:00:00Z'),
+          ('cust-def-2', 'Default VIP 2', '0901111112', 800, 800, 4000000, 50000, '1991-${bdayMonthDay}', 'default', '${today}T08:00:00Z'),
+          ('cust-b-1', 'Store B VIP', '0902222222', 100, 100, 300000, 15000, '1992-${bdayMonthDay}', 'store-b', '${today}T09:00:00Z');
+        INSERT INTO orders (id, customer_id, customer_name, customer_phone, total, status, tenant_id, created_at)
+        VALUES
+          ('ord-def-1', 'cust-def-1', 'Default VIP 1', '0901111111', 500000, 'completed', 'default', '${today}T10:00:00Z'),
+          ('ord-b-1', 'cust-b-1', 'Store B VIP', '0902222222', 120000, 'confirmed', 'store-b', '${today}T10:30:00Z');
+        INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent)
+        VALUES
+          ('wal-def-1', 'cust-def-1', 100000, 250000, 150000),
+          ('wal-b-1', 'cust-b-1', 15000, 20000, 5000);
+        INSERT INTO checkins (id, customer_id, customer_name, checkin_date, checkin_time, reward_amount, status, created_at)
+        VALUES
+          ('ci-def-1', 'cust-def-1', 'Default VIP 1', '${today}', '${today}T09:00:00Z', 50000, 'approved', '${today}T09:00:00Z'),
+          ('ci-b-1', 'cust-b-1', 'Store B VIP', '${today}', '${today}T09:15:00Z', 5000, 'approved', '${today}T09:15:00Z');
+      `);
+
+      const mgrBAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b'").get();
+      const { token: mgrBToken } = await issueStaffSession(env, mgrBAccount, { sessionType: 'staff-web' });
+      const bHeaders = { Authorization: `Bearer ${mgrBToken}`, 'Content-Type': 'application/json' };
+
+      // P1: /api/admin-loyalty/top-customers?limit=1 returns store-b VIP even though default has higher spend
+      const topCustB = await app.fetch(
+        new Request('http://localhost/api/admin-loyalty/top-customers?limit=1', { headers: bHeaders }),
+        env
+      );
+      expect(topCustB.status).toBe(200);
+      const topCustBBody: any = await topCustB.json();
+      expect(topCustBBody.data.map((c: any) => c.id)).toEqual(['cust-b-1']);
+
+      // P2: /api/test/telegram-sim & /api/admin/dindin/checkout/:orderId/qc reject foreign order IDs
+      const tgSimForeign = await app.fetch(
+        new Request('http://localhost/api/test/telegram-sim', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ order_id: 'ord-def-1' }),
+        }),
+        env
+      );
+      expect(tgSimForeign.status).toBe(404);
+
+      const dindinQcForeign = await app.fetch(
+        new Request('http://localhost/api/admin/dindin/checkout/ord-def-1/qc', {
+          method: 'POST',
+          headers: bHeaders,
+        }),
+        env
+      );
+      expect(dindinQcForeign.status).toBe(404);
+
+      // P3: /api/loyalty/birthday/config requires auth when JWT_SECRET is set and namespaces KV per tenant
+      const unauthBdayPut = await app.fetch(
+        new Request('http://localhost/api/loyalty/birthday/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discountPercent: 50 }),
+        }),
+        env
+      );
+      expect(unauthBdayPut.status).toBe(401);
+
+      const bdayPutB = await app.fetch(
+        new Request('http://localhost/api/loyalty/birthday/config', {
+          method: 'PUT',
+          headers: bHeaders,
+          body: JSON.stringify({ discountPercent: 25 }),
+        }),
+        env
+      );
+      expect(bdayPutB.status).toBe(200);
+      expect(await env.AUTH_KV.get('config:birthday:store-b')).toContain('"discountPercent":25');
+      expect(await env.AUTH_KV.get('config:birthday')).toBeNull();
+
+      // P3: /api/loyalty/birthday/redeem rejects foreign order_id
+      const redeemForeignOrder = await app.fetch(
+        new Request('http://localhost/api/loyalty/birthday/redeem', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ customer_id: 'cust-b-1', order_id: 'ord-def-1' }),
+        }),
+        env
+      );
+      expect(redeemForeignOrder.status).toBe(404);
+
+      // P4: /api/reports/summary & /api/reports/daily isolate checkins cashback to store-b (5000, not 55000)
+      const summaryB = await app.fetch(
+        new Request('http://localhost/api/reports/summary', { headers: bHeaders }),
+        env
+      );
+      expect(summaryB.status).toBe(200);
+      const summaryBBody: any = await summaryB.json();
+      expect(summaryBBody.data.total_cashback_issued).toBe(5000);
+
+      const dailyB = await app.fetch(
+        new Request(`http://localhost/api/reports/daily?from=${today}&to=${today}`, { headers: bHeaders }),
+        env
+      );
+      expect(dailyB.status).toBe(200);
+      const dailyBBody: any = await dailyB.json();
+      expect(dailyBBody.data[0].cashback_earned).toBe(5000);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 18 (Q1..Q4): enforces fail-closed table-sessions/floor-plan/admin-qr tenant guards, bidirectional referral isolation, and exact order lookup in customer assistant', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const env = {
+      ...baseEnv,
+      QR_SIGNING_SECRET: 'qr-signing-secret-test-32-bytes!',
+    } as any;
+    const sharedTs = new Date().toISOString();
+    try {
+      sql.exec(`
+        CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT, email TEXT, phone TEXT, tenant_id TEXT, loyalty_points INTEGER DEFAULT 0, lifetime_points INTEGER DEFAULT 0, loyalty_tier TEXT DEFAULT 'bronze');
+        CREATE TABLE referral_codes (id TEXT PRIMARY KEY, customer_id TEXT, code TEXT UNIQUE, times_used INTEGER DEFAULT 0, total_points_earned INTEGER DEFAULT 0, created_at TEXT);
+        CREATE TABLE referrals (id TEXT PRIMARY KEY, referrer_id TEXT, referred_customer_id TEXT, referral_code TEXT, points_awarded INTEGER DEFAULT 0, cashback_awarded_vnd INTEGER DEFAULT 0, status TEXT, bonus_type TEXT, created_at TEXT);
+        CREATE TABLE table_sessions (id TEXT PRIMARY KEY, table_id TEXT, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT, order_count INTEGER DEFAULT 0, total_amount INTEGER DEFAULT 0, notes TEXT, opened_at TEXT, closed_at TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE table_qr_codes (table_id TEXT PRIMARY KEY, slug TEXT UNIQUE, updated_at TEXT);
+        CREATE TABLE reviews (id TEXT PRIMARY KEY, order_id TEXT, rating INTEGER, comment TEXT, customer_name TEXT, created_at TEXT);
+        CREATE TABLE container_telemetry_logs (id TEXT PRIMARY KEY, container_id TEXT, tenant_id TEXT, power_source TEXT, battery_percentage REAL, ambient_temp_celsius REAL, kds_online INTEGER, network_ping_ms REAL, alert_status TEXT, alert_message TEXT, created_at TEXT);
+
+        INSERT INTO cafe_tables (id, table_number, name, status, capacity, tenant_id) VALUES
+          ('tbl-def-1', 1, 'T1', 'Occupied', 4, 'default'),
+          ('tbl-b-1', 2, 'T2', 'Available', 4, 'store-b');
+        INSERT INTO table_sessions (id, table_id, status, opened_at, created_at, updated_at) VALUES
+          ('SES-DEF-SECRET99', 'tbl-def-1', 'active', '2026-10-30T10:00:00Z', '2026-10-30T10:00:00Z', '2026-10-30T10:00:00Z');
+        INSERT INTO table_qr_codes (table_id, slug) VALUES
+          ('tbl-def-1', 'slug-def-1'),
+          ('tbl-ghost', 'slug-ghost-orphan');
+        INSERT INTO orders (id, order_number, customer_name, customer_phone, total, status, payment_status, payment_method, order_type, items, tenant_id, created_at, updated_at) VALUES
+          ('order_def_secret', 'ORD-DEF-SEC', 'Secret Guest', '0901112222', 125000, 'preparing', 'paid', 'cash', 'dine_in', '[]', 'default', '2026-10-30T10:00:00Z', '2026-10-30T10:00:00Z');
+        INSERT INTO customers (id, name, email, phone, tenant_id) VALUES
+          ('cust-def-ref', 'Default Referrer', 'def@aura.test', '0901000111', 'default'),
+          ('cust-b-ref', 'Store B Referee', 'b@aura.test', '0902000222', 'store-b');
+        INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES
+          ('rc-def-1', 'cust-def-ref', 'FNB-DEF001', 0, 0, '2026-10-30T00:00:00Z');
+        INSERT INTO container_telemetry_logs (id, container_id, tenant_id, power_source, battery_percentage, ambient_temp_celsius, kds_online, network_ping_ms, alert_status, alert_message, created_at) VALUES
+          ('tel-def', 'shared-c1', 'default', 'battery', 15, 41, 0, 100, 'CRITICAL', 'Def Critical', '${sharedTs}'),
+          ('tel-b', 'shared-c1', 'store-b', 'grid', 100, 26, 1, 15, 'NORMAL', null, '${sharedTs}');
+        INSERT INTO users (id, name, role, tenant_id, is_active, auth_version, created_at) VALUES
+          ('mgr-q-b', 'Store B Owner', 'owner', 'store-b', 1, 1, '2026-10-30T00:00:00Z');
+      `);
+
+      const mgrBAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-q-b'").get();
+      const { token: mgrBToken } = await issueStaffSession(env, mgrBAccount, { sessionType: 'staff-web' });
+      const bHeaders = {
+        Authorization: `Bearer ${mgrBToken}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Q1: POST /api/table-sessions checks table ownership BEFORE active-session 409 check (no session ID leak)
+      const openForeignSession = await app.fetch(
+        new Request('http://localhost/api/table-sessions', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ table_id: 'tbl-def-1' }),
+        }),
+        env
+      );
+      expect(openForeignSession.status).toBe(404);
+      const openForeignBody = await openForeignSession.text();
+      expect(openForeignBody).not.toContain('SES-DEF-SECRET99');
+
+      // Q2: GET /api/admin/qr/:slug/download blocks foreign & orphaned slugs for non-default tenant
+      const dlForeignQr = await app.fetch(
+        new Request('http://localhost/api/admin/qr/slug-def-1/download', { headers: bHeaders }),
+        env
+      );
+      expect(dlForeignQr.status).toBe(404);
+      const dlOrphanQr = await app.fetch(
+        new Request('http://localhost/api/admin/qr/slug-ghost-orphan/download', { headers: bHeaders }),
+        env
+      );
+      expect(dlOrphanQr.status).toBe(404);
+
+      // Q3: POST /api/reviews rejects nonexistent/unverified order_id for non-default tenant
+      const reviewGhostOrder = await app.fetch(
+        new Request('http://localhost/api/reviews', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ order_id: 'ord-nonexistent-999', rating: 5, comment: 'Fake' }),
+        }),
+        env
+      );
+      expect(reviewGhostOrder.status).toBe(404);
+
+      // Q3: Store-B customer cannot apply Default-store referral code (bidirectional referral tenant isolation)
+      const multiTenantEnv = { ...env, PILOT_TENANT_ID: undefined, ENVIRONMENT: 'test' };
+      const custBToken = await generateJWT(
+        { id: 'cust-b-ref', email: 'b@aura.test', role: 'customer', tenantId: 'store-b' } as any,
+        env.JWT_SECRET
+      );
+      const spoofedHeaderRef = await app.fetch(
+        new Request('http://localhost/api/loyalty/referral/apply', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${custBToken}`,
+            'X-Tenant-ID': 'default',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ code: 'FNB-DEF001' }),
+        }),
+        multiTenantEnv
+      );
+      expect(spoofedHeaderRef.status).toBe(403);
+
+      const applyCrossTenantRef = await app.fetch(
+        new Request('http://localhost/api/loyalty/referral/apply', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${custBToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: 'FNB-DEF001' }),
+        }),
+        multiTenantEnv
+      );
+      expect(applyCrossTenantRef.status).toBe(404);
+
+      // Q4: Customer assistant does not match generic word "order" against order_def_secret via substring LIKE
+      const genericOrderQuery = await app.fetch(
+        new Request('http://localhost/api/chat/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Check my order status please' }),
+        }),
+        env
+      );
+      expect(genericOrderQuery.status).toBe(200);
+      const genericOrderBody: any = await genericOrderQuery.json();
+      expect(genericOrderBody.data.reply).not.toContain('order_def_secret');
+      expect(genericOrderBody.data.reply).not.toContain('125.000');
+
+      // Q4: GET /api/edge/containers/status outer join isolates shared container_id + timestamp by tenant_id
+      const statusB = await app.fetch(
+        new Request('http://localhost/api/edge/containers/status', { headers: bHeaders }),
+        env
+      );
+      expect(statusB.status).toBe(200);
+      const statusBBody: any = await statusB.json();
+      expect(statusBBody.data).toHaveLength(1);
+      expect(statusBBody.data[0].operational_status).toBe('NORMAL');
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 19 (R1..R4): enforces fail-closed CRM customer/referral/order/fulfillment tenant isolation, prevents pre-auth promotion redemption probing, guards SQLite NOT IN NULL trap in customer segments & broadcast, and isolates per-tenant campaign configs', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const multiTenantEnv = { ...baseEnv, PILOT_TENANT_ID: undefined } as any;
+    try {
+      const recentTs = new Date(Date.now() - 5 * 60_000).toISOString();
+      const olderTs = new Date(Date.now() - 10 * 60_000).toISOString();
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          phone TEXT,
+          name TEXT,
+          email TEXT,
+          date_of_birth TEXT,
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          total_orders INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS referral_codes (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          code TEXT UNIQUE,
+          times_used INTEGER DEFAULT 0,
+          total_points_earned INTEGER DEFAULT 0,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS referrals (
+          id TEXT PRIMARY KEY,
+          referrer_id TEXT,
+          referred_customer_id TEXT,
+          referral_code TEXT,
+          points_awarded INTEGER DEFAULT 0,
+          cashback_awarded_vnd INTEGER DEFAULT 0,
+          status TEXT,
+          bonus_type TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promotions (
+          id TEXT PRIMARY KEY,
+          code TEXT,
+          name TEXT,
+          type TEXT,
+          value REAL,
+          percent INTEGER,
+          max_discount INTEGER DEFAULT 0,
+          min_order INTEGER DEFAULT 0,
+          starts_at TEXT,
+          expires_at TEXT,
+          usage_limit INTEGER DEFAULT 0,
+          usage_count INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promotion_redemptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          promotion_id TEXT,
+          code TEXT,
+          order_id TEXT,
+          discount_amount REAL,
+          order_total REAL,
+          redeemed_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS campaign_configs (
+          trigger TEXT PRIMARY KEY,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          channels TEXT NOT NULL DEFAULT '["sms"]',
+          timing TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS menu_items (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          category_id TEXT,
+          price INTEGER,
+          available INTEGER DEFAULT 1,
+          is_available INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS order_items (
+          id TEXT PRIMARY KEY,
+          order_id TEXT,
+          menu_item_id TEXT,
+          item_name TEXT,
+          quantity INTEGER,
+          unit_price INTEGER,
+          modifiers TEXT,
+          notes TEXT
+        );
+        ALTER TABLE orders ADD COLUMN subtotal INTEGER DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN discount INTEGER DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN customer_id TEXT;
+        ALTER TABLE orders ADD COLUMN pickup_slot TEXT;
+        ALTER TABLE orders ADD COLUMN delivery_address TEXT;
+        ALTER TABLE orders ADD COLUMN delivery_notes TEXT;
+        ALTER TABLE orders ADD COLUMN loyalty_points_used INTEGER DEFAULT 0;
+
+        INSERT OR IGNORE INTO users (id, email, name, role, is_active, tenant_id, auth_version)
+        VALUES
+          ('mgr_def_r19', 'mgr-def-r19@aura.test', 'Default Manager', 'manager', 1, 'default', 1),
+          ('mgr_b_r19', 'mgr-b-r19@aura.test', 'Store B Manager', 'manager', 1, 'store-b', 1);
+
+        INSERT OR IGNORE INTO customers (id, phone, name, email, loyalty_points, lifetime_points, loyalty_tier, total_orders, tenant_id)
+        VALUES
+          ('cust_def_r19', '0907111111', 'Default Customer R19', 'def-r19@test.vn', 50, 50, 'GOLD', 1, 'default'),
+          ('cust_b_r19', '0907222222', 'Store B Customer R19', 'b-r19@test.vn', 10, 10, 'GOLD', 0, 'store-b');
+
+        INSERT OR IGNORE INTO referral_codes (id, customer_id, code, times_used, created_at)
+        VALUES ('rc_def_r19', 'cust_def_r19', 'REFDEF19', 0, '${recentTs}');
+
+        INSERT OR IGNORE INTO menu_items (id, name, category_id, price, available, tenant_id)
+        VALUES
+          ('item_def_r19', 'Default Espresso', 'cat_1', 45000, 1, 'default'),
+          ('item_b_r19', 'Store B Matcha', 'cat_1', 55000, 1, 'store-b');
+
+        INSERT OR IGNORE INTO orders (id, order_number, status, order_type, total, subtotal, items, customer_id, customer_phone, tenant_id, created_at)
+        VALUES
+          ('ord_def_pending_1', 'ORD-DEFP1', 'pending', 'pickup', 45000, 45000, '[]', 'cust_def_r19', '0907111111', 'default', '${olderTs}'),
+          ('ord_def_pending_2', 'ORD-DEFP2', 'pending', 'pickup', 50000, 50000, '[]', NULL, NULL, 'default', '${olderTs}'),
+          ('ord_b_null_phone', 'ORD-BNULL', 'pending', 'pickup', 60000, 60000, '[]', NULL, NULL, 'store-b', '${olderTs}');
+
+        INSERT OR IGNORE INTO promotions (id, code, name, type, value, percent, max_discount, min_order, usage_limit, usage_count, is_active, tenant_id)
+        VALUES ('promo_def_r19', 'R19SAVE', 'Default R19 Save', 'percentage', 15, 15, 30000, 0, 100, 1, 1, 'default');
+
+        INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at)
+        VALUES ('promo_def_r19', 'R19SAVE', 'ord_def_pending_1', 6750, 45000, '${recentTs}');
+      `);
+
+      const defMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_def_r19'").get();
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_r19'").get();
+      const { token: defMgrToken } = await issueStaffSession(multiTenantEnv, defMgrRow, { sessionType: 'staff-web' });
+      const { token: bMgrToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const custBToken = await generateJWT(
+        { id: 'cust_b_r19', sub: 'cust_b_r19', role: 'customer', tenantId: 'store-b' },
+        multiTenantEnv.JWT_SECRET
+      );
+      const bHeaders = {
+        Authorization: `Bearer ${bMgrToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+      const defHeaders = {
+        Authorization: `Bearer ${defMgrToken}`,
+        'Content-Type': 'application/json',
+      };
+
+      // R1: GET /api/crm/customers/:id/360 fails closed (403) for cross-tenant and nonexistent customers under store-b
+      const crm360Cross = await app.fetch(
+        new Request('http://localhost/api/crm/customers/cust_def_r19/360', { headers: bHeaders }),
+        multiTenantEnv
+      );
+      expect(crm360Cross.status).toBe(403);
+
+      const crm360Missing = await app.fetch(
+        new Request('http://localhost/api/crm/customers/cust_nonexistent_r19/360', { headers: bHeaders }),
+        multiTenantEnv
+      );
+      expect(crm360Missing.status).toBe(403);
+
+      // R1: POST /api/crm/customers/:id/referral/redeem rejects cross-tenant referral code
+      const redeemCrossRef = await app.fetch(
+        new Request('http://localhost/api/crm/customers/cust_b_r19/referral/redeem', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${custBToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: 'REFDEF19' }),
+        }),
+        multiTenantEnv
+      );
+      expect(redeemCrossRef.status).toBe(400);
+
+      // R1: POST /api/crm/orders rejects cross-tenant menu item and stamps tenant_id = 'store-b' on valid store-b item
+      const crossItemOrder = await app.fetch(
+        new Request('http://localhost/api/crm/orders', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${custBToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel: 'pickup',
+            customerPhone: '0907222222',
+            items: [{ menuItemId: 'item_def_r19', quantity: 1 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(crossItemOrder.status).toBe(400);
+
+      const validBOrder = await app.fetch(
+        new Request('http://localhost/api/crm/orders', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${custBToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel: 'pickup',
+            customerPhone: '0907222222',
+            items: [{ menuItemId: 'item_b_r19', quantity: 1 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(validBOrder.status).toBe(201);
+      const validBOrderBody: any = await validBOrder.json();
+      const createdBOrderId = validBOrderBody.data.orderId;
+
+      // R1: GET /api/crm/orders/:id/fulfillment scopes queueDepth to store-b (only ord_b_null_phone is ahead in store-b, not ord_def_pending_1/2)
+      const fulfillmentB = await app.fetch(
+        new Request(`http://localhost/api/crm/orders/${createdBOrderId}/fulfillment`, {
+          headers: { Authorization: `Bearer ${custBToken}` },
+        }),
+        multiTenantEnv
+      );
+      expect(fulfillmentB.status).toBe(200);
+      const fulfillmentBBody: any = await fulfillmentB.json();
+      expect(fulfillmentBBody.data.queueDepth).toBe(1);
+
+      // R2: Store B manager can create promotion with code 'R19SAVE' without colliding with default tenant's 'R19SAVE'
+      const createPromoB = await app.fetch(
+        new Request('http://localhost/api/promotions', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ code: 'R19SAVE', percent: 20, max_discount: 40000, min_order: 0 }),
+        }),
+        multiTenantEnv
+      );
+      expect(createPromoB.status).toBe(201);
+
+      // R2: POST /api/promotions/redeem verifies order ownership before checking promotion_redemptions (returns 404, not 200 idempotent leak)
+      const probeCrossRedemption = await app.fetch(
+        new Request('http://localhost/api/promotions/redeem', {
+          method: 'POST',
+          headers: bHeaders,
+          body: JSON.stringify({ code: 'R19SAVE', order_id: 'ord_def_pending_1', order_total: 45000 }),
+        }),
+        multiTenantEnv
+      );
+      expect(probeCrossRedemption.status).toBe(404);
+
+      // R3: GET /api/customers/segments returns non-zero inactive_90d and case-insensitive loyalty_gold despite NULL customer_phone orders
+      const segmentsBRes = await app.fetch(
+        new Request('http://localhost/api/customers/segments', { headers: bHeaders }),
+        multiTenantEnv
+      );
+      expect(segmentsBRes.status).toBe(200);
+      const segmentsBBody: any = await segmentsBRes.json();
+      const goldSeg = segmentsBBody.data.find((s: any) => s.id === 'loyalty_gold');
+      const inactiveSeg = segmentsBBody.data.find((s: any) => s.id === 'inactive_90d');
+      expect(goldSeg?.count).toBe(1);
+      // cust_b_r19 just placed validBOrder with phone '0907222222'; add an inactive store-b customer and verify NOT IN (NULL) does not zero it out
+      sql.exec(`
+        INSERT INTO customers (id, phone, name, email, loyalty_points, lifetime_points, loyalty_tier, total_orders, tenant_id)
+        VALUES ('cust_b_inactive_r19', '0907333333', 'Inactive B', 'inact-b@test.vn', 0, 0, 'BRONZE', 0, 'store-b');
+      `);
+      const segmentsBRes2 = await app.fetch(
+        new Request('http://localhost/api/customers/segments', { headers: bHeaders }),
+        multiTenantEnv
+      );
+      const segmentsBBody2: any = await segmentsBRes2.json();
+      const inactiveSeg2 = segmentsBBody2.data.find((s: any) => s.id === 'inactive_90d');
+      expect(inactiveSeg2?.count).toBe(1);
+      void inactiveSeg;
+
+      // R4: PUT /api/campaigns/welcome by store-b manager does not mutate default tenant's welcome campaign config
+      await app.fetch(new Request('http://localhost/api/campaigns', { headers: defHeaders }), multiTenantEnv);
+      await app.fetch(new Request('http://localhost/api/campaigns', { headers: bHeaders }), multiTenantEnv);
+
+      const putBWelcome = await app.fetch(
+        new Request('http://localhost/api/campaigns/welcome', {
+          method: 'PUT',
+          headers: bHeaders,
+          body: JSON.stringify({ is_active: 0, channels: ['zalo'] }),
+        }),
+        multiTenantEnv
+      );
+      expect(putBWelcome.status).toBe(200);
+
+      const getDefWelcome = await app.fetch(
+        new Request('http://localhost/api/campaigns/welcome', { headers: defHeaders }),
+        multiTenantEnv
+      );
+      expect(getDefWelcome.status).toBe(200);
+      const getDefWelcomeBody: any = await getDefWelcome.json();
+      expect(getDefWelcomeBody.data.is_active).toBe(1);
+      expect(getDefWelcomeBody.data.channels).toEqual(['sms', 'email']);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 20 (S1..S4): enforces ERPNext invoice tenant/order ownership, fail-closed ERPNext configure auth + tenant KV isolation, WiFi captive-portal PII masking/duration ceiling/tenant isolation, and Mixpost/Zalo tenant scoping', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const { handleErpnextRequest } = await import('../../routes/erpnext');
+    const multiTenantEnv = { ...baseEnv, PILOT_TENANT_ID: undefined } as any;
+    try {
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS erpnext_mappings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          local_id TEXT,
+          local_type TEXT DEFAULT 'order',
+          erpnext_id TEXT,
+          erpnext_model TEXT DEFAULT 'Sales Invoice',
+          sync_status TEXT DEFAULT 'synced',
+          attempts INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          last_synced_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          email TEXT,
+          name TEXT,
+          phone TEXT,
+          zalo TEXT,
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'BRONZE',
+          source TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS wifi_sessions (
+          id TEXT PRIMARY KEY,
+          client_mac TEXT NOT NULL,
+          ip_address TEXT,
+          phone TEXT,
+          customer_id TEXT,
+          status TEXT DEFAULT 'authorized',
+          session_timeout INTEGER DEFAULT 3600,
+          authorized_at TEXT,
+          expires_at TEXT,
+          created_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS promotions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          code TEXT NOT NULL,
+          percent INTEGER NOT NULL,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          price INTEGER NOT NULL,
+          category_id INTEGER DEFAULT 1,
+          is_available INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS mixpost_posts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          content TEXT,
+          status TEXT,
+          platforms TEXT,
+          source TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          tenant_id TEXT DEFAULT 'default'
+        );
+
+        ALTER TABLE orders ADD COLUMN total_amount INTEGER;
+        ALTER TABLE orders ADD COLUMN customer_email TEXT;
+
+        INSERT INTO users (id, email, name, role, is_active, tenant_id)
+        VALUES
+          ('mgr_def_s20', 'mgr-def-s20@test.vn', 'Manager Def S20', 'manager', 1, 'default'),
+          ('mgr_b_s20', 'mgr-b-s20@test.vn', 'Manager B S20', 'manager', 1, 'store-b'),
+          ('staff_b_s20', 'staff-b-s20@test.vn', 'Staff B S20', 'staff', 1, 'store-b');
+
+        INSERT INTO orders (id, order_number, status, payment_status, total, total_amount, customer_name, tenant_id)
+        VALUES
+          ('ord_s20_def', 'ORD-S20-D', 'completed', 'paid', 65000, 65000, 'Khach Default', 'default'),
+          ('ord_s20_b', 'ORD-S20-B', 'completed', 'paid', 85000, 85000, 'Khach Store B', 'store-b');
+
+        INSERT INTO erpnext_mappings (local_id, local_type, erpnext_id, sync_status)
+        VALUES
+          ('ord_s20_def', 'order', 'SINV-DEF-001', 'synced'),
+          ('ord_s20_b', 'order', 'SINV-B-001', 'synced');
+
+        INSERT INTO customers (id, email, name, phone, zalo, tenant_id)
+        VALUES
+          ('cust_s20_def', 'def@test.vn', 'Customer Default', '0908111111', '0908111111', 'default'),
+          ('cust_s20_b', 'b@test.vn', 'Customer B', '0908222222', '0908222222', 'store-b');
+
+        INSERT INTO promotions (code, percent, is_active, tenant_id)
+        VALUES
+          ('PROMO_DEF_ONLY', 30, 1, 'default'),
+          ('PROMO_B_ONLY', 15, 1, 'store-b');
+
+        INSERT INTO products (id, name, price, category_id, is_available, tenant_id)
+        VALUES
+          ('prod_s20_def', 'Secret Default Roast', 55000, 1, 1, 'default'),
+          ('prod_s20_b', 'Store B Matcha', 49000, 1, 1, 'store-b');
+
+        INSERT INTO mixpost_posts (content, status, platforms, source, tenant_id)
+        VALUES
+          ('Post Default', 'published', '[]', 'manual', 'default'),
+          ('Post Store B', 'published', '[]', 'manual', 'store-b');
+      `);
+
+      const defMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_def_s20'").get();
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_s20'").get();
+      const bStaffRow: any = sql.prepare("SELECT * FROM users WHERE id = 'staff_b_s20'").get();
+
+      const { token: defaultManagerToken } = await issueStaffSession(multiTenantEnv, defMgrRow, { sessionType: 'staff-web' });
+      const { token: storeBManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const { token: storeBStaffToken } = await issueStaffSession(multiTenantEnv, bStaffRow, { sessionType: 'staff-web' });
+
+      const bManagerHeaders = { Authorization: `Bearer ${storeBManagerToken}`, 'Content-Type': 'application/json' };
+      const bStaffHeaders = { Authorization: `Bearer ${storeBStaffToken}`, 'Content-Type': 'application/json' };
+      const defManagerHeaders = { Authorization: `Bearer ${defaultManagerToken}`, 'Content-Type': 'application/json' };
+
+      // S1: GET /api/erpnext-invoices/list ignores spoofed X-Tenant-ID: * from Store B manager
+      const listSpoofRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-invoices/list', {
+          headers: { ...bManagerHeaders, 'X-Tenant-ID': '*' },
+        }),
+        multiTenantEnv
+      );
+      expect(listSpoofRes.status).toBe(200);
+      const listSpoofBody: any = await listSpoofRes.json();
+      expect(listSpoofBody.data.map((r: any) => r.order_id)).toEqual(['ord_s20_b']);
+
+      // S1: POST /api/erpnext-invoices/create & GET /api/erpnext-invoices/:orderId return 404 for foreign-tenant order
+      const createForeignInvRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-invoices/create', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ id: 'ord_s20_def', total: 65000, items: [] }),
+        }),
+        multiTenantEnv
+      );
+      expect(createForeignInvRes.status).toBe(404);
+
+      const getForeignInvRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-invoices/ord_s20_def', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(getForeignInvRes.status).toBe(404);
+
+      // S2: DELETE /api/erpnext/configure fails closed (401) when JWT_SECRET is missing
+      const delNoSecretRes = await handleErpnextRequest(
+        new Request('http://localhost/api/erpnext/configure', { method: 'DELETE' }),
+        { AUTH_KV: multiTenantEnv.AUTH_KV }
+      );
+      expect(delNoSecretRes.status).toBe(401);
+
+      // S2: Staff role is rejected (403) on POST & DELETE /api/erpnext/configure
+      const staffPostConfRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/configure', {
+          method: 'POST',
+          headers: bStaffHeaders,
+          body: JSON.stringify({ url: 'https://erp.store-b.vn', api_key: 'key_b', api_secret: 'sec_b' }),
+        }),
+        multiTenantEnv
+      );
+      expect(staffPostConfRes.status).toBe(403);
+
+      const staffDelConfRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/configure', {
+          method: 'DELETE',
+          headers: bStaffHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(staffDelConfRes.status).toBe(403);
+
+      // S2: Tenant-namespaced KV keys prevent Store B manager from overwriting/deleting default tenant ERPNext credentials
+      await multiTenantEnv.AUTH_KV.put('erpnext:api_url', 'https://erp.default.vn');
+      await multiTenantEnv.AUTH_KV.put('erpnext:api_key', 'key_def');
+      await multiTenantEnv.AUTH_KV.put('erpnext:api_secret', 'sec_def');
+
+      const mgrBDelConfRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/configure', {
+          method: 'DELETE',
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(mgrBDelConfRes.status).toBe(200);
+      expect(await multiTenantEnv.AUTH_KV.get('erpnext:api_url')).toBe('https://erp.default.vn');
+
+      // S3: POST /api/wifi/login rejects excessive duration_seconds (>86400)
+      const excessiveWifiRes = await app.fetch(
+        new Request('http://localhost/api/wifi/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac: 'AA:BB:CC:11:22:33', phone: '0909123456', duration_seconds: 9999999 }),
+        }),
+        multiTenantEnv
+      );
+      expect(excessiveWifiRes.status).toBe(400);
+
+      // S3: Valid WiFi login + GET /api/wifi/status masks phone PII and isolates tenants
+      const validWifiLoginRes = await app.fetch(
+        new Request('http://localhost/api/wifi/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac: 'AA:BB:CC:11:22:33', phone: '0909777888', duration_seconds: 3600 }),
+        }),
+        multiTenantEnv
+      );
+      expect(validWifiLoginRes.status).toBe(200);
+
+      const wifiStatusDefRes = await app.fetch(
+        new Request('http://localhost/api/wifi/status?mac=AA:BB:CC:11:22:33'),
+        multiTenantEnv
+      );
+      expect(wifiStatusDefRes.status).toBe(200);
+      const wifiStatusDefBody: any = await wifiStatusDefRes.json();
+      expect(wifiStatusDefBody.authorized).toBe(true);
+      expect(wifiStatusDefBody.session.phone).toBe('090****888');
+
+      // S3: Store B staff revoking AA:BB:CC:11:22:33 does not revoke default tenant's active WiFi session
+      const bRevokeWifiRes = await app.fetch(
+        new Request('http://localhost/api/wifi/authorize', {
+          method: 'POST',
+          headers: bStaffHeaders,
+          body: JSON.stringify({ mac: 'AA:BB:CC:11:22:33', action: 'revoke' }),
+        }),
+        multiTenantEnv
+      );
+      expect(bRevokeWifiRes.status).toBe(200);
+
+      const wifiStatusAfterBRevoke = await app.fetch(
+        new Request('http://localhost/api/wifi/status?mac=AA:BB:CC:11:22:33'),
+        multiTenantEnv
+      );
+      const wifiStatusAfterBRevokeBody: any = await wifiStatusAfterBRevoke.json();
+      expect(wifiStatusAfterBRevokeBody.authorized).toBe(true);
+
+      // S4: POST /api/mixpost/generate isolates promotions & menu products per tenant
+      const genForeignPromoRes = await app.fetch(
+        new Request('http://localhost/api/mixpost/generate', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ source: 'promotion', id: 'PROMO_DEF_ONLY' }),
+        }),
+        multiTenantEnv
+      );
+      expect(genForeignPromoRes.status).toBe(404);
+
+      const genOwnMenuRes = await app.fetch(
+        new Request('http://localhost/api/mixpost/generate', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ source: 'menu' }),
+        }),
+        multiTenantEnv
+      );
+      expect(genOwnMenuRes.status).toBe(200);
+      const genOwnMenuBody: any = await genOwnMenuRes.json();
+      expect(genOwnMenuBody.data.content).toContain('Store B Matcha');
+      expect(genOwnMenuBody.data.content).not.toContain('Secret Default Roast');
+
+      // S4: GET /api/mixpost/posts scopes posts by tenant
+      const postsBRes = await app.fetch(
+        new Request('http://localhost/api/mixpost/posts', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(postsBRes.status).toBe(200);
+      const postsBBody: any = await postsBRes.json();
+      expect(postsBBody.data.map((p: any) => p.content)).toEqual(['Post Store B']);
+
+      // S4: POST /api/zalo/send with foreign-tenant customer_id returns customer_not_found
+      const zaloForeignRes = await app.fetch(
+        new Request('http://localhost/api/zalo/send', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ customer_id: 'cust_s20_def', template_key: 'welcome', data: {} }),
+        }),
+        multiTenantEnv
+      );
+      expect(zaloForeignRes.status).toBe(200);
+      const zaloForeignBody: any = await zaloForeignRes.json();
+      expect(zaloForeignBody.success).toBe(false);
+      expect(zaloForeignBody.data.reason).toBe('customer_not_found');
+      void defManagerHeaders;
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('T1..T4: enforces ERPNext POS webhook secret & batch bounds, Mautic per-tenant state, TastyIgniter order ownership & status allowlist, and Frigate/HA tenant & identifier guards', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const kvStore = new Map<string, string>();
+    const multiTenantEnv = {
+      ...baseEnv,
+      PILOT_TENANT_ID: undefined,
+      ENVIRONMENT: 'production',
+      ERPNEXT_URL: 'https://erp.example.com',
+      ERPNEXT_API_KEY: 'key',
+      ERPNEXT_API_SECRET: 'secret',
+      ERPNEXT_WEBHOOK_SECRET: 'erp_wh_secret_123',
+      TASTYIGNITER_WEBHOOK_SECRET: 'ti_wh_secret_123',
+      TASTYIGNITER_SYNC_ENABLED: 'false',
+      HA_WEBHOOK_SECRET: 'ha_wh_secret_123',
+      AURA_KV: {
+        get: async (k: string, type?: string) => {
+          const v = kvStore.get(k) ?? null;
+          return v && type === 'json' ? JSON.parse(v) : v;
+        },
+        put: async (k: string, v: string) => { kvStore.set(k, v); },
+        delete: async (k: string) => { kvStore.delete(k); },
+      } as unknown as KVNamespace,
+    } as any;
+
+    try {
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS erpnext_webhook_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          doctype TEXT,
+          docname TEXT,
+          action TEXT,
+          payload TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS ti_order_bridge (
+          id TEXT PRIMARY KEY,
+          local_order_id TEXT,
+          ti_order_id TEXT,
+          status TEXT,
+          synced_at TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS frigate_events (
+          id TEXT PRIMARY KEY,
+          camera TEXT,
+          label TEXT,
+          start_time INTEGER,
+          end_time INTEGER,
+          score REAL,
+          payload TEXT,
+          received_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS ha_device_states (
+          entity_id TEXT PRIMARY KEY,
+          state TEXT,
+          attributes TEXT,
+          last_changed TEXT,
+          last_updated TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        INSERT INTO users (id, email, name, role, is_active, tenant_id)
+        VALUES ('mgr_b_t21', 'mgr-b-t21@test.vn', 'Manager B T21', 'manager', 1, 'store-b');
+        INSERT INTO orders (id, order_number, status, payment_status, total, customer_name, tenant_id)
+        VALUES ('ord_t21_def', 'ORD-T21-D', 'pending', 'unpaid', 95000, 'Customer Default', 'default');
+        INSERT INTO frigate_events (id, camera, label, start_time, end_time, score, payload, received_at, tenant_id)
+        VALUES
+          ('evt_def', 'front_door', 'person', 1700000100, 1700000110, 0.92, '{}', datetime('now'), 'default'),
+          ('evt_b', 'patio', 'person', 1700000200, 1700000210, 0.88, '{}', datetime('now'), 'store-b');
+        INSERT INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated, tenant_id)
+        VALUES
+          ('light.kitchen_main', 'on', '{}', datetime('now'), datetime('now'), 'default'),
+          ('light.kitchen_b', 'off', '{}', datetime('now'), datetime('now'), 'store-b');
+      `);
+
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_t21'").get();
+      const { token: storeBManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const bManagerHeaders = {
+        Authorization: `Bearer ${storeBManagerToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+
+      // T1: POST /api/erpnext-pos/webhook rejects invalid secret with 401 and accepts valid secret
+      const badWhRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-pos/webhook', {
+          method: 'POST',
+          headers: { ...bManagerHeaders, 'x-erpnext-webhook-secret': 'wrong_secret' },
+          body: JSON.stringify({ doctype: 'Sales Order', docname: 'SO-001', action: 'on_update' }),
+        }),
+        multiTenantEnv
+      );
+      expect(badWhRes.status).toBe(401);
+
+      const goodWhRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-pos/webhook', {
+          method: 'POST',
+          headers: { ...bManagerHeaders, 'x-erpnext-webhook-secret': 'erp_wh_secret_123' },
+          body: JSON.stringify({ doctype: 'Sales Order', docname: 'SO-001', action: 'on_update' }),
+        }),
+        multiTenantEnv
+      );
+      expect(goodWhRes.status).toBe(200);
+
+      // T1: POST /api/erpnext-pos/products/sync rejects empty products array with 400
+      const emptySyncRes = await app.fetch(
+        new Request('http://localhost/api/erpnext-pos/products/sync', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ products: [] }),
+        }),
+        multiTenantEnv
+      );
+      expect(emptySyncRes.status).toBe(400);
+
+      // T2: GET /api/mautic-bridge/status isolates per-tenant sync status from default tenant
+      const statusBRes = await app.fetch(
+        new Request('http://localhost/api/mautic-bridge/status', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(statusBRes.status).toBe(200);
+      const statusBBody: any = await statusBRes.json();
+      expect(statusBBody.data.status).toBe('idle');
+
+      // T3: POST /api/integrations/tastyigniter/sync/order rejects foreign tenant order ID with 404
+      const tiForeignOrderRes = await app.fetch(
+        new Request('http://localhost/api/integrations/tastyigniter/sync/order', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            localOrderId: 'ord_t21_def',
+            orderData: { items: [], total: 95000 },
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(tiForeignOrderRes.status).toBe(404);
+
+      // T3: POST /api/integrations/tastyigniter/webhook in production rejects query-string secret (?secret=...)
+      const tiQuerySecretRes = await app.fetch(
+        new Request('http://localhost/api/integrations/tastyigniter/webhook?secret=ti_wh_secret_123', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'order.InjectedStatus', local_order_id: 'ord_t21_def' }),
+        }),
+        multiTenantEnv
+      );
+      expect(tiQuerySecretRes.status).toBe(401);
+
+      // T3: POST /api/integrations/tastyigniter/webhook with header secret maps unknown status to allowlisted 'confirmed'
+      const tiHeaderSecretRes = await app.fetch(
+        new Request('http://localhost/api/integrations/tastyigniter/webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tastyigniter-signature': 'ti_wh_secret_123',
+          },
+          body: JSON.stringify({ event: 'order.arbitrary_pwn_status', local_order_id: 'ord_t21_def' }),
+        }),
+        multiTenantEnv
+      );
+      expect(tiHeaderSecretRes.status).toBe(200);
+      const tiHeaderSecretBody: any = await tiHeaderSecretRes.json();
+      expect(tiHeaderSecretBody.mapped_status).toBe('confirmed');
+
+      // T4: Frigate rejects invalid camera ID / invalid since and scopes events by tenant
+      const frigateBadCamRes = await app.fetch(
+        new Request('http://localhost/api/integrations/frigate/camera/../../etc/passwd/snapshot', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect([400, 404]).toContain(frigateBadCamRes.status);
+
+      const frigateBadSinceRes = await app.fetch(
+        new Request('http://localhost/api/integrations/frigate/events?since=not_a_number', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(frigateBadSinceRes.status).toBe(400);
+
+      const frigateEventsBRes = await app.fetch(
+        new Request('http://localhost/api/integrations/frigate/events', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(frigateEventsBRes.status).toBe(200);
+      const frigateEventsBBody: any = await frigateEventsBRes.json();
+      expect(frigateEventsBBody.events.map((e: any) => e.id)).toEqual(['evt_b']);
+
+      // T4: Home Assistant rejects wildcard zone '%', scopes devices by tenant, and rejects query token in production
+      const haWildcardZoneRes = await app.fetch(
+        new Request('http://localhost/api/ha/devices/zone/%25', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(haWildcardZoneRes.status).toBe(400);
+
+      const haDevicesBRes = await app.fetch(
+        new Request('http://localhost/api/ha/devices', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(haDevicesBRes.status).toBe(200);
+      const haDevicesBBody: any = await haDevicesBRes.json();
+      expect(haDevicesBBody.devices.map((d: any) => d.entity_id)).toEqual(['light.kitchen_b']);
+
+      const haForeignDeviceRes = await app.fetch(
+        new Request('http://localhost/api/ha/devices/light.kitchen_main', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(haForeignDeviceRes.status).toBe(404);
+
+      const haQueryWebhookRes = await app.fetch(
+        new Request('http://localhost/api/ha/webhook?token=ha_wh_secret_123', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity_id: 'light.kitchen_b', state: 'on' }),
+        }),
+        multiTenantEnv
+      );
+      expect(haQueryWebhookRes.status).toBe(401);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('U1..U4: enforces ERPNext customers/expenses bounds, admin sync role/log scoping, customer assistant PII masking, and dynamic pricing server-authoritative cost floor', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const multiTenantEnv = {
+      ...baseEnv,
+      PILOT_TENANT_ID: undefined,
+      ENVIRONMENT: 'production',
+    } as any;
+
+    try {
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          tax_id TEXT,
+          erpnext_id TEXT,
+          sync_status TEXT,
+          loyalty_points INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
+          id TEXT PRIMARY KEY,
+          method TEXT,
+          endpoint TEXT,
+          request_body TEXT,
+          response_body TEXT,
+          error TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          price REAL,
+          cost_price REAL,
+          category_id TEXT,
+          is_available INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS dynamic_pricing_rules (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT DEFAULT 'default',
+          name TEXT,
+          rule_type TEXT,
+          discount_percent REAL,
+          target_category TEXT,
+          target_product_id TEXT,
+          min_margin_percent REAL DEFAULT 30,
+          days_of_week TEXT DEFAULT '0,1,2,3,4,5,6',
+          start_time TEXT DEFAULT '00:00',
+          end_time TEXT DEFAULT '23:59',
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO users (id, email, name, role, is_active, tenant_id)
+        VALUES
+          ('mgr_b_u22', 'mgr-b-u22@test.vn', 'Manager B U22', 'manager', 1, 'store-b'),
+          ('staff_b_u22', 'staff-b-u22@test.vn', 'Staff B U22', 'staff', 1, 'store-b');
+        INSERT INTO customers (id, name, phone, loyalty_points, loyalty_tier, tenant_id)
+        VALUES ('cust_u22_def', 'Nguyễn Văn An', '0912345678', 320, 'gold', 'default');
+        INSERT INTO orders (id, order_number, status, payment_status, total, customer_phone, customer_name, tenant_id)
+        VALUES ('ord_secret_0001', 'ORD-U22-1', 'preparing', 'paid', 85000, '0912345678', 'Nguyễn Văn An', 'default');
+        INSERT INTO products (id, name, price, cost_price, category_id, is_available, tenant_id)
+        VALUES ('prod_u22_cf', 'Cà Phê Đặc Biệt', 50000, 35000, 'cat_cf', 1, 'default');
+        INSERT INTO dynamic_pricing_rules (
+          id, tenant_id, name, rule_type, discount_percent, target_product_id, min_margin_percent, days_of_week, start_time, end_time, is_active
+        ) VALUES (
+          'rule_u22_1', 'default', 'Flash 60%', 'happy_hour', 60, 'prod_u22_cf', 30, '0,1,2,3,4,5,6', '00:00', '23:59', 1
+        );
+        INSERT INTO erpnext_sync_logs (id, method, endpoint, request_body, response_body, error, created_at)
+        VALUES
+          ('log_def_1', 'POST', '/api/admin/erpnext-sync/orders', '{"entity":"orders","tenant_id":"default","secret":"pii_def"}', '{"ok":true}', NULL, '2026-10-30T08:00:00Z'),
+          ('log_b_1', 'POST', '/api/admin/erpnext-sync/orders', '{"entity":"orders","tenant_id":"store-b","secret":"pii_b"}', '{"ok":true}', NULL, '2026-10-30T09:00:00Z');
+      `);
+
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_u22'").get();
+      const bStaffRow: any = sql.prepare("SELECT * FROM users WHERE id = 'staff_b_u22'").get();
+      const { token: storeBManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const { token: storeBStaffToken } = await issueStaffSession(multiTenantEnv, bStaffRow, { sessionType: 'staff-web' });
+
+      const bManagerHeaders = {
+        Authorization: `Bearer ${storeBManagerToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+      const bStaffHeaders = {
+        Authorization: `Bearer ${storeBStaffToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+
+      // U1: GET /api/erpnext/customers clamps negative page and excessive limit
+      const custRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/customers?page=-5&limit=9999', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(custRes.status).toBe(200);
+      const custBody: any = await custRes.json();
+      expect(custBody.pagination.page).toBe(1);
+      expect(custBody.pagination.limit).toBe(200);
+
+      // U1: GET /api/erpnext/expenses rejects invalid date filter with 400
+      const badExpDateRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/expenses?from=not-a-date', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(badExpDateRes.status).toBe(400);
+
+      // U2: Staff cannot access GET /api/admin/erpnext-sync/status or POST /api/admin/erpnext-sync/sync-all
+      const staffSyncStatusRes = await app.fetch(
+        new Request('http://localhost/api/admin/erpnext-sync/status', { headers: bStaffHeaders }),
+        multiTenantEnv
+      );
+      expect(staffSyncStatusRes.status).toBe(403);
+
+      const staffSyncTriggerRes = await app.fetch(
+        new Request('http://localhost/api/admin/erpnext-sync/sync-all', {
+          method: 'POST',
+          headers: bStaffHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(staffSyncTriggerRes.status).toBe(403);
+
+      // U2: Manager B sees only store-b sync logs and request_body/response_body are redacted
+      const mgrSyncStatusRes = await app.fetch(
+        new Request('http://localhost/api/admin/erpnext-sync/status', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(mgrSyncStatusRes.status).toBe(200);
+      const mgrSyncStatusBody: any = await mgrSyncStatusRes.json();
+      expect(mgrSyncStatusBody.logs.map((l: any) => l.id)).toEqual(['log_b_1']);
+      expect(mgrSyncStatusBody.logs[0].request_body).toBeUndefined();
+      expect(mgrSyncStatusBody.logs[0].response_body).toBeUndefined();
+
+      // U3: POST /api/chat/assistant masks customer full name on loyalty lookup and order ID on phone-only order lookup
+      const loyaltyChatRes = await app.fetch(
+        new Request('http://localhost/api/chat/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra điểm tích lũy', phone: '0912345678' }),
+        }),
+        multiTenantEnv
+      );
+      expect(loyaltyChatRes.status).toBe(200);
+      const loyaltyChatBody: any = await loyaltyChatRes.json();
+      expect(loyaltyChatBody.data.reply).toContain('Nguyễn ***');
+      expect(loyaltyChatBody.data.reply).not.toContain('Nguyễn Văn An');
+
+      const orderPhoneChatRes = await app.fetch(
+        new Request('http://localhost/api/chat/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra đơn hàng của tôi', phone: '0912345678' }),
+        }),
+        multiTenantEnv
+      );
+      expect(orderPhoneChatRes.status).toBe(200);
+      const orderPhoneChatBody: any = await orderPhoneChatRes.json();
+      expect(orderPhoneChatBody.data.reply).toContain('#***0001');
+      expect(orderPhoneChatBody.data.reply).not.toContain('ord_secret_0001');
+
+      // U4: Invalid timestamp rejected with 400 on /active and /calculate
+      const badTsActiveRes = await app.fetch(
+        new Request('http://localhost/api/pricing/dynamic/active?timestamp=not-a-timestamp'),
+        multiTenantEnv
+      );
+      expect(badTsActiveRes.status).toBe(400);
+
+      // U4: Invalid days_of_week rejected with 400 on POST /api/pricing/dynamic/rules
+      const badRuleRes = await app.fetch(
+        new Request('http://localhost/api/pricing/dynamic/rules', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            name: 'Invalid Days Rule',
+            rule_type: 'happy_hour',
+            discount_percent: 20,
+            days_of_week: '1,9,invalid',
+            start_time: '08:00',
+            end_time: '17:00',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(badRuleRes.status).toBe(400);
+
+      // U4: POST /api/pricing/dynamic/calculate without unit_cost enforces server-authoritative cost_price (35,000 * 1.3 = 45,500 floor -> max 9% discount)
+      const calcRes = await app.fetch(
+        new Request('http://localhost/api/pricing/dynamic/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ product_id: 'prod_u22_cf', price: 50000, quantity: 1 }],
+            timestamp: '2026-10-30T10:00:00Z',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(calcRes.status).toBe(200);
+      const calcBody: any = await calcRes.json();
+      expect(calcBody.data.items[0].discount_percent).toBe(9);
+      expect(calcBody.data.items[0].final_price).toBe(45500);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('V1..V4: enforces ERPNext vendors pre-limit tenant scoping, inventory forecasting NaN/tenant guards, franchise financial metrics RBAC + date validation, and Zalo/Barista/Recommendations input hardening', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const multiTenantEnv = {
+      ...baseEnv,
+      PILOT_TENANT_ID: undefined,
+      ENVIRONMENT: 'production',
+    } as any;
+
+    try {
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS franchise_locations (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT DEFAULT 'default',
+          code TEXT,
+          name TEXT,
+          address TEXT,
+          city TEXT,
+          phone TEXT,
+          royalty_percentage REAL DEFAULT 5.0,
+          status TEXT DEFAULT 'active'
+        );
+        INSERT INTO users (id, email, name, role, is_active, tenant_id)
+        VALUES
+          ('mgr_b_v23', 'mgr-b-v23@test.vn', 'Manager B V23', 'manager', 1, 'store-b'),
+          ('staff_b_v23', 'staff-b-v23@test.vn', 'Staff B V23', 'staff', 1, 'store-b');
+        INSERT INTO suppliers (id, name, tenant_id, created_at)
+        VALUES
+          ('sup_def_1', 'Supplier Default 1', 'default', '2026-10-30T10:00:00Z'),
+          ('sup_def_2', 'Supplier Default 2', 'default', '2026-10-30T10:01:00Z'),
+          ('sup_b_1', 'Supplier Store B', 'store-b', '2026-10-30T09:00:00Z');
+        INSERT INTO franchise_locations (id, tenant_id, code, name, royalty_percentage, status)
+        VALUES ('loc_b_v23', 'store-b', 'SDB01', 'AURA Store B', 5.0, 'active');
+      `);
+
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_v23'").get();
+      const bStaffRow: any = sql.prepare("SELECT * FROM users WHERE id = 'staff_b_v23'").get();
+      const { token: storeBManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const { token: storeBStaffToken } = await issueStaffSession(multiTenantEnv, bStaffRow, { sessionType: 'staff-web' });
+
+      const bManagerHeaders = {
+        Authorization: `Bearer ${storeBManagerToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+      const bStaffHeaders = {
+        Authorization: `Bearer ${storeBStaffToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+
+      // V1: GET /api/erpnext/vendors?limit=1 returns store-b's supplier even when default tenant has newer rows
+      const vendorsRes = await app.fetch(
+        new Request('http://localhost/api/erpnext/vendors?limit=1', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(vendorsRes.status).toBe(200);
+      const vendorsBody: any = await vendorsRes.json();
+      expect(vendorsBody.data.map((v: any) => v.id)).toEqual(['sup_b_1']);
+
+      // V2: GET /api/inventory/forecasting/run-rate?days=abc&lead_time_days=xyz does not throw 500 RangeError and isolates store-b from default inventory
+      const runRateRes = await app.fetch(
+        new Request('http://localhost/api/inventory/forecasting/run-rate?days=abc&lead_time_days=xyz', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(runRateRes.status).toBe(200);
+      const runRateBody: any = await runRateRes.json();
+      expect(runRateBody.data).toEqual([]);
+
+      // V3: Staff cannot access GET /api/franchise/locations/:id/metrics (403), while manager can (200) and invalid start_date returns 400
+      const staffMetricsRes = await app.fetch(
+        new Request('http://localhost/api/franchise/locations/loc_b_v23/metrics', { headers: bStaffHeaders }),
+        multiTenantEnv
+      );
+      expect(staffMetricsRes.status).toBe(403);
+
+      const badDateMetricsRes = await app.fetch(
+        new Request('http://localhost/api/franchise/locations/loc_b_v23/metrics?start_date=not-a-date', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(badDateMetricsRes.status).toBe(400);
+
+      const mgrMetricsRes = await app.fetch(
+        new Request('http://localhost/api/franchise/locations/loc_b_v23/metrics?start_date=2026-10-01', {
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(mgrMetricsRes.status).toBe(200);
+
+      // V4: GET /api/webhooks/zalo rejects HTML/script challenge with 400 and sets X-Content-Type-Options: nosniff on valid challenge
+      const xssChallengeRes = await app.fetch(
+        new Request('http://localhost/api/webhooks/zalo?challenge=%3Cscript%3Ealert(1)%3C/script%3E'),
+        multiTenantEnv
+      );
+      expect(xssChallengeRes.status).toBe(400);
+
+      const validChallengeRes = await app.fetch(
+        new Request('http://localhost/api/webhooks/zalo?challenge=zalo_verify_token_123'),
+        multiTenantEnv
+      );
+      expect(validChallengeRes.status).toBe(200);
+      expect(validChallengeRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
+
+      // V4: POST /api/ai/barista/recommend rejects oversized mood (>100 chars) with 400
+      const badBaristaRes = await app.fetch(
+        new Request('http://localhost/api/ai/barista/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preferences: { mood: 'x'.repeat(150) } }),
+        }),
+        multiTenantEnv
+      );
+      expect(badBaristaRes.status).toBe(400);
+
+      // V4: GET /api/recommendations/trending?limit=abc falls back cleanly without NaN slice
+      const trendingNaNRes = await app.fetch(
+        new Request('http://localhost/api/recommendations/trending?limit=abc'),
+        multiTenantEnv
+      );
+      expect(trendingNaNRes.status).toBe(200);
+      const trendingNaNBody: any = await trendingNaNRes.json();
+      expect(trendingNaNBody.data.length).toBeGreaterThan(0);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('W1..W4: enforces Pretix identifier/path-traversal guards, DinDin config RBAC & cart price/qty validation, OpenAPI catalog multi-tenant isolation, and loyalty account tenant/annual birthday guards', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    const multiTenantEnv = {
+      ...baseEnv,
+      PILOT_TENANT_ID: undefined,
+      ENVIRONMENT: 'production',
+      PRETIX_API_URL: 'https://pretix.example.com',
+      PRETIX_API_TOKEN: 'pretix_token_123',
+      PRETIX_ORGANIZER: 'aura-cafe',
+    } as any;
+
+    try {
+      const catDefId = '11111111-1111-4111-8111-111111111124';
+      const catBId = '22222222-2222-4222-8222-222222222224';
+      const prodDefId = '33333333-3333-4333-8333-333333333324';
+      const prodBId = '44444444-4444-4444-8444-444444444424';
+      const custDefId = '55555555-5555-4555-8555-555555555524';
+      const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      const currentYearStr = String(new Date().getFullYear());
+
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          description TEXT,
+          sort_order INTEGER DEFAULT 0,
+          image_url TEXT,
+          display_name_vi TEXT,
+          display_name_en TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          category_id TEXT,
+          name TEXT,
+          slug TEXT,
+          price REAL,
+          compare_at_price REAL,
+          description TEXT,
+          image_url TEXT,
+          tags TEXT,
+          is_available INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          birthday TEXT,
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_accounts (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          current_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          tier TEXT DEFAULT 'bronze',
+          order_count INTEGER DEFAULT 0,
+          total_spent REAL DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          last_activity_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_transactions (
+          id TEXT PRIMARY KEY,
+          account_id TEXT,
+          customer_id TEXT,
+          type TEXT,
+          points INTEGER,
+          balance_after INTEGER,
+          order_id TEXT,
+          reward_id TEXT,
+          description TEXT,
+          reason TEXT,
+          idempotency_key TEXT,
+          created_by TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO users (id, email, name, role, is_active, tenant_id)
+        VALUES
+          ('mgr_b_w24', 'mgr-b-w24@test.vn', 'Manager B W24', 'manager', 1, 'store-b'),
+          ('staff_b_w24', 'staff-b-w24@test.vn', 'Staff B W24', 'staff', 1, 'store-b'),
+          ('${custDefId}', 'cust-def-w24@test.vn', 'Customer Default W24', 'customer', 1, 'default');
+        INSERT INTO categories (id, name, slug, sort_order, tenant_id)
+        VALUES
+          ('${catDefId}', 'Default Coffee', 'default-coffee', 1, 'default'),
+          ('${catBId}', 'Store B Tea', 'store-b-tea', 1, 'store-b');
+        INSERT INTO products (id, category_id, name, slug, price, is_available, tenant_id)
+        VALUES
+          ('${prodDefId}', '${catDefId}', 'Default Espresso', 'default-espresso', 45000, 1, 'default'),
+          ('${prodBId}', '${catBId}', 'Store B Oolong', 'store-b-oolong', 55000, 1, 'store-b');
+        INSERT INTO customers (id, name, phone, birthday, loyalty_points, lifetime_points, loyalty_tier, tenant_id)
+        VALUES ('${custDefId}', 'Customer Default W24', '0909000024', '1995-${currentMonthStr}-15', 200, 200, 'silver', 'default');
+        INSERT INTO loyalty_accounts (id, customer_id, current_points, lifetime_points, tier, tenant_id)
+        VALUES ('la_def_w24', '${custDefId}', 200, 200, 'silver', 'default');
+      `);
+
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_w24'").get();
+      const bStaffRow: any = sql.prepare("SELECT * FROM users WHERE id = 'staff_b_w24'").get();
+      const { token: storeBManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const { token: storeBStaffToken } = await issueStaffSession(multiTenantEnv, bStaffRow, { sessionType: 'staff-web' });
+      const defCustomerToken = await generateJWT(
+        { sub: custDefId, role: 'customer', tenantId: 'default' },
+        multiTenantEnv.JWT_SECRET
+      );
+      const foreignCustomerToken = await generateJWT(
+        { sub: custDefId, role: 'customer', tenantId: 'store-b' },
+        multiTenantEnv.JWT_SECRET
+      );
+
+      const bManagerHeaders = {
+        Authorization: `Bearer ${storeBManagerToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+      const bStaffHeaders = {
+        Authorization: `Bearer ${storeBStaffToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+
+      // W1: Pretix rejects path traversal in event query/slug andcheckin secret
+      const pretixBadOrdersRes = await app.fetch(
+        new Request('http://localhost/api/pretix/orders?event=..%2F..%2Fwebhooks', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(pretixBadOrdersRes.status).toBe(400);
+
+      const pretixBadSlugRes = await app.fetch(
+        new Request('http://localhost/api/pretix/events/bad%2Fslug'),
+        multiTenantEnv
+      );
+      expect([400, 404]).toContain(pretixBadSlugRes.status);
+
+      const pretixBadCheckinRes = await app.fetch(
+        new Request('http://localhost/api/pretix/checkin', {
+          method: 'POST',
+          headers: bStaffHeaders,
+          body: JSON.stringify({ secret: '../../admin/token', event: 'jazz-night' }),
+        }),
+        multiTenantEnv
+      );
+      expect(pretixBadCheckinRes.status).toBe(400);
+
+      // W2: DinDin PUT /api/admin/dindin/config blocks staff role (403) and rejects negative item price (400)
+      const dindinStaffCfgRes = await app.fetch(
+        new Request('http://localhost/api/admin/dindin/config', {
+          method: 'PUT',
+          headers: bStaffHeaders,
+          body: JSON.stringify({ menu: { sections: [{ items: [{ name: 'Tea', price: 30000 }] }] } }),
+        }),
+        multiTenantEnv
+      );
+      expect(dindinStaffCfgRes.status).toBe(403);
+
+      const dindinNegPriceCfgRes = await app.fetch(
+        new Request('http://localhost/api/admin/dindin/config', {
+          method: 'PUT',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ menu: { sections: [{ items: [{ name: 'Tea', price: -5000 }] }] } }),
+        }),
+        multiTenantEnv
+      );
+      expect(dindinNegPriceCfgRes.status).toBe(400);
+
+      // W2: DinDin PATCH /api/admin/dindin/cart/:sessionId rejects negative item price or invalid sessionId
+      const dindinBadCartPriceRes = await app.fetch(
+        new Request('http://localhost/api/admin/dindin/cart/sess_valid_1', {
+          method: 'PATCH',
+          headers: bStaffHeaders,
+          body: JSON.stringify({ action: 'add', item: { id: 'it_1', name: 'Espresso', price: -10000, qty: 1 } }),
+        }),
+        multiTenantEnv
+      );
+      expect(dindinBadCartPriceRes.status).toBe(400);
+
+      // W3: Store B manager cannot PATCH or DELETE default tenant's category or product on OpenAPI catalog routers (404)
+      const { openApiCategoriesRouter } = await import('../../routes/openapi-categories');
+      const { openApiProductsRouter } = await import('../../routes/openapi-products');
+
+      const crossTenantCatPatchRes = await openApiCategoriesRouter.fetch(
+        new Request(`http://localhost/api/categories/${catDefId}`, {
+          method: 'PATCH',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ name: 'Hijacked Category' }),
+        }),
+        multiTenantEnv
+      );
+      expect(crossTenantCatPatchRes.status).toBe(404);
+
+      const crossTenantProdDelRes = await openApiProductsRouter.fetch(
+        new Request(`http://localhost/api/products/${prodDefId}`, {
+          method: 'DELETE',
+          headers: bManagerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(crossTenantProdDelRes.status).toBe(404);
+
+      // W3: GET /api/products on openApiProductsRouter scopes products to caller tenant
+      const bProductsRes = await openApiProductsRouter.fetch(
+        new Request('http://localhost/api/products', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(bProductsRes.status).toBe(200);
+      const bProductsBody: any = await bProductsRes.json();
+      expect(bProductsBody.data.products.map((p: any) => p.id)).toEqual([prodBId]);
+
+      // W4: Foreign-tenant token cannot read default tenant's loyalty account (404)
+      const foreignLoyaltyRes = await app.fetch(
+        new Request('http://localhost/api/loyalty/account', {
+          headers: { Authorization: `Bearer ${foreignCustomerToken}`, 'X-Tenant-ID': 'store-b' },
+        }),
+        multiTenantEnv
+      );
+      expect(foreignLoyaltyRes.status).toBe(404);
+
+      // W4: Birthday bonus rejects duplicate claim within the same year (even if claimed in an earlier month of the same year)
+      sql.prepare(
+        `INSERT INTO loyalty_transactions (id, account_id, customer_id, type, points, balance_after, description, reason, created_at)
+         VALUES ('tx_bday_prev', 'la_def_w24', ?, 'birthday', 500, 700, 'Birthday bonus', 'Birthday bonus', ?)`
+      ).run(custDefId, `${currentYearStr}-01-01T00:00:00Z`);
+
+      const duplicateYearlyBdayRes = await app.fetch(
+        new Request('http://localhost/api/loyalty/account/birthday-bonus', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${defCustomerToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }),
+        multiTenantEnv
+      );
+      expect(duplicateYearlyBdayRes.status).toBe(400);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 25 (X1..X4): enforces OpenAPI auth OTP type separation & brute-force rate limits, session ownership/expiry & logout KV revocation, PO supplier tenant ownership & cancelled-PO receive guard, and vitals/metrics input bounds', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    try {
+      const multiTenantEnv: any = {
+        ...baseEnv,
+        PILOT_TENANT_ID: undefined,
+        ENVIRONMENT: 'production',
+      };
+
+      const { openApiAuthRouter } = await import('../../routes/openapi-auth');
+      const { openApiInventoryRouter } = await import('../../routes/openapi-inventory');
+
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS email_verifications (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          code TEXT NOT NULL,
+          type TEXT,
+          expires_at TEXT NOT NULL,
+          used INTEGER DEFAULT 0,
+          verified_at TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          access_token TEXT NOT NULL,
+          refresh_token TEXT,
+          expires_at TEXT NOT NULL,
+          is_trusted_device INTEGER DEFAULT 0,
+          device_fingerprint TEXT,
+          device_name TEXT,
+          last_used_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          contact_person TEXT,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          payment_terms INTEGER DEFAULT 30,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS purchase_orders (
+          id TEXT PRIMARY KEY,
+          po_number TEXT,
+          supplier_id TEXT,
+          order_date TEXT,
+          expected_date TEXT,
+          expected_delivery_date TEXT,
+          status TEXT DEFAULT 'draft',
+          total_amount REAL DEFAULT 0,
+          notes TEXT,
+          created_by TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS purchase_order_items (
+          id TEXT PRIMARY KEY,
+          purchase_order_id TEXT,
+          po_id TEXT,
+          ingredient_id TEXT,
+          quantity REAL,
+          unit_cost REAL,
+          unit_price REAL,
+          total_price REAL,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id TEXT PRIMARY KEY,
+          sku TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          name TEXT,
+          category TEXT,
+          unit TEXT,
+          current_stock REAL DEFAULT 0,
+          min_stock REAL DEFAULT 0,
+          max_stock REAL DEFAULT 0,
+          cost_per_unit REAL DEFAULT 0,
+          unit_cost REAL DEFAULT 0,
+          active INTEGER DEFAULT 1,
+          is_active INTEGER DEFAULT 1,
+          last_restocked_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          actor_id TEXT,
+          actor_name TEXT,
+          user_id TEXT,
+          action TEXT,
+          resource_type TEXT,
+          resource_id TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          tenant_id TEXT,
+          details TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+      `);
+
+      const nowIso = new Date().toISOString();
+      const futureIso = new Date(Date.now() + 600_000).toISOString();
+      const pastIso = new Date(Date.now() - 60_000).toISOString();
+
+      sql.prepare(
+        `INSERT INTO users (id, email, name, role, is_active, tenant_id)
+         VALUES ('usr_x25', 'x25@aura.vn', 'User X25', 'customer', 1, 'default')`
+      ).run();
+
+      // X1: Password-reset OTP cannot be redeemed on POST /api/auth/verify-email to mint an active session
+      sql.prepare(
+        `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+         VALUES ('ev_reset_x25', 'x25@aura.vn', '777888', 'password_reset', ?, 0, ?)`
+      ).run(futureIso, nowIso);
+
+      const resetOtpVerifyRes = await openApiAuthRouter.fetch(
+        new Request('http://localhost/api/auth/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'x25@aura.vn', code: '777888' }),
+        }),
+        multiTenantEnv
+      );
+      expect(resetOtpVerifyRes.status).toBe(400);
+
+      // X1: 5 failed verify-email attempts trigger 429 lockout
+      sql.prepare(
+        `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+         VALUES ('ev_verify_x25', 'x25@aura.vn', '111222', 'email_verification', ?, 0, ?)`
+      ).run(futureIso, nowIso);
+
+      for (let i = 0; i < 3; i++) {
+        const badVerifyRes = await openApiAuthRouter.fetch(
+          new Request('http://localhost/api/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'x25@aura.vn', code: '000000' }),
+          }),
+          multiTenantEnv
+        );
+        expect(badVerifyRes.status).toBe(400);
+      }
+      const fifthBadVerifyRes = await openApiAuthRouter.fetch(
+        new Request('http://localhost/api/auth/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'x25@aura.vn', code: '000000' }),
+        }),
+        multiTenantEnv
+      );
+      expect(fifthBadVerifyRes.status).toBe(429);
+
+      // X1: POST /api/auth/reset-password enforces 5-request rate limit
+      for (let i = 0; i < 5; i++) {
+        const rpRes = await openApiAuthRouter.fetch(
+          new Request('http://localhost/api/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'x25@aura.vn' }),
+          }),
+          multiTenantEnv
+        );
+        expect(rpRes.status).toBe(200);
+      }
+      const sixthRpRes = await openApiAuthRouter.fetch(
+        new Request('http://localhost/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'x25@aura.vn' }),
+        }),
+        multiTenantEnv
+      );
+      expect(sixthRpRes.status).toBe(429);
+
+      // X2: GET /api/auth/session rejects expired session rows (404), and POST /api/auth/logout writes revoked:${token} to AUTH_KV
+      const custToken = await generateJWT(
+        { id: 'usr_x25', role: 'customer', email: 'x25@aura.vn', tenantId: 'default', authVersion: 1 },
+        multiTenantEnv.JWT_SECRET
+      );
+      sql.prepare(
+        `INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, is_trusted_device, created_at, updated_at)
+         VALUES ('sess_exp_x25', 'usr_x25', ?, 'ref_x25', ?, 0, ?, ?)`
+      ).run(custToken, pastIso, nowIso, nowIso);
+
+      const expiredSessionRes = await openApiAuthRouter.fetch(
+        new Request('http://localhost/api/auth/session', {
+          headers: { Authorization: `Bearer ${custToken}` },
+        }),
+        multiTenantEnv
+      );
+      expect(expiredSessionRes.status).toBe(404);
+
+      const logoutRes = await openApiAuthRouter.fetch(
+        new Request('http://localhost/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${custToken}` },
+        }),
+        multiTenantEnv
+      );
+      expect(logoutRes.status).toBe(200);
+      expect(await multiTenantEnv.AUTH_KV.get(`revoked:${custToken}`)).toBe('1');
+
+      // X3: POST /api/inventory/purchase-orders rejects foreign-tenant supplierId (404) & /receive rejects cancelled PO (409)
+      sql.prepare(
+        `INSERT INTO users (id, email, name, role, is_active, tenant_id)
+         VALUES
+          ('mgr_def_x25', 'mgr.def.x25@aura.vn', 'Def Manager', 'manager', 1, 'default'),
+          ('mgr_b_x25', 'mgr.b.x25@aura.vn', 'Store B Manager', 'manager', 1, 'store-b')`
+      ).run();
+      const defMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_def_x25'").get();
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_x25'").get();
+      const { token: managerDefToken } = await issueStaffSession(multiTenantEnv, defMgrRow, { sessionType: 'staff-web' });
+      const { token: managerBToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+
+      const createSupDefRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/suppliers', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${managerDefToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: 'Default Tenant Supplier' }),
+        }),
+        multiTenantEnv
+      );
+      expect(createSupDefRes.status).toBe(201);
+      const supDefId = ((await createSupDefRes.json()) as any).data.id;
+
+      sql.prepare(
+        `INSERT INTO inventory_items (id, sku, tenant_id, name, category, unit, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
+         VALUES ('ing_b_x25', 'SKU-B-X25', 'store-b', 'Store B Beans', 'raw', 'kg', 10, 2, 50, 120000, 1, ?, ?)`
+      ).run(nowIso, nowIso);
+
+      const crossTenantPoCreateRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/purchase-orders', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${managerBToken}`,
+            'X-Tenant-ID': 'store-b',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            supplierId: supDefId,
+            locationId: 'store-b',
+            items: [{ ingredientId: 'ing_b_x25', quantity: 5, unitCost: 120000 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(crossTenantPoCreateRes.status).toBe(404);
+
+      sql.prepare(
+        `INSERT INTO inventory_items (id, sku, tenant_id, name, category, unit, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
+         VALUES ('ing_def_x25', 'SKU-DEF-X25', 'default', 'Default Beans', 'raw', 'kg', 10, 2, 50, 100000, 1, ?, ?)`
+      ).run(nowIso, nowIso);
+      sql.prepare(
+        `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, status, total_amount, created_by, created_at, updated_at)
+         VALUES ('po_cancelled_x25', 'PO-X25', ?, '2026-10-30', 'cancelled', 500000, 'mgr_def_x25', ?, ?)`
+      ).run(supDefId, nowIso, nowIso);
+
+      const receiveCancelledPoRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/purchase-orders/po_cancelled_x25/receive', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${managerDefToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: [{ ingredientId: 'ing_def_x25', receivedQuantity: 5 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(receiveCancelledPoRes.status).toBe(409);
+
+      // X4: POST /api/vitals rejects negative value or invalid rating (400), and GET /api/admin/metrics rejects wildcard % filter (400)
+      const negVitalsRes = await app.fetch(
+        new Request('http://localhost/api/vitals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'LCP', value: -50, rating: 'good' }),
+        }),
+        multiTenantEnv
+      );
+      expect(negVitalsRes.status).toBe(400);
+
+      const badRatingVitalsRes = await app.fetch(
+        new Request('http://localhost/api/vitals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'LCP', value: 1200, rating: '<script>alert(1)</script>' }),
+        }),
+        multiTenantEnv
+      );
+      expect(badRatingVitalsRes.status).toBe(400);
+
+      const badMetricsFilterRes = await app.fetch(
+        new Request('http://localhost/api/admin/metrics?range=24h&filter=%25_inject', {
+          headers: { Authorization: `Bearer ${managerDefToken}` },
+        }),
+        multiTenantEnv
+      );
+      expect(badMetricsFilterRes.status).toBe(400);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 26 (Y1..Y4): enforces loyalty reward/tier multi-tenant isolation & order ownership, promotion code multi-tenant resolution & subtotal clamp, and table/zone/cron cross-tenant locationId spoofing guards', async () => {
+    const { env: baseEnv, sql } = createTestEnv();
+    try {
+      const multiTenantEnv: any = {
+        ...baseEnv,
+        PILOT_TENANT_ID: undefined,
+        ENVIRONMENT: 'production',
+      };
+
+      const { openApiLoyaltyRouter } = await import('../../routes/openapi-loyalty');
+      const { openApiPromotionsRouter } = await import('../../routes/openapi-promotions');
+      const { openApiTablesRouter } = await import('../../routes/openapi-tables');
+      const { openApiCronRouter } = await import('../../routes/openapi-cron');
+
+      const custDef1Id = '11111111-1111-4111-8111-111111111126';
+      const custDef2Id = '22222222-2222-4222-8222-222222222226';
+      const ordDef1Id = '33333333-3333-4333-8333-333333333326';
+      const ordDef2Id = '44444444-4444-4444-8444-444444444426';
+      const promoDefId = '55555555-5555-4555-8555-555555555526';
+      const promoBId = '66666666-6666-4666-8666-666666666626';
+      const promoExpiredId = '77777777-7777-4777-8777-777777777726';
+      const menuItemId = '88888888-8888-4888-8888-888888888826';
+      const nowIso = new Date().toISOString();
+      const pastIso = new Date(Date.now() - 86_400_000).toISOString();
+      const futureIso = new Date(Date.now() + 86_400_000).toISOString();
+
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS loyalty_rewards (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          points_cost INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          value REAL NOT NULL,
+          max_redemptions INTEGER,
+          current_redemptions INTEGER DEFAULT 0,
+          valid_from TEXT,
+          valid_to TEXT,
+          is_active INTEGER DEFAULT 1,
+          image_url TEXT,
+          terms TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_tier_configs (
+          tier TEXT PRIMARY KEY,
+          name TEXT,
+          min_points INTEGER DEFAULT 0,
+          point_multiplier REAL DEFAULT 1,
+          points_multiplier REAL DEFAULT 1,
+          discount_percent REAL DEFAULT 0,
+          birthday_bonus INTEGER DEFAULT 0,
+          free_shipping INTEGER DEFAULT 0,
+          priority_support INTEGER DEFAULT 0,
+          color TEXT,
+          icon TEXT,
+          benefits TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_accounts (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          current_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          tier TEXT DEFAULT 'bronze',
+          order_count INTEGER DEFAULT 0,
+          total_spent REAL DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          last_activity_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_transactions (
+          id TEXT PRIMARY KEY,
+          account_id TEXT,
+          customer_id TEXT,
+          type TEXT,
+          points INTEGER,
+          balance_after INTEGER,
+          order_id TEXT,
+          reward_id TEXT,
+          description TEXT,
+          reason TEXT,
+          idempotency_key TEXT,
+          created_by TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promotions (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          code TEXT,
+          type TEXT,
+          discount_type TEXT,
+          discount_value REAL,
+          min_order_value REAL,
+          max_discount_value REAL,
+          max_uses INTEGER,
+          current_uses INTEGER DEFAULT 0,
+          usage_count INTEGER DEFAULT 0,
+          valid_from TEXT,
+          valid_to TEXT,
+          is_active INTEGER DEFAULT 1,
+          applicable_items TEXT,
+          excluded_items TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promotion_usages (
+          id TEXT PRIMARY KEY,
+          promotion_id TEXT,
+          order_id TEXT,
+          customer_id TEXT,
+          discount_amount REAL,
+          idempotency_key TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS table_zones (
+          id TEXT PRIMARY KEY,
+          slug TEXT,
+          name TEXT,
+          description TEXT,
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          location_id TEXT,
+          metadata TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS cron_jobs (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          description TEXT,
+          cron_expression TEXT,
+          handler TEXT,
+          payload TEXT,
+          timeout_seconds INTEGER DEFAULT 300,
+          max_retries INTEGER DEFAULT 3,
+          retry_delay_seconds INTEGER DEFAULT 60,
+          is_active INTEGER DEFAULT 1,
+          status TEXT DEFAULT 'pending',
+          location_id TEXT,
+          created_by TEXT,
+          last_run_at TEXT,
+          last_status TEXT,
+          next_run_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          actor_id TEXT,
+          actor_name TEXT,
+          user_id TEXT,
+          action TEXT,
+          resource_type TEXT,
+          resource_id TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          details TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+        ALTER TABLE orders ADD COLUMN customer_id TEXT;
+      `);
+
+      sql.prepare(
+        `INSERT INTO users (id, email, name, role, is_active, tenant_id)
+         VALUES
+          ('mgr_def_y26', 'mgr.def.y26@aura.vn', 'Def Manager Y26', 'manager', 1, 'default'),
+          ('mgr_b_y26', 'mgr.b.y26@aura.vn', 'Store B Manager Y26', 'manager', 1, 'store-b'),
+          (?, 'cust1.y26@aura.vn', 'Customer 1 Y26', 'customer', 1, 'default'),
+          (?, 'cust2.y26@aura.vn', 'Customer 2 Y26', 'customer', 1, 'default')`
+      ).run(custDef1Id, custDef2Id);
+
+      sql.prepare(
+        `INSERT INTO loyalty_tier_configs (tier, name, min_points, point_multiplier, points_multiplier, updated_at)
+         VALUES ('gold', 'Gold', 1000, 1.5, 1.5, ?)`
+      ).run(nowIso);
+
+      sql.prepare(
+        `INSERT INTO loyalty_accounts (id, customer_id, current_points, lifetime_points, tier, tenant_id, created_at, updated_at)
+         VALUES ('la_y26_1', ?, 500, 500, 'silver', 'default', ?, ?)`
+      ).run(custDef1Id, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO orders (id, order_number, customer_id, status, payment_status, total, customer_name, tenant_id)
+         VALUES
+          (?, 'ORD-Y26-1', ?, 'pending', 'unpaid', 60000, 'Customer 1', 'default'),
+          (?, 'ORD-Y26-2', ?, 'pending', 'unpaid', 75000, 'Customer 2', 'default')`
+      ).run(ordDef1Id, custDef1Id, ordDef2Id, custDef2Id);
+
+      const defMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_def_y26'").get();
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr_b_y26'").get();
+      const { token: managerDefToken } = await issueStaffSession(multiTenantEnv, defMgrRow, { sessionType: 'staff-web' });
+      const { token: managerBToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const cust1Token = await generateJWT(
+        { id: custDef1Id, sub: custDef1Id, role: 'customer', tenantId: 'default' },
+        multiTenantEnv.JWT_SECRET
+      );
+
+      const defManagerHeaders = {
+        Authorization: `Bearer ${managerDefToken}`,
+        'Content-Type': 'application/json',
+      };
+      const bManagerHeaders = {
+        Authorization: `Bearer ${managerBToken}`,
+        'X-Tenant-ID': 'store-b',
+        'Content-Type': 'application/json',
+      };
+      const cust1Headers = {
+        Authorization: `Bearer ${cust1Token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Y1: Default manager creates a reward (maxRedemptions: 1); Store B cannot read, list, or PATCH it
+      const createRewardRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/rewards', {
+          method: 'POST',
+          headers: defManagerHeaders,
+          body: JSON.stringify({
+            name: 'Free Phin Coffee',
+            pointsCost: 100,
+            type: 'free_item',
+            value: 35000,
+            maxRedemptions: 1,
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(createRewardRes.status).toBe(201);
+      const rewardId = ((await createRewardRes.json()) as any).data.id;
+
+      const bGetRewardRes = await openApiLoyaltyRouter.fetch(
+        new Request(`http://localhost/api/loyalty/rewards/${rewardId}`, { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(bGetRewardRes.status).toBe(404);
+
+      const bListRewardsRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/rewards', { headers: bManagerHeaders }),
+        multiTenantEnv
+      );
+      expect(bListRewardsRes.status).toBe(200);
+      expect(((await bListRewardsRes.json()) as any).data.rewards).toEqual([]);
+
+      const bPatchTierRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/tiers/gold', {
+          method: 'PATCH',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ pointMultiplier: 9.9 }),
+        }),
+        multiTenantEnv
+      );
+      expect(bPatchTierRes.status).toBe(403);
+
+      // Y1: Customer 1 cannot redeem reward against Customer 2's order (404), can redeem once (200), and second redeem hits quota (409)
+      const redeemOtherOrderRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/rewards/redeem', {
+          method: 'POST',
+          headers: cust1Headers,
+          body: JSON.stringify({ rewardId, orderId: ordDef2Id, idempotencyKey: 'idem_redeem_other_y26' }),
+        }),
+        multiTenantEnv
+      );
+      expect(redeemOtherOrderRes.status).toBe(404);
+
+      const redeemOwnOrderRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/rewards/redeem', {
+          method: 'POST',
+          headers: cust1Headers,
+          body: JSON.stringify({ rewardId, orderId: ordDef1Id, idempotencyKey: 'idem_redeem_own_y26' }),
+        }),
+        multiTenantEnv
+      );
+      expect(redeemOwnOrderRes.status).toBe(200);
+
+      const redeemOverQuotaRes = await openApiLoyaltyRouter.fetch(
+        new Request('http://localhost/api/loyalty/rewards/redeem', {
+          method: 'POST',
+          headers: cust1Headers,
+          body: JSON.stringify({ rewardId, idempotencyKey: 'idem_redeem_over_y26' }),
+        }),
+        multiTenantEnv
+      );
+      expect(redeemOverQuotaRes.status).toBe(409);
+
+      // Y2: Duplicate promo code across tenants resolves caller tenant's promo & clamps fixed discount to subtotal
+      sql.prepare(
+        `INSERT INTO promotions (id, name, code, type, discount_type, discount_value, valid_from, valid_to, is_active, tenant_id, created_at, updated_at)
+         VALUES
+          (?, 'Default VIP', 'VIP50', 'percentage', 'percentage', 10, ?, ?, 1, 'default', ?, ?),
+          (?, 'Store B VIP', 'VIP50', 'fixed', 'fixed', 50000, ?, ?, 1, 'store-b', ?, ?),
+          (?, 'Expired Promo', 'OLD10', 'percentage', 'percentage', 10, ?, ?, 1, 'default', ?, ?)`
+      ).run(
+        promoDefId, pastIso, futureIso, nowIso, nowIso,
+        promoBId, pastIso, futureIso, nowIso, nowIso,
+        promoExpiredId, pastIso, pastIso, nowIso, nowIso
+      );
+
+      const valBRes = await openApiPromotionsRouter.fetch(
+        new Request('http://localhost/api/promotions/validate', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            code: 'VIP50',
+            orderValue: 30000,
+            items: [{ menuItemId, quantity: 1, price: 30000 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(valBRes.status).toBe(200);
+      const valBBody: any = await valBRes.json();
+      expect(valBBody.data.promotion.id).toBe(promoBId);
+      expect(valBBody.data.discount).toBe(30000);
+      expect(valBBody.data.finalTotal).toBe(0);
+
+      // Y2: POST /api/promotions/use rejects expired promo (400) and rejects foreign customer's orderId (404)
+      const useExpiredRes = await openApiPromotionsRouter.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: cust1Headers,
+          body: JSON.stringify({
+            promotionId: promoExpiredId,
+            orderId: ordDef1Id,
+            discountAmount: 5000,
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(useExpiredRes.status).toBe(400);
+
+      const useForeignOrderRes = await openApiPromotionsRouter.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: cust1Headers,
+          body: JSON.stringify({
+            promotionId: promoDefId,
+            orderId: ordDef2Id,
+            discountAmount: 5000,
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(useForeignOrderRes.status).toBe(404);
+
+      // Y3: Store B manager cannot spoof locationId: 'default' on POST /api/tables or POST /api/table-zones (403)
+      const spoofTableLocRes = await openApiTablesRouter.fetch(
+        new Request('http://localhost/api/tables', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            zoneId: 'indoor',
+            code: 'T-SPOOF',
+            name: 'Spoofed Table',
+            capacity: 4,
+            locationId: 'default',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(spoofTableLocRes.status).toBe(403);
+
+      const spoofZoneLocRes = await openApiTablesRouter.fetch(
+        new Request('http://localhost/api/table-zones', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            slug: 'spoof-zone',
+            name: 'Spoof Zone',
+            locationId: 'default',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(spoofZoneLocRes.status).toBe(403);
+
+      // Y4: Store B manager cannot spoof locationId: 'default' on POST /api/cron/jobs (403)
+      const spoofCronLocRes = await openApiCronRouter.fetch(
+        new Request('http://localhost/api/cron/jobs', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            name: 'Spoof Cron',
+            cronExpression: '0 * * * *',
+            handler: 'daily_report',
+            locationId: 'default',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(spoofCronLocRes.status).toBe(403);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('Phase 27 (Z1..Z4): OpenAPI inventory SKU tenant isolation & atomic PO receive CAS, order cancel customer projection & tenant-scoped promo decrement, staff AUTH_KV soft-delete revocation, and atomic stock movement balance CAS', async () => {
+    const { env, sql } = createTestEnv();
+    try {
+      const { openApiInventoryRouter } = await import('../../routes/openapi-inventory');
+      const { openApiOrdersRouter } = await import('../../routes/openapi-orders');
+      const { openApiStaffRouter } = await import('../../routes/openapi-staff');
+
+      sql.exec(`
+        ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1;
+        ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'vi';
+        ALTER TABLE users ADD COLUMN avatar_url TEXT;
+        ALTER TABLE users ADD COLUMN hire_date TEXT;
+        CREATE TABLE IF NOT EXISTS staff_users (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          email TEXT,
+          phone TEXT,
+          role TEXT,
+          is_active INTEGER DEFAULT 1,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS ingredients (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          sku TEXT NOT NULL,
+          category TEXT,
+          unit TEXT NOT NULL,
+          cost_per_unit REAL DEFAULT 0,
+          current_stock REAL DEFAULT 0,
+          min_stock REAL DEFAULT 0,
+          max_stock REAL DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id TEXT PRIMARY KEY,
+          sku TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          name TEXT,
+          category TEXT,
+          unit TEXT,
+          current_stock REAL DEFAULT 0,
+          min_stock REAL DEFAULT 0,
+          max_stock REAL DEFAULT 0,
+          cost_per_unit REAL DEFAULT 0,
+          unit_cost REAL DEFAULT 0,
+          active INTEGER DEFAULT 1,
+          is_active INTEGER DEFAULT 1,
+          last_restocked_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT DEFAULT 'default',
+          name TEXT NOT NULL,
+          contact_person TEXT,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          payment_terms INTEGER DEFAULT 30,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS purchase_orders (
+          id TEXT PRIMARY KEY,
+          po_number TEXT,
+          supplier_id TEXT,
+          order_date TEXT,
+          expected_date TEXT,
+          expected_delivery_date TEXT,
+          status TEXT DEFAULT 'draft',
+          total_amount REAL DEFAULT 0,
+          notes TEXT,
+          created_by TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS purchase_order_items (
+          id TEXT PRIMARY KEY,
+          purchase_order_id TEXT,
+          po_id TEXT,
+          ingredient_id TEXT,
+          quantity REAL,
+          unit_cost REAL,
+          unit_price REAL,
+          total_price REAL,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS stock_movements (
+          id TEXT PRIMARY KEY,
+          ingredient_id TEXT,
+          type TEXT,
+          quantity REAL,
+          reference_id TEXT,
+          reference_type TEXT,
+          notes TEXT,
+          created_by TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+          id TEXT PRIMARY KEY,
+          item_id TEXT,
+          type TEXT,
+          quantity REAL,
+          reference_type TEXT,
+          reference_id TEXT,
+          notes TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promotions (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT DEFAULT 'default',
+          code TEXT,
+          name TEXT,
+          usage_count INTEGER DEFAULT 0,
+          current_uses INTEGER DEFAULT 0,
+          used_count INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS promotion_redemptions (
+          id TEXT PRIMARY KEY,
+          promotion_id TEXT,
+          order_id TEXT,
+          customer_id TEXT,
+          code TEXT,
+          discount_amount REAL DEFAULT 0,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          actor_id TEXT,
+          actor_name TEXT,
+          user_id TEXT,
+          action TEXT,
+          resource_type TEXT,
+          resource_id TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          tenant_id TEXT,
+          details TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+
+        INSERT INTO users (id, name, email, role, tenant_id, is_active, auth_version, created_at)
+        VALUES
+          ('owner-def-z27', 'Owner Default', 'owner-def-z27@aura.vn', 'owner', 'default', 1, 1, '2026-10-30T00:00:00Z'),
+          ('mgr-b-z27', 'Manager B', 'mgr-b-z27@aura.vn', 'manager', 'store-b', 1, 1, '2026-10-30T00:00:00Z'),
+          ('staff-del-z27', 'Staff To Delete', 'staff-del-z27@aura.vn', 'staff', 'default', 1, 2, '2026-10-30T00:00:00Z'),
+          ('cust-z27', 'Customer Z27', 'cust-z27@aura.vn', 'customer', 'default', 1, 1, '2026-10-30T00:00:00Z');
+
+        INSERT INTO staff_users (id, name, email, role, is_active, updated_at)
+        VALUES ('staff-del-z27', 'Staff To Delete', 'staff-del-z27@aura.vn', 'staff', 1, '2026-10-30T00:00:00Z');
+
+        INSERT INTO ingredients (id, name, sku, category, unit, cost_per_unit, current_stock, is_active, created_at, updated_at)
+        VALUES
+          ('ing_def_z27', 'Default Arabica', 'SKU-SHARED-Z27', 'beans', 'kg', 250000, 10, 1, '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z'),
+          ('ing_b_z27', 'Store B Milk', 'SKU-B-MILK', 'dairy', 'l', 40000, 10, 1, '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z');
+
+        INSERT INTO inventory_items (id, sku, tenant_id, name, category, unit, current_stock, cost_per_unit, unit_cost, is_active, created_at, updated_at)
+        VALUES
+          ('ing_def_z27', 'SKU-SHARED-Z27', 'default', 'Default Arabica', 'beans', 'kg', 10, 250000, 250000, 1, '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z'),
+          ('ing_b_z27', 'SKU-B-MILK', 'store-b', 'Store B Milk', 'dairy', 'l', 10, 40000, 40000, 1, '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z');
+
+        INSERT INTO suppliers (id, tenant_id, name, is_active, created_at, updated_at)
+        VALUES ('sup_b_z27', 'store-b', 'Store B Supplier', 1, '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z');
+
+        INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, status, total_amount, created_by, created_at, updated_at)
+        VALUES ('po_b_z27', 'PO-Z27', 'sup_b_z27', '2026-10-30', 'ordered', 400000, 'mgr-b-z27', '2026-10-30T00:00:00Z', '2026-10-30T00:00:00Z');
+
+        INSERT INTO purchase_order_items (id, purchase_order_id, po_id, ingredient_id, quantity, unit_cost, unit_price, total_price, created_at)
+        VALUES ('poi_b_z27', 'po_b_z27', 'po_b_z27', 'ing_b_z27', 10, 40000, 40000, 400000, '2026-10-30T00:00:00Z');
+
+        INSERT INTO promotions (id, tenant_id, code, name, usage_count, current_uses, used_count, is_active)
+        VALUES
+          ('promo_def_z27', 'default', 'PROMO-Z27', 'Default Promo', 3, 3, 3, 1),
+          ('promo_b_z27', 'store-b', 'PROMO-Z27', 'Store B Promo', 5, 5, 5, 1);
+
+        ALTER TABLE orders ADD COLUMN customer_id TEXT;
+        ALTER TABLE orders ADD COLUMN source TEXT;
+        ALTER TABLE orders ADD COLUMN location_id TEXT;
+        INSERT INTO orders (id, order_number, customer_id, customer_phone, customer_name, tenant_id, total, status, payment_status, payment_method, order_type, source, location_id, items, created_at, updated_at)
+        VALUES ('ord_cancel_z27', 'ORD-Z27', 'cust-z27', '0909999888', 'Customer Z27', 'default', 55000, 'cancelled', 'unpaid', 'cod', 'dine_in', 'pos_internal', 'loc_internal_1', '[]', '2026-10-30T01:00:00Z', '2026-10-30T01:00:00Z');
+
+        INSERT INTO promotion_redemptions (id, promotion_id, order_id, customer_id, code, discount_amount, created_at)
+        VALUES ('pr_z27', 'promo_def_z27', 'ord_cancel_z27', 'cust-z27', 'PROMO-Z27', 10000, '2026-10-30T01:00:00Z');
+      `);
+
+      const kvStore = new Map<string, string>();
+      kvStore.set('user:staff-del-z27@aura.vn', JSON.stringify({
+        id: 'staff-del-z27',
+        email: 'staff-del-z27@aura.vn',
+        role: 'staff',
+        active: true,
+        isActive: true,
+        auth_version: 2,
+      }));
+      kvStore.set('user:staff-del-z27', JSON.stringify({
+        id: 'staff-del-z27',
+        email: 'staff-del-z27@aura.vn',
+        role: 'staff',
+        active: true,
+        isActive: true,
+        auth_version: 2,
+      }));
+
+      const multiTenantEnv = {
+        ...env,
+        TENANT_ID: '',
+        AUTH_KV: {
+          get: async (k: string) => kvStore.get(k) ?? null,
+          put: async (k: string, v: string) => { kvStore.set(k, v); },
+          delete: async (k: string) => { kvStore.delete(k); },
+        },
+      } as any;
+
+      const defOwnerRow: any = sql.prepare("SELECT * FROM users WHERE id = 'owner-def-z27'").get();
+      const bMgrRow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b-z27'").get();
+      const { token: defOwnerToken } = await issueStaffSession(multiTenantEnv, defOwnerRow, { sessionType: 'staff-web' });
+      const { token: bManagerToken } = await issueStaffSession(multiTenantEnv, bMgrRow, { sessionType: 'staff-web' });
+      const custToken = await generateJWT(
+        { id: 'cust-z27', sub: 'cust-z27', role: 'customer', tenantId: 'default' } as any,
+        env.JWT_SECRET,
+        3600
+      );
+
+      const defOwnerHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${defOwnerToken}`,
+      };
+      const bManagerHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bManagerToken}`,
+        'X-Tenant-ID': 'store-b',
+      };
+      const custHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${custToken}`,
+      };
+
+      // Z1: Store B manager can create an ingredient with the same SKU ('SKU-SHARED-Z27') used by default tenant (201, not 409)
+      const createSameSkuRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/ingredients', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            name: 'Store B Arabica',
+            sku: 'SKU-SHARED-Z27',
+            category: 'beans',
+            unit: 'kg',
+            costPerUnit: 240000,
+            currentStock: 5,
+            minStock: 1,
+            maxStock: 50,
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(createSameSkuRes.status).toBe(201);
+
+      // Z1: PATCH /api/inventory/purchase-orders/{id} rejects status: 'received' bypass (400)
+      const patchPoReceivedRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/purchase-orders/po_b_z27', {
+          method: 'PATCH',
+          headers: bManagerHeaders,
+          body: JSON.stringify({ status: 'received' }),
+        }),
+        multiTenantEnv
+      );
+      expect(patchPoReceivedRes.status).toBe(400);
+
+      // Z1: POST /api/inventory/purchase-orders/{id}/receive rejects ingredient not belonging to the PO (400)
+      const receiveUnlistedItemRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/purchase-orders/po_b_z27/receive', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            items: [{ ingredientId: 'ing_def_z27', receivedQuantity: 5 }],
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(receiveUnlistedItemRes.status).toBe(400);
+
+      // Z2: Customer calling idempotent POST /api/orders/:id/cancel receives customer-safe projection (omits source/payments/location_id)
+      const custCancelRes = await openApiOrdersRouter.fetch(
+        new Request('http://localhost/api/orders/ord_cancel_z27/cancel', {
+          method: 'POST',
+          headers: custHeaders,
+          body: JSON.stringify({ reason: 'Changed mind' }),
+        }),
+        multiTenantEnv
+      );
+      expect(custCancelRes.status).toBe(200);
+      const custCancelJson = (await custCancelRes.json()) as any;
+      expect(custCancelJson.data.id).toBe('ord_cancel_z27');
+      expect(custCancelJson.data.source).toBeUndefined();
+      expect(custCancelJson.data.payments).toBeUndefined();
+      expect(custCancelJson.data.location_id).toBeUndefined();
+
+      // Z3: DELETE /api/staff/:id soft-deletes staff_users and revokes AUTH_KV cached credentials
+      const delStaffRes = await openApiStaffRouter.fetch(
+        new Request('http://localhost/api/staff/staff-del-z27', {
+          method: 'DELETE',
+          headers: defOwnerHeaders,
+        }),
+        multiTenantEnv
+      );
+      expect(delStaffRes.status).toBe(200);
+      const kvAfterDel = JSON.parse(kvStore.get('user:staff-del-z27@aura.vn') || '{}');
+      expect(kvAfterDel.active).toBe(false);
+      expect(kvAfterDel.isActive).toBe(false);
+      expect(kvAfterDel.auth_version).toBe(3);
+      const staffUserRow = sql.prepare('SELECT is_active FROM staff_users WHERE id = ?').get('staff-del-z27') as { is_active: number };
+      expect(staffUserRow.is_active).toBe(0);
+
+      // Z4: POST /api/inventory/movements enforces atomic stock balance deduction and rejects overdraft (400)
+      const deductOkRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/movements', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            ingredientId: 'ing_b_z27',
+            type: 'waste',
+            quantity: -6,
+            notes: 'Spilled milk',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(deductOkRes.status).toBe(201);
+
+      const deductOverRes = await openApiInventoryRouter.fetch(
+        new Request('http://localhost/api/inventory/movements', {
+          method: 'POST',
+          headers: bManagerHeaders,
+          body: JSON.stringify({
+            ingredientId: 'ing_b_z27',
+            type: 'waste',
+            quantity: -6,
+            notes: 'Second spill exceeding remaining 4L',
+          }),
+        }),
+        multiTenantEnv
+      );
+      expect(deductOverRes.status).toBe(400);
+      const remStock = sql.prepare('SELECT current_stock FROM ingredients WHERE id = ?').get('ing_b_z27') as { current_stock: number };
+      expect(remStock.current_stock).toBe(4);
+    } finally {
+      sql.close();
+    }
+  });
+
+  // ── Phase 28 (AA1..AA4) ───────────────────────────────────────────
+  it('AA1: subscription customer/vendor horizontal isolation and price tampering guard', async () => {
+    const sql = new DatabaseSync(':memory:');
+    try {
+      sql.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, email TEXT, phone TEXT, role TEXT,
+          tenant_id TEXT, is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1,
+          password_hash TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE subscription_plans (id TEXT PRIMARY KEY, name TEXT, slug TEXT, description TEXT,
+          container_size TEXT, monthly_price_vnd INTEGER, deposit_vnd INTEGER, features TEXT,
+          max_occupants INTEGER, is_popular INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT);
+        CREATE TABLE subscriptions (id TEXT PRIMARY KEY, plan_id TEXT, customer_id TEXT,
+          customer_name TEXT, customer_email TEXT, customer_phone TEXT, container_number TEXT,
+          status TEXT, amount_vnd INTEGER, deposit_vnd INTEGER, deposit_paid INTEGER DEFAULT 0,
+          billing_cycle TEXT, current_period_start TEXT, current_period_end TEXT,
+          next_billing_date TEXT, tenant_id TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE subscription_invoices (id TEXT PRIMARY KEY, subscription_id TEXT,
+          amount_vnd INTEGER, status TEXT, period_start TEXT, period_end TEXT,
+          invoice_number TEXT, tenant_id TEXT, payment_method TEXT, payment_ref TEXT,
+          paid_at TEXT, created_at TEXT, updated_at TEXT);
+        INSERT INTO users(id,name,email,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('cust-aa1','Cust AA1','cust@aa1.vn','customer','default',1,1,'2026-10-30');
+        INSERT INTO users(id,name,email,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('admin-aa1','Admin','admin@aa1.vn','admin','default',1,1,'2026-10-30');
+        INSERT INTO subscription_plans(id,name,slug,monthly_price_vnd,deposit_vnd,is_active,created_at,updated_at)
+          VALUES('plan-aa1','Basic','basic',5000000,2000000,1,'2026-10-30','2026-10-30');
+        INSERT INTO subscriptions(id,plan_id,customer_id,customer_email,status,amount_vnd,deposit_vnd,tenant_id,created_at,updated_at)
+          VALUES('sub-aa1-a','plan-aa1','cust-aa1','cust@aa1.vn','active',5000000,2000000,'default','2026-10-30','2026-10-30');
+        INSERT INTO subscriptions(id,plan_id,customer_id,customer_email,status,amount_vnd,deposit_vnd,tenant_id,created_at,updated_at)
+          VALUES('sub-aa1-b','plan-aa1','other-cust','other@aa1.vn','active',5000000,2000000,'default','2026-10-30','2026-10-30');
+      `);
+
+      function statement(query: string, values: unknown[] = []): any {
+        return {
+          bind(...args: unknown[]) { return statement(query, args); },
+          async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+          async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+          async run() {
+            const r = sql.prepare(query).run(...(values as any[]));
+            return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+          },
+        };
+      }
+      const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+      const kvData = new Map<string, string>();
+      const kv = {
+        async get(k: string) { return kvData.get(k) ?? null; },
+        async put(k: string, v: string) { kvData.set(k, v); },
+        async delete(k: string) { kvData.delete(k); },
+        async list(opts?: { prefix?: string }) {
+          const prefix = opts?.prefix ?? '';
+          return { keys: Array.from(kvData.keys()).filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true };
+        },
+      };
+
+      const env: any = {
+        AURA_DB: db,
+        DB: db,
+        AUTH_KV: kv,
+        JWT_SECRET: 'test-jwt-secret-aa1-32chars!!!',
+        ENVIRONMENT: 'production',
+        PILOT_TENANT_ID: 'default',
+      };
+
+      const custJwt = await generateJWT({ sub: 'cust-aa1', id: 'cust-aa1', email: 'cust@aa1.vn', role: 'customer', customerId: 'cust-aa1' }, env.JWT_SECRET);
+      const custHeaders = { Authorization: `Bearer ${custJwt}`, 'Content-Type': 'application/json' };
+
+      // Customer can see their own subscription
+      const ownRes = await app.fetch(
+        new Request('http://localhost/api/subscriptions/sub-aa1-a', { headers: custHeaders }),
+        env
+      );
+      expect(ownRes.status).toBe(200);
+
+      // Customer cannot see another's subscription (403)
+      const foreignRes = await app.fetch(
+        new Request('http://localhost/api/subscriptions/sub-aa1-b', { headers: custHeaders }),
+        env
+      );
+      expect([403, 404]).toContain(foreignRes.status);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('AA3: QR admin host header poisoning defense', () => {
+    // Validate the resolveSafeBaseUrl allowlist logic exists in source
+    const fs = require('fs');
+    const src = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/admin-qr.ts'), 'utf-8'
+    );
+    expect(src).toContain('resolveSafeBaseUrl');
+    expect(src).toContain('auraspace.cafe');
+    expect(src).toContain('isAllowed');
+  });
+
+  it('AA4: session-handlers rejects PATCH on terminal sessions (409)', async () => {
+    const sql = new DatabaseSync(':memory:');
+    try {
+      sql.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, email TEXT, phone TEXT, role TEXT,
+          tenant_id TEXT, is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1,
+          password_hash TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE cafe_tables (id TEXT PRIMARY KEY, table_number INTEGER, name TEXT, status TEXT,
+          capacity INTEGER, tenant_id TEXT, zone TEXT);
+        CREATE TABLE table_sessions (id TEXT PRIMARY KEY, table_id TEXT, customer_id TEXT,
+          customer_name TEXT, customer_phone TEXT, status TEXT, opened_at TEXT, closed_at TEXT,
+          order_count INTEGER DEFAULT 0, total_amount INTEGER DEFAULT 0, notes TEXT,
+          created_at TEXT, updated_at TEXT);
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('staff-aa4','Staff','staff','default',1,1,'2026-10-30');
+        INSERT INTO cafe_tables(id,table_number,name,status,capacity,tenant_id,zone)
+          VALUES('T-AA4',1,'Table 1','Occupied',4,'default','A');
+        INSERT INTO table_sessions(id,table_id,status,opened_at,closed_at,created_at,updated_at)
+          VALUES('SES-AA4','T-AA4','closed','2026-10-30','2026-10-30','2026-10-30','2026-10-30');
+      `);
+
+      function statement(query: string, values: unknown[] = []): any {
+        return {
+          bind(...args: unknown[]) { return statement(query, args); },
+          async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+          async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+          async run() {
+            const r = sql.prepare(query).run(...(values as any[]));
+            return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+          },
+        };
+      }
+      const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+      const kvData = new Map<string, string>();
+      const kv = {
+        async get(k: string) { return kvData.get(k) ?? null; },
+        async put(k: string, v: string) { kvData.set(k, v); },
+        async delete(k: string) { kvData.delete(k); },
+        async list(opts?: { prefix?: string }) {
+          const prefix = opts?.prefix ?? '';
+          return { keys: Array.from(kvData.keys()).filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true };
+        },
+      };
+
+      const env: any = {
+        AURA_DB: db,
+        DB: db,
+        AUTH_KV: kv,
+        JWT_SECRET: 'test-jwt-secret-aa4-32chars!!!',
+        ENVIRONMENT: 'production',
+        PILOT_TENANT_ID: 'default',
+      };
+
+      const staffAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'staff-aa4'").get();
+      const { token: staffToken } = await issueStaffSession(env, staffAccount, { sessionType: 'staff-web' });
+      const headers = { Authorization: `Bearer ${staffToken}`, 'Content-Type': 'application/json' };
+
+      const patchRes = await app.fetch(
+        new Request('http://localhost/api/table-sessions/SES-AA4', {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ status: 'ordering' }),
+        }),
+        env
+      );
+      expect(patchRes.status).toBe(409);
+      const patchJson = await patchRes.json() as { error: string };
+      expect(patchJson.error).toContain('ended');
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('AA4: order-handlers rejects cross-table order hijack (409)', async () => {
+    const sql = new DatabaseSync(':memory:');
+    try {
+      sql.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, email TEXT, phone TEXT, role TEXT,
+          tenant_id TEXT, is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1,
+          password_hash TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE cafe_tables (id TEXT PRIMARY KEY, table_number INTEGER, name TEXT, status TEXT,
+          capacity INTEGER, tenant_id TEXT, zone TEXT);
+        CREATE TABLE table_sessions (id TEXT PRIMARY KEY, table_id TEXT, customer_id TEXT,
+          customer_name TEXT, customer_phone TEXT, status TEXT, opened_at TEXT, closed_at TEXT,
+          order_count INTEGER DEFAULT 0, total_amount INTEGER DEFAULT 0, notes TEXT,
+          current_order_id TEXT, created_at TEXT, updated_at TEXT);
+        CREATE TABLE orders (id TEXT PRIMARY KEY, order_number TEXT, customer_phone TEXT,
+          customer_name TEXT, tenant_id TEXT, total INTEGER, status TEXT, payment_status TEXT,
+          payment_method TEXT, order_type TEXT, table_id TEXT, items TEXT, notes TEXT,
+          created_at TEXT, updated_at TEXT);
+        INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
+          VALUES('staff-aa4b','Staff','staff','default',1,1,'2026-10-30');
+        INSERT INTO cafe_tables(id,table_number,name,status,capacity,tenant_id,zone)
+          VALUES('T-AA4-A',1,'Table A','Occupied',4,'default','A');
+        INSERT INTO cafe_tables(id,table_number,name,status,capacity,tenant_id,zone)
+          VALUES('T-AA4-B',2,'Table B','Occupied',4,'default','A');
+        INSERT INTO table_sessions(id,table_id,status,opened_at,order_count,total_amount,created_at,updated_at)
+          VALUES('SES-AA4-A','T-AA4-A','active','2026-10-30',0,0,'2026-10-30','2026-10-30');
+        INSERT INTO orders(id,order_number,status,total,table_id,tenant_id,created_at,updated_at)
+          VALUES('ORD-AA4','ORD-001','pending',50000,'T-AA4-B','default','2026-10-30','2026-10-30');
+      `);
+
+      function statement(query: string, values: unknown[] = []): any {
+        return {
+          bind(...args: unknown[]) { return statement(query, args); },
+          async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+          async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+          async run() {
+            const r = sql.prepare(query).run(...(values as any[]));
+            return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+          },
+        };
+      }
+      const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+      const kvData = new Map<string, string>();
+      const kv = {
+        async get(k: string) { return kvData.get(k) ?? null; },
+        async put(k: string, v: string) { kvData.set(k, v); },
+        async delete(k: string) { kvData.delete(k); },
+        async list(opts?: { prefix?: string }) {
+          const prefix = opts?.prefix ?? '';
+          return { keys: Array.from(kvData.keys()).filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true };
+        },
+      };
+
+      const env: any = {
+        AURA_DB: db,
+        DB: db,
+        AUTH_KV: kv,
+        JWT_SECRET: 'test-jwt-secret-aa4b-32chars!!',
+        ENVIRONMENT: 'production',
+        PILOT_TENANT_ID: 'default',
+      };
+
+      const staffAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'staff-aa4b'").get();
+      const { token: staffToken } = await issueStaffSession(env, staffAccount, { sessionType: 'staff-web' });
+      const headers = { Authorization: `Bearer ${staffToken}`, 'Content-Type': 'application/json' };
+
+      // Order belongs to table B; attaching to session of table A should fail (409)
+      const attachRes = await app.fetch(
+        new Request('http://localhost/api/table-sessions/SES-AA4-A/orders', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ order_id: 'ORD-AA4' }),
+        }),
+        env
+      );
+      expect(attachRes.status).toBe(409);
+      const attachJson = await attachRes.json() as { error: string };
+      expect(attachJson.error).toContain('another table');
+    } finally {
+      sql.close();
+    }
+  });
+
+  // ── Phase 29 (AB1..AB4) ───────────────────────────────────────────
+  it('AB1: analytics router uses requireAuth instead of optionalAuth', () => {
+    const fs = require('fs');
+    const src = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/analytics-handlers/routes.ts'), 'utf-8'
+    );
+    expect(src).toContain('requireAuth');
+    expect(src).not.toContain('optionalAuth');
+  });
+
+  it('AB2: reviews clamps limit and has rate limiting on POST', () => {
+    const fs = require('fs');
+    const src = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/reviews.ts'), 'utf-8'
+    );
+    // Limit clamped to max 100
+    expect(src).toContain('Math.min(');
+    expect(src).toContain(', 100)');
+    // Rate limiting on POST
+    expect(src).toContain('rl:review:');
+    expect(src).toContain('429');
+  });
+
+  it('AB3: reviews and signage do not trust X-Tenant-ID from unauthenticated requests', () => {
+    const fs = require('fs');
+    const reviewsSrc = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/reviews.ts'), 'utf-8'
+    );
+    const signageSrc = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/signage.ts'), 'utf-8'
+    );
+    // Reviews getTenantId should not read X-Tenant-ID header for unauthenticated callers
+    const reviewsTenantFn = reviewsSrc.match(/function getTenantId[\s\S]*?^}/m)?.[0] || '';
+    expect(reviewsTenantFn).not.toContain("c.req.header('X-Tenant-ID')");
+    // Signage getTenantId should not read X-Tenant-ID or tenant_id query for unauthenticated callers
+    const signageTenantFn = signageSrc.match(/function getTenantId[\s\S]*?^}/m)?.[0] || '';
+    expect(signageTenantFn).not.toContain("c.req.header('X-Tenant-ID')");
+    expect(signageTenantFn).not.toContain("c.req.query('tenant_id')");
+  });
+
+  it('AB4: push subscribe has rate limiting and unsubscribe has ownership verification', () => {
+    const fs = require('fs');
+    const src = fs.readFileSync(
+      require('path').resolve(__dirname, '../../routes/push.ts'), 'utf-8'
+    );
+    // Rate limiting on subscribe
+    expect(src).toContain('rl:push-sub:');
+    expect(src).toContain('Too many subscription attempts');
+    // Ownership verification on unsubscribe
+    expect(src).toContain('auth_key');
+    expect(src).toContain('Invalid auth_key');
+  });
+
+  // ── Phase 30 (AC1..AC4) ───────────────────────────────────────────
+  it('AC1..AC4: Mixpost mediaUrls SSRF & tenant tagging, TastyIgniter bridge poisoning & null-order guard, Frigate/HA tenant scoping, and Domain Inventory/Reservations isolation', async () => {
+    const { mixpostCreatePostSchema } = await import('../../lib/validators/mixpost');
+    const { processTIWebhook } = await import('../../tree/integrations/tastyigniter/webhook');
+    const { createTIRoutes } = await import('../../routes/integrations/tastyigniter');
+    const { getOccupancyAnalytics } = await import('../../tree/integrations/frigate/occupancy');
+    const { triggerAutomation, getAutomationLog } = await import('../../tree/homeassistant/automations');
+    const { dispatchDiningPresence } = await import('../../tree/homeassistant/presence');
+    const { inventoryCRUD } = await import('../../../../packages/domain/inventory/src/routes/inventory-crud');
+    const { inventoryTransactions } = await import('../../../../packages/domain/inventory/src/routes/inventory-transactions');
+    const { inventorySnapshots } = await import('../../../../packages/domain/inventory/src/routes/inventory-snapshots');
+    const { reservationsRouter } = await import('../../../../packages/domain/reservation/src/routes/reservations');
+    const { Hono } = await import('hono');
+
+    // AC1: mixpostCreatePostSchema rejects SSRF URLs in both media_urls and mediaUrls
+    expect(
+      mixpostCreatePostSchema.safeParse({
+        content: 'Hello Aura',
+        accounts: [1],
+        mediaUrls: ['http://169.254.169.254/latest/meta-data/'],
+      }).success
+    ).toBe(false);
+    expect(
+      mixpostCreatePostSchema.safeParse({
+        content: 'Hello Aura',
+        accounts: [1],
+        media_urls: ['https://localhost/internal.png'],
+      }).success
+    ).toBe(false);
+    expect(
+      mixpostCreatePostSchema.safeParse({
+        content: 'Hello Aura',
+        accounts: [1],
+        mediaUrls: ['https://cdn.auraspace.cafe/promo.jpg'],
+      }).success
+    ).toBe(true);
+
+    const sql = new DatabaseSync(':memory:');
+    try {
+      const nowSec = Math.floor(Date.now() / 1000) - 60;
+      const futureDate = '2099-12-31';
+      sql.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY, name TEXT, email TEXT, phone TEXT, role TEXT,
+          tenant_id TEXT, is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1,
+          password_hash TEXT, created_at TEXT, updated_at TEXT
+        );
+        CREATE TABLE orders (
+          id TEXT PRIMARY KEY, status TEXT, order_type TEXT, payment_status TEXT, tenant_id TEXT
+        );
+        CREATE TABLE ti_order_bridge (
+          id TEXT PRIMARY KEY, local_order_id TEXT, ti_order_id TEXT,
+          status TEXT, synced_at TEXT, created_at TEXT
+        );
+        CREATE TABLE frigate_events (
+          id TEXT PRIMARY KEY, camera TEXT, label TEXT, start_time INTEGER,
+          end_time INTEGER, score REAL, payload TEXT, received_at TEXT, tenant_id TEXT
+        );
+        CREATE TABLE ha_automation_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT, trigger_entity TEXT,
+          payload TEXT, result TEXT, executed_at TEXT, tenant_id TEXT
+        );
+        CREATE TABLE inventory_items (
+          id TEXT PRIMARY KEY, sku TEXT, name TEXT, name_en TEXT, category TEXT,
+          unit TEXT, current_stock REAL, min_stock REAL, max_stock REAL,
+          cost_per_unit REAL, supplier TEXT, active INTEGER DEFAULT 1, tenant_id TEXT
+        );
+        CREATE TABLE ingredients (
+          id TEXT PRIMARY KEY, name TEXT, is_active INTEGER DEFAULT 1, tenant_id TEXT
+        );
+        CREATE TABLE inventory_transactions (
+          id TEXT PRIMARY KEY, item_id TEXT, type TEXT, quantity REAL,
+          reference_id TEXT, reference_type TEXT, notes TEXT, created_at TEXT
+        );
+        CREATE TABLE inventory_snapshots (
+          id TEXT PRIMARY KEY, item_id TEXT, date TEXT, opening_stock REAL, closing_stock REAL
+        );
+        CREATE TABLE cafe_tables (
+          id TEXT PRIMARY KEY, table_number TEXT, zone TEXT, capacity INTEGER, status TEXT, tenant_id TEXT
+        );
+        CREATE TABLE reservations (
+          id TEXT PRIMARY KEY, table_id TEXT, customer_name TEXT, customer_phone TEXT,
+          guest_count INTEGER, date TEXT, time TEXT, zone TEXT, notes TEXT,
+          status TEXT, tenant_id TEXT, created_at TEXT, updated_at TEXT
+        );
+
+        INSERT INTO users (id, name, email, role, tenant_id, is_active, auth_version) VALUES
+          ('mgr-def-ac', 'Mgr Def', 'mgr.def@ac.vn', 'manager', 'default', 1, 1),
+          ('mgr-b-ac', 'Mgr B', 'mgr.b@ac.vn', 'manager', 'store-b', 1, 1);
+
+        INSERT INTO orders (id, status, order_type, payment_status, tenant_id) VALUES
+          ('ord-victim-ac2', 'confirmed', 'dine_in', 'paid', 'default');
+
+        INSERT INTO frigate_events (id, camera, label, start_time, received_at, tenant_id) VALUES
+          ('fevt-def-1', 'dining_area', 'person', ${nowSec}, '2026-11-02T00:00:00Z', 'default'),
+          ('fevt-b-1', 'patio', 'person', ${nowSec}, '2026-11-02T00:00:00Z', 'store-b'),
+          ('fevt-b-2', 'patio', 'person', ${nowSec}, '2026-11-02T00:00:00Z', 'store-b');
+
+        INSERT INTO inventory_items (id, sku, name, category, unit, current_stock, min_stock, max_stock, cost_per_unit, active, tenant_id) VALUES
+          ('inv-def-1', 'SKU-SHARED-01', 'Beans Def', 'coffee', 'kg', 10, 2, 50, 100000, 1, 'default');
+
+        INSERT INTO inventory_transactions (id, item_id, type, quantity, created_at) VALUES
+          ('tx-orphan-1', 'nonexistent-item', 'in', 5, '2026-11-02T00:00:00Z');
+        INSERT INTO inventory_snapshots (id, item_id, date, opening_stock, closing_stock) VALUES
+          ('snap-orphan-1', 'nonexistent-item', '2026-11-02', 5, 5);
+
+        INSERT INTO cafe_tables (id, table_number, zone, capacity, status, tenant_id) VALUES
+          ('tbl-def-t1', 'T1', 'indoor', 4, 'Available', 'default'),
+          ('tbl-b-t1', 'T1', 'indoor', 4, 'Available', 'store-b');
+
+        INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, status, tenant_id, created_at, updated_at) VALUES
+          ('rsv-def-t1', 'T1', 'Guest Def', '0901112222', 2, '${futureDate}', '19:00', 'indoor', 'confirmed', 'default', '2026-11-02T00:00:00Z', '2026-11-02T00:00:00Z');
+      `);
+
+      function statement(query: string, values: unknown[] = []): any {
+        return {
+          bind(...args: unknown[]) { return statement(query, args); },
+          async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+          async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+          async run() {
+            const r = sql.prepare(query).run(...(values as any[]));
+            return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+          },
+        };
+      }
+      const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+      const kvData = new Map<string, string>();
+      const kv = {
+        async get(k: string) { return kvData.get(k) ?? null; },
+        async put(k: string, v: string) { kvData.set(k, v); },
+        async delete(k: string) { kvData.delete(k); },
+        async list(opts?: { prefix?: string }) {
+          const prefix = opts?.prefix ?? '';
+          return { keys: Array.from(kvData.keys()).filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true };
+        },
+      };
+
+      const env: any = {
+        AURA_DB: db,
+        DB: db,
+        AUTH_KV: kv,
+        JWT_SECRET: 'test-jwt-secret-ac-32chars-long!!',
+        ENVIRONMENT: 'production',
+        PILOT_TENANT_ID: 'default',
+        FRIGATE_URL: 'https://frigate.auraspace.cafe',
+        FRIGATE_API_KEY: 'frigate-key',
+        FRIGATE_SYNC_ENABLED: 'true',
+      };
+
+      const defMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-def-ac'").get();
+      const bMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b-ac'").get();
+      const { token: defToken } = await issueStaffSession(env, defMgrAccount, { sessionType: 'staff-web' });
+      const { token: bToken } = await issueStaffSession(env, bMgrAccount, { sessionType: 'staff-web' });
+
+      // AC2: 2-step TastyIgniter webhook bridge poisoning cannot bind or cancel ord-victim-ac2
+      const step1 = await processTIWebhook(env, {
+        event: 'order.received',
+        ti_order_id: '99901',
+        local_order_id: 'ord-victim-ac2',
+        status: 'received',
+      });
+      expect(step1.local_order_id).toBe('ti-auto-99901');
+      const step2 = await processTIWebhook(env, {
+        event: 'order.cancelled',
+        ti_order_id: '99901',
+        status: 'cancelled',
+      });
+      expect(step2.local_order_id).toBe('ti-auto-99901');
+      const victimOrder = sql.prepare("SELECT status FROM orders WHERE id = 'ord-victim-ac2'").get() as { status: string };
+      expect(victimOrder.status).toBe('confirmed');
+
+      // AC2: POST /api/integrations/tastyigniter/sync/order rejects nonexistent order even in 'default' tenant
+      const tiApp = createTIRoutes();
+      const tiMissingOrderRes = await tiApp.fetch(
+        new Request('http://localhost/sync/order', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            localOrderId: 'nonexistent-order-id',
+            orderData: { items: [], total: 50000 },
+          }),
+        }),
+        env
+      );
+      expect(tiMissingOrderRes.status).toBe(404);
+
+      // AC3: Frigate occupancy analytics scopes active count by tenantId
+      const occDef = await getOccupancyAnalytics(env, 'default');
+      expect(occDef.current_occupancy).toBe(1);
+      const occB = await getOccupancyAnalytics(env, 'store-b');
+      expect(occB.current_occupancy).toBe(2);
+
+      // AC3: Home Assistant triggerAutomation and dispatchDiningPresence persist tenant_id in ha_automation_log
+      await triggerAutomation(env, 'auto_ac_def', { trigger_entity: 'sensor.door' }, 'default');
+      await dispatchDiningPresence(env, 'table_occupied', { table_id: 'T1' }, 'store-b');
+      const logDefRes = await getAutomationLog(env, -5, 'default');
+      const logDefJson = (await logDefRes.json()) as { entries: Array<{ automation_id: string }> };
+      expect(logDefJson.entries.map(e => e.automation_id)).toEqual(['auto_ac_def']);
+      const logBRes = await getAutomationLog(env, 50, 'store-b');
+      const logBJson = (await logBRes.json()) as { entries: Array<{ automation_id: string }> };
+      expect(logBJson.entries.map(e => e.automation_id)).toEqual(['dining_table_occupied']);
+
+      // AC4: Domain inventory fails closed (404) on missing item for transactions & snapshots, and scopes SKU uniqueness per tenant
+      const invApp = new Hono<any>();
+      invApp.use('*', async (c, next) => {
+        const tenant = c.req.header('X-Test-Tenant') || 'default';
+        c.set('user', { id: 'u', role: 'manager', tenantId: tenant });
+        await next();
+      });
+      inventoryCRUD(invApp);
+      inventoryTransactions(invApp);
+      inventorySnapshots(invApp);
+
+      const orphanTxRes = await invApp.fetch(new Request('http://localhost/nonexistent-item/transactions'), env);
+      expect(orphanTxRes.status).toBe(404);
+      const orphanSnapRes = await invApp.fetch(new Request('http://localhost/nonexistent-item/snapshots'), env);
+      expect(orphanSnapRes.status).toBe(404);
+
+      const dupSkuDefaultRes = await invApp.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Tenant': 'default' },
+          body: JSON.stringify({
+            sku: 'SKU-SHARED-01',
+            name: 'Dup Def',
+            category: 'raw_materials',
+            unit: 'kg',
+            current_stock: 5,
+            min_stock: 1,
+            max_stock: 20,
+            cost_per_unit: 90000,
+          }),
+        }),
+        env
+      );
+      expect(dupSkuDefaultRes.status).toBe(409);
+
+      const sameSkuStoreBRes = await invApp.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Tenant': 'store-b' },
+          body: JSON.stringify({
+            sku: 'SKU-SHARED-01',
+            name: 'Store B Beans',
+            category: 'raw_materials',
+            unit: 'kg',
+            current_stock: 8,
+            min_stock: 1,
+            max_stock: 20,
+            cost_per_unit: 95000,
+          }),
+        }),
+        env
+      );
+      expect(sameSkuStoreBRes.status).toBe(201);
+
+      // AC4: Domain reservations isolates availability and table_number lookup across tenants
+      const availBRes = await reservationsRouter.fetch(
+        new Request(`http://localhost/availability?date=${futureDate}&time=19:00`, {
+          headers: { Authorization: `Bearer ${bToken}` },
+        }),
+        env
+      );
+      expect(availBRes.status).toBe(200);
+      const availBJson = (await availBRes.json()) as { data: Array<{ id: string; available: boolean }> };
+      expect(availBJson.data).toHaveLength(1);
+      expect(availBJson.data[0].id).toBe('tbl-b-t1');
+      expect(availBJson.data[0].available).toBe(true);
+
+      const bookBT1Res = await reservationsRouter.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${bToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table_id: 'T1',
+            customer_name: 'Guest Store B',
+            customer_phone: '0908889999',
+            guest_count: 2,
+            date: futureDate,
+            time: '19:00',
+          }),
+        }),
+        env
+      );
+      expect(bookBT1Res.status).toBe(201);
+      const bookBT1Json = (await bookBT1Res.json()) as { data: { table_id: string } };
+      expect(bookBT1Json.data.table_id).toBe('tbl-b-t1');
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('enforces Table/Zone tenant isolation & pagination clamping, Catalog Modifiers & Happy-Hour validation, Kitchen Station multi-tenancy & item readiness scoping, and Subscription Invoice idempotency & Reports date-range cap (AD1–AD4)', async () => {
+    const { OpenAPIHono } = await import('@hono/zod-openapi');
+    const { Hono } = await import('hono');
+    const { registerTableCrudHandlers } = await import('../../routes/openapi-tables-handlers/table-crud-handlers');
+    const { registerZoneCrudHandlers } = await import('../../routes/openapi-tables-handlers/zone-crud-handlers');
+    const { menuModifiersRouter } = await import('../../../../packages/domain/catalog/commands/menu-modifiers');
+    const { kitchenStationsRouter } = await import('../../../../packages/domain/kitchen/commands/kitchen-stations');
+    const { generateInvoices } = await import('../../tree/subscriptions/invoice-handlers');
+    const { createPlan, listPlans, updatePlan } = await import('../../tree/subscriptions/plan-handlers');
+    const { deletePlan } = await import('../../tree/subscriptions/sub-handlers');
+    const { registerAnalyticsHandlers } = await import('../../routes/reports-handlers/analytics-handlers');
+    const { issueStaffSession } = await import('../../lib/staff-session');
+
+    const sql = new DatabaseSync(':memory:');
+    function statement(query: string, values: unknown[] = []): any {
+      return {
+        bind(...args: unknown[]) { return statement(query, args); },
+        async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+        async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+        async run() {
+          const r = sql.prepare(query).run(...(values as any[]));
+          return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+        },
+      };
+    }
+    const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+    try {
+      const nowIso = new Date().toISOString();
+      const todayDate = nowIso.slice(0, 10);
+
+      sql.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          email TEXT,
+          name TEXT,
+          phone TEXT,
+          role TEXT,
+          password_hash TEXT,
+          is_active INTEGER DEFAULT 1,
+          auth_version INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE cafe_tables (
+          id TEXT PRIMARY KEY,
+          table_number INTEGER,
+          code TEXT,
+          name TEXT,
+          capacity INTEGER DEFAULT 4,
+          zone TEXT DEFAULT 'indoor',
+          zone_id TEXT DEFAULT 'indoor',
+          status TEXT DEFAULT 'available',
+          position_x REAL DEFAULT 0,
+          position_y REAL DEFAULT 0,
+          width REAL DEFAULT 80,
+          height REAL DEFAULT 80,
+          rotation REAL DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          location_id TEXT DEFAULT 'default',
+          qr_code TEXT,
+          metadata TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          updated_at TEXT
+        );
+        CREATE TABLE tables (
+          id TEXT PRIMARY KEY,
+          code TEXT,
+          name TEXT,
+          zone_id TEXT,
+          capacity INTEGER DEFAULT 4,
+          status TEXT DEFAULT 'available',
+          tenant_id TEXT DEFAULT 'default',
+          updated_at TEXT
+        );
+        CREATE TABLE table_zones (
+          id TEXT PRIMARY KEY,
+          slug TEXT,
+          name TEXT,
+          description TEXT,
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          location_id TEXT DEFAULT 'default',
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE audit_logs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          action TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          details TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE products (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          price INTEGER DEFAULT 35000,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE modifier_groups (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          type TEXT DEFAULT 'single',
+          required INTEGER DEFAULT 0,
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE modifier_choices (
+          id TEXT PRIMARY KEY,
+          group_id TEXT,
+          name TEXT,
+          price_delta INTEGER DEFAULT 0,
+          is_default INTEGER DEFAULT 0,
+          sort_order INTEGER DEFAULT 0,
+          is_available INTEGER DEFAULT 1
+        );
+        CREATE TABLE menu_modifiers (
+          id TEXT PRIMARY KEY,
+          group_id TEXT,
+          name TEXT,
+          price_delta INTEGER DEFAULT 0,
+          available INTEGER DEFAULT 1
+        );
+        CREATE TABLE product_modifier_groups (
+          product_id TEXT,
+          group_id TEXT,
+          sort_order INTEGER DEFAULT 0,
+          PRIMARY KEY (product_id, group_id)
+        );
+        CREATE TABLE happy_hour_windows (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          day_of_week INTEGER,
+          start_time TEXT,
+          end_time TEXT,
+          discount_rate REAL,
+          apply_to TEXT DEFAULT 'all',
+          apply_ids TEXT,
+          priority INTEGER DEFAULT 0,
+          active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE kitchen_stations (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          sort_order INTEGER DEFAULT 0,
+          active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE categories (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE category_stations (
+          category_id TEXT,
+          station_id TEXT,
+          PRIMARY KEY (category_id, station_id)
+        );
+        CREATE TABLE orders (
+          id TEXT PRIMARY KEY,
+          table_id TEXT,
+          items TEXT,
+          status TEXT DEFAULT 'preparing',
+          order_type TEXT DEFAULT 'dine_in',
+          payment_status TEXT DEFAULT 'paid',
+          total INTEGER DEFAULT 50000,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE order_item_stations (
+          order_item_id TEXT,
+          station_id TEXT,
+          started_at TEXT,
+          ready_at TEXT,
+          PRIMARY KEY (order_item_id, station_id)
+        );
+        CREATE TABLE subscription_plans (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          description TEXT,
+          container_size TEXT,
+          monthly_price_vnd INTEGER,
+          deposit_vnd INTEGER DEFAULT 0,
+          features TEXT DEFAULT '[]',
+          max_occupants INTEGER DEFAULT 1,
+          is_popular INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE subscriptions (
+          id TEXT PRIMARY KEY,
+          plan_id TEXT,
+          customer_id TEXT,
+          customer_name TEXT,
+          customer_phone TEXT,
+          billing_cycle TEXT DEFAULT 'monthly',
+          amount_vnd INTEGER DEFAULT 2500000,
+          status TEXT DEFAULT 'active',
+          next_billing_date TEXT,
+          container_number TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE subscription_invoices (
+          id TEXT PRIMARY KEY,
+          subscription_id TEXT,
+          amount_vnd INTEGER,
+          status TEXT DEFAULT 'pending',
+          period_start TEXT,
+          period_end TEXT,
+          invoice_number TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT
+        );
+        CREATE TABLE customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT
+        );
+      `);
+
+      sql.prepare(
+        `INSERT INTO users (id, email, name, role, is_active, auth_version, tenant_id)
+         VALUES
+          ('mgr-def-ad', 'mgr.def.ad@aura.vn', 'Def Mgr AD', 'manager', 1, 1, 'default'),
+          ('mgr-b-ad', 'mgr.b.ad@aura.vn', 'Store B Mgr AD', 'manager', 1, 1, 'store-b')`
+      ).run();
+
+      sql.prepare(
+        `INSERT INTO cafe_tables (id, table_number, code, name, capacity, zone, zone_id, status, location_id, tenant_id, updated_at)
+         VALUES ('tbl-def-1', 1, 'T1', 'Default Table 1', 4, 'indoor', 'indoor', 'available', 'default', 'default', ?)`
+      ).run(nowIso);
+
+      sql.prepare(
+        `INSERT INTO tables (id, code, name, capacity, status, tenant_id, updated_at)
+         VALUES ('legacy-tbl-b', 'LB1', 'Legacy Store B Table', 4, 'available', 'store-b', ?)`
+      ).run(nowIso);
+
+      sql.prepare(
+        `INSERT INTO table_zones (id, slug, name, sort_order, is_active, location_id, tenant_id, created_at, updated_at)
+         VALUES
+          ('z-def-1', 'def-1', 'Default Zone 1', 1, 1, 'default', 'default', ?, ?),
+          ('z-def-2', 'def-2', 'Default Zone 2', 2, 1, 'default', 'default', ?, ?),
+          ('z-b-1', 'b-1', 'Store B Zone 1', 3, 1, 'store-b', 'store-b', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO products (id, name, price, tenant_id)
+         VALUES ('prod-def-1', 'Default Latte', 45000, 'default'), ('prod-b-1', 'Store B Matcha', 55000, 'store-b')`
+      ).run();
+
+      sql.prepare(
+        `INSERT INTO modifier_groups (id, name, type, required, sort_order, is_active, tenant_id, created_at, updated_at)
+         VALUES ('mg-def-1', 'Sugar Level', 'single', 0, 1, 1, 'default', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO happy_hour_windows (id, name, day_of_week, start_time, end_time, discount_rate, tenant_id, created_at, updated_at)
+         VALUES ('hh-def-1', 'Afternoon Tea', 2, '14:00', '17:00', 0.2, 'default', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO kitchen_stations (id, name, slug, sort_order, active, tenant_id, created_at, updated_at)
+         VALUES ('ks-def-1', 'Default Bar', 'bar-def', 1, 1, 'default', ?, ?),
+                ('ks-b-1', 'Store B Bar', 'bar-b', 1, 1, 'store-b', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      // Historical unprefixed order_item_stations row for product 'prod-shared'
+      sql.prepare(
+        `INSERT INTO order_item_stations (order_item_id, station_id, started_at, ready_at)
+         VALUES ('prod-shared', 'ks-def-1', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      // New order with two items: 'item-1' and 'prod-shared' (neither is marked ready under composite key yet)
+      sql.prepare(
+        `INSERT INTO orders (id, table_id, items, status, order_type, payment_status, total, tenant_id, created_at, updated_at)
+         VALUES ('ord-kds-ad3', 'tbl-def-1', ?, 'preparing', 'dine_in', 'paid', 90000, 'default', ?, ?)`
+      ).run(
+        JSON.stringify([
+          { id: 'item-1', name: 'Espresso', qty: 1 },
+          { product_id: 'prod-shared', name: 'Croissant', qty: 1 },
+        ]),
+        nowIso,
+        nowIso
+      );
+      sql.prepare(
+        `INSERT INTO order_item_stations (order_item_id, station_id, started_at, ready_at)
+         VALUES ('ord-kds-ad3:item-1', 'ks-def-1', ?, NULL)`
+      ).run(nowIso);
+
+      sql.prepare(
+        `INSERT INTO subscriptions (id, plan_id, customer_id, customer_name, customer_phone, billing_cycle, amount_vnd, status, next_billing_date, container_number, tenant_id, created_at, updated_at)
+         VALUES ('sub-ad4-1', 'plan-def-1', 'cust-1', 'Sub User', '0901234567', 'monthly', 2500000, 'active', ?, 'C101', 'default', ?, ?)`
+      ).run(todayDate, nowIso, nowIso);
+
+      const kvStore = new Map<string, string>();
+      const env: any = {
+        AURA_DB: db,
+        JWT_SECRET: 'test-jwt-secret-key-min-16-chars',
+        AUTH_KV: {
+          get: async (k: string) => kvStore.get(k) ?? null,
+          put: async (k: string, v: string) => {
+            kvStore.set(k, v);
+          },
+          delete: async (k: string) => {
+            kvStore.delete(k);
+          },
+        },
+      };
+
+      const defMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-def-ad'").get();
+      const bMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b-ad'").get();
+      const { token: defToken } = await issueStaffSession(env, defMgrAccount, { sessionType: 'staff-web' });
+      const { token: bToken } = await issueStaffSession(env, bMgrAccount, { sessionType: 'staff-web' });
+
+      // AD1: Table & Zone routes — Store B can create code 'T1' with table_number 1 without colliding with Default store's table_number 1
+      const tablesApp = new OpenAPIHono<any>();
+      tablesApp.use('*', async (c, next) => {
+        const tenant = c.req.header('X-Tenant-ID') || 'default';
+        c.set('user', { id: tenant === 'store-b' ? 'mgr-b-ad' : 'mgr-def-ad', role: 'manager', tenantId: tenant });
+        await next();
+      });
+      registerTableCrudHandlers(tablesApp);
+      registerZoneCrudHandlers(tablesApp);
+
+      const createBTableRes = await tablesApp.fetch(
+        new Request('http://localhost/api/tables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-b' },
+          body: JSON.stringify({ zoneId: 'indoor', code: 'T1', name: 'Store B Table 1', capacity: 4, locationId: 'store-b' }),
+        }),
+        env
+      );
+      expect(createBTableRes.status).toBe(201);
+      const bTableRow = sql.prepare("SELECT table_number FROM cafe_tables WHERE tenant_id = 'store-b' AND code = 'T1'").get() as { table_number: number };
+      expect(bTableRow.table_number).toBe(1);
+
+      // AD1: bulk-status fails closed (404) when Default store tries to update Store B's legacy table in `tables`
+      const crossBulkRes = await tablesApp.fetch(
+        new Request('http://localhost/api/tables/bulk-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'default' },
+          body: JSON.stringify({ tableIds: ['legacy-tbl-b'], status: 'occupied' }),
+        }),
+        env
+      );
+      expect(crossBulkRes.status).toBe(404);
+      const legacyRowAfter = sql.prepare("SELECT status FROM tables WHERE id = 'legacy-tbl-b'").get() as { status: string };
+      expect(legacyRowAfter.status).toBe('available');
+
+      // AD1: GET /api/table-zones filters by tenant BEFORE SQL pagination so Store B gets its zone on page 1 with limit=1
+      const zonesBRes = await tablesApp.fetch(
+        new Request('http://localhost/api/table-zones?page=1&limit=1', {
+          headers: { 'X-Tenant-ID': 'store-b' },
+        }),
+        env
+      );
+      expect(zonesBRes.status).toBe(200);
+      const zonesBJson = (await zonesBRes.json()) as { data: { zones: Array<{ id: string }>; meta: { total: number } } };
+      expect(zonesBJson.data.zones).toHaveLength(1);
+      expect(zonesBJson.data.zones[0].id).toBe('z-b-1');
+      expect(zonesBJson.data.meta.total).toBe(1);
+
+      // AD2: Menu modifiers rejects linking Default store's modifier group onto Store B's product, and validates happy-hour PATCH
+      const crossLinkProdRes = await menuModifiersRouter.fetch(
+        new Request('http://localhost/products/prod-b-1/groups', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: 'mg-def-1' }),
+        }),
+        env
+      );
+      expect(crossLinkProdRes.status).toBe(404);
+
+      const badHhRateRes = await menuModifiersRouter.fetch(
+        new Request('http://localhost/happy-hour/hh-def-1', {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discount_rate: 1.5 }),
+        }),
+        env
+      );
+      expect(badHhRateRes.status).toBe(400);
+
+      const badHhTimeRes = await menuModifiersRouter.fetch(
+        new Request('http://localhost/happy-hour/hh-def-1', {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ start_time: '18:00', end_time: '15:00' }),
+        }),
+        env
+      );
+      expect(badHhTimeRes.status).toBe(400);
+
+      // AD3: Kitchen stations isolates stations across tenants and prevents historical unprefixed product_id ready collision
+      const listKsBRes = await kitchenStationsRouter.fetch(
+        new Request('http://localhost/', {
+          headers: { Authorization: `Bearer ${bToken}` },
+        }),
+        env
+      );
+      expect(listKsBRes.status).toBe(200);
+      const listKsBJson = (await listKsBRes.json()) as { data: Array<{ id: string }> };
+      expect(listKsBJson.data.map((s) => s.id)).toEqual(['ks-b-1']);
+
+      const crossDelKsRes = await kitchenStationsRouter.fetch(
+        new Request('http://localhost/ks-def-1', {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${bToken}` },
+        }),
+        env
+      );
+      expect(crossDelKsRes.status).toBe(404);
+
+      // Marking only item-1 ready on ord-kds-ad3 must NOT consider prod-shared ready from historical unprefixed row
+      const markItem1ReadyRes = await kitchenStationsRouter.fetch(
+        new Request('http://localhost/tickets/ord-kds-ad3/items/item-1/ready?station_id=ks-def-1', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}` },
+        }),
+        env
+      );
+      expect(markItem1ReadyRes.status).toBe(200);
+      const markItem1ReadyJson = (await markItem1ReadyRes.json()) as { all_items_ready: boolean; order_status: string };
+      expect(markItem1ReadyJson.all_items_ready).toBe(false);
+      expect(markItem1ReadyJson.order_status).toBe('preparing');
+
+      // AD4: Subscription generateInvoices is idempotent across repeated invocations, plans are tenant-isolated, and /api/reports/daily caps date span
+      const subApp = new Hono<any>();
+      subApp.post('/invoices/generate', generateInvoices);
+      subApp.get('/plans', listPlans);
+      subApp.post('/plans', createPlan);
+      subApp.put('/plans/:id', updatePlan);
+      subApp.delete('/plans/:id', deletePlan);
+
+      const gen1Res = await subApp.fetch(
+        new Request('http://localhost/invoices/generate', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}` },
+        }),
+        env
+      );
+      expect(gen1Res.status).toBe(200);
+      const gen1Json = (await gen1Res.json()) as { generated_count: number };
+      expect(gen1Json.generated_count).toBe(1);
+
+      const gen2Res = await subApp.fetch(
+        new Request('http://localhost/invoices/generate', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}` },
+        }),
+        env
+      );
+      expect(gen2Res.status).toBe(200);
+      const gen2Json = (await gen2Res.json()) as { generated_count: number };
+      expect(gen2Json.generated_count).toBe(0);
+
+      const createPlanDefRes = await subApp.fetch(
+        new Request('http://localhost/plans', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Default Plan',
+            slug: 'default-plan',
+            monthly_price_vnd: 2500000,
+          }),
+        }),
+        env
+      );
+      expect(createPlanDefRes.status).toBe(201);
+      const createdPlanId = ((await createPlanDefRes.json()) as { data: { id: string } }).data.id;
+
+      const crossDelPlanRes = await subApp.fetch(
+        new Request(`http://localhost/plans/${createdPlanId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${bToken}` },
+        }),
+        env
+      );
+      expect(crossDelPlanRes.status).toBe(404);
+
+      const reportsApp = new Hono<any>();
+      registerAnalyticsHandlers(reportsApp);
+      const hugeRangeRes = await reportsApp.fetch(
+        new Request('http://localhost/daily?from=2000-01-01&to=2026-12-31'),
+        env
+      );
+      expect(hugeRangeRes.status).toBe(400);
     } finally {
       sql.close();
     }

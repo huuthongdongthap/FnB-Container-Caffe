@@ -1,14 +1,23 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import { mixpostGenerateSchema, zodErrorResponse } from '../../lib/validators';
 import type { PromotionRow, ProductRow } from '../../tree/mixpost/types';
 
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
+    return String(row.tenant_id).trim() === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /generate — generate social content from source
   router.post('/generate', async (c) => {
     const env = c.env as unknown as MixpostEnv;
     const db = env.AURA_DB;
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
 
     let rawBody: Record<string, unknown>;
     try {
@@ -33,7 +42,7 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
         'SELECT * FROM promotions WHERE code = ?'
       ).bind(promoId).all<PromotionRow>();
 
-      const promos = results || [];
+      const promos = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
       if (promos.length === 0) {
         return c.json({ success: false, error: 'Promotion not found' }, 404);
       }
@@ -59,10 +68,12 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
         query += ' AND category_id = ?';
         params.push(categoryId);
       }
-      query += ' LIMIT 5';
+      query += ' LIMIT 50';
 
       const { results } = await db.prepare(query).bind(...params).all<ProductRow>();
-      const products = results || [];
+      const products = (results || [])
+        .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+        .slice(0, 5);
 
       if (products.length === 0) {
         const content = '☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay';

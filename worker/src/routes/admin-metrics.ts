@@ -30,6 +30,9 @@ adminMetrics.get('/', async(c) => {
   if (!VALID_RANGES.includes(range as Range)) {
     return c.json({ error: 'Invalid range. Use: 24h, 7d, 30d' }, 400);
   }
+  if (filter !== undefined && (filter.length === 0 || filter.length > 100 || !/^[A-Za-z0-9_.*:-]+$/.test(filter))) {
+    return c.json({ error: 'Invalid filter parameter' }, 400);
+  }
 
   const hours = getRangeHours(range as Range);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;

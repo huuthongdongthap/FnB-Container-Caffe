@@ -56,8 +56,10 @@ export async function getCustomer360(
   kv?: KVNamespace,
   options: Customer360Options = {},
 ): Promise<Customer360> {
-  const eventLimit = options.eventLimit ?? 5;
-  const orderLimit = options.orderLimit ?? 100;
+  const rawEventLimit = Number(options.eventLimit ?? 5);
+  const eventLimit = Number.isFinite(rawEventLimit) ? Math.min(Math.max(1, Math.floor(rawEventLimit)), 200) : 5;
+  const rawOrderLimit = Number(options.orderLimit ?? 100);
+  const orderLimit = Number.isFinite(rawOrderLimit) ? Math.min(Math.max(1, Math.floor(rawOrderLimit)), 200) : 100;
 
   const [account, events, bandPolicy] = await Promise.all([
     getCustomerAccount(db, customerId).catch((err) => {
@@ -75,10 +77,15 @@ export async function getCustomer360(
 
   const orders = await db
     .prepare(
-      `SELECT total, items, order_type as channel, payment_method, created_at
-       FROM orders
-       WHERE customer_id = ? OR customer_phone = (SELECT phone FROM customers WHERE id = ?)
-       ORDER BY created_at DESC LIMIT ?`,
+      `SELECT o.total, o.items, o.order_type as channel, o.payment_method, o.created_at
+       FROM orders o
+       LEFT JOIN customers c ON c.id = ?
+       WHERE (
+         o.customer_id = ?
+         OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
+       )
+       AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default'))
+       ORDER BY o.created_at DESC LIMIT ?`,
     )
     .bind(customerId, customerId, orderLimit)
     .all<{
@@ -91,9 +98,26 @@ export async function getCustomer360(
     .catch(() =>
       db
         .prepare(
+          `SELECT total, items, order_type as channel, payment_method, created_at
+           FROM orders
+           WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .bind(customerId, customerId, orderLimit)
+        .all<{
+          total: number | null;
+          items: string | null;
+          channel: string | null;
+          payment_method: string | null;
+          created_at: string | null;
+        }>(),
+    )
+    .catch(() =>
+      db
+        .prepare(
           `SELECT total, items, channel, payment_method, created_at
            FROM orders
-           WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?)
+           WHERE customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
            ORDER BY created_at DESC LIMIT ?`,
         )
         .bind(customerId, orderLimit)
@@ -110,7 +134,7 @@ export async function getCustomer360(
         .prepare(
           `SELECT COALESCE(total, total_amount, 0) AS total, items, payment_method, created_at
            FROM orders
-           WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?)
+           WHERE customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
            ORDER BY created_at DESC LIMIT ?`,
         )
         .bind(customerId, orderLimit)

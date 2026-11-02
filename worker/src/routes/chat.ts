@@ -11,7 +11,7 @@ import { privacyError, privacyStore } from '../lib/pilot-privacy-access';
 import { resolvePilotStore } from '../lib/pilot-store';
 import type { Env } from '../types/env';
 
-const roles = ['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin'];
+const roles = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin'];
 const sendMessageSchema = z.object({
   name: z.string().trim().min(1, 'Ten khong duoc de trong').max(100),
   phone: z.string().trim().min(8, 'So dien thoai khong hop le').max(15),

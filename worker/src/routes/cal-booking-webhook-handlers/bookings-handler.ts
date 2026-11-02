@@ -2,14 +2,15 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
+import { matchesTenantRow } from '../../lib/db';
 import { createLogger } from '../../middleware/logger';
 import { type BookingRecord } from './types';
 
 const log = createLogger({ route: 'cal-booking-webhook' });
 
 export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
-  // GET /api/cal-booking-webhook/bookings — list bookings (staff/manager/owner only)
-  router.get('/bookings', requireAuth(['owner', 'manager', 'staff', 'admin', 'waiter']), async (c) => {
+  // GET /api/cal-booking-webhook/bookings — list bookings (staff/manager/supervisor/owner only)
+  router.get('/bookings', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter']), async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     const status = c.req.query('status');
@@ -27,7 +28,7 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
 
     try {
       let canonicalQuery =
-        'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || \'T\' || time) AS start_time, COALESCE(reservation_time, date || \'T\' || time) AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL))';
+        "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || 'T' || time) AS start_time, COALESCE(reservation_time, date || 'T' || time) AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
       const canonicalParams: unknown[] = [tenantId, tenantId];
       if (status) {
         canonicalQuery += ' AND status = ?';
@@ -36,11 +37,12 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
       canonicalQuery += ' ORDER BY created_at DESC LIMIT ?';
       canonicalParams.push(limit);
       const { results } = await db.prepare(canonicalQuery).bind(...canonicalParams).all<BookingRecord>();
-      return c.json({ success: true, data: results || [] });
+      const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      return c.json({ success: true, data: filtered });
     } catch {
       try {
         let fallbackQuery =
-          'SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, created_at, updated_at FROM reservations WHERE (tenant_id = ? OR (? = \'default\' AND tenant_id IS NULL))';
+          "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
         const fallbackParams: unknown[] = [tenantId, tenantId];
         if (status) {
           fallbackQuery += ' AND status = ?';
@@ -49,11 +51,13 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
         fallbackQuery += ' ORDER BY created_at DESC LIMIT ?';
         fallbackParams.push(limit);
         const { results } = await db.prepare(fallbackQuery).bind(...fallbackParams).all<BookingRecord>();
-        return c.json({ success: true, data: results || [] });
+        const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        return c.json({ success: true, data: filtered });
       } catch {
         try {
           const { results } = await db.prepare(query).bind(...params).all<BookingRecord>();
-          return c.json({ success: true, data: results || [] });
+          const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+          return c.json({ success: true, data: filtered });
         } catch (e: unknown) {
           log.error('Bookings list error:', { message: e instanceof Error ? e.message : String(e) });
           return c.json({ success: false, error: 'Failed to list bookings' }, 500);

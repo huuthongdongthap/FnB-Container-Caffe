@@ -59,25 +59,29 @@ type StaffDeviceRole =
   | 'owner'
   | 'admin'
   | 'manager'
+  | 'supervisor'
   | 'staff'
   | 'waiter'
   | 'cashier'
   | 'kitchen'
   | 'barista'
-  | 'chef';
+  | 'chef'
+  | 'shipper';
 
-const MANAGER_MANAGED_ROLES = new Set(['staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef']);
+const MANAGER_MANAGED_ROLES = new Set(['supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper']);
 
 const VALID_DEVICE_ROLES = new Set<StaffDeviceRole>([
   'owner',
   'admin',
   'manager',
+  'supervisor',
   'staff',
   'waiter',
   'cashier',
   'kitchen',
   'barista',
   'chef',
+  'shipper',
 ]);
 
 function normalizeDeviceRole(rawRole: unknown): StaffDeviceRole {

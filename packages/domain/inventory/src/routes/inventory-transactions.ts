@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import { inventoryTransactionSchema } from '../model/inventory-schemas';
 
 interface D1Database {
@@ -22,8 +23,26 @@ type AppContext = { Bindings: AppEnv };
 export function inventoryTransactions(app: Hono<AppContext>) {
   app.get('/:id/transactions', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const itemId = c.req.param('id');
-    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+    const rawLimit = parseInt(c.req.query('limit') || '50', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+
+    let item = await db
+      .prepare('SELECT * FROM inventory_items WHERE id = ?')
+      .bind(itemId)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (!item) {
+      item = await db
+        .prepare('SELECT * FROM ingredients WHERE id = ?')
+        .bind(itemId)
+        .first<Record<string, unknown>>()
+        .catch(() => null);
+    }
+    if (!item || !matchesTenantRow(item, tenantId)) {
+      return c.json({ success: false, error: 'Item không tồn tại / Item not found' }, 404);
+    }
 
     const { results } = await db
       .prepare('SELECT * FROM inventory_transactions WHERE item_id = ? ORDER BY created_at DESC LIMIT ?')
@@ -35,6 +54,7 @@ export function inventoryTransactions(app: Hono<AppContext>) {
 
   app.post('/:id/transactions', async (c) => {
     const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
     const itemId = c.req.param('id');
     const body = await c.req.json();
     const input = inventoryTransactionSchema.parse(body);
@@ -42,9 +62,9 @@ export function inventoryTransactions(app: Hono<AppContext>) {
     const item = await db
       .prepare('SELECT * FROM inventory_items WHERE id = ? AND active = 1')
       .bind(itemId)
-      .first<{ id: string; sku: string; name: string; current_stock: number; unit: string; min_stock: number }>();
+      .first<{ id: string; sku: string; name: string; current_stock: number; unit: string; min_stock: number; tenant_id?: string | null }>();
 
-    if (!item) {
+    if (!item || !matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)) {
       return c.json({ success: false, error: 'Item không tồn tại / Item not found' }, 404);
     }
 
@@ -81,8 +101,8 @@ export function inventoryTransactions(app: Hono<AppContext>) {
         )
         .bind(id, itemId, input.type, qty, input.reference_id || null, input.reference_type || null, input.notes || null),
       db
-        .prepare("UPDATE inventory_items SET current_stock = ?, updated_at = datetime('now') WHERE id = ?")
-        .bind(newStock, itemId),
+        .prepare("UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) + ?), updated_at = datetime('now') WHERE id = ?")
+        .bind(qty, itemId),
     ]);
 
     return c.json(

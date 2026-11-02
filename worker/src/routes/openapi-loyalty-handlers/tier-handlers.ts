@@ -2,6 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
 import { writeLoyaltyAuditLog } from './loyalty-db-helpers';
 
 export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
@@ -54,9 +55,13 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/loyalty/tiers/{tier} - Update loyalty tier config
   app.openapi(LoyaltyRoutes.tiers.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
-    if (user?.role !== 'owner' && user?.role !== 'manager' && user?.role !== 'admin') {
+    if (!user || !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Global tier configuration can only be modified by default tenant admin' }, 403);
     }
     const { tier } = c.req.valid('param');
     const body = c.req.valid('json');

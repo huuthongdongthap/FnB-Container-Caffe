@@ -5,6 +5,14 @@ import type { MixpostEnv, MixpostPostInput, AutoPostTemplate } from './types';
 
 const log = createLogger({ route: 'mixpost' });
 
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
+    return String(row.tenant_id).trim() === tenantId;
+  }
+  return tenantId === 'default';
+}
+
 function getMixpostClient(env: MixpostEnv) {
   if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) {
     return null;
@@ -12,10 +20,11 @@ function getMixpostClient(env: MixpostEnv) {
   return createMixpostClient(env.MIXPOST_API_URL, env.MIXPOST_API_TOKEN);
 }
 
-export async function handleMixpostRequest(request: Request, env: MixpostEnv): Promise<Response> {
+export async function handleMixpostRequest(request: Request, env: MixpostEnv, resolvedTenantId?: string): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace('/api/mixpost', '');
   const method = request.method;
+  const tenantId = resolvedTenantId || 'default';
 
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
@@ -45,16 +54,32 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
       });
 
       if (env.AURA_DB) {
-        await env.AURA_DB.prepare(
-          'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).bind(
-          body.content, 'published',
-          JSON.stringify(body.accounts || []),
-          JSON.stringify(body.mediaUrls || []),
-          body.scheduledAt || null,
-          new Date().toISOString(),
-          new Date().toISOString()
-        ).run();
+        const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+        const now = new Date().toISOString();
+        try {
+          await env.AURA_DB.prepare(
+            'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            body.content, 'published',
+            JSON.stringify(body.accounts || []),
+            JSON.stringify(body.mediaUrls || []),
+            body.scheduledAt || null,
+            now,
+            now,
+            effectiveTenant
+          ).run();
+        } catch {
+          await env.AURA_DB.prepare(
+            'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            body.content, 'published',
+            JSON.stringify(body.accounts || []),
+            JSON.stringify(body.mediaUrls || []),
+            body.scheduledAt || null,
+            now,
+            now
+          ).run();
+        }
       }
 
       return json({ success: true, data: result });
@@ -79,14 +104,17 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
       const dayOfWeek = now.getDay();
       const hour = now.getHours();
 
-      const { results: templates } = await env.AURA_DB.prepare(
+      const { results: rawTemplates } = await env.AURA_DB.prepare(
         'SELECT * FROM mixpost_templates WHERE is_active = 1'
       ).all<AutoPostTemplate>();
+      const templates = (rawTemplates || []).filter((t) =>
+        matchesTenantRow(t as unknown as Record<string, unknown>, tenantId)
+      );
 
       let posted = 0;
       const errors: string[] = [];
 
-      for (const template of templates || []) {
+      for (const template of templates) {
         try {
           const [cronDay, cronHour] = template.schedule_cron.split(' ');
           const matchDay = cronDay === '*' || parseInt(cronDay) === dayOfWeek;
@@ -96,16 +124,24 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
             continue;
           }
 
-          const content = await resolveTemplate(template.content_template, env);
+          const content = await resolveTemplate(template.content_template, env, tenantId);
 
           const _result = await client.createPost({
             content,
             accounts: template.accounts ? JSON.parse(template.accounts) : []
           });
 
-          await env.AURA_DB.prepare(
-            'INSERT INTO mixpost_posts (content, status, platforms, source, created_at) VALUES (?, ?, ?, ?, ?)'
-          ).bind(content, 'published', template.accounts, 'auto', new Date().toISOString()).run();
+          const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+          const nowIso = new Date().toISOString();
+          try {
+            await env.AURA_DB.prepare(
+              'INSERT INTO mixpost_posts (content, status, platforms, source, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
+            ).bind(content, 'published', template.accounts, 'auto', nowIso, effectiveTenant).run();
+          } catch {
+            await env.AURA_DB.prepare(
+              'INSERT INTO mixpost_posts (content, status, platforms, source, created_at) VALUES (?, ?, ?, ?, ?)'
+            ).bind(content, 'published', template.accounts, 'auto', nowIso).run();
+          }
 
           posted++;
         } catch (e: unknown) {
@@ -128,12 +164,14 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
       return json({ success: true, data: [] });
     }
 
-    const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+    const rawLimit = parseInt(url.searchParams.get('limit') || '20', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
     const { results } = await env.AURA_DB.prepare(
       'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT ?'
-    ).bind(limit).all();
+    ).bind(Math.max(limit, 200)).all<Record<string, unknown>>();
+    const filtered = (results || []).filter((r) => matchesTenantRow(r, tenantId)).slice(0, limit);
 
-    return json({ success: true, data: results || [] });
+    return json({ success: true, data: filtered });
   }
 
   // GET /api/mixpost/accounts

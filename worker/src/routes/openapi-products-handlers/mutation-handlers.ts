@@ -7,7 +7,8 @@ import {
 } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
-import { formatProduct, type ProductRow } from './helpers';
+import { getTenantId } from '../../middleware/tenant';
+import { formatProduct, matchesCatalogTenant, type ProductRow } from './helpers';
 
 async function logProductAudit(
   db: any,
@@ -21,7 +22,7 @@ async function logProductAudit(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'product', entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'product', entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -56,6 +57,8 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       translations?: Array<{ locale: string; name: string; description?: string }>;
     };
     const user = c.get('user') as { id: string };
+    const rawTenant = getTenantId(c);
+    const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
@@ -66,15 +69,29 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const tags = JSON.stringify(body.tags || []);
     const isAvailable = body.status === 'inactive' ? 0 : 1;
 
-    // Check slug uniqueness
-    if (body.slug) {
-      let existing: unknown = null;
-      try {
-        existing = await db.prepare('SELECT id FROM products WHERE slug = ?').bind(body.slug).first();
-      } catch {
-        existing = null;
+    // Verify category belongs to same tenant when present
+    if (body.categoryId) {
+      const catRow = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(body.categoryId).first().catch(() => null);
+      if (catRow && !matchesCatalogTenant(catRow, targetTenant)) {
+        return c.json({ success: false, error: 'Category not found' }, 404);
       }
-      if (existing) {
+    }
+
+    // Check slug uniqueness within tenant
+    if (body.slug) {
+      let hasSlugConflict = false;
+      try {
+        const allRes = await db.prepare('SELECT * FROM products WHERE slug = ?').bind(body.slug).all<Record<string, unknown>>().catch(() => null);
+        if (allRes && Array.isArray(allRes.results) && allRes.results.length > 0) {
+          hasSlugConflict = allRes.results.some((r) => matchesCatalogTenant(r, targetTenant));
+        } else {
+          const existing = await db.prepare('SELECT * FROM products WHERE slug = ?').bind(body.slug).first();
+          hasSlugConflict = Boolean(existing && matchesCatalogTenant(existing, targetTenant));
+        }
+      } catch {
+        hasSlugConflict = false;
+      }
+      if (hasSlugConflict) {
         return c.json({ success: false, error: 'Slug already exists' }, 409);
       }
     }
@@ -115,6 +132,10 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       ).run();
     }
 
+    if (targetTenant !== 'default') {
+      await db.prepare('UPDATE products SET tenant_id = ? WHERE id = ?').bind(targetTenant, id).run().catch(() => {});
+    }
+
     // Audit log
     await logProductAudit(db, user.id, 'product_create', id, JSON.stringify(body), now);
 
@@ -133,6 +154,7 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // PATCH /api/products/:id - Update product
   router.openapi(ProductRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       slug?: string;
@@ -148,7 +170,7 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const now = new Date().toISOString();
 
     const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    if (!existing) {
+    if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 
@@ -158,19 +180,30 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const canonicalParams: (string | number | null)[] = [];
 
     if (body.slug !== undefined) {
-      let slugExists: unknown = null;
+      const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+      let hasSlugConflict = false;
       try {
-        slugExists = await db.prepare('SELECT id FROM products WHERE slug = ? AND id != ?').bind(body.slug, id).first();
+        const allRes = await db.prepare('SELECT * FROM products WHERE slug = ? AND id != ?').bind(body.slug, id).all<Record<string, unknown>>().catch(() => null);
+        if (allRes && Array.isArray(allRes.results) && allRes.results.length > 0) {
+          hasSlugConflict = allRes.results.some((r) => matchesCatalogTenant(r, effectiveTenant));
+        } else {
+          const slugExists = await db.prepare('SELECT * FROM products WHERE slug = ? AND id != ?').bind(body.slug, id).first();
+          hasSlugConflict = Boolean(slugExists && matchesCatalogTenant(slugExists, effectiveTenant));
+        }
       } catch {
-        slugExists = null;
+        hasSlugConflict = false;
       }
-      if (slugExists) {
+      if (hasSlugConflict) {
         return c.json({ success: false, error: 'Slug already exists' }, 409);
       }
       updates.push('slug = ?');
       params.push(body.slug);
     }
     if (body.categoryId !== undefined) {
+      const catRow = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(body.categoryId).first().catch(() => null);
+      if (catRow && !matchesCatalogTenant(catRow, tenantId === '*' ? 'default' : tenantId)) {
+        return c.json({ success: false, error: 'Category not found' }, 404);
+      }
       updates.push('category_id = ?');
       params.push(body.categoryId);
       canonicalUpdates.push('category_id = ?');
@@ -246,12 +279,13 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // DELETE /api/products/:id - Delete product
   router.openapi(ProductRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { name?: string; slug?: string } | null;
-    if (!existing) {
+    const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { name?: string; slug?: string; tenant_id?: string | null } | null;
+    if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 

@@ -39,6 +39,10 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // ── PUT /config ──────────────────────────────────────────────────────────────
   router.put('/config', async (c) => {
+    const user = c.get?.('user' as never) as { role?: string } | undefined;
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     try {
       const body = await c.req.json<Record<string, unknown>>();
       const menuRaw = body.menu as Record<string, unknown> | undefined;
@@ -51,7 +55,7 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
           if (typeof item.name !== 'string') {
             return errorResponse(c as DindinContext, err('D07', 400, 'Định dạng config menu không hợp lệ'));
           }
-          if (typeof item.price !== 'number') {
+          if (typeof item.price !== 'number' || !Number.isFinite(item.price) || item.price < 0) {
             return errorResponse(c as DindinContext, err('D07', 400, 'Định dạng config menu không hợp lệ'));
           }
         }

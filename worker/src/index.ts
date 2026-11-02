@@ -102,7 +102,7 @@ app.use('/api/kds/orders', requireAuth(KDS_ROLES));
 app.use('/api/kds/orders/*', requireAuth(KDS_ROLES));
 app.use('/api/kds/orders', tenantMiddleware);
 app.use('/api/kds/orders/*', tenantMiddleware);
-const codCollectionRoles = ['owner', 'manager', 'cashier', 'admin'];
+const codCollectionRoles = ['owner', 'manager', 'supervisor', 'cashier', 'admin'];
 app.use('/api/orders/:id/mark-cod-paid', requireAuth(codCollectionRoles));
 app.use('/api/orders/:id/mark-cod-paid', tenantMiddleware);
 app.route('/api/orders', ordersUnifiedRouter);

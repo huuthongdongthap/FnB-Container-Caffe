@@ -7,11 +7,12 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
+import { matchesTenantRow } from '../lib/db';
 import type { InventoryForecastItem } from '../types/api';
 
 export const inventoryForecastingRouter = new Hono<{ Bindings: Env }>();
 
-inventoryForecastingRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'staff']));
+inventoryForecastingRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']));
 
 interface InventoryRow {
   id: string;
@@ -21,28 +22,47 @@ interface InventoryRow {
   min_stock?: number;
   max_stock?: number;
   unit?: string;
+  tenant_id?: string | null;
 }
 
 // GET /api/inventory/forecasting/run-rate
 inventoryForecastingRouter.get('/run-rate', async (c) => {
   const tenantId = getTenantId(c);
-  const days = Math.max(1, Math.min(30, parseInt(c.req.query('days') || '7', 10)));
-  const leadTimeDays = Math.max(1, Math.min(14, parseInt(c.req.query('lead_time_days') || '2', 10)));
+  const rawDays = parseInt(c.req.query('days') || '7', 10);
+  const days = Number.isFinite(rawDays) ? Math.max(1, Math.min(30, rawDays)) : 7;
+  const rawLeadTime = parseInt(c.req.query('lead_time_days') || '2', 10);
+  const leadTimeDays = Number.isFinite(rawLeadTime) ? Math.max(1, Math.min(14, rawLeadTime)) : 2;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   let items: InventoryRow[] = [];
+  let hasTenantCol = true;
   try {
     const res = await db.prepare(`
-      SELECT id, sku, name, current_stock, min_stock, unit
+      SELECT id, sku, name, current_stock, min_stock, unit, tenant_id
       FROM inventory_items
-      WHERE tenant_id = ? AND active = 1
+      WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND active = 1
       ORDER BY sku ASC
-    `).bind(tenantId).all<InventoryRow>();
-    items = res.results || [];
-  } catch {
-    items = [];
+    `).bind(tenantId, tenantId).all<InventoryRow>();
+    items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/no such column:\s*tenant_id/i.test(msg)) {
+      hasTenantCol = false;
+    } else {
+      try {
+        const res = await db.prepare(`
+          SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit, tenant_id
+          FROM inventory_items
+          WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
+          ORDER BY COALESCE(sku, id) ASC
+        `).bind(tenantId, tenantId).all<InventoryRow>();
+        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      } catch {
+        hasTenantCol = false;
+      }
+    }
   }
-  if (items.length === 0) {
+  if ((!hasTenantCol || items.length === 0) && (tenantId === 'default' || tenantId === '*')) {
     try {
       const res = await db.prepare(`
         SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit
@@ -50,12 +70,12 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
         WHERE COALESCE(active, is_active, 1) = 1
         ORDER BY COALESCE(sku, id) ASC
       `).all<InventoryRow>();
-      items = res.results || [];
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
       items = [];
     }
   }
-  if (items.length === 0) {
+  if (items.length === 0 && tenantId === 'default') {
     try {
       const res = await db.prepare(`
         SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit
@@ -63,7 +83,7 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
         WHERE is_active = 1
         ORDER BY id ASC
       `).all<InventoryRow>();
-      items = res.results || [];
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
       items = [];
     }
@@ -179,38 +199,53 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
 // POST /api/inventory/forecasting/snapshot
 inventoryForecastingRouter.post('/snapshot', async (c) => {
   const tenantId = getTenantId(c);
+  const snapshotTenant = tenantId === '*' ? 'default' : tenantId;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const snapshotDate = new Date().toISOString().slice(0, 10);
 
   // Call run-rate logic internally with schema fallbacks
   let items: InventoryRow[] = [];
+  let hasTenantCol = true;
   try {
     const res = await db.prepare(`
-      SELECT id, sku, name, current_stock, min_stock
-      FROM inventory_items WHERE tenant_id = ? AND active = 1
-    `).bind(tenantId).all<InventoryRow>();
-    items = res.results || [];
-  } catch {
-    items = [];
+      SELECT id, sku, name, current_stock, min_stock, tenant_id
+      FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND active = 1
+    `).bind(tenantId, tenantId).all<InventoryRow>();
+    items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/no such column:\s*tenant_id/i.test(msg)) {
+      hasTenantCol = false;
+    } else {
+      try {
+        const res = await db.prepare(`
+          SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, tenant_id
+          FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
+        `).bind(tenantId, tenantId).all<InventoryRow>();
+        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      } catch {
+        hasTenantCol = false;
+      }
+    }
   }
-  if (items.length === 0) {
+  if ((!hasTenantCol || items.length === 0) && (tenantId === 'default' || tenantId === '*')) {
     try {
       const res = await db.prepare(`
         SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock
         FROM inventory_items WHERE COALESCE(active, is_active, 1) = 1
       `).all<InventoryRow>();
-      items = res.results || [];
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
       items = [];
     }
   }
-  if (items.length === 0) {
+  if (items.length === 0 && tenantId === 'default') {
     try {
       const res = await db.prepare(`
         SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock
         FROM ingredients WHERE is_active = 1
       `).all<InventoryRow>();
-      items = res.results || [];
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
       items = [];
     }
@@ -290,7 +325,8 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
 
     const max = Number(it.max_stock || 50);
     const reorder = Math.max(0, Math.round((max - stock + rate * 2) * 10) / 10);
-    const id = `snap_${tenantId}_${it.sku}_${snapshotDate}`;
+    const itemTenant = (it.tenant_id && String(it.tenant_id).trim()) ? String(it.tenant_id).trim() : snapshotTenant;
+    const id = `snap_${itemTenant}_${it.sku}_${snapshotDate}`;
 
     stmts.push(db.prepare(`
       INSERT INTO inventory_forecast_snapshots (
@@ -303,7 +339,7 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
         days_of_supply = excluded.days_of_supply,
         risk_level = excluded.risk_level,
         suggested_reorder_qty = excluded.suggested_reorder_qty
-    `).bind(id, tenantId, it.sku, it.name, rate, stock, dos, risk, reorder, snapshotDate));
+    `).bind(id, itemTenant, it.sku, it.name, rate, stock, dos, risk, reorder, snapshotDate));
   }
 
   for (let i = 0; i < stmts.length; i += 50) {
@@ -323,11 +359,12 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
 inventoryForecastingRouter.get('/history', async (c) => {
   const tenantId = getTenantId(c);
   const sku = c.req.query('item_sku');
-  const limit = Math.min(60, parseInt(c.req.query('limit') || '30', 10));
+  const rawLimit = parseInt(c.req.query('limit') || '30', 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(60, Math.max(1, rawLimit)) : 30;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  let query = 'SELECT * FROM inventory_forecast_snapshots WHERE tenant_id = ?';
-  const params: unknown[] = [tenantId];
+  let query = "SELECT * FROM inventory_forecast_snapshots WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
+  const params: unknown[] = [tenantId, tenantId];
   if (sku) {
     query += ' AND item_sku = ?';
     params.push(sku);
@@ -336,5 +373,6 @@ inventoryForecastingRouter.get('/history', async (c) => {
   params.push(limit);
 
   const { results } = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
-  return c.json({ success: true, data: results || [] });
+  const filtered = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+  return c.json({ success: true, data: filtered });
 });

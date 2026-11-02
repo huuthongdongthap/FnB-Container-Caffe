@@ -13,9 +13,17 @@ import type { Customer, ReferralCode } from '../types/models';
 
 export const referralRouter = new Hono<{ Bindings: Env }>();
 
-function getTenantId(c: { env: Env; get: (k: string) => unknown }): string {
+function getTenantId(c: {
+  env: Env;
+  req?: { header?: (k: string) => string | undefined };
+  get: (k: string) => unknown;
+}): string {
+  const cust = c.get('customer') as { tenant_id?: string | null } | undefined;
+  if (cust?.tenant_id && String(cust.tenant_id).trim()) return String(cust.tenant_id).trim();
   const user = c.get('user') as { tenantId?: string } | undefined;
   if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
+  const hdr = c.req?.header?.('X-Tenant-ID');
+  if (hdr && hdr.trim()) return hdr.trim();
   try {
     return resolvePilotStore(c.env);
   } catch {
@@ -25,6 +33,7 @@ function getTenantId(c: { env: Env; get: (k: string) => unknown }): string {
 
 function matchesTenantRow(row: unknown, tenantId: string): boolean {
   if (!row || typeof row !== 'object') return false;
+  if (tenantId === '*') return true;
   const r = row as Record<string, unknown>;
   if (r.tenant_id === undefined) {
     return tenantId === 'default';

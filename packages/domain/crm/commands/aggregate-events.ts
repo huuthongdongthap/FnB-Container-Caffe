@@ -34,7 +34,8 @@ export async function aggregateEvents(
   customerId: string,
   options: { limit?: number } = {},
 ): Promise<AggregateResult> {
-  const limit = Math.min(options.limit ?? 100, 500);
+  const rawLimit = Number(options.limit ?? 100);
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, Math.floor(rawLimit)), 500) : 100;
 
   try {
     // Parallel reads across event sources.
@@ -70,19 +71,33 @@ export async function aggregateEvents(
         .catch(() => ({ results: [] })),
 
       db.prepare(
-        `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
-                json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
-         FROM orders
-         WHERE customer_id = ? OR customer_phone = (SELECT phone FROM customers WHERE id = ?)
-         ORDER BY created_at DESC LIMIT ?`,
+        `SELECT o.id, 'OrderLinked' as type, 'order' as source, o.created_at as timestamp,
+                json_object('total', o.total, 'status', o.status, 'payment_method', o.payment_method) as payload
+         FROM orders o
+         LEFT JOIN customers c ON c.id = ?
+         WHERE (
+           o.customer_id = ?
+           OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
+         )
+         AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default'))
+         ORDER BY o.created_at DESC LIMIT ?`,
       ).bind(customerId, customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
         .catch(() =>
           db.prepare(
             `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
                     json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
-             FROM orders WHERE customer_phone = (SELECT phone FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
-            .catch(() => ({ results: [] })),
+             FROM orders
+             WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
+             ORDER BY created_at DESC LIMIT ?`,
+          ).bind(customerId, customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            .catch(() =>
+              db.prepare(
+                `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
+                        json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
+                 FROM orders WHERE customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+                .catch(() => ({ results: [] })),
+            ),
         ),
 
       db.prepare(

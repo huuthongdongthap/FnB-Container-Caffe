@@ -2,6 +2,8 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
+import { checkCronJobTenant } from './helpers';
 
 export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/cron/summary - Get cron summary
@@ -9,6 +11,7 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
+    const tenantId = getTenantId(c);
 
     let whereClause = 'WHERE 1=1';
     const params: (string | number)[] = [];
@@ -24,6 +27,89 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (dateTo) {
       whereClause += ' AND date(created_at) <= ?';
       params.push(dateTo);
+    }
+
+    if (tenantId !== '*') {
+      const allJobsRes = await db.prepare(
+        `SELECT * FROM cron_jobs ${whereClause}`
+      ).bind(...params).all().catch(() => ({ results: [] }));
+      const rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+
+      if (rawJobs.length > 0 || tenantId !== 'default') {
+        const tenantJobs: Record<string, any>[] = [];
+        for (const j of rawJobs) {
+          if (await checkCronJobTenant(db, j, tenantId)) {
+            tenantJobs.push(j);
+          }
+        }
+        const allowedJobIds = new Set(tenantJobs.map((j) => j.id));
+        const jobsByStatus: Record<string, number> = {};
+        let activeCount = 0;
+        for (const j of tenantJobs) {
+          if (j.is_active) activeCount += 1;
+          const st = String(j.status || 'pending');
+          jobsByStatus[st] = (jobsByStatus[st] || 0) + 1;
+        }
+
+        let runWhere = 'WHERE 1=1';
+        const runParams: (string | number)[] = [];
+        if (dateFrom) {
+          runWhere += ' AND date(started_at) >= ?';
+          runParams.push(dateFrom);
+        }
+        if (dateTo) {
+          runWhere += ' AND date(started_at) <= ?';
+          runParams.push(dateTo);
+        }
+        const allRunsRes = await db.prepare(
+          `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC`
+        ).bind(...runParams).all().catch(() => ({ results: [] }));
+        const rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
+          (r) => allowedJobIds.has(r.job_id)
+        );
+
+        let successfulRuns = 0;
+        let failedRuns = 0;
+        let timeoutRuns = 0;
+        let durationSum = 0;
+        let durationCount = 0;
+        for (const r of rawRuns) {
+          if (r.status === 'success') successfulRuns += 1;
+          else if (r.status === 'failed') failedRuns += 1;
+          else if (r.status === 'timeout') timeoutRuns += 1;
+          if (typeof r.duration_ms === 'number') {
+            durationSum += r.duration_ms;
+            durationCount += 1;
+          }
+        }
+
+        const jobNameById = new Map(tenantJobs.map((j) => [j.id, j.name]));
+        const recentFailures = rawRuns
+          .filter((r) => r.status === 'failed' || r.status === 'timeout')
+          .slice(0, 10)
+          .map((r) => ({
+            id: r.id,
+            jobId: r.job_id,
+            jobName: jobNameById.get(r.job_id) || '',
+            error: r.error,
+            failedAt: r.started_at,
+          }));
+
+        return c.json({
+          success: true,
+          data: {
+            totalJobs: tenantJobs.length,
+            activeJobs: activeCount,
+            jobsByStatus,
+            totalRuns: rawRuns.length,
+            successfulRuns,
+            failedRuns,
+            timeoutRuns,
+            avgDurationMs: durationCount > 0 ? durationSum / durationCount : 0,
+            recentFailures,
+          },
+        });
+      }
     }
 
     // Total jobs

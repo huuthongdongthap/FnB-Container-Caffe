@@ -2,6 +2,37 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
+import { getTenantId } from '../../middleware/tenant';
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+async function checkIngredientTenant(
+  db: any,
+  id: string,
+  row: Record<string, unknown>,
+  tenantId: string
+): Promise<boolean> {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    return matchesTenantRow(row, tenantId);
+  }
+  const invRow = (await db
+    .prepare('SELECT id, tenant_id FROM inventory_items WHERE id = ?')
+    .bind(id)
+    .first()
+    .catch(() => null)) as Record<string, unknown> | null;
+  if (invRow && 'tenant_id' in invRow && invRow.tenant_id !== undefined) {
+    return matchesTenantRow(invRow, tenantId);
+  }
+  return tenantId === 'default';
+}
 
 async function writeIngredientAuditLog(
   db: any,
@@ -21,7 +52,7 @@ async function writeIngredientAuditLog(
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, userId, action, 'ingredient', entityId, metadata, now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'ingredient', entityId, metadata, now).run();
     } catch {
       try {
         await db.prepare(
@@ -62,6 +93,10 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       params.push(query.isActive ? 1 : 0);
     }
 
+    const tenantId = getTenantId(c);
+    const fetchLimit = tenantId === '*' ? limit : Math.max(limit * 10, 500);
+    const fetchOffset = tenantId === '*' ? offset : 0;
+
     let total = 0;
     let itemResults: any[] = [];
     try {
@@ -70,7 +105,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
       const items = await db.prepare(
         `SELECT * FROM ingredients ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all();
+      ).bind(...params, fetchLimit, fetchOffset).all();
       itemResults = items.results || [];
     } catch {
       let invWhere = '';
@@ -92,8 +127,19 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
       const items = await db.prepare(
         `SELECT *, id as sku, unit_cost as cost_per_unit FROM inventory_items ${invWhere} ORDER BY name ASC LIMIT ? OFFSET ?`
-      ).bind(...invParams, limit, offset).all();
+      ).bind(...invParams, fetchLimit, fetchOffset).all();
       itemResults = items.results || [];
+    }
+
+    if (tenantId !== '*' && itemResults.length > 0) {
+      const filtered: any[] = [];
+      for (const item of itemResults) {
+        if (await checkIngredientTenant(db, String(item.id), item, tenantId)) {
+          filtered.push(item);
+        }
+      }
+      total = filtered.length;
+      itemResults = filtered.slice(offset, offset + limit);
     }
 
     return c.json({
@@ -106,6 +152,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   // GET /api/inventory/ingredients/{id} - Get ingredient by ID
   app.openapi(InventoryRoutes.ingredients.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
 
     let ingredient: any = null;
@@ -118,7 +165,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       ingredient = await db.prepare('SELECT *, COALESCE(sku, id) as sku, COALESCE(cost_per_unit, unit_cost, 0) as cost_per_unit FROM inventory_items WHERE id = ?').bind(id).first().catch(() => null);
     }
 
-    if (!ingredient) {
+    if (!ingredient || !(await checkIngredientTenant(db, id, ingredient, tenantId))) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
 
@@ -128,24 +175,43 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   // POST /api/inventory/ingredients - Create ingredient
   app.openapi(InventoryRoutes.ingredients.create as any, async (c: any) => {
     const db = getDatabase(c);
+    const rawTenantId = getTenantId(c);
+    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const user = c.get('user');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
-    // Check SKU uniqueness
+    // Check SKU uniqueness within tenant scope
     let existing: unknown = null;
     let usingCanonical = false;
     try {
-      existing = await db.prepare('SELECT id FROM ingredients WHERE sku = ?').bind(body.sku).first();
+      const skuRes = await db.prepare('SELECT * FROM ingredients WHERE sku = ?').bind(body.sku).all();
+      const candidates = (skuRes?.results as Array<Record<string, unknown>> | undefined) || [];
+      if (candidates.length > 0) {
+        for (const cand of candidates) {
+          if (await checkIngredientTenant(db, String(cand.id), cand, tenantId)) {
+            existing = cand;
+            break;
+          }
+        }
+      } else {
+        const firstCand = (await db.prepare('SELECT * FROM ingredients WHERE sku = ?').bind(body.sku).first()) as Record<string, unknown> | null;
+        if (firstCand && (await checkIngredientTenant(db, String(firstCand.id), firstCand, tenantId))) {
+          existing = firstCand;
+        }
+      }
     } catch {
       usingCanonical = true;
-      existing = await db.prepare('SELECT id FROM inventory_items WHERE id = ? OR name = ?').bind(body.sku, body.name).first().catch(() => null);
+      const firstCand = (await db.prepare('SELECT * FROM inventory_items WHERE id = ? OR name = ?').bind(body.sku, body.name).first().catch(() => null)) as Record<string, unknown> | null;
+      if (firstCand && (await checkIngredientTenant(db, String(firstCand.id), firstCand, tenantId))) {
+        existing = firstCand;
+      }
     }
     if (existing) {
       return c.json({ success: false, error: 'SKU already exists' }, 409);
     }
 
-    const id = `ing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `ing_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const isActiveInt = body.isActive !== false ? 1 : 0;
 
     if (!usingCanonical) {
@@ -171,10 +237,11 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         `INSERT OR IGNORE INTO inventory_items (
           id, sku, tenant_id, name, category, unit, current_stock, min_stock, max_stock,
           cost_per_unit, unit_cost, active, is_active, created_at, updated_at
-        ) VALUES (?, ?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
         body.sku,
+        tenantId,
         body.name,
         body.category || 'raw_materials',
         body.unit,
@@ -189,22 +256,42 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         now
       ).run().catch(() => {});
     } else {
-      await db.prepare(
-        `INSERT INTO inventory_items (id, name, unit, category, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.unit,
-        body.category || 'general',
-        body.currentStock || 0,
-        body.minStock || 0,
-        body.maxStock || 0,
-        body.costPerUnit || 0,
-        isActiveInt,
-        now,
-        now
-      ).run();
+      try {
+        await db.prepare(
+          `INSERT INTO inventory_items (id, tenant_id, name, unit, category, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          tenantId,
+          body.name,
+          body.unit,
+          body.category || 'general',
+          body.currentStock || 0,
+          body.minStock || 0,
+          body.maxStock || 0,
+          body.costPerUnit || 0,
+          isActiveInt,
+          now,
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO inventory_items (id, name, unit, category, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.unit,
+          body.category || 'general',
+          body.currentStock || 0,
+          body.minStock || 0,
+          body.maxStock || 0,
+          body.costPerUnit || 0,
+          isActiveInt,
+          now,
+          now
+        ).run();
+      }
     }
 
     await writeIngredientAuditLog(db, user.id, 'ingredient_create', id, JSON.stringify(body), now);
@@ -224,6 +311,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   // PATCH /api/inventory/ingredients/{id} - Update ingredient
   app.openapi(InventoryRoutes.ingredients.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
@@ -242,13 +330,28 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         usingCanonical = true;
       }
     }
-    if (!existing) {
+    if (!existing || !(await checkIngredientTenant(db, id, existing, tenantId))) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
 
-    // Check SKU uniqueness if changing
+    // Check SKU uniqueness within tenant scope if changing
     if (body.sku && body.sku !== existing.sku && !usingCanonical) {
-      const skuExists = await db.prepare('SELECT id FROM ingredients WHERE sku = ? AND id != ?').bind(body.sku, id).first();
+      let skuExists: Record<string, unknown> | null = null;
+      const skuRes = await db.prepare('SELECT * FROM ingredients WHERE sku = ? AND id != ?').bind(body.sku, id).all().catch(() => ({ results: [] }));
+      const candidates = (skuRes?.results as Array<Record<string, unknown>> | undefined) || [];
+      if (candidates.length > 0) {
+        for (const cand of candidates) {
+          if (await checkIngredientTenant(db, String(cand.id), cand, tenantId)) {
+            skuExists = cand;
+            break;
+          }
+        }
+      } else {
+        const firstCand = (await db.prepare('SELECT * FROM ingredients WHERE sku = ? AND id != ?').bind(body.sku, id).first().catch(() => null)) as Record<string, unknown> | null;
+        if (firstCand && (await checkIngredientTenant(db, String(firstCand.id), firstCand, tenantId))) {
+          skuExists = firstCand;
+        }
+      }
       if (skuExists) {
         return c.json({ success: false, error: 'SKU already exists' }, 409);
       }
@@ -329,6 +432,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   // DELETE /api/inventory/ingredients/{id} - Delete ingredient
   app.openapi(InventoryRoutes.ingredients.delete as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const now = new Date().toISOString();
@@ -346,7 +450,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         usingCanonical = true;
       }
     }
-    if (!existing) {
+    if (!existing || !(await checkIngredientTenant(db, id, existing, tenantId))) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
 

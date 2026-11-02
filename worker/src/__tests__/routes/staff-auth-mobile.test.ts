@@ -490,6 +490,22 @@ describe('registerStaffDevice', () => {
     expect(body.success).toBe(true);
     expect(body.user.role).toBe('kitchen');
   });
+
+  it('preserves supervisor and shipper device roles when registered by manager', async () => {
+    const kv = createMockKV({ 'user:USR_2': JSON.stringify({ id: 'USR_2', name: 'Shift Lead' }) });
+    for (const deviceRole of ['supervisor', 'shipper'] as const) {
+      const ctx: any = mockContext({
+        user: { id: 'USR_1', role: 'manager' },
+        body: { device_token: `tok_${deviceRole}_01`, staff_id: 'USR_2', role: deviceRole, pin: '1234' },
+        kv,
+      });
+      const res = await registerStaffDevice(ctx);
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.user.role).toBe(deviceRole);
+    }
+  });
 });
 
 describe('revokeStaffDevice', () => {

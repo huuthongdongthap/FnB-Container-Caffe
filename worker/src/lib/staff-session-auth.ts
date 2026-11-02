@@ -26,19 +26,33 @@ export async function authenticateRequest(
   catch { throw new SessionUnavailableError(); }
   if (revoked) throw new StaffSessionError('SESSION_REVOKED');
   const account = isStaffIdentity(claims) ? await validateStaffSession(env.AURA_DB, claims) : null;
-  if (!account && payload.email && env.AUTH_KV?.get) {
+  if (!account && env.AUTH_KV?.get) {
     let rawCustomer: string | null = null;
-    try { rawCustomer = await env.AUTH_KV.get(`user:${payload.email}`); }
-    catch { throw new SessionUnavailableError(); }
+    let rawCustVer: string | null = null;
+    try {
+      if (payload.email) rawCustomer = await env.AUTH_KV.get(`user:${payload.email}`);
+      if (payload.id) rawCustVer = await env.AUTH_KV.get(`cust_auth_ver:${payload.id}`);
+    } catch {
+      throw new SessionUnavailableError();
+    }
+    let storedVersion = 1;
     if (rawCustomer) {
       try {
         const storedCustomer = JSON.parse(rawCustomer) as { auth_version?: number };
-        const storedVersion = Number(storedCustomer.auth_version || 1);
-        const tokenVersion = Number(payload.authVersion || 1);
-        if (storedVersion !== tokenVersion) throw new StaffSessionError('SESSION_REVOKED');
-      } catch (err) {
-        if (err instanceof StaffSessionError) throw err;
+        storedVersion = Math.max(storedVersion, Number(storedCustomer.auth_version || 1));
+      } catch {
+        // Ignore malformed KV JSON
       }
+    }
+    if (rawCustVer) {
+      const parsedVer = Number(rawCustVer);
+      if (Number.isFinite(parsedVer) && parsedVer > 0) {
+        storedVersion = Math.max(storedVersion, parsedVer);
+      }
+    }
+    if (rawCustomer || rawCustVer) {
+      const tokenVersion = Number(payload.authVersion || 1);
+      if (storedVersion !== tokenVersion) throw new StaffSessionError('SESSION_REVOKED');
     }
   }
   return { payload, token, account } as const;

@@ -7,7 +7,11 @@ type Order = { total: number; status: string; payment_status: string; payment_me
 
 /** Cash collection is one ledger transaction and never changes kitchen fulfillment. */
 export async function collectCodPayment(db: D1Database, id: string, tenantId: string): Promise<CollectionResult> {
-  const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
   let order: Order | null;
   try {

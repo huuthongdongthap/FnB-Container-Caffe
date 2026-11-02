@@ -117,7 +117,11 @@ kdsStreamRouter.get('/stream', async(c) => {
           try { controller.close(); } catch { /* Disconnected. */ }
           throw error;
         }
-        const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+        const tenantClause = tenantId === '*'
+          ? ''
+          : tenantId === 'default'
+            ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+            : ' AND tenant_id = ?';
         let results: OrderRecord[] | undefined;
         try {
           const statement = db.prepare(

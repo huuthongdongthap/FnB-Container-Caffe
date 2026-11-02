@@ -58,9 +58,18 @@ export async function creditLoyaltyIfEligible(
   let customerId = orderRow.customer_id;
   if (!customerId && (orderRow.customer_phone || orderRow.customer_email)) {
     const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
-    const cust = await db.prepare(
-      'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-    ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+    const rawTenant = (orderRow as Record<string, unknown>).tenant_id;
+    const orderTenant = typeof rawTenant === 'string' && rawTenant.trim() ? rawTenant.trim() : 'default';
+    let cust: { id: string } | null = null;
+    try {
+      cust = await db.prepare(
+        "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+      ).bind(orderRow.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant, orderTenant).first<{ id: string }>();
+    } catch {
+      cust = await db.prepare(
+        'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+      ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+    }
     customerId = cust?.id ?? null;
   }
 

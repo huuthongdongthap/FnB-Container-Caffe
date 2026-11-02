@@ -9,6 +9,7 @@ import { timingSafeEqual } from '@aura/domain-security';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
+import { matchesTenantRow } from '../lib/db';
 import { sendTelegramMessage } from '../lib/alerts/telegram';
 import { createLogger } from '../middleware/logger';
 
@@ -38,7 +39,7 @@ containerTelemetryRouter.post(
       return next();
     }
     if (isProd || Boolean(expectedSecret) || c.req.header('Authorization') || providedSecret) {
-      return requireAuth(['owner', 'admin', 'manager', 'staff'])(c, next);
+      return requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff'])(c, next);
     }
     return next();
   },
@@ -50,7 +51,10 @@ containerTelemetryRouter.post(
     }
 
     const data = parsed.data;
-    const tenantId = getTenantId(c);
+    const rawTenant = c.get('user' as never)
+      ? getTenantId(c)
+      : (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+    const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
     const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
     // Autonomous Watchdog Rule Evaluation
@@ -93,7 +97,10 @@ containerTelemetryRouter.post(
       }
     }
 
-    const logId = `tel_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const randBytes = new Uint8Array(3);
+    crypto.getRandomValues(randBytes);
+    const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const logId = `tel_${Date.now().toString(36)}_${randHex}`;
     try {
       await db.prepare(`
         INSERT INTO container_telemetry_logs (
@@ -122,7 +129,7 @@ containerTelemetryRouter.post(
 );
 
 // GET /api/edge/containers/status
-containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin', 'manager']), async (c) => {
+containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
@@ -131,18 +138,22 @@ containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin'
       SELECT t.*
       FROM container_telemetry_logs t
       INNER JOIN (
-        SELECT container_id, MAX(created_at) as max_created
+        SELECT container_id, COALESCE(NULLIF(tenant_id, ''), 'default') as norm_tenant, MAX(created_at) as max_created
         FROM container_telemetry_logs
-        WHERE tenant_id = ?
-        GROUP BY container_id
-      ) latest ON t.container_id = latest.container_id AND t.created_at = latest.max_created
-    `).bind(tenantId).all<{
-      id: string; container_id: string; power_source: string; battery_percentage: number | null;
+        WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
+        GROUP BY container_id, COALESCE(NULLIF(tenant_id, ''), 'default')
+      ) latest ON t.container_id = latest.container_id
+        AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = latest.norm_tenant
+        AND t.created_at = latest.max_created
+    `).bind(tenantId, tenantId).all<{
+      id: string; container_id: string; tenant_id?: string | null; power_source: string; battery_percentage: number | null;
       ambient_temp_celsius: number; kds_online: number; alert_status: string; alert_message: string | null; created_at: string;
     }>();
 
     const now = Date.now();
-    const containers = (rawLogs || []).map((row) => {
+    const containers = (rawLogs || [])
+      .filter((row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
+      .map((row) => {
       const logTime = new Date(row.created_at).getTime();
       const minutesAgo = Math.round((now - logTime) / (60 * 1000));
       const isOffline = minutesAgo > 15;
@@ -168,17 +179,18 @@ containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin'
 });
 
 // GET /api/edge/containers/:id/history
-containerTelemetryRouter.get('/containers/:id/history', requireAuth(['owner', 'manager', 'admin']), async (c) => {
+containerTelemetryRouter.get('/containers/:id/history', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
   const containerId = c.req.param('id');
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   try {
     const { results } = await db.prepare(
-      'SELECT * FROM container_telemetry_logs WHERE container_id = ? AND tenant_id = ? ORDER BY created_at DESC LIMIT 50'
-    ).bind(containerId, tenantId).all();
+      "SELECT * FROM container_telemetry_logs WHERE container_id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) ORDER BY created_at DESC LIMIT 50"
+    ).bind(containerId, tenantId, tenantId).all<Record<string, unknown>>();
 
-    return c.json({ success: true, container_id: containerId, data: results || [] });
+    const filtered = (results || []).filter((row) => matchesTenantRow(row, tenantId));
+    return c.json({ success: true, container_id: containerId, data: filtered });
   } catch (err) {
     log.error('Container history query error:', { message: (err as Error).message });
     return c.json({ success: false, error: 'Failed to retrieve container history' }, 500);

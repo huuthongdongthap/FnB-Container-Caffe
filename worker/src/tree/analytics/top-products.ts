@@ -16,8 +16,21 @@ export interface TopProductRow {
  */
 export async function getTopProducts(
   db: import('@cloudflare/workers-types').D1Database,
-  limit: number
+  limit: number,
+  tenantId?: string
 ): Promise<TopProductRow[]> {
+  const hasTenant = Boolean(tenantId && tenantId !== '*');
+  const orderAliasClause = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
+  const orderClause = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const tenantBinds = hasTenant && tenantId ? [tenantId] : [];
   try {
     const { results } = await db.prepare(`
     SELECT
@@ -27,18 +40,21 @@ export async function getTopProducts(
     FROM order_items oi
     JOIN products p ON p.id = oi.product_id
     JOIN orders o ON o.id = oi.order_id
-    WHERE o.status != 'cancelled'
+    WHERE o.status != 'cancelled'${orderAliasClause}
     GROUP BY oi.product_id, p.name
     ORDER BY total_qty DESC
     LIMIT ?
-  `).bind(limit).all<TopProductRow>();
+  `).bind(...tenantBinds, limit).all<TopProductRow>();
 
     return results || [];
   } catch {
     try {
-      const { results: orderRows } = await db.prepare(`
-        SELECT items FROM orders WHERE status != 'cancelled'
-      `).all<{ items: string }>();
+      const stmt = db.prepare(`
+        SELECT items FROM orders WHERE status != 'cancelled'${orderClause}
+      `);
+      const { results: orderRows } = tenantBinds.length > 0
+        ? await stmt.bind(...tenantBinds).all<{ items: string }>()
+        : await stmt.all<{ items: string }>();
       const productMap = new Map<string, { total_qty: number; revenue: number }>();
       for (const r of orderRows || []) {
         try {

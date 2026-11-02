@@ -24,6 +24,37 @@ export function formatZone(row: Record<string, any>) {
   };
 }
 
+export async function isAllowedLocationForTenant(
+  db: any,
+  locationId: unknown,
+  tenantId: string
+): Promise<boolean> {
+  if (locationId === undefined || locationId === null || String(locationId).trim() === '') {
+    return true;
+  }
+  if (!tenantId || tenantId === '*') return true;
+  const locId = String(locationId).trim();
+  if (locId === tenantId) return true;
+  try {
+    const locRow = await db
+      .prepare('SELECT tenant_id FROM locations WHERE id = ? LIMIT 1')
+      .bind(locId)
+      .first();
+    if (locRow && locRow.tenant_id !== undefined && locRow.tenant_id !== null && String(locRow.tenant_id).trim() !== '') {
+      return String(locRow.tenant_id).trim() === tenantId;
+    }
+  } catch {
+    // Optional locations table
+  }
+  if (tenantId !== 'default') {
+    return false;
+  }
+  if (/^tenant[-_]/i.test(locId) && locId !== 'default') {
+    return false;
+  }
+  return true;
+}
+
 export async function writeTableAuditLog(
   db: any,
   userId: string,
@@ -43,7 +74,7 @@ export async function writeTableAuditLog(
       await db.prepare(
         `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${Date.now()}`, userId, action, entityType, entityId, metadata, now).run();
+      ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
     } catch {
       try {
         await db.prepare(

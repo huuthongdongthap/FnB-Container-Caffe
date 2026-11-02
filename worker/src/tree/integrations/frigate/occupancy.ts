@@ -28,7 +28,8 @@ export interface FrigateOccupancyReport {
 }
 
 export async function getOccupancyAnalytics(
-  env: Record<string, unknown>
+  env: Record<string, unknown>,
+  tenantId?: string
 ): Promise<FrigateOccupancyReport> {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
   const client = createFrigateClient(env as { FRIGATE_URL?: string; FRIGATE_API_KEY?: string; FRIGATE_SYNC_ENABLED?: string });
@@ -69,15 +70,46 @@ export async function getOccupancyAnalytics(
     const twentyFourHoursAgoSec = Math.floor(Date.now() / 1000) - 86400;
 
     // 1. Current active person detections (last 5 minutes)
-    const activeRows = await db
-      .prepare(
-        `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
-         FROM frigate_events
-         WHERE label = 'person' AND start_time >= ?
-         GROUP BY camera`
-      )
-      .bind(fiveMinutesAgoSec)
-      .all<{ camera: string; count: number; last_seen: string | null }>();
+    const scopedTenant = tenantId && tenantId !== '*' ? tenantId : null;
+    let activeRows: { results?: Array<{ camera: string; count: number; last_seen: string | null }> };
+    if (scopedTenant) {
+      try {
+        activeRows = await db
+          .prepare(
+            `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
+             FROM frigate_events
+             WHERE label = 'person' AND start_time >= ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             GROUP BY camera`
+          )
+          .bind(fiveMinutesAgoSec, scopedTenant)
+          .all<{ camera: string; count: number; last_seen: string | null }>();
+      } catch {
+        if (scopedTenant !== 'default') {
+          activeRows = { results: [] };
+        } else {
+          activeRows = await db
+            .prepare(
+              `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
+               FROM frigate_events
+               WHERE label = 'person' AND start_time >= ?
+               GROUP BY camera`
+            )
+            .bind(fiveMinutesAgoSec)
+            .all<{ camera: string; count: number; last_seen: string | null }>();
+        }
+      }
+    } else {
+      activeRows = await db
+        .prepare(
+          `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
+           FROM frigate_events
+           WHERE label = 'person' AND start_time >= ?
+           GROUP BY camera`
+        )
+        .bind(fiveMinutesAgoSec)
+        .all<{ camera: string; count: number; last_seen: string | null }>();
+    }
 
     const breakdown: CameraOccupancy[] = (activeRows.results ?? []).map(r => ({
       camera: r.camera,
@@ -89,16 +121,48 @@ export async function getOccupancyAnalytics(
 
     // 2. Peak hours in the last 24h
     // In SQLite, strftime('%H', datetime(start_time, 'unixepoch')) extracts the hour (00-23)
-    const hourlyRows = await db
-      .prepare(
-        `SELECT CAST(strftime('%H', datetime(start_time, 'unixepoch')) AS INTEGER) as hour, COUNT(*) as count
-         FROM frigate_events
-         WHERE label = 'person' AND start_time >= ?
-         GROUP BY hour
-         ORDER BY hour ASC`
-      )
-      .bind(twentyFourHoursAgoSec)
-      .all<{ hour: number; count: number }>();
+    let hourlyRows: { results?: Array<{ hour: number; count: number }> };
+    if (scopedTenant) {
+      try {
+        hourlyRows = await db
+          .prepare(
+            `SELECT CAST(strftime('%H', datetime(start_time, 'unixepoch')) AS INTEGER) as hour, COUNT(*) as count
+             FROM frigate_events
+             WHERE label = 'person' AND start_time >= ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             GROUP BY hour
+             ORDER BY hour ASC`
+          )
+          .bind(twentyFourHoursAgoSec, scopedTenant)
+          .all<{ hour: number; count: number }>();
+      } catch {
+        if (scopedTenant !== 'default') {
+          hourlyRows = { results: [] };
+        } else {
+          hourlyRows = await db
+            .prepare(
+              `SELECT CAST(strftime('%H', datetime(start_time, 'unixepoch')) AS INTEGER) as hour, COUNT(*) as count
+               FROM frigate_events
+               WHERE label = 'person' AND start_time >= ?
+               GROUP BY hour
+               ORDER BY hour ASC`
+            )
+            .bind(twentyFourHoursAgoSec)
+            .all<{ hour: number; count: number }>();
+        }
+      }
+    } else {
+      hourlyRows = await db
+        .prepare(
+          `SELECT CAST(strftime('%H', datetime(start_time, 'unixepoch')) AS INTEGER) as hour, COUNT(*) as count
+           FROM frigate_events
+           WHERE label = 'person' AND start_time >= ?
+           GROUP BY hour
+           ORDER BY hour ASC`
+        )
+        .bind(twentyFourHoursAgoSec)
+        .all<{ hour: number; count: number }>();
+    }
 
     const hourMap = new Map<number, number>();
     (hourlyRows.results ?? []).forEach(r => {

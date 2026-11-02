@@ -5,16 +5,14 @@ import { sendSMS } from '../../lib/speedsms-client';
 import { sendZNS } from '../../tree/zalo/zns-sender';
 import { createLogger } from '../../utils/logger';
 import { broadcastSendSchema, zodErrorResponse } from '../../lib/validators';
+import { getTenantId } from '../../middleware/tenant';
 import { segmentSQL, type BroadcastCustomer } from './types';
 
 const log = createLogger({ route: 'broadcast' });
-
-function getTenantId(c: { get: (k: string) => unknown }): string {
-  const user = c.get('user') as { tenantId?: string } | undefined;
-  return user?.tenantId || 'default';
-}
+const BROADCAST_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 
 function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (tenantId === '*') return true;
   if (!row || typeof row !== 'object') return false;
   const r = row as Record<string, unknown>;
   if (r.tenant_id === undefined) {
@@ -37,7 +35,11 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
   // POST /api/broadcast/send — send bulk broadcast
   router.post('/send', async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c as unknown as { get: (k: string) => unknown });
+    const user = (c as unknown as { get?: (k: string) => { role?: string } | undefined }).get?.('user');
+    if (user?.role && !BROADCAST_ADMIN_ROLES.includes(user.role)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    const tenantId = getTenantId(c);
 
     const raw = await c.req.json();
     const parsed = broadcastSendSchema.safeParse(raw);
@@ -60,7 +62,7 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     }
 
     // ── Lookup customers in segment ──
-    const seg = segmentSQL(segment);
+    const seg = segmentSQL(segment, tenantId);
     const tenantAwareSql = seg.sql
       .replace(/^SELECT DISTINCT c\./, 'SELECT DISTINCT c.tenant_id, c.')
       .replace(/^SELECT id, name, phone, email/, 'SELECT id, name, phone, email, tenant_id');
@@ -73,15 +75,16 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       customers = results || [];
     } catch (err) {
       // Fallback for legacy test mocks without tenant_id, loyalty_tier, or date_of_birth
-      let fallbackSql = seg.sql;
+      const fallbackSeg = segmentSQL(segment);
+      let fallbackSql = fallbackSeg.sql;
       if (fallbackSql.includes('loyalty_tier')) {
         fallbackSql = fallbackSql.replace(/loyalty_tier/g, 'tier');
       } else if (fallbackSql.includes('date_of_birth')) {
         fallbackSql = fallbackSql.replace(/date_of_birth/g, 'birthday');
       }
       try {
-        const stmt = seg.params
-          ? db.prepare(fallbackSql).bind(...seg.params)
+        const stmt = fallbackSeg.params
+          ? db.prepare(fallbackSql).bind(...fallbackSeg.params)
           : db.prepare(fallbackSql);
         const { results } = await stmt.all<BroadcastCustomer>();
         customers = results || [];

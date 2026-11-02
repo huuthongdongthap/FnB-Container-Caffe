@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import { getOrdersInRange, formatCsvRows } from '../../tree/analytics/csv-export';
 import { exportSchema } from './helpers';
 
@@ -18,7 +19,8 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     const { start, end } = parsed.data;
-    const rows = await getOrdersInRange(c.env.AURA_DB, start, end);
+    const tenantId = getTenantId(c);
+    const rows = await getOrdersInRange(c.env.AURA_DB, start, end, tenantId);
     const csv = formatCsvRows(rows);
 
     return c.newResponse(csv, 200, {

@@ -15,7 +15,7 @@ import { getActiveCampaign } from './campaign';
 
 const log = createLogger({ route: 'loyalty' });
 const DEFAULT_TIER = 'bronze';
-const STAFF_ASSIST_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'cashier']);
+const STAFF_ASSIST_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'cashier']);
 
 // Hono's executionCtx getter throws when no ExecutionContext exists (e.g.
 // router.request() in tests). Never let background capture break signup.
@@ -79,8 +79,27 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       } catch {
         // Optional metadata columns in partial test schemas
       }
-      if (meta?.tenant_id && meta.tenant_id !== tenantId) {
-        return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+      if (meta && 'tenant_id' in meta && meta.tenant_id !== undefined) {
+        const custTenant = (meta.tenant_id && String(meta.tenant_id).trim()) || 'default';
+        if (custTenant !== tenantId) {
+          let tenantCustomer: (Customer & { tenant_id?: string | null; verified_at?: string | null }) | null = null;
+          try {
+            tenantCustomer = await db.prepare(
+              "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, verified_at, tenant_id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+            ).bind(phone, tenantId).first<Customer & { tenant_id?: string | null; verified_at?: string | null }>();
+          } catch {
+            // Ignore when tenant_id column is absent in test schemas
+          }
+          const resolvedTenant =
+            tenantCustomer && 'tenant_id' in tenantCustomer && tenantCustomer.tenant_id !== undefined
+              ? (tenantCustomer.tenant_id && String(tenantCustomer.tenant_id).trim()) || 'default'
+              : custTenant;
+          if (!tenantCustomer || resolvedTenant !== tenantId) {
+            return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+          }
+          customer = tenantCustomer;
+          meta = { tenant_id: tenantId, verified_at: tenantCustomer.verified_at ?? null };
+        }
       }
 
       const authHeader = c.req.header?.('Authorization');
@@ -127,9 +146,42 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             verifiedPayload &&
             (!verifiedPayload.tenantId || verifiedPayload.tenantId === tenantId)
           ) {
-            if (verifiedPayload.id === customer.id) {
+            let versionValid = true;
+            if (c.env.AUTH_KV?.get) {
+              let storedVersion = 1;
+              let hasVersionRecord = false;
+              const lookupEmail = verifiedPayload.email || customer.email;
+              if (lookupEmail) {
+                const rawUser = await c.env.AUTH_KV.get(`user:${lookupEmail}`).catch(() => null);
+                if (rawUser) {
+                  hasVersionRecord = true;
+                  try {
+                    const parsed = JSON.parse(rawUser) as { auth_version?: number };
+                    storedVersion = Math.max(storedVersion, Number(parsed.auth_version || 1));
+                  } catch {
+                    // Ignore malformed KV record
+                  }
+                }
+              }
+              const lookupId = verifiedPayload.id || customer.id;
+              if (lookupId) {
+                const rawVer = await c.env.AUTH_KV.get(`cust_auth_ver:${lookupId}`).catch(() => null);
+                if (rawVer) {
+                  hasVersionRecord = true;
+                  const parsedVer = Number(rawVer);
+                  if (Number.isFinite(parsedVer) && parsedVer > 0) {
+                    storedVersion = Math.max(storedVersion, parsedVer);
+                  }
+                }
+              }
+              if (hasVersionRecord && storedVersion !== Number(verifiedPayload.authVersion || 1)) {
+                versionValid = false;
+              }
+            }
+            if (versionValid && verifiedPayload.id === customer.id) {
               proofVerified = true;
             } else if (
+              versionValid &&
               verifiedPayload.email &&
               customer.email &&
               verifiedPayload.email === customer.email &&
@@ -273,7 +325,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
           (async () => {
             try {
               const { redeemReferral } = await import('@aura/domain-crm');
-              const result = await redeemReferral(db, referralCode, id);
+              const result = await redeemReferral(db, referralCode, id, tenantId);
               if (!result.success) {
                 log.warn('Referral redeem failed on signup:', { reason: result.reason, customerId: id });
               }
@@ -307,8 +359,30 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       );
     }
 
+    let customerAuthVersion = 1;
+    if (c.env.AUTH_KV?.get) {
+      try {
+        if (customer.email) {
+          const rawUser = await c.env.AUTH_KV.get(`user:${customer.email}`);
+          if (rawUser) {
+            const parsed = JSON.parse(rawUser) as { auth_version?: number };
+            customerAuthVersion = Math.max(customerAuthVersion, Number(parsed.auth_version || 1));
+          }
+        }
+        const rawVer = await c.env.AUTH_KV.get(`cust_auth_ver:${customer.id}`);
+        if (rawVer) {
+          const parsedVer = Number(rawVer);
+          if (Number.isFinite(parsedVer) && parsedVer > 0) {
+            customerAuthVersion = Math.max(customerAuthVersion, parsedVer);
+          }
+        }
+      } catch {
+        // Fallback to authVersion 1 if KV read fails
+      }
+    }
+
     const token = await generateJWT(
-      { email: customer.email || '', name: customer.name || '', id: customer.id, role: 'customer', tenantId },
+      { email: customer.email || '', name: customer.name || '', id: customer.id, role: 'customer', tenantId, authVersion: customerAuthVersion },
       c.env.JWT_SECRET,
       c.env.JWT_EXPIRY_SECONDS
     );

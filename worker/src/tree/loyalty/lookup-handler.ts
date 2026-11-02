@@ -11,7 +11,7 @@ import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 
 const DEFAULT_TIER = 'bronze';
 const TIER_VI_MAP: Record<string, string> = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
-const POS_LOOKUP_ROLES = new Set(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']);
+const POS_LOOKUP_ROLES = new Set(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']);
 
 export async function handleLookup(c: Context<{ Bindings: Env }>) {
   let tenantId = 'default';
@@ -69,21 +69,32 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   let customer: Customer | null = null;
   try {
     customer = await db.prepare(
-      "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+      "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
     ).bind(phone, tenantId).first<Customer>();
   } catch {
     try {
       customer = await db.prepare(
-        'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+        'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
       ).bind(phone).first<Customer>();
     } catch {
-      customer = await db.prepare(
-        'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-      ).bind(phone).first<Customer>();
+      try {
+        customer = await db.prepare(
+          'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
+        ).bind(phone).first<Customer>();
+      } catch {
+        customer = await db.prepare(
+          'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+        ).bind(phone).first<Customer>();
+      }
     }
-    const rowTenant = (customer as unknown as Record<string, unknown> | null)?.tenant_id;
-    if (typeof rowTenant === 'string' && rowTenant.trim() !== '' && rowTenant !== tenantId) {
-      customer = null;
+    if (customer && 'tenant_id' in (customer as unknown as Record<string, unknown>)) {
+      const rowTenantRaw = (customer as unknown as Record<string, unknown>).tenant_id;
+      if (rowTenantRaw !== undefined) {
+        const rowTenant = typeof rowTenantRaw === 'string' && rowTenantRaw.trim() ? rowTenantRaw.trim() : 'default';
+        if (rowTenant !== tenantId) {
+          customer = null;
+        }
+      }
     }
   }
   if (!customer) {
@@ -93,7 +104,14 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: 'Không đủ quyền truy cập hồ sơ khách hàng khác' }, 403);
   }
 
-  const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet>();
+  let wallet: CashbackWallet | null = null;
+  try {
+    wallet = await db.prepare(
+      "SELECT * FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(customer.id, tenantId).first<CashbackWallet>();
+  } catch {
+    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet>();
+  }
   const balance = wallet?.balance || 0;
 
   let lifetimeRow: { total: number } | null = null;

@@ -9,7 +9,8 @@ export interface BroadcastCustomer {
 /**
  * Build SQL query for each predefined segment.
  */
-export function segmentSQL(segment: string): { sql: string; params?: string[] } {
+export function segmentSQL(segment: string, tenantId?: string): { sql: string; params?: string[] } {
+  const scopedTenant = tenantId && tenantId !== '*' ? tenantId : undefined;
   switch (segment) {
   case 'all':
     return { sql: 'SELECT id, name, phone, email FROM customers' };
@@ -22,6 +23,15 @@ export function segmentSQL(segment: string): { sql: string; params?: string[] } 
   case 'loyalty_platinum':
     return { sql: "SELECT id, name, phone, email FROM customers WHERE (loyalty_tier = 'platinum' OR LOWER(loyalty_tier) = 'platinum')" };
   case 'active_30d':
+    if (scopedTenant) {
+      return {
+        sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email
+              FROM customers c
+              INNER JOIN orders o ON o.customer_phone = c.phone
+                AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')
+              WHERE o.created_at >= datetime('now', '-30 days')`
+      };
+    }
     return {
       sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email
               FROM customers c
@@ -29,11 +39,24 @@ export function segmentSQL(segment: string): { sql: string; params?: string[] } 
               WHERE o.created_at >= datetime('now', '-30 days')`
     };
   case 'inactive_90d':
+    if (scopedTenant) {
+      return {
+        sql: `SELECT id, name, phone, email FROM customers
+              WHERE phone NOT IN (
+                SELECT DISTINCT customer_phone FROM orders
+                WHERE customer_phone IS NOT NULL
+                  AND created_at >= datetime('now', '-90 days')
+                  AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
+              ) AND phone IS NOT NULL`,
+        params: [scopedTenant]
+      };
+    }
     return {
       sql: `SELECT id, name, phone, email FROM customers
               WHERE phone NOT IN (
                 SELECT DISTINCT customer_phone FROM orders
-                WHERE created_at >= datetime('now', '-90 days')
+                WHERE customer_phone IS NOT NULL
+                  AND created_at >= datetime('now', '-90 days')
               ) AND phone IS NOT NULL`
     };
   case 'birthday_this_month': {

@@ -11,18 +11,18 @@
 
 import { Hono } from 'hono';
 import { resolvePilotStore } from '../lib/pilot-store';
+import { optionalAuth } from '../middleware/auth';
+import { getTenantId as getCanonicalTenantId } from '../lib/db';
 import type { Env } from '../types/env';
 import { createLogger } from '../utils/logger.js';
 
-function getTenantId(c: {
-  env: Env;
-  req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined };
-  get: (k: string) => unknown;
-}): string {
-  const user = c.get('user') as { tenantId?: string } | undefined;
-  if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
-  const requested = c.req.header('X-Tenant-ID') || c.req.query('tenant_id');
-  if (requested && requested.trim()) return requested.trim();
+function getTenantId(c: any): string {
+  const user = c.get('user') as { tenantId?: string; role?: string } | undefined;
+  if (user) {
+    return getCanonicalTenantId(c);
+  }
+  // Public signage endpoints resolve tenant from the deployment-bound pilot store only.
+  // Never trust X-Tenant-ID or query params from unauthenticated requests.
   try {
     return resolvePilotStore(c.env);
   } catch {
@@ -32,6 +32,7 @@ function getTenantId(c: {
 
 function matchesTenantRow(row: unknown, tenantId: string): boolean {
   if (!row || typeof row !== 'object') return false;
+  if (tenantId === '*') return true;
   const r = row as Record<string, unknown>;
   if (r.tenant_id === undefined) {
     return tenantId === 'default';
@@ -76,6 +77,12 @@ interface SignageDbRow {
 const log = createLogger({ route: 'signage' });
 
 export const signageRouter = new Hono<{ Bindings: Env }>();
+signageRouter.use('*', async(c, next) => {
+  if (!c.get('user' as any) && c.req.header('Authorization')) {
+    return optionalAuth()(c, next);
+  }
+  await next();
+});
 
 // ── GET /api/signage/menu ──────────────────────────────────────────
 signageRouter.get('/menu', async(c) => {

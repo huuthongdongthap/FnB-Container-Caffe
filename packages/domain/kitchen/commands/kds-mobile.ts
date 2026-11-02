@@ -8,8 +8,8 @@ import { getTenantId } from 'worker/src/middleware/tenant';
 const log = createLogger({ route: 'kds-mobile' });
 
 // Allowed roles per action
-const VIEW_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
 const VALID_STATUSES: string[] = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled'];
 
 function parseKdsItems(raw: unknown): unknown[] {
@@ -37,7 +37,11 @@ export async function getKdsMobile(
     }
 
     const tenantId = getTenantId(context);
-    const tenantClause = tenantId === '*' ? '' : ' AND o.tenant_id = ?';
+    const tenantClause = tenantId === '*'
+      ? ''
+      : tenantId === 'default'
+        ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+        : ' AND o.tenant_id = ?';
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
     let orders: { results: unknown[] };
     try {
@@ -47,6 +51,7 @@ export async function getKdsMobile(
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
+             AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')
            WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
            ORDER BY o.created_at ASC`
         )

@@ -31,6 +31,18 @@ export const PROFILE_SQL = `
          COALESCE(cw.balance, 0) AS cashback_balance,
          COALESCE(cw.total_earned, 0) AS total_earned,
          COALESCE(cw.total_spent, 0) AS total_spent,
+         (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) AS visit_count
+  FROM customers c
+  LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+`;
+
+export const LEGACY_PROFILE_SQL = `
+  SELECT c.id, c.name, c.phone, c.email,
+         c.loyalty_tier, c.loyalty_points, c.lifetime_points,
+         c.created_at,
+         COALESCE(cw.balance, 0) AS cashback_balance,
+         COALESCE(cw.total_earned, 0) AS total_earned,
+         COALESCE(cw.total_spent, 0) AS total_spent,
          (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
   FROM customers c
   LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id

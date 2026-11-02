@@ -25,6 +25,7 @@ export interface ConsentUpdate {
     | 'staff'
     | 'owner'
     | 'manager'
+    | 'supervisor'
     | 'admin'
     | 'cashier'
     | 'waiter'
@@ -154,9 +155,11 @@ export const CONSENT_PURPOSES = VALID_PURPOSES;
 
 function genId(prefix: string): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
   let id = prefix;
   for (let i = 0; i < 12; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
+    id += chars.charAt(bytes[i] % chars.length);
   }
   return id;
 }

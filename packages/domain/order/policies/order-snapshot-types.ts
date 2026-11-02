@@ -42,6 +42,7 @@ export interface OrderSnapshotInput {
   tip_amount?: number;
   now?: Date;
   channelDeltas?: ChannelDeltaConfig;
+  tenantId?: string;
 }
 
 export interface OrderSnapshotRejection {

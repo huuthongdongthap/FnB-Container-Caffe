@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { ProtectedRoute, ADMIN_SHELL_ROLES } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute, ADMIN_SHELL_ROLES, KDS_SHELL_ROLES } from '@/components/auth/ProtectedRoute';
+import { canAccess } from '@/pages/mobile/mobile-layout-constants';
 
 // vi.mock is hoisted — use vi.hoisted() for variables it references
 const { mockGetState } = vi.hoisted(() => ({ mockGetState: vi.fn<() => { user: { id: string; name: string; email: string; role: string } | null }>(() => ({ user: null })) }));
@@ -81,6 +82,45 @@ describe('ProtectedRoute', () => {
       expect(screen.getByText('KDS Queue')).toBeDefined();
       expect(screen.queryByText('Admin Dashboard')).toBeNull();
       unmount();
+    }
+  });
+
+  it('admits supervisor and shipper into both desktop ADMIN_SHELL_ROLES, KDS_SHELL_ROLES, and all mobile tabs', () => {
+    for (const role of ['supervisor', 'shipper']) {
+      mockGetState.mockReturnValue({ user: { id: `u_${role}`, name: role, email: `${role}@test.com`, role } });
+      const { unmount: unmountAdmin } = render(
+        <MemoryRouter initialEntries={['/admin/dashboard']}>
+          <Routes>
+            <Route path="/admin/login" element={<div>Login Page</div>} />
+            <Route element={<ProtectedRoute allowedRoles={ADMIN_SHELL_ROLES} />}>
+              <Route path="/admin/dashboard" element={<div>Admin Dashboard</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText('Admin Dashboard')).toBeDefined();
+      unmountAdmin();
+
+      const { unmount: unmountKds } = render(
+        <MemoryRouter initialEntries={['/kds']}>
+          <Routes>
+            <Route path="/admin/login" element={<div>Login Page</div>} />
+            <Route element={<ProtectedRoute allowedRoles={KDS_SHELL_ROLES} />}>
+              <Route path="/kds" element={<div>KDS Queue</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText('KDS Queue')).toBeDefined();
+      unmountKds();
+
+      for (const tab of ['orders', 'notifications', 'profile'] as const) {
+        expect(canAccess(tab, role)).toBe(true);
+      }
+      if (role === 'supervisor') {
+        expect(canAccess('kds', role)).toBe(true);
+        expect(canAccess('tables', role)).toBe(true);
+      }
     }
   });
 });

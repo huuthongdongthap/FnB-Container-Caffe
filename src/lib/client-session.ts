@@ -32,7 +32,7 @@ export function storedValue<T>(key: string, fallback: T): T {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; }
   catch { try { return (localStorage.getItem(key) as T) || fallback; } catch { return fallback; } }
 }
-export const storedDevice = () => storedValue<string | null>('mobile_device', null) || storedValue<string | null>('aura_device_token', null);
+export const storedDevice = () => storedValue<string | null>('aura_device_token', null) || storedValue<string | null>('mobile_device', null);
 export function readClientSession() {
   const token = storedValue<string | null>('aura_auth_token', null) || storedValue<string | null>('mobile_token', null);
   const user = token ? storedValue<ClientSessionUser | null>('aura_auth_user', null)

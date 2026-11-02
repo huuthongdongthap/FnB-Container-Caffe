@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import {
+  DINDIN_SESSION_ID_RE,
   err,
   errorResponse,
   readCartRD,
@@ -67,6 +68,9 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /cart/:sessionId ─────────────────────────────────────────────────────
   router.get('/cart/:sessionId', async (c) => {
     const { sessionId } = c.req.param();
+    if (!DINDIN_SESSION_ID_RE.test(sessionId)) {
+      return errorResponse(c as DindinContext, err('D07', 400, 'sessionId không hợp lệ'));
+    }
     const cart = (await readCartRD(c.env, sessionId)) ?? emptyCart();
     return c.json({ success: true, data: { sessionId, ...cart }, cart: { sessionId, ...cart } });
   });
@@ -74,6 +78,9 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── PATCH /cart/:sessionId ───────────────────────────────────────────────────
   router.patch('/cart/:sessionId', async (c) => {
     const { sessionId } = c.req.param();
+    if (!DINDIN_SESSION_ID_RE.test(sessionId)) {
+      return errorResponse(c as DindinContext, err('D07', 400, 'sessionId không hợp lệ'));
+    }
     const body = await c.req.json<{
       action?: 'add' | 'remove' | 'update';
       op?: 'add' | 'remove' | 'update';
@@ -118,8 +125,13 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
           // config enrichment is best-effort
         }
       }
-      const qty = Math.max(1, Number(item.qty ?? item.quantity ?? 1));
-      const price = Number(itemPrice ?? 0);
+      const rawQty = Number(item.qty ?? item.quantity ?? 1);
+      const rawPrice = Number(itemPrice ?? 0);
+      if (!Number.isFinite(rawQty) || rawQty < 1 || rawQty > 1000 || !Number.isFinite(rawPrice) || rawPrice < 0) {
+        return errorResponse(c as DindinContext, err('D07', 400, 'Số lượng hoặc đơn giá không hợp lệ'));
+      }
+      const qty = Math.floor(rawQty);
+      const price = rawPrice;
       cart.items.push({ ...item, name: itemName ?? item.id ?? '', price, qty, quantity: qty } as (typeof cart.items)[number]);
       cart.total = Math.round(cart.total + price * qty);
     } else if (action === 'remove') {
@@ -138,8 +150,13 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
       }
       const prevQty = Math.max(1, Number(cart.items[idx].qty ?? 1));
       const prevPrice = Number(cart.items[idx].price ?? 0);
-      const nextQty = Math.max(1, Number(item.qty ?? item.quantity ?? prevQty));
-      const nextPrice = Number(item.price ?? prevPrice);
+      const rawNextQty = Number(item.qty ?? item.quantity ?? prevQty);
+      const rawNextPrice = Number(item.price ?? prevPrice);
+      if (!Number.isFinite(rawNextQty) || rawNextQty < 1 || rawNextQty > 1000 || !Number.isFinite(rawNextPrice) || rawNextPrice < 0) {
+        return errorResponse(c as DindinContext, err('D07', 400, 'Số lượng hoặc đơn giá không hợp lệ'));
+      }
+      const nextQty = Math.floor(rawNextQty);
+      const nextPrice = rawNextPrice;
       cart.items[idx] = { ...cart.items[idx], ...item, price: nextPrice, qty: nextQty, quantity: nextQty } as (typeof cart.items)[number];
       cart.total = Math.max(0, Math.round(cart.total + (nextPrice * nextQty - prevPrice * prevQty)));
     }

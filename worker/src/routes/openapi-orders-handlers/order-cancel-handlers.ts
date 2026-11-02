@@ -3,7 +3,7 @@ import type { Env } from '../../types/env';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
-import { fetchOrderItemsAndPayments, formatOrder } from './helpers';
+import { fetchOrderItemsAndPayments, formatCustomerOrder, formatOrder } from './helpers';
 
 export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
@@ -14,7 +14,13 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
 
   const tenantId = getTenantId(c);
   const customer = user?.role === 'customer';
-  const clause = customer ? ' AND customer_id = ?' : tenantId === '*' ? '' : ' AND tenant_id = ?';
+  const clause = customer
+    ? ' AND customer_id = ?'
+    : tenantId === '*'
+      ? ''
+      : tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
   const scope = customer ? [user.id] : tenantId === '*' ? [] : [tenantId];
   const existing = (await db.prepare(`SELECT * FROM orders WHERE id = ?${clause}`).bind(id, ...scope).first()) as {
     id: string; status: string; customer_id?: string | null; tenant_id?: string;
@@ -29,7 +35,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     return c.json({
       success: true,
       message: 'Already cancelled',
-      data: formatOrder(existing, orderItems, payments),
+      data: customer ? formatCustomerOrder(existing, orderItems) : formatOrder(existing, orderItems, payments),
     });
   }
 
@@ -88,9 +94,32 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
       'SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
     ).bind(id).first<{ promotion_id?: string; code?: string }>();
     if (redRow && (redRow.promotion_id || redRow.code)) {
-      await db.prepare(
-        'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
-      ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+      const promoTenant = customer ? (existing.tenant_id || 'default') : (tenantId === '*' ? (existing.tenant_id || 'default') : tenantId);
+      if (redRow.promotion_id) {
+        await db.prepare(
+          `UPDATE promotions
+           SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
+               used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
+               usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
+           WHERE id = ?`
+        ).bind(redRow.promotion_id).run().catch(async () => {
+          await db.prepare(
+            'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ?'
+          ).bind(redRow.promotion_id).run().catch(() => {});
+        });
+      } else if (redRow.code) {
+        await db.prepare(
+          `UPDATE promotions
+           SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END
+           WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
+        ).bind(redRow.code, promoTenant).run().catch(async () => {
+          if (promoTenant === 'default') {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?)'
+            ).bind(redRow.code).run().catch(() => {});
+          }
+        });
+      }
       await db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(id).run().catch(() => {});
     }
   } catch {
@@ -101,7 +130,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, user?.id || 'system', 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
   } catch {
     const actor = user?.id || 'system';
     const metaStr = JSON.stringify({ reason: body.reason || 'User cancelled' });
@@ -135,6 +164,6 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const { items: orderItems, payments } = await fetchOrderItemsAndPayments(db, id);
   return c.json({
     success: true,
-    data: formatOrder(updated, orderItems, payments),
+    data: customer ? formatCustomerOrder(updated, orderItems) : formatOrder(updated, orderItems, payments),
   });
 }

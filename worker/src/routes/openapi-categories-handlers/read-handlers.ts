@@ -1,7 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { CategoryRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
-import { formatCategory, type CategoryRow } from './helpers';
+import { formatCategory, matchesCatalogTenant, resolveCatalogTenantId, type CategoryRow } from './helpers';
 import { getDatabase } from '../../lib/db';
 
 export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
@@ -36,14 +36,12 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    // Get total count
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM categories c ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
+    const tenantId = resolveCatalogTenantId(c);
+    const safePage = Number.isFinite(Number(page)) && Number(page) >= 1 ? Math.floor(Number(page)) : 1;
+    const safeLimit = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.floor(Number(limit)), 100) : 20;
 
-    // Get categories directly from canonical categories table
-    const offset = (page - 1) * limit;
+    // Get categories directly from canonical categories table and filter by tenant before slicing
+    const offset = (safePage - 1) * safeLimit;
     const allowedSorts: Record<string, string> = {
       sort_order: 'c.sort_order',
       name: 'c.name',
@@ -56,21 +54,25 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
     const rows = (await db.prepare(
       `SELECT c.* FROM categories c
        ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: CategoryRow[] };
+       ORDER BY ${orderClause}`
+    ).bind(...params).all()) as { results: CategoryRow[] };
 
-    const categories = (rows.results || []).map((row) => formatCategory(row, locale));
+    const rawRows = rows.results || [];
+    const filteredRows = rawRows.filter((row) => matchesCatalogTenant(row, tenantId));
+    const total = filteredRows.length;
+    const pagedRows = filteredRows.slice(offset, offset + safeLimit);
+    const categories = pagedRows.map((row) => formatCategory(row, locale));
 
     return c.json({
       success: true,
-      data: { categories, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { categories, meta: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } },
     });
   });
 
   // GET /api/categories/tree - Get category tree
   router.openapi(CategoryRoutes.tree as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = resolveCatalogTenantId(c);
     const query = c.req.valid('query' as never) as {
       locale?: string;
       locationId?: string;
@@ -86,7 +88,9 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
       `SELECT c.* FROM categories c ORDER BY c.sort_order ASC, c.name ASC`
     ).all()) as { results: CategoryRow[] };
 
-    const roots = (rows.results || []).map((row) => formatCategory(row, locale));
+    const roots = (rows.results || [])
+      .filter((row) => matchesCatalogTenant(row, tenantId))
+      .map((row) => formatCategory(row, locale));
 
     return c.json({
       success: true,
@@ -97,6 +101,7 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
   // GET /api/categories/:id - Get category by ID
   router.openapi(CategoryRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = resolveCatalogTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 
@@ -104,7 +109,7 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
       `SELECT c.* FROM categories c WHERE c.id = ?`
     ).bind(id).first()) as CategoryRow | null;
 
-    if (!row) {
+    if (!row || !matchesCatalogTenant(row, tenantId)) {
       return c.json({ success: false, error: 'Category not found' }, 404);
     }
 

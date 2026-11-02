@@ -57,12 +57,12 @@ ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 ordersUnifiedRouter.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
 // POS checkout is staff-only, but a stuck till retrying in a loop must still be
 // throttled before it reaches order creation.
-ordersUnifiedRouter.post('/checkout', rateLimitMiddleware(POS_CHECKOUT_RATE_LIMIT), requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
+ordersUnifiedRouter.post('/checkout', rateLimitMiddleware(POS_CHECKOUT_RATE_LIMIT), requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), audit('order_create_checkout'), handlePosCheckout);
 
-ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin']), handleGetOrderSummary);
+ordersUnifiedRouter.get('/summary', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), handleGetOrderSummary);
 
 ordersUnifiedRouter.post('/', orderRateLimit, handleCreateOrder);
-ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), handleListOrders);
+ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'customer']), handleListOrders);
 
 // ── 2. Parameterized Routes with Sub-paths (/:id/...) ──
 // Tracking links are shared, so these stay reachable without credentials — but
@@ -71,14 +71,14 @@ ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'staff', 'waiter',
 ordersUnifiedRouter.get('/:id/events', optionalAuth(), handleOrderStreamEvents);
 ordersUnifiedRouter.get('/:id/track', optionalAuth(), handleTrackOrder);
 
-ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), audit('order_status_change'), handleUpdateOrderStatus);
-ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper']), audit('order_status_change'), handleUpdateOrderStatus);
+ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'supervisor', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
-ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
+ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
+ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──
-ordersUnifiedRouter.get('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'customer']), handleGetOrderById);
-ordersUnifiedRouter.patch('/:id', requireAuth(['owner', 'manager', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef']), handleUpdateOrder);
+ordersUnifiedRouter.get('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'customer']), handleGetOrderById);
+ordersUnifiedRouter.patch('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper']), handleUpdateOrder);
 
 export default ordersUnifiedRouter;

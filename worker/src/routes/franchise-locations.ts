@@ -6,7 +6,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { isHQSuperAdmin } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
+import { matchesTenantRow } from '../lib/db';
 import { createLogger } from '../middleware/logger';
 import type { FranchiseLocation } from '../types/api';
 
@@ -15,9 +16,9 @@ const log = createLogger({ route: 'franchise-locations' });
 export const franchiseRouter = new Hono<{ Bindings: Env }>();
 
 const createLocationSchema = z.object({
-  code: z.string().min(2).max(20),
+  code: z.string().min(2).max(20).regex(/^[A-Za-z0-9_-]+$/),
   name: z.string().min(2).max(100),
-  tenant_id: z.string().min(2).max(50).optional().default('default'),
+  tenant_id: z.string().min(2).max(50).regex(/^[A-Za-z0-9_-]+$/).optional().default('default'),
   address: z.string().max(255).optional(),
   city: z.string().max(100).optional().default('Sa Đéc'),
   phone: z.string().max(20).optional(),
@@ -25,31 +26,37 @@ const createLocationSchema = z.object({
   status: z.enum(['active', 'suspended', 'closed']).optional().default('active'),
 });
 
-franchiseRouter.use('/*', requireAuth(['owner', 'admin', 'staff', 'manager']));
+const ISO_DATE_FILTER_RE = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function isValidDateFilter(value: string): boolean {
+  return ISO_DATE_FILTER_RE.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+franchiseRouter.use('/*', requireAuth(['owner', 'admin', 'staff', 'manager', 'supervisor']));
 
 // GET /api/franchise/locations
 franchiseRouter.get('/locations', async (c) => {
   const user = c.get('user');
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const isHQ = isHQSuperAdmin(user);
-  const queryTenant = c.req.query('tenant_id');
+  const queryTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+  const targetTenant = isHQ ? (queryTenant || '*') : getTenantId(c);
 
-  let query = 'SELECT * FROM franchise_locations WHERE 1=1';
+  let sql = 'SELECT * FROM franchise_locations WHERE 1=1';
   const params: unknown[] = [];
-
-  if (isHQ) {
-    if (queryTenant && queryTenant !== '*') {
-      query += ' AND tenant_id = ?';
-      params.push(queryTenant);
+  if (targetTenant !== '*') {
+    if (targetTenant === 'default') {
+      sql += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    } else {
+      sql += ' AND tenant_id = ?';
     }
-  } else {
-    query += ' AND tenant_id = ?';
-    params.push(user?.tenantId ?? 'default');
+    params.push(targetTenant);
   }
+  sql += ' ORDER BY code ASC';
 
-  query += ' ORDER BY code ASC';
-  const { results } = await db.prepare(query).bind(...params).all<FranchiseLocation>();
-  return c.json({ success: true, data: results });
+  const { results } = await db.prepare(sql).bind(...params).all<FranchiseLocation>();
+  const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetTenant));
+  return c.json({ success: true, data: filtered });
 });
 
 // POST /api/franchise/locations (Owner/Admin only)
@@ -99,7 +106,9 @@ franchiseRouter.get('/locations/:id', async (c) => {
     return c.json({ success: false, error: 'Location not found' }, 404);
   }
 
-  if (!isHQSuperAdmin(user) && location.tenant_id !== (user?.tenantId ?? 'default')) {
+  const queryTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+  const targetTenant = isHQSuperAdmin(user) ? (queryTenant || '*') : getTenantId(c);
+  if (!matchesTenantRow(location as unknown as Record<string, unknown>, targetTenant)) {
     return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
   }
 
@@ -107,29 +116,34 @@ franchiseRouter.get('/locations/:id', async (c) => {
 });
 
 // GET /api/franchise/locations/:id/metrics
-franchiseRouter.get('/locations/:id/metrics', async (c) => {
+franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
+
+  const startDate = c.req.query('start_date');
+  const endDate = c.req.query('end_date');
+  if ((startDate && !isValidDateFilter(startDate)) || (endDate && !isValidDateFilter(endDate))) {
+    return c.json({ success: false, error: 'Invalid date filter' }, 400);
+  }
 
   const location = await db.prepare('SELECT * FROM franchise_locations WHERE id = ?').bind(id).first<FranchiseLocation>();
   if (!location) {
     return c.json({ success: false, error: 'Location not found' }, 404);
   }
 
-  if (!isHQSuperAdmin(user) && location.tenant_id !== (user?.tenantId ?? 'default')) {
+  const queryTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+  const targetTenant = isHQSuperAdmin(user) ? (queryTenant || '*') : getTenantId(c);
+  if (!matchesTenantRow(location as unknown as Record<string, unknown>, targetTenant)) {
     return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
   }
-
-  const startDate = c.req.query('start_date');
-  const endDate = c.req.query('end_date');
 
   let query = `
     SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
     FROM orders
-    WHERE tenant_id = ? AND status != 'cancelled'
+    WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND status != 'cancelled'
   `;
-  const params: unknown[] = [location.tenant_id];
+  const params: unknown[] = [location.tenant_id || 'default'];
 
   if (startDate) {
     query += ' AND created_at >= ?';

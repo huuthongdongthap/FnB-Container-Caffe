@@ -8,6 +8,7 @@ import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErr
 const STAFF_PUSH_AUTH_ROLES = new Set([
   'owner',
   'manager',
+  'supervisor',
   'admin',
   'staff',
   'waiter',
@@ -20,7 +21,7 @@ const STAFF_PUSH_AUTH_ROLES = new Set([
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/push/list-subscriptions — list staff push subscriptions for admin UI
-pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
+pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   let results: Array<{
     id: string;
@@ -88,6 +89,20 @@ pushRouter.post('/subscribe', async(c) => {
   const isManualStaffEntry = !raw.endpoint && typeof raw.name === 'string' && raw.name.trim().length > 0;
   const requestedRole = typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : (isManualStaffEntry ? DEFAULT_STAFF_PUSH_ROLE : 'customer');
 
+  // Rate limit customer subscriptions: 5 per minute per IP
+  if (requestedRole === 'customer' && !isManualStaffEntry) {
+    const kv = c.env.AUTH_KV as { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> } | undefined;
+    if (kv) {
+      const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() || 'unknown';
+      const rlKey = `rl:push-sub:${ip}`;
+      const cur = parseInt(await kv.get(rlKey) || '0', 10);
+      if (cur >= 5) {
+        return c.json({ success: false, error: 'Too many subscription attempts, please try again later' }, 429);
+      }
+      await kv.put(rlKey, String(cur + 1), { expirationTtl: 60 });
+    }
+  }
+
   if (isManualStaffEntry || requestedRole !== 'customer') {
     let authSession: Awaited<ReturnType<typeof authenticateRequest>> | { role?: string } | null = null;
     try {
@@ -127,9 +142,33 @@ pushRouter.post('/subscribe', async(c) => {
       return zodErrorResponse(c, parsed.error);
     }
     ({ endpoint, auth_key, p256dh_key, customer_id, user_agent, role } = parsed.data);
+    try {
+      const parsedEndpoint = new URL(endpoint);
+      const host = parsedEndpoint.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      if (
+        parsedEndpoint.protocol !== 'https:' ||
+        host === 'localhost' ||
+        host === '0.0.0.0' ||
+        host === '::1' ||
+        host.endsWith('.local') ||
+        host.endsWith('.internal') ||
+        /^127\./.test(host) ||
+        /^10\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        /^169\.254\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+      ) {
+        return c.json({ success: false, error: 'Push endpoint must use HTTPS and a public host' }, 400);
+      }
+    } catch {
+      return c.json({ success: false, error: 'Push endpoint must use HTTPS and a public host' }, 400);
+    }
   }
 
-  const id = `SUB-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const subRand = new Uint8Array(3);
+  crypto.getRandomValues(subRand);
+  const subSuffix = Array.from(subRand, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const id = `SUB-${Date.now().toString(36).toUpperCase()}${subSuffix}`;
   const now = new Date().toISOString();
 
   try {
@@ -160,7 +199,7 @@ pushRouter.post('/subscribe', async(c) => {
 });
 
 // DELETE /api/push/subscribe — remove staff subscription by name or endpoint
-pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
+pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
   const db = c.env.AURA_DB;
   const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const name = typeof raw.name === 'string' ? raw.name.trim() : '';
@@ -182,7 +221,7 @@ pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'admin', 'staff
   return c.json({ success: true, message: 'Unsubscribed' });
 });
 
-// POST /api/push/unsubscribe — remove subscription
+// POST /api/push/unsubscribe — remove subscription (requires matching auth_key for ownership proof)
 pushRouter.post('/unsubscribe', async(c) => {
   const db = c.env.AURA_DB;
   const raw = await c.req.json();
@@ -191,7 +230,24 @@ pushRouter.post('/unsubscribe', async(c) => {
     return zodErrorResponse(c, parsed.error);
   }
 
-  await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(parsed.data.endpoint).run();
+  const endpoint = parsed.data.endpoint;
+  // Verify the caller owns this subscription via auth_key match
+  const authKey = typeof (raw as Record<string, unknown>).auth_key === 'string'
+    ? String((raw as Record<string, unknown>).auth_key).trim()
+    : '';
+  if (authKey) {
+    // If auth_key provided, verify it matches the stored subscription
+    try {
+      const existing = await db.prepare('SELECT auth_key FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).first<{ auth_key: string }>();
+      if (existing && existing.auth_key !== authKey && existing.auth_key !== 'manual_pending') {
+        return c.json({ success: false, error: 'Invalid auth_key' }, 403);
+      }
+    } catch {
+      // table schema variation — proceed with delete
+    }
+  }
+
+  await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
   return c.json({ success: true, message: 'Unsubscribed' });
 });
 
@@ -204,7 +260,7 @@ pushRouter.get('/public-key', async(c) => {
 });
 
 // POST /api/push/send-staff — send push to staff by role (kitchen/cashier/all or admin testSend)
-pushRouter.post('/send-staff', requireAuth(['owner', 'manager', 'admin']), async(c) => {
+pushRouter.post('/send-staff', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
   const raw = await c.req.json() as Record<string, unknown>;
   const targetRole = typeof raw.targetRole === 'string' ? raw.targetRole : undefined;
   const staffName = typeof raw.name === 'string' ? raw.name : undefined;

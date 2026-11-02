@@ -11,7 +11,12 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
   let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
   const tenantId = getTenantId(c);
-  if (tenantId !== '*') { whereClause += ' AND tenant_id = ?'; params.push(tenantId); }
+  if (tenantId !== '*') {
+    whereClause += tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+    params.push(tenantId);
+  }
 
   if (locationId) {
     whereClause += ' AND location_id = ?';

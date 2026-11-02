@@ -2,7 +2,8 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import { CategoryRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
-import { formatCategory, type CategoryRow } from './helpers';
+import { getTenantId } from '../../middleware/tenant';
+import { formatCategory, matchesCatalogTenant, type CategoryRow } from './helpers';
 
 async function writeCategoryAuditLog(
   db: any,
@@ -16,7 +17,7 @@ async function writeCategoryAuditLog(
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${Date.now()}`, userId, action, 'category', entityId, metadata, now).run();
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'category', entityId, metadata, now).run();
   } catch {
     try {
       await db.prepare(
@@ -46,6 +47,8 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
       translations?: Array<{ locale: string; name: string; description?: string }>;
     };
     const user = c.get('user') as { id: string };
+    const rawTenant = getTenantId(c);
+    const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -76,6 +79,10 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
       ).bind(id, body.name, body.description || null, sortOrder, now).run();
     }
 
+    if (targetTenant !== 'default') {
+      await db.prepare('UPDATE categories SET tenant_id = ? WHERE id = ?').bind(targetTenant, id).run().catch(() => {});
+    }
+
     // Audit log
     await writeCategoryAuditLog(db, user.id, 'category_create', id, JSON.stringify(body), now);
 
@@ -89,6 +96,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   // PATCH /api/categories/:id - Update category
   router.openapi(CategoryRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       name?: string;
@@ -103,7 +111,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     const now = new Date().toISOString();
 
     const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first();
-    if (!existing) {
+    if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Category not found' }, 404);
     }
 
@@ -162,18 +170,26 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   // DELETE /api/categories/:id - Delete category
   router.openapi(CategoryRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string };
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first()) as { name: string } | null;
-    if (!existing) {
+    const existing = (await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first()) as { name: string; tenant_id?: string | null } | null;
+    if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Category not found' }, 404);
     }
 
-    // Check for products
+    // Check for products within the same tenant
     const products = (await db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').bind(id).first()) as { count: number } | null;
-    if (products && products.count > 0) {
+    let hasTenantProducts = Boolean(products && products.count > 0);
+    if (hasTenantProducts && tenantId !== '*') {
+      const prodRowsRes = await db.prepare('SELECT * FROM products WHERE category_id = ?').bind(id).all<Record<string, unknown>>().catch(() => null);
+      if (prodRowsRes && Array.isArray(prodRowsRes.results) && prodRowsRes.results.length > 0) {
+        hasTenantProducts = prodRowsRes.results.some((p) => matchesCatalogTenant(p, tenantId));
+      }
+    }
+    if (hasTenantProducts) {
       return c.json({ success: false, error: 'Cannot delete category with products' }, 409);
     }
 
@@ -188,6 +204,7 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
   // POST /api/categories/reorder - Reorder categories
   router.openapi(CategoryRoutes.reorder as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = getTenantId(c);
     const body = c.req.valid('json' as never) as {
       items: Array<{ id: string; sortOrder: number }>;
     };
@@ -195,6 +212,12 @@ export function registerCategoryMutationHandlers(router: OpenAPIHono<{ Bindings:
     const now = new Date().toISOString();
     const { items } = body;
 
+    for (const item of items) {
+      const catRow = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(item.id).first().catch(() => null);
+      if (!catRow || (tenantId !== '*' && !matchesCatalogTenant(catRow, tenantId))) {
+        return c.json({ success: false, error: 'Category not found' }, 404);
+      }
+    }
     for (const item of items) {
       try {
         await db.prepare(

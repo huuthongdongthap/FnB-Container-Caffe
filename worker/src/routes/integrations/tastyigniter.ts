@@ -21,9 +21,47 @@ import {
 } from '../../tree/integrations/tastyigniter/sync';
 import { processTIWebhook, type TIWebhookPayload } from '../../tree/integrations/tastyigniter/webhook';
 import { requireAuth } from '../../middleware/auth';
+import { getTenantId } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'ti-gateway' });
+
+function matchesTiOrderTenant(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if (!row) return false;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null) {
+    const rowTenant = String(row.tenant_id).trim() || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
+async function verifyLocalOrderTenant(
+  env: Env,
+  localOrderId: string,
+  tenantId: string
+): Promise<boolean> {
+  if (tenantId === '*') return true;
+  const db = (env.AURA_DB ?? (env as unknown as Record<string, unknown>).DB) as D1Database | undefined;
+  if (!db) return tenantId === 'default';
+  try {
+    const row = await db
+      .prepare('SELECT id, tenant_id FROM orders WHERE id = ? LIMIT 1')
+      .bind(localOrderId)
+      .first<Record<string, unknown>>();
+    return matchesTiOrderTenant(row, tenantId);
+  } catch {
+    try {
+      const row = await db
+        .prepare('SELECT id FROM orders WHERE id = ? LIMIT 1')
+        .bind(localOrderId)
+        .first<Record<string, unknown>>();
+      return matchesTiOrderTenant(row, tenantId);
+    } catch {
+      return tenantId === 'default';
+    }
+  }
+}
 
 const SyncOrderSchema = z.object({
   localOrderId: z.string().min(1),
@@ -41,8 +79,8 @@ const SyncOrderSchema = z.object({
 export function createTIRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
-  // Middleware: owner, admin, manager, staff only
-  const allow = requireAuth(['owner', 'admin', 'manager', 'staff']);
+  // Middleware: owner, admin, manager, supervisor, staff only
+  const allow = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
 
   // POST /api/integrations/tastyigniter/sync/menu
   // Pull menu from TI and cache locally (fire-and-forget).
@@ -68,6 +106,10 @@ export function createTIRoutes() {
       }
 
       const { localOrderId, orderData } = parsed.data;
+      const tenantId = getTenantId(c);
+      if (!(await verifyLocalOrderTenant(c.env, localOrderId, tenantId))) {
+        return c.json({ success: false, error: 'Order not found' }, 404);
+      }
       const result = await bridgeOrderToTI(c.env, localOrderId, orderData, c.executionCtx as unknown as ExecutionContext);
       return c.json({ success: true, result });
     } catch (err) {
@@ -104,7 +146,9 @@ export function createTIRoutes() {
         return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
       }
       if (secret) {
-        const sig = c.req.header('x-tastyigniter-signature') ?? c.req.query('secret') ?? c.req.query('token');
+        const sig =
+          c.req.header('x-tastyigniter-signature') ??
+          (!isProd ? (c.req.query('secret') ?? c.req.query('token')) : undefined);
         const enc = new TextEncoder();
         const aBytes = enc.encode(sig ?? '');
         const bBytes = enc.encode(secret);

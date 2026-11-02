@@ -23,6 +23,17 @@ export const erpnextProductSyncSchema = z.object({
   product_ids: z.array(z.string()).max(200).optional()
 });
 
+export const erpnextProductsBatchSyncSchema = z.object({
+  products: z.array(
+    z.object({
+      name: z.string().min(1).max(128),
+      item_code: z.string().min(1).max(128),
+      item_name: z.string().max(256).optional().default(''),
+      modified: z.string().nullable().optional().default(null)
+    })
+  ).min(1, 'Phải có ít nhất 1 sản phẩm').max(200, 'Tối đa 200 sản phẩm mỗi batch')
+});
+
 export const erpnextSalesOrderSchema = z.object({
   customer_name: z.string().optional(),
   customer_phone: z.string().optional(),
@@ -45,8 +56,35 @@ export const erpnextPosWebhookSchema = z.object({
   action: z.string().optional()
 }).passthrough();
 
+export function isSafePublicHttpsUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') {
+      return false;
+    }
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const erpnextConfigureSchema = z.object({
-  url: z.string().url('URL không hợp lệ'),
+  url: z.string().url('URL không hợp lệ').refine(isSafePublicHttpsUrl, 'ERPNext URL phải dùng HTTPS và host công khai'),
   api_key: z.string().min(1, 'api_key là bắt buộc'),
   api_secret: z.string().min(1, 'api_secret là bắt buộc')
 });

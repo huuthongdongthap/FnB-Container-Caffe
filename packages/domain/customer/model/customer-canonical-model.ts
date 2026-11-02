@@ -67,6 +67,7 @@ export interface CustomerMergeInput {
   secondaryCustomerId: string;
   reason: string;
   actorId?: string;
+  tenantId?: string | null;
 }
 
 export interface CustomerMergeResult {

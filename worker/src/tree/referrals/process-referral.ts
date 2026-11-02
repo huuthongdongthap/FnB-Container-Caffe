@@ -2,7 +2,10 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Referral, Customer } from '../../types/models';
 
 function genId(prefix: string): string {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + rand;
 }
 
 export async function processReferralOnFirstOrder(db: D1Database, customerId: string): Promise<Record<string, unknown>> {

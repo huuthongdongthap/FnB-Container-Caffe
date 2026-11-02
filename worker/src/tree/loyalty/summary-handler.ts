@@ -5,6 +5,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import type { Customer, CashbackWallet, LoyaltyTier } from '../../types/models';
+import { resolvePilotStore } from '../../lib/pilot-store';
 import { genId } from './helpers';
 
 const DEFAULT_TIER = 'bronze';
@@ -12,6 +13,19 @@ const DEFAULT_TIER = 'bronze';
 export async function handleSummary(c: Context<{ Bindings: Env }>) {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
+
+  const custAny = cust as unknown as { tenant_id?: string | null; tenantId?: string | null };
+  const custTenant = (custAny.tenant_id && String(custAny.tenant_id).trim())
+    || (custAny.tenantId && String(custAny.tenantId).trim())
+    || '';
+  let tenantId = custTenant || 'default';
+  if (c.env?.PILOT_TENANT_ID) {
+    try {
+      tenantId = resolvePilotStore(c.env as unknown as Record<string, unknown>);
+    } catch {
+      // keep custTenant || 'default'
+    }
+  }
 
   let tier: LoyaltyTier | null = null;
   try {
@@ -26,13 +40,23 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
-    .bind(cust.id).first<CashbackWallet>();
+  let wallet: CashbackWallet | null = null;
+  try {
+    wallet = await db.prepare("SELECT * FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(cust.id, tenantId).first<CashbackWallet>();
+  } catch {
+    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
+      .bind(cust.id).first<CashbackWallet>();
+  }
 
   if (!wallet) {
     const wid = genId('wal_');
     const now = new Date().toISOString();
-    await db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)').bind(wid, cust.id, now, now).run();
+    try {
+      await db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)').bind(wid, cust.id, tenantId, now, now).run();
+    } catch {
+      await db.prepare('INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)').bind(wid, cust.id, now, now).run();
+    }
     wallet = { id: wid, customer_id: cust.id, balance: 0, total_earned: 0, total_spent: 0, created_at: now, updated_at: now };
   }
 

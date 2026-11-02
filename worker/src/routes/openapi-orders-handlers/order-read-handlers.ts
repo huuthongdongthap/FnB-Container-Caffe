@@ -10,7 +10,7 @@ import { canAccessOrder } from '@aura/domain-order';
 
 export { handleGetOrderSummary };
 
-const STAFF_ROLES = ['owner', 'manager', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier'];
+const STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper'];
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
   total_amount: 'COALESCE(o.total_amount, o.total)',
@@ -46,24 +46,34 @@ function projectForActor(
  * The join to cafe_tables is best-effort: a schema without that table falls back
  * to a bare select, but never past the tenant boundary.
  */
-async function fetchOrderForRead(
+export async function fetchOrderForRead(
   db: ReturnType<typeof getDatabase>,
   id: string,
   tenantId: string
 ): Promise<Record<string, any> | null> {
   const scoped = tenantId !== '*';
+  const joinTenantClause = !scoped
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
+  const bareTenantClause = !scoped
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
   let order: Record<string, any> | null = null;
   try {
     order = (await db.prepare(
       `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
        FROM orders o
        LEFT JOIN cafe_tables t ON o.table_id = t.id
-       WHERE o.id = ?${scoped ? ' AND o.tenant_id = ?' : ''}`
+       WHERE o.id = ?${joinTenantClause}`
     ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
     return order;
   } catch {
     order = (await db.prepare(
-      `SELECT * FROM orders WHERE id = ?${scoped ? ' AND tenant_id = ?' : ''}`
+      `SELECT * FROM orders WHERE id = ?${bareTenantClause}`
     ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
     return order;
   }
@@ -78,7 +88,12 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
   const tenantId = getTenantId(c);
-  if (tenantId !== '*') { whereClause += ' AND o.tenant_id = ?'; params.push(tenantId); }
+  if (tenantId !== '*') {
+    whereClause += tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+      : ' AND o.tenant_id = ?';
+    params.push(tenantId);
+  }
 
   if (scope.allowAll) {
     if (customerId) {
@@ -128,14 +143,25 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';
   const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
   const orderClause = `${safeSort} ${safeDirection}`;
-  const rows = (await db.prepare(
-    `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-     FROM orders o
-     LEFT JOIN cafe_tables t ON o.table_id = t.id
-     ${whereClause}
-     ORDER BY ${orderClause}
-     LIMIT ? OFFSET ?`
-  ).bind(...params, limitNum, offset).all()) as { results: any[] };
+  let rows: { results: any[] };
+  try {
+    rows = (await db.prepare(
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+       FROM orders o
+       LEFT JOIN cafe_tables t ON o.table_id = t.id
+       ${whereClause}
+       ORDER BY ${orderClause}
+       LIMIT ? OFFSET ?`
+    ).bind(...params, limitNum, offset).all()) as { results: any[] };
+  } catch {
+    rows = (await db.prepare(
+      `SELECT o.*
+       FROM orders o
+       ${whereClause}
+       ORDER BY ${orderClause}
+       LIMIT ? OFFSET ?`
+    ).bind(...params, limitNum, offset).all()) as { results: any[] };
+  }
 
   const orders = await Promise.all(rows.results.map(async (_order) => {
     const { items, payments } = await fetchOrderItemsAndPayments(db, _order.id as string);

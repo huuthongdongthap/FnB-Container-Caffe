@@ -1,10 +1,19 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
+import { getTenantId } from '../../middleware/tenant';
 import { mixpostCreatePostSchema, zodErrorResponse } from '../../lib/validators';
 import { createLogger } from '../../utils/logger.js';
 import { getMixpostClient, type PostRecord } from './types';
 
 const log = createLogger({ route: 'mixpost:posts' });
+
+function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
+  if (tenantId === '*') return true;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
+    return String(row.tenant_id).trim() === tenantId;
+  }
+  return tenantId === 'default';
+}
 
 export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /posts — create and publish a post
@@ -29,8 +38,9 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
 
     try {
       const mediaIds: Array<string | number> = [];
-      if (rawBody.mediaUrls && (rawBody.mediaUrls as unknown[]).length > 0) {
-        for (const url of rawBody.mediaUrls as string[]) {
+      const mediaUrls = data.media_urls ?? data.mediaUrls ?? [];
+      if (mediaUrls.length > 0) {
+        for (const url of mediaUrls) {
           try {
             const media = await client.uploadMediaFromUrl(url);
             if (media.id) {
@@ -42,12 +52,49 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
         }
       }
 
+      const scheduledAt = data.scheduled_at ?? data.scheduledAt;
       const result = await client.createPost({
         content: data.content,
         accounts: data.accounts,
-        scheduledAt: rawBody.scheduledAt as string | undefined,
+        scheduledAt,
         mediaIds
       });
+
+      if (env.AURA_DB) {
+        const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+        const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
+        const now = new Date().toISOString();
+        try {
+          await env.AURA_DB.prepare(
+            'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            data.content,
+            scheduledAt ? 'scheduled' : 'published',
+            JSON.stringify(data.accounts),
+            JSON.stringify(mediaUrls),
+            scheduledAt || null,
+            scheduledAt ? null : now,
+            now,
+            tenantId
+          ).run();
+        } catch {
+          try {
+            await env.AURA_DB.prepare(
+              'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+            ).bind(
+              data.content,
+              scheduledAt ? 'scheduled' : 'published',
+              JSON.stringify(data.accounts),
+              JSON.stringify(mediaUrls),
+              scheduledAt || null,
+              scheduledAt ? null : now,
+              now
+            ).run();
+          } catch {
+            // optional persistence table in test mocks
+          }
+        }
+      }
 
       return c.json({ success: true, postId: result.id });
     } catch (e: unknown) {
@@ -60,14 +107,28 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
   // GET /posts — list recent posts
   router.get('/posts', async (c) => {
     const env = c.env as unknown as MixpostEnv;
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
     const client = getMixpostClient(env);
-    if (!client) {
-      if (env.AURA_DB) {
+    const rawLimit = parseInt(c.req.query('limit') || '20', 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+    if (env.AURA_DB) {
+      try {
         const { results } = await env.AURA_DB.prepare(
-          'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT 20'
-        ).all<PostRecord>();
-        return c.json({ success: true, data: results || [] });
+          'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT ?'
+        ).bind(Math.max(limit, 200)).all<PostRecord>();
+        const filtered = (results || [])
+          .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+          .slice(0, limit);
+        if (filtered.length > 0 || !client) {
+          return c.json({ success: true, data: filtered });
+        }
+      } catch {
+        if (!client) {
+          return c.json({ success: true, data: [] });
+        }
       }
+    }
+    if (!client) {
       return c.json({ success: true, data: [] });
     }
 

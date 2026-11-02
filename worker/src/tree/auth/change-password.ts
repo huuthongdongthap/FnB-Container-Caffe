@@ -28,7 +28,10 @@ export async function changePassword(request: Request, env: Record<string, unkno
     if ('blocked' in session) return errorResponse(session.blocked, 403);
     const { payload, account } = session;
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
+    let userStr = payload.email ? await authKV.get(`user:${payload.email}`) : null;
+    if (!userStr && payload.id) {
+      userStr = await authKV.get(`user:${payload.id}`);
+    }
     if (!userStr && !account) {
       return errorResponse('User không tồn tại', 404);
     }
@@ -51,7 +54,15 @@ export async function changePassword(request: Request, env: Record<string, unkno
       await changeStaffPassword((env as unknown as Env).AURA_DB, account, user.password);
       if (payload.email) await authKV.put(`user:${payload.email}`, JSON.stringify(user)).catch(() => {});
     } else {
-      await authKV.put(`user:${payload.email}`, JSON.stringify(user));
+      if (payload.email) {
+        await authKV.put(`user:${payload.email}`, JSON.stringify(user));
+      }
+      if (payload.id) {
+        const existingById = await authKV.get(`user:${payload.id}`).catch(() => null);
+        if (existingById || !payload.email) {
+          await authKV.put(`user:${payload.id}`, JSON.stringify(user)).catch(() => {});
+        }
+      }
     }
     const rawToken = getAuthToken(request);
     if (rawToken && authKV) {

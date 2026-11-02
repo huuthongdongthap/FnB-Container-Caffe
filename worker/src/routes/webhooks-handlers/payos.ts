@@ -114,9 +114,17 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
           let refCustomerId = (orderRecord.customer_id as string | undefined) || null;
           if (!refCustomerId && (orderRecord.customer_phone || orderRecord.customer_email)) {
             const normalizedPhone = String(orderRecord.customer_phone || '').replace(/\D/g, '');
-            const cust = await db.prepare(
-              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-            ).bind(orderRecord.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+            const orderTenant = (orderRecord.tenant_id && String(orderRecord.tenant_id).trim()) || 'default';
+            let cust: { id: string } | null = null;
+            try {
+              cust = await db.prepare(
+                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+              ).bind(orderRecord.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant).first<{ id: string }>();
+            } catch {
+              cust = await db.prepare(
+                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+              ).bind(orderRecord.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+            }
             refCustomerId = cust?.id ?? null;
           }
           if (refCustomerId && orderAmount >= 20000) {

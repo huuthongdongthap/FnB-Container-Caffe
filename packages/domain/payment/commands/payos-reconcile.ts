@@ -56,7 +56,8 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
      WHERE p.id = ?`
   ).bind(input.paymentId).first<PaymentOrderRow>();
 
-  if (!row || (input.tenantId && (row.order_tenant_id || 'default') !== input.tenantId)) {
+  const rowTenant = row?.order_tenant_id && String(row.order_tenant_id).trim() ? String(row.order_tenant_id).trim() : 'default';
+  if (!row || (input.tenantId && input.tenantId !== '*' && rowTenant !== input.tenantId)) {
     return { ok: false, status: 404, outcome: 'not_found', error: 'Payment not found' };
   }
 

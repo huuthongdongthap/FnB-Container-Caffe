@@ -40,7 +40,11 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/export', async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const tenantClause = tenantId === '*' ? '' : ' AND tenant_id = ?';
+    const tenantClause = tenantId === '*'
+      ? ''
+      : tenantId === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        : ' AND tenant_id = ?';
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -81,21 +85,33 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
 
       // Get cashback earned per day separately
+      const custJoin = tenantId === '*'
+        ? ''
+        : tenantId === 'default'
+          ? ' LEFT JOIN customers c ON c.id = t.customer_id'
+          : ' JOIN customers c ON c.id = t.customer_id';
+      const custClause = tenantId === '*'
+        ? ''
+        : tenantId === 'default'
+          ? " AND (c.tenant_id = ? OR c.tenant_id IS NULL OR c.tenant_id = '')"
+          : ' AND c.tenant_id = ?';
       let cashbackResults: { date: string; amount: number }[] = [];
       try {
         const res = await db.prepare(
-          `SELECT DATE(created_at) as date, COALESCE(SUM(reward_amount), 0) as amount
-           FROM checkins WHERE DATE(created_at) BETWEEN ? AND ? AND status = 'approved'
-           GROUP BY DATE(created_at)`
-        ).bind(from, to).all<{ date: string; amount: number }>();
+          `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+           FROM checkins t${custJoin}
+           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.status = 'approved'${custClause}
+           GROUP BY DATE(t.created_at)`
+        ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
         cashbackResults = res.results || [];
       } catch {
         try {
           const res = await db.prepare(
-            `SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as amount
-             FROM cashback_transactions WHERE DATE(created_at) BETWEEN ? AND ? AND type = 'earn'
-             GROUP BY DATE(created_at)`
-          ).bind(from, to).all<{ date: string; amount: number }>();
+            `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.amount), 0) as amount
+             FROM cashback_transactions t${custJoin}
+             WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'earn'${custClause}
+             GROUP BY DATE(t.created_at)`
+          ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
           cashbackResults = res.results || [];
         } catch {
           cashbackResults = [];
@@ -120,14 +136,28 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     if (type === 'customers') {
-      const { results } = await db.prepare(
+      const custWhere = tenantId === '*'
+        ? ''
+        : tenantId === 'default'
+          ? " WHERE (c.tenant_id = ? OR c.tenant_id IS NULL OR c.tenant_id = '')"
+          : ' WHERE c.tenant_id = ?';
+      const orderTenantJoin = tenantId === '*'
+        ? ''
+        : tenantId === 'default'
+          ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+          : ' AND o.tenant_id = ?';
+      const custBinds = tenantId === '*' ? [] : [tenantId, tenantId];
+      const stmt = db.prepare(
         `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
                 COALESCE(SUM(o.total), 0) as total_spent,
                 COUNT(o.id) as order_count
          FROM customers c
-         LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND o.customer_phone = c.phone)) AND o.status != 'cancelled'
+         LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND o.customer_phone = c.phone)) AND o.status != 'cancelled'${orderTenantJoin}${custWhere}
          GROUP BY c.id ORDER BY c.created_at`
-      ).all<CustomerExportRow>();
+      );
+      const { results } = custBinds.length > 0
+        ? await stmt.bind(...custBinds).all<CustomerExportRow>()
+        : await stmt.all<CustomerExportRow>();
 
       const headers = ['id', 'name', 'email', 'phone', 'total_spent', 'order_count', 'loyalty_tier', 'created_at'];
       const rows = (results || []).map((r) => [

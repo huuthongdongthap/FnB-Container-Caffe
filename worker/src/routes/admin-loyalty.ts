@@ -10,7 +10,7 @@ import { getTenantId } from '../middleware/tenant';
 
 function escapeCsvCell(val: unknown, alwaysQuote = false): string {
   const raw = String(val ?? '');
-  const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  const safe = /^[\t\r ]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   if (alwaysQuote || safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
@@ -18,9 +18,10 @@ function escapeCsvCell(val: unknown, alwaysQuote = false): string {
 }
 
 function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (tenantId === '*') return true;
   if (!row || typeof row !== 'object') return false;
   const rec = row as Record<string, unknown>;
-  if (!('tenant_id' in rec) || rec.tenant_id === undefined) return true;
+  if (!('tenant_id' in rec) || rec.tenant_id === undefined) return tenantId === 'default';
   const rowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() ? rec.tenant_id.trim() : 'default';
   return rowTenant === tenantId;
 }
@@ -50,11 +51,127 @@ interface TopCustomer {
 export const adminLoyaltyRouter = new Hono<{ Bindings: Env }>();
 
 // All routes require auth
-adminLoyaltyRouter.use('*', requireAuth(['owner', 'admin', 'manager', 'staff']));
+adminLoyaltyRouter.use('*', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']));
 
 // GET /api/admin-loyalty/widgets — 8 KPI widgets
 adminLoyaltyRouter.get('/widgets', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+
+  const allCustRes = await db
+    .prepare('SELECT * FROM customers')
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Record<string, unknown>[] }));
+  const allCustomers = allCustRes.results || [];
+  if (tenantId !== 'default' || allCustomers.some((r) => r && typeof r === 'object' && 'tenant_id' in r)) {
+      const scopedCustomers = allCustomers.filter((r) => matchesTenantRow(r, tenantId));
+      const scopedIds = new Set(scopedCustomers.map((r) => String(r.id)));
+      const thirtyDaysAgoIso = new Date(Date.now() - 30 * 86400000).toISOString();
+      const ninetyDaysAgoIso = new Date(Date.now() - 90 * 86400000).toISOString();
+
+      const totalCustomersScoped = scopedCustomers.length;
+      const activeScoped = scopedCustomers.filter((r) => String(r.updated_at || '') >= thirtyDaysAgoIso).length;
+      const churnScoped = scopedCustomers.filter((r) => r.updated_at && String(r.updated_at) < ninetyDaysAgoIso).length;
+
+      let cashbackScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.cashback_balance || 0), 0);
+      if (cashbackScoped === 0 && scopedIds.size > 0) {
+        const walRes = await db
+          .prepare('SELECT customer_id, balance FROM cashback_wallets')
+          .all<{ customer_id: string; balance: number }>()
+          .catch(() => ({ results: [] as Array<{ customer_id: string; balance: number }> }));
+        cashbackScoped = (walRes.results || [])
+          .filter((w) => scopedIds.has(String(w.customer_id)))
+          .reduce((sum, w) => sum + Number(w.balance || 0), 0);
+      }
+
+      let spentScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.total_spent || 0), 0);
+      if (spentScoped === 0 && scopedIds.size > 0) {
+        const walSpentRes = await db
+          .prepare('SELECT customer_id, total_spent FROM cashback_wallets')
+          .all<{ customer_id: string; total_spent: number }>()
+          .catch(() => ({ results: [] as Array<{ customer_id: string; total_spent: number }> }));
+        spentScoped = (walSpentRes.results || [])
+          .filter((w) => scopedIds.has(String(w.customer_id)))
+          .reduce((sum, w) => sum + Number(w.total_spent || 0), 0);
+      }
+      if (spentScoped === 0) {
+        const ordRes = await db
+          .prepare("SELECT customer_id, total, tenant_id FROM orders WHERE status != 'cancelled'")
+          .all<{ customer_id?: string; total?: number; tenant_id?: string | null }>()
+          .catch(() => ({ results: [] as Array<{ customer_id?: string; total?: number; tenant_id?: string | null }> }));
+        spentScoped = (ordRes.results || [])
+          .filter((o) =>
+            'tenant_id' in o && o.tenant_id !== undefined
+              ? matchesTenantRow(o, tenantId)
+              : Boolean(o.customer_id && scopedIds.has(String(o.customer_id)))
+          )
+          .reduce((sum, o) => sum + Number(o.total || 0), 0);
+      }
+
+      let avgVisitsScoped =
+        totalCustomersScoped > 0
+          ? Math.round(
+              scopedCustomers.reduce((sum, r) => sum + Number(r.visit_count || 0), 0) / totalCustomersScoped
+            )
+          : 0;
+      if (avgVisitsScoped === 0 && scopedIds.size > 0) {
+        const ordRes = await db
+          .prepare("SELECT customer_id, customer_phone, tenant_id FROM orders WHERE status != 'cancelled'")
+          .all<{ customer_id?: string; customer_phone?: string; tenant_id?: string | null }>()
+          .catch(() => ({ results: [] as Array<{ customer_id?: string; customer_phone?: string; tenant_id?: string | null }> }));
+        const validOrders = (ordRes.results || []).filter((o) =>
+          'tenant_id' in o && o.tenant_id !== undefined
+            ? matchesTenantRow(o, tenantId)
+            : Boolean(o.customer_id && scopedIds.has(String(o.customer_id)))
+        );
+        const byCust = new Map<string, number>();
+        for (const o of validOrders) {
+          const key = String(o.customer_id || o.customer_phone || '');
+          if (key) byCust.set(key, (byCust.get(key) || 0) + 1);
+        }
+        if (byCust.size > 0) {
+          const sumCnt = Array.from(byCust.values()).reduce((a, b) => a + b, 0);
+          avgVisitsScoped = Math.round(sumCnt / byCust.size);
+        }
+      }
+
+      const tierCounts = new Map<string, number>();
+      for (const r of scopedCustomers) {
+        const t = String(r.tier || r.loyalty_tier || '').trim();
+        if (t) tierCounts.set(t, (tierCounts.get(t) || 0) + 1);
+      }
+      let topTierScoped = totalCustomersScoped > 0 ? 'bronze' : 'N/A';
+      let maxTierCount = 0;
+      for (const [tier, cnt] of tierCounts.entries()) {
+        if (cnt > maxTierCount) {
+          maxTierCount = cnt;
+          topTierScoped = tier;
+        }
+      }
+
+      const checkinRes = await db
+        .prepare('SELECT customer_id, status FROM checkins')
+        .all<{ customer_id: string; status: string }>()
+        .catch(() => ({ results: [] as Array<{ customer_id: string; status: string }> }));
+      const scopedCheckins = (checkinRes.results || []).filter((ci) => scopedIds.has(String(ci.customer_id)));
+      const redeemedCheckins = scopedCheckins.filter((ci) => ci.status === 'approved').length;
+
+      const scopedWidgets: LoyaltyWidget[] = [
+        { title: 'Total Members', value: totalCustomersScoped, icon: 'users' },
+        { title: 'Active (30d)', value: activeScoped, icon: 'activity' },
+        { title: 'Cashback Pool', value: cashbackScoped, icon: 'gift' },
+        { title: 'Total Spend', value: spentScoped, icon: 'dollar' },
+        { title: 'Avg Visits', value: avgVisitsScoped, icon: 'repeat' },
+        { title: 'Top Tier', value: topTierScoped, icon: 'star' },
+        { title: 'Churn Risk (90d)', value: churnScoped, icon: 'alert' },
+        {
+          title: 'Redemption Rate',
+          value: scopedCheckins.length ? `${Math.round((redeemedCheckins / scopedCheckins.length) * 100)}%` : '0%',
+          icon: 'check',
+        },
+      ];
+      return c.json({ success: true, data: scopedWidgets });
+  }
 
   let totalCustomers = 0;
   let activeThisMonth = 0;
@@ -171,6 +288,30 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
 // GET /api/admin-loyalty/tiers — tier distribution
 adminLoyaltyRouter.get('/tiers', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
+
+  const allCustRes = await db
+    .prepare('SELECT * FROM customers')
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Record<string, unknown>[] }));
+  const allCustomers = allCustRes.results || [];
+  if (tenantId !== 'default' || allCustomers.some((r) => r && typeof r === 'object' && 'tenant_id' in r)) {
+      const scopedCustomers = allCustomers.filter((r) => matchesTenantRow(r, tenantId));
+      const counts = new Map<string, number>();
+      for (const r of scopedCustomers) {
+        const tier = String(r.tier || r.loyalty_tier || 'bronze');
+        counts.set(tier, (counts.get(tier) || 0) + 1);
+      }
+      const totalScoped = scopedCustomers.length;
+      const distributionScoped: TierDistribution[] = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([tier, count]) => ({
+          tier,
+          count,
+          percentage: totalScoped > 0 ? Math.round((count / totalScoped) * 1000) / 10 : 0,
+        }));
+      return c.json({ success: true, data: { distribution: distributionScoped, total: totalScoped } });
+  }
 
   let rawTiers: Array<{ tier: string; count: number }> = [];
   try {
@@ -217,20 +358,19 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
   try {
     const res = await db.prepare(`
       SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
-             COALESCE(cw.total_spent, 0) as total_spent,
-             (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') as visit_count
+             COALESCE(cw.total_spent, c.total_spent, 0) as total_spent,
+             (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
       FROM customers c
       LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
       ORDER BY total_spent DESC
-      LIMIT ?
-    `).bind(limit).all<TopCustomer>();
-    results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
+    `).all<TopCustomer>();
+    results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId)).slice(0, limit);
   } catch {
     try {
       const res = await db.prepare(
-        'SELECT * FROM customers ORDER BY total_spent DESC LIMIT ?'
-      ).bind(limit).all<TopCustomer>();
-      results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
+        'SELECT * FROM customers ORDER BY total_spent DESC'
+      ).all<TopCustomer>();
+      results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId)).slice(0, limit);
     } catch {
       results = [];
     }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '@aura/domain-table';
 import { adminQRRouter } from '../../routes/admin-qr';
 import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../../tree/qr/signer';
-import { createMockEnv, createMockContext, isStaffAccountLookup, mockRequestWithRole } from '../test-utils';
+import { createMockEnv, createMockContext, isStaffAccountLookup, mockRequestWithAuth, mockRequestWithRole, mockStaffToken } from '../test-utils';
 
 const VALID_SECRET = 'qr-signing-secret-2026';
 
@@ -158,6 +158,43 @@ describe('tables — PATCH /:id/release', () => {
     const db = buildDb(SAMPLE_TABLES, [], null, { row: null });
     const res = await execTables('/999/release', db, {}, 'PATCH');
     expect(res.status).toBe(404);
+  });
+
+  it('404 when non-default tenant attempts to occupy a null-tenant default table', async() => {
+    const nullTenantDefaultTable = { id: '1', table_number: 'T01', zone: 'indoor', capacity: 4, status: 'Available', tenant_id: null };
+    const db = {
+      prepare: (sql: string) => {
+        const stmt: any = {
+          bind(...args: any[]) {
+            stmt._bound = args;
+            return stmt;
+          },
+          raw: async() => [],
+          run: async() => ({ success: true, changes: 1 }),
+          first: async() => {
+            if (isStaffAccountLookup(sql)) {
+              return { id: 'user-supervisor', name: 'Supervisor B', phone: null, role: 'supervisor', tenant_id: 'tenant-b', is_active: 1, auth_version: 1 };
+            }
+            if (sql.includes('cafe_tables') && sql.includes('WHERE id')) {
+              return nullTenantDefaultTable;
+            }
+            return null;
+          },
+          all: async() => ({ results: [nullTenantDefaultTable], success: true }),
+        };
+        return stmt;
+      },
+    };
+    const env = { ...createMockEnv(), AURA_DB: db };
+    const ctx = createMockContext();
+    const token = await mockStaffToken({ id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant-b' });
+    const req = mockRequestWithAuth('PATCH', '/1/occupy', token);
+    const res = await tablesRouter.fetch(req, env as any, ctx as any);
+    expect(res.status).toBe(404);
+
+    const getReq = mockRequestWithAuth('GET', '/1', token);
+    const getRes = await tablesRouter.fetch(getReq, env as any, ctx as any);
+    expect(getRes.status).toBe(404);
   });
 });
 

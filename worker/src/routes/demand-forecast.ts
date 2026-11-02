@@ -10,14 +10,15 @@ import { getTenantId } from '../middleware/tenant';
 
 export const demandForecastRouter = new Hono<{ Bindings: Env }>();
 
-demandForecastRouter.use('/*', requireAuth(['owner', 'admin', 'manager']));
+demandForecastRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor']));
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
 // GET /api/admin/metrics/forecast
 demandForecastRouter.get('/forecast', async (c) => {
   const tenantId = getTenantId(c);
-  const forecastDays = Math.max(1, Math.min(14, parseInt(c.req.query('days') || '7', 10)));
+  const rawDays = parseInt(c.req.query('days') || '7', 10);
+  const forecastDays = Number.isFinite(rawDays) ? Math.max(1, Math.min(14, rawDays)) : 7;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const fourWeeksAgo = new Date(Date.now() - 28 * 86400000).toISOString();
@@ -28,9 +29,10 @@ demandForecastRouter.get('/forecast', async (c) => {
            strftime('%w', created_at) as dow,
            strftime('%H', created_at) as hour
     FROM orders
-    WHERE tenant_id = ? AND status != 'cancelled' AND created_at >= ?
+    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
+      AND status != 'cancelled' AND created_at >= ?
     ORDER BY created_at ASC
-  `).bind(tenantId, fourWeeksAgo).all<{ total: number; created_at: string; dow: string; hour: string }>();
+  `).bind(tenantId, tenantId, fourWeeksAgo).all<{ total: number; created_at: string; dow: string; hour: string }>();
 
   const dowRevenue = [0, 0, 0, 0, 0, 0, 0];
   const dowCounts = [0, 0, 0, 0, 0, 0, 0];
@@ -120,10 +122,11 @@ demandForecastRouter.get('/forecast/hourly', async (c) => {
   const { results: hourRows } = await db.prepare(`
     SELECT strftime('%H', created_at) as hour, COUNT(*) as orders_count
     FROM orders
-    WHERE tenant_id = ? AND status != 'cancelled' AND created_at >= ?
+    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
+      AND status != 'cancelled' AND created_at >= ?
     GROUP BY hour
     ORDER BY hour ASC
-  `).bind(tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>();
+  `).bind(tenantId, tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>();
 
   const hourlyMap: Record<string, number> = {};
   for (let h = 0; h < 24; h++) {

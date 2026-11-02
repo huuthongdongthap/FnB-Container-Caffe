@@ -1,7 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { ProductRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
-import { formatProduct, type ProductRow } from './helpers';
+import { formatProduct, matchesCatalogTenant, resolveCatalogTenantId, type ProductRow } from './helpers';
 import { getDatabase } from '../../lib/db';
 
 export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
@@ -51,14 +51,12 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       params.push(`%${tags}%`);
     }
 
-    // Get total count
-    const countResult = (await db.prepare(
-      `SELECT COUNT(*) as total FROM products p ${whereClause}`
-    ).bind(...params).first()) as { total: number } | null;
-    const total = countResult?.total || 0;
+    const tenantId = resolveCatalogTenantId(c);
+    const safePage = Number.isFinite(Number(page)) && Number(page) >= 1 ? Math.floor(Number(page)) : 1;
+    const safeLimit = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.floor(Number(limit)), 100) : 20;
 
-    // Get products directly from canonical products table
-    const offset = (page - 1) * limit;
+    // Get products directly from canonical products table and filter by tenant before slicing
+    const offset = (safePage - 1) * safeLimit;
     const allowedSorts: Record<string, string> = {
       sort_order: 'p.sort_order',
       name: 'p.name',
@@ -74,21 +72,25 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all()) as { results: ProductRow[] };
+       ORDER BY ${orderClause}`
+    ).bind(...params).all()) as { results: ProductRow[] };
 
-    const products = (rows.results || []).map((row) => formatProduct(row, locale));
+    const rawRows = rows.results || [];
+    const filteredRows = rawRows.filter((row) => matchesCatalogTenant(row, tenantId));
+    const total = filteredRows.length;
+    const pagedRows = filteredRows.slice(offset, offset + safeLimit);
+    const products = pagedRows.map((row) => formatProduct(row, locale));
 
     return c.json({
       success: true,
-      data: { products, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      data: { products, meta: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } },
     });
   });
 
   // GET /api/products/:id - Get product by ID
   router.openapi(ProductRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = resolveCatalogTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 
@@ -99,7 +101,7 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
        WHERE p.id = ?`
     ).bind(id).first()) as ProductRow | null;
 
-    if (!row) {
+    if (!row || !matchesCatalogTenant(row, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 
@@ -112,17 +114,28 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
   // GET /api/products/slug/:slug - Get product by slug
   router.openapi(ProductRoutes.getBySlug as any, async (c: any) => {
     const db = getDatabase(c);
+    const tenantId = resolveCatalogTenantId(c);
     const { slug } = c.req.valid('param' as never) as { slug: string };
     const locale = c.req.query('locale') || 'vi';
 
-    const row = (await db.prepare(
+    let row = (await db.prepare(
       `SELECT p.*, c.name as category_name
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.slug = ?`
     ).bind(slug).first()) as ProductRow | null;
 
-    if (!row) {
+    if (row && !matchesCatalogTenant(row, tenantId)) {
+      const allRows = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.slug = ?`
+      ).bind(slug).all().catch(() => ({ results: [] }))) as { results?: ProductRow[] };
+      row = (allRows.results || []).find((r) => matchesCatalogTenant(r, tenantId)) || null;
+    }
+
+    if (!row || !matchesCatalogTenant(row, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 

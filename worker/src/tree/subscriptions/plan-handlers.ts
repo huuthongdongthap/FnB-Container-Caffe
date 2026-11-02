@@ -6,10 +6,13 @@ import type { PlanRecord } from './types';
 import { requireAdmin } from './middleware';
 import { generateId, nowStr } from './helpers';
 import { createPlanSchema, updatePlanSchema } from '../../lib/validators';
+import { getTenantId, matchesTenantRow } from '../../lib/db';
 
 export async function listPlans(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const includeInactive = c.req.query('all') === '1';
+  const tenantId = getTenantId(c);
+  const wantsAll = c.req.query('all') === '1';
+  const includeInactive = wantsAll ? (await requireAdmin(c)) === null : false;
 
   let query = 'SELECT * FROM subscription_plans';
   if (!includeInactive) {
@@ -19,10 +22,12 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
 
   try {
     const plans = await db.prepare(query).all<PlanRecord>();
-    const results = (plans.results || []).map(p => ({
-      ...p,
-      features: p.features ? JSON.parse(p.features) : []
-    }));
+    const results = (plans.results || [])
+      .filter((p) => matchesTenantRow(p as unknown as Record<string, unknown>, tenantId))
+      .map(p => ({
+        ...p,
+        features: p.features ? JSON.parse(p.features) : []
+      }));
     return c.json({ success: true, data: results });
   } catch {
     return c.json({ success: true, data: [] });
@@ -31,12 +36,19 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
 
 export async function getPlan(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ?'
   ).bind(c.req.param('id')).first<PlanRecord>();
 
-  if (!plan) {
+  if (!plan || !matchesTenantRow(plan as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
+  }
+  if (Number(plan.is_active ?? 1) === 0) {
+    const adminErr = await requireAdmin(c);
+    if (adminErr) {
+      return c.json({ success: false, error: 'Plan not found' }, 404);
+    }
   }
   return c.json({ success: true, data: { ...plan, features: plan.features ? JSON.parse(plan.features) : [] } });
 }
@@ -48,6 +60,8 @@ export async function createPlan(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
+  const rawTenantId = getTenantId(c);
+  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createPlanSchema.safeParse(body);
   if (!parsed.success) {
@@ -57,17 +71,31 @@ export async function createPlan(c: Context<{ Bindings: Env }>) {
   const id = generateId('plan_');
   const nowIso = nowStr();
 
-  await db.prepare(
-    `INSERT INTO subscription_plans (id, name, slug, description, container_size,
-     monthly_price_vnd, deposit_vnd, features, max_occupants, is_popular, is_active, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    id, body.name, body.slug, body.description || '', body.container_size || '20ft',
-    body.monthly_price_vnd, body.deposit_vnd || 0, JSON.stringify(body.features || []),
-    body.max_occupants || 1, body.is_popular ? 1 : 0,
-    body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
-    body.sort_order || 0, nowIso, nowIso
-  ).run();
+  try {
+    await db.prepare(
+      `INSERT INTO subscription_plans (id, name, slug, description, container_size,
+       monthly_price_vnd, deposit_vnd, features, max_occupants, is_popular, is_active, sort_order, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, body.name, body.slug, body.description || '', body.container_size || '20ft',
+      body.monthly_price_vnd, body.deposit_vnd || 0, JSON.stringify(body.features || []),
+      body.max_occupants || 1, body.is_popular ? 1 : 0,
+      body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
+      body.sort_order || 0, tenantId, nowIso, nowIso
+    ).run();
+  } catch {
+    await db.prepare(
+      `INSERT INTO subscription_plans (id, name, slug, description, container_size,
+       monthly_price_vnd, deposit_vnd, features, max_occupants, is_popular, is_active, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, body.name, body.slug, body.description || '', body.container_size || '20ft',
+      body.monthly_price_vnd, body.deposit_vnd || 0, JSON.stringify(body.features || []),
+      body.max_occupants || 1, body.is_popular ? 1 : 0,
+      body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
+      body.sort_order || 0, nowIso, nowIso
+    ).run();
+  }
 
   const plan = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<PlanRecord>();
   return c.json({ success: true, data: { ...plan, features: plan?.features ? JSON.parse(plan.features) : [] } }, 201);
@@ -80,6 +108,7 @@ export async function updatePlan(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c);
   const body = await c.req.json();
   const parsed = updatePlanSchema.safeParse(body);
   if (!parsed.success) {
@@ -88,7 +117,7 @@ export async function updatePlan(c: Context<{ Bindings: Env }>) {
 
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<PlanRecord>();
-  if (!existing) {
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
   }
 

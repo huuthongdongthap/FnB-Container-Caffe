@@ -12,7 +12,8 @@ import { describe, it, expect, vi } from 'vitest';
 // (_c, next) => next() calls next() so Hono 4 finalises the context and the
 // route handler runs normally (empty response would cause "Context is not finalised").
 vi.mock('../../middleware/auth', () => ({
-  requireAuth: () => (_c: any, next: any) => next()
+  requireAuth: () => (_c: any, next: any) => next(),
+  optionalAuth: () => (_c: any, next: any) => next(),
 }));
 
 import type { Context } from 'hono';

@@ -11,6 +11,7 @@ import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
+import { getTenantId, matchesTenantRow } from '../lib/db';
 import { createAlertDispatcher } from '../lib/alert-dispatcher';
 import { notifyTelegram } from '@aura/domain-order';
 import { sendZNS } from './zalo';
@@ -86,9 +87,10 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
       if (!body.order_id) {
         return c.json({ error: 'Missing order_id' }, 400);
       }
+      const tenantId = getTenantId(c);
       const order = await c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?')
         .bind(body.order_id).first<Record<string, unknown>>();
-      if (!order) {
+      if (!order || !matchesTenantRow(order, tenantId)) {
         return c.json({ error: 'Order not found' }, 404);
       }
       const parsedItems = JSON.parse((order.items as string) || '[]');
@@ -134,7 +136,7 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   });
 
   // ── Admin: Manual cashback expiry warning run ──
-  app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner', 'admin', 'manager']), audit('send_expiry_warnings'), async(c) => {
+  app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner', 'admin', 'manager', 'supervisor']), audit('send_expiry_warnings'), async(c) => {
     const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>);
     return c.json({ ok: true, ...result });
   });

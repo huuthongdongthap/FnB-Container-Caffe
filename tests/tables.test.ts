@@ -16,6 +16,11 @@ vi.mock('../worker/src/middleware/auth.js', () => ({
       await next();
     };
   },
+  optionalAuth: () => {
+    return async (_c: any, next: any) => {
+      await next();
+    };
+  },
 }));
 
 // ── Mock D1 Database ──────────────────────────────────────────────
