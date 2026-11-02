@@ -136,7 +136,7 @@ export async function getFulfillment(
     try {
       const q = await (tenantId && tenantId !== '*'
         ? db
-            .prepare("SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+            .prepare("SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)")
             .bind('pending', row.created_at, tenantId)
             .first<{ c: number }>()
             .catch(() =>

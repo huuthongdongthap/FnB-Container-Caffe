@@ -91,7 +91,7 @@ dynamicPricingRouter.get('/active', async (c) => {
   }
 
   const { results: rules } = await db.prepare(
-    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND is_active = 1"
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND is_active = 1"
   ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>().catch(() => ({ results: [] }));
 
   const active = (rules || [])
@@ -117,7 +117,7 @@ dynamicPricingRouter.post('/calculate', async (c) => {
   }
 
   const { results: rules } = await db.prepare(
-    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND is_active = 1"
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND is_active = 1"
   ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>().catch(() => ({ results: [] }));
 
   const activeRules = (rules || [])
@@ -205,7 +205,7 @@ dynamicPricingRouter.get('/rules', requireAuth(['owner', 'admin', 'manager', 'su
   const tenantId = getTenantId(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const { results } = await db.prepare(
-    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) ORDER BY created_at DESC"
+    "SELECT * FROM dynamic_pricing_rules WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC"
   ).bind(tenantId, tenantId).all<DynamicPricingRuleRow>();
 
   const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));

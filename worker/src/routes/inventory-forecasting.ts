@@ -40,7 +40,7 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
     const res = await db.prepare(`
       SELECT id, sku, name, current_stock, min_stock, unit, tenant_id
       FROM inventory_items
-      WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND active = 1
+      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
       ORDER BY sku ASC
     `).bind(tenantId, tenantId).all<InventoryRow>();
     items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
@@ -53,7 +53,7 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
         const res = await db.prepare(`
           SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, unit, tenant_id
           FROM inventory_items
-          WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
+          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
           ORDER BY COALESCE(sku, id) ASC
         `).bind(tenantId, tenantId).all<InventoryRow>();
         items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
@@ -209,7 +209,7 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
   try {
     const res = await db.prepare(`
       SELECT id, sku, name, current_stock, min_stock, tenant_id
-      FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND active = 1
+      FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
     `).bind(tenantId, tenantId).all<InventoryRow>();
     items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
   } catch (err) {
@@ -220,7 +220,7 @@ inventoryForecastingRouter.post('/snapshot', async (c) => {
       try {
         const res = await db.prepare(`
           SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, tenant_id
-          FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
+          FROM inventory_items WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
         `).bind(tenantId, tenantId).all<InventoryRow>();
         items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
       } catch {
@@ -363,7 +363,7 @@ inventoryForecastingRouter.get('/history', async (c) => {
   const limit = Number.isFinite(rawLimit) ? Math.min(60, Math.max(1, rawLimit)) : 30;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  let query = "SELECT * FROM inventory_forecast_snapshots WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
+  let query = "SELECT * FROM inventory_forecast_snapshots WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
   const params: unknown[] = [tenantId, tenantId];
   if (sku) {
     query += ' AND item_sku = ?';

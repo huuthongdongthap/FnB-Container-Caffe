@@ -29,7 +29,7 @@ demandForecastRouter.get('/forecast', async (c) => {
            strftime('%w', created_at) as dow,
            strftime('%H', created_at) as hour
     FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
+    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
       AND status != 'cancelled' AND created_at >= ?
     ORDER BY created_at ASC
   `).bind(tenantId, tenantId, fourWeeksAgo).all<{ total: number; created_at: string; dow: string; hour: string }>();
@@ -122,7 +122,7 @@ demandForecastRouter.get('/forecast/hourly', async (c) => {
   const { results: hourRows } = await db.prepare(`
     SELECT strftime('%H', created_at) as hour, COUNT(*) as orders_count
     FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
+    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
       AND status != 'cancelled' AND created_at >= ?
     GROUP BY hour
     ORDER BY hour ASC

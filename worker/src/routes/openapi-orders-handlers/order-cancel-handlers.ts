@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
+import { restoreInventoryForOrder } from '@aura/domain-inventory';
 import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
 import { fetchOrderItemsAndPayments, formatCustomerOrder, formatOrder } from './helpers';
@@ -14,17 +15,29 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
 
   const tenantId = getTenantId(c);
   const customer = user?.role === 'customer';
-  const clause = customer
-    ? ' AND customer_id = ?'
-    : tenantId === '*'
-      ? ''
-      : tenantId === 'default'
-        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-        : ' AND tenant_id = ?';
-  const scope = customer ? [user.id] : tenantId === '*' ? [] : [tenantId];
-  const existing = (await db.prepare(`SELECT * FROM orders WHERE id = ?${clause}`).bind(id, ...scope).first()) as {
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const clause = customer ? ` AND customer_id = ?${tenantClause}` : tenantClause;
+  const scope = customer
+    ? (tenantId === '*' ? [user.id] : [user.id, tenantId])
+    : (tenantId === '*' ? [] : [tenantId]);
+  let existing = (await db.prepare(`SELECT * FROM orders WHERE id = ?${clause}`).bind(id, ...scope).first().catch(async () => {
+    if (tenantId === 'default') {
+      const fallbackClause = customer ? ' AND customer_id = ?' : '';
+      const fallbackScope = customer ? [user.id] : [];
+      return db.prepare(`SELECT * FROM orders WHERE id = ?${fallbackClause}`).bind(id, ...fallbackScope).first();
+    }
+    return null;
+  })) as {
     id: string; status: string; customer_id?: string | null; tenant_id?: string;
   } | null;
+  if (existing && tenantId !== '*' && 'tenant_id' in existing && existing.tenant_id !== undefined) {
+    const rowTenant = (existing.tenant_id && String(existing.tenant_id).trim()) || 'default';
+    if (rowTenant !== tenantId) existing = null;
+  }
   if (!existing) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
@@ -46,6 +59,8 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     env: c.env as unknown as Record<string, unknown>,
   });
   if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
+
+  await restoreInventoryForOrder({ AURA_DB: db as any }, id).catch(() => {});
 
   try {
     await db.prepare(

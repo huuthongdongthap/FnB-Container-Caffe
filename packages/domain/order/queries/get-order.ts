@@ -32,12 +32,28 @@ export async function getOrder(
     } catch {
       try {
         const res = await db.prepare(
-          'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
-        ).bind(id).all<Record<string, unknown>>();
+          `SELECT * FROM orders WHERE id = ?${tenantClause}`
+        ).bind(...binds).all<Record<string, unknown>>();
         results = res.results ?? [];
       } catch {
-        const res = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).all<Record<string, unknown>>();
-        results = res.results ?? [];
+        if (!hasTenantScope || tenantId === 'default') {
+          try {
+            const res = await db.prepare(
+              'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
+            ).bind(id).all<Record<string, unknown>>();
+            results = res.results ?? [];
+          } catch {
+            const res = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).all<Record<string, unknown>>();
+            results = res.results ?? [];
+          }
+        }
+      }
+    }
+
+    if (hasTenantScope && results.length > 0 && 'tenant_id' in results[0] && results[0].tenant_id !== undefined) {
+      const rowTenant = (results[0].tenant_id && String(results[0].tenant_id).trim()) || 'default';
+      if (rowTenant !== tenantId) {
+        results = [];
       }
     }
 

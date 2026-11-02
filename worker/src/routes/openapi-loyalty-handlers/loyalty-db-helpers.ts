@@ -115,26 +115,30 @@ export async function getLoyaltyAccountWithFallback(
   }
 
   if (account && tenantId && tenantId !== '*') {
-    if ('tenant_id' in account && account.tenant_id !== undefined) {
+    const custLookup = String(account.customer_id ?? customerId ?? '');
+    let ownerRow: Record<string, unknown> | null = null;
+    if (custLookup) {
+      ownerRow = (await db.prepare('SELECT * FROM customers WHERE id = ?').bind(custLookup).first().catch(() => null)) as Record<string, unknown> | null;
+      if (!ownerRow) {
+        ownerRow = (await db.prepare('SELECT id, tenant_id FROM users WHERE id = ?').bind(custLookup).first().catch(() => null)) as Record<string, unknown> | null;
+      }
+    }
+    const rawAccountTenant = 'tenant_id' in account && account.tenant_id !== undefined
+      ? String(account.tenant_id ?? '').trim()
+      : '';
+    if (rawAccountTenant && rawAccountTenant !== 'default' && !matchesLoyaltyTenant(account, tenantId)) {
+      return { account: null, usingCustomersFallback: false };
+    }
+    if (ownerRow && 'tenant_id' in ownerRow && ownerRow.tenant_id !== undefined) {
+      if (!matchesLoyaltyTenant(ownerRow, tenantId)) {
+        return { account: null, usingCustomersFallback: false };
+      }
+    } else if ('tenant_id' in account && account.tenant_id !== undefined) {
       if (!matchesLoyaltyTenant(account, tenantId)) {
         return { account: null, usingCustomersFallback: false };
       }
-    } else {
-      const custLookup = String(account.customer_id ?? customerId ?? '');
-      let ownerRow: Record<string, unknown> | null = null;
-      if (custLookup) {
-        ownerRow = (await db.prepare('SELECT * FROM customers WHERE id = ?').bind(custLookup).first().catch(() => null)) as Record<string, unknown> | null;
-        if (!ownerRow) {
-          ownerRow = (await db.prepare('SELECT id, tenant_id FROM users WHERE id = ?').bind(custLookup).first().catch(() => null)) as Record<string, unknown> | null;
-        }
-      }
-      if (ownerRow && 'tenant_id' in ownerRow && ownerRow.tenant_id !== undefined) {
-        if (!matchesLoyaltyTenant(ownerRow, tenantId)) {
-          return { account: null, usingCustomersFallback: false };
-        }
-      } else if (tenantId !== 'default') {
-        return { account: null, usingCustomersFallback: false };
-      }
+    } else if (tenantId !== 'default') {
+      return { account: null, usingCustomersFallback: false };
     }
   }
 

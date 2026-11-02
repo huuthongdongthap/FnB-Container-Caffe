@@ -90,7 +90,7 @@ export async function processCustomerQuery(
     if (extractedId) {
       try {
         orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1"
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1"
         ).bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -100,14 +100,14 @@ export async function processCustomerQuery(
                 .bind(extractedId).first<{ id: string; status: string; total: number }>().catch(() => null)
             : null;
         } else {
-          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1")
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1")
             .bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number }>().catch(() => null);
         }
       }
     } else if (data.phone) {
       try {
         orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND (customer_phone = ? OR customer_id = ?) ORDER BY created_at DESC LIMIT 1"
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND (customer_phone = ? OR customer_id = ?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND (customer_phone = ?3 OR customer_id = ?4) ORDER BY created_at DESC LIMIT 1"
         ).bind(tenantId, tenantId, data.phone, data.phone).first<{ id: string; status: string; total: number }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -116,7 +116,7 @@ export async function processCustomerQuery(
               ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT 1')
                   .bind(data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
               : null)
-          : await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? ORDER BY created_at DESC LIMIT 1")
+          : await db.prepare("SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1")
               .bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number }>().catch(() => null);
       }
     }
@@ -138,8 +138,8 @@ export async function processCustomerQuery(
           `SELECT o.id, COALESCE(o.total_amount, o.total, 0) as total, o.status
            FROM orders o
            LEFT JOIN cafe_tables t ON o.table_id = t.id
-             AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')
-           WHERE (? = '*' OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?)
+             AND (COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default') OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default'))
+           WHERE (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
              AND (o.table_number = ? OR t.table_number = ? OR o.table_id = ?)
              AND o.status NOT IN ('completed', 'cancelled')
            ORDER BY o.created_at DESC
@@ -157,7 +157,7 @@ export async function processCustomerQuery(
         } else {
           activeOrder = await db.prepare(
             `SELECT o.id, COALESCE(o.total, 0) as total, o.status FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id
-             WHERE (? = '*' OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?) AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
+             WHERE (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
                AND o.status NOT IN ('completed', 'cancelled') ORDER BY o.created_at DESC LIMIT 1`
           ).bind(tenantId, tenantId, String(tbl), tbl).first<{ id: string; total: number; status: string }>().catch(() => null);
         }
@@ -176,7 +176,7 @@ export async function processCustomerQuery(
       let cust: { name: string; loyalty_points: number; loyalty_tier: string } | null = null;
       try {
         cust = await db.prepare(
-          "SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+          "SELECT name, loyalty_points, loyalty_tier FROM customers WHERE phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
         ).bind(data.phone, tenantId, tenantId).first<{ name: string; loyalty_points: number; loyalty_tier: string }>();
       } catch (err) {
         if (/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {

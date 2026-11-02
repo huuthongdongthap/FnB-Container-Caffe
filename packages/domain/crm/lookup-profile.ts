@@ -61,34 +61,54 @@ export async function lookupProfile(
 
   try {
     const rawPhone = String(phone ?? '').trim();
+    if (!rawPhone) {
+      return EMPTY;
+    }
     const digits = rawPhone.replace(/\D/g, '');
     const normalized =
       digits.startsWith('84') && digits.length >= 11 ? '0' + digits.slice(2) : (digits || rawPhone);
 
     let identity: { customer_id: string; value?: string } | null = null;
-    if (!targetTenant) {
+    try {
+      identity = await db
+        .prepare(
+          `SELECT customer_id, identifier_value AS value FROM customer_identities
+           WHERE identifier_type = 'phone' AND (identifier_value = ?1 OR identifier_value = ?2)
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(rawPhone, normalized)
+        .first<{ customer_id: string; value?: string }>();
+    } catch {
       try {
         identity = await db
           .prepare(
-            `SELECT customer_id, identifier_value AS value FROM customer_identities
-             WHERE identifier_type = 'phone' AND identifier_value = ?1
+            `SELECT customer_id, value FROM customer_identities
+             WHERE type = 'phone' AND (value = ?1 OR value = ?2)
              ORDER BY created_at DESC LIMIT 1`,
           )
-          .bind(phone)
+          .bind(rawPhone, normalized)
           .first<{ customer_id: string; value?: string }>();
       } catch {
-        try {
-          identity = await db
-            .prepare(
-              `SELECT customer_id, value FROM customer_identities
-               WHERE type = 'phone' AND value = ?1
-               ORDER BY created_at DESC LIMIT 1`,
-            )
-            .bind(phone)
-            .first<{ customer_id: string; value?: string }>();
-        } catch {
+        identity = null;
+      }
+    }
+
+    if (identity?.customer_id && targetTenant) {
+      try {
+        const idOwner = await db
+          .prepare('SELECT id, tenant_id FROM customers WHERE id = ?1')
+          .bind(identity.customer_id)
+          .first<{ id: string; tenant_id?: string | null }>();
+        if (!idOwner) {
           identity = null;
+        } else if ('tenant_id' in idOwner && idOwner.tenant_id !== undefined) {
+          const ownerTenant = (idOwner.tenant_id && String(idOwner.tenant_id).trim()) || 'default';
+          if (ownerTenant !== targetTenant) {
+            identity = null;
+          }
         }
+      } catch {
+        identity = null;
       }
     }
 
@@ -97,15 +117,17 @@ export async function lookupProfile(
         identity = targetTenant
           ? await db
               .prepare(
-                "SELECT id AS customer_id FROM customers WHERE (phone = ? OR phone = ?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? LIMIT 1",
+                "SELECT id AS customer_id FROM customers WHERE (phone = ? OR phone = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
               )
               .bind(normalized, rawPhone, targetTenant)
               .first<{ customer_id: string; value?: string }>()
               .catch(() =>
-                db
-                  .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
-                  .bind(normalized, rawPhone)
-                  .first<{ customer_id: string; value?: string }>(),
+                targetTenant === 'default'
+                  ? db
+                      .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
+                      .bind(normalized, rawPhone)
+                      .first<{ customer_id: string; value?: string }>()
+                  : null,
               )
           : await db
               .prepare('SELECT id AS customer_id FROM customers WHERE phone = ? OR phone = ? LIMIT 1')
@@ -180,30 +202,41 @@ export async function lookupProfile(
         `SELECT * FROM orders
          WHERE customer_id = ?1
            AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?2
+            OR customer_id = ?1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2
          ORDER BY created_at DESC LIMIT ?3`,
       )
       .bind(customer.id, resolvedTenant, orderLimit)
       .all<Record<string, unknown>>()
       .catch(() =>
-        db
-          .prepare(
-            `SELECT * FROM orders
-             WHERE customer_id = ?1
-             ORDER BY created_at DESC LIMIT ?2`,
-          )
-          .bind(customer.id, orderLimit)
-          .all<Record<string, unknown>>()
-          .catch(() =>
-            db
+        !targetTenant || targetTenant === 'default'
+          ? db
               .prepare(
-                `SELECT id, total_cents, placed_at FROM orders
+                `SELECT * FROM orders
                  WHERE customer_id = ?1
-                 ORDER BY placed_at DESC LIMIT ?2`,
+                 ORDER BY created_at DESC LIMIT ?2`,
               )
               .bind(customer.id, orderLimit)
-              .all<Record<string, unknown>>(),
-          ),
+              .all<Record<string, unknown>>()
+              .catch(() =>
+                db
+                  .prepare(
+                    `SELECT id, total_cents, placed_at FROM orders
+                     WHERE customer_id = ?1
+                     ORDER BY placed_at DESC LIMIT ?2`,
+                  )
+                  .bind(customer.id, orderLimit)
+                  .all<Record<string, unknown>>(),
+              )
+          : { results: [] as Record<string, unknown>[] },
       );
+
+    const scopedOrders = (orders.results ?? []).filter((o) => {
+      if (targetTenant && 'tenant_id' in o && o.tenant_id !== undefined) {
+        const ordTenant = (o.tenant_id && String(o.tenant_id).trim()) || 'default';
+        return ordTenant === targetTenant;
+      }
+      return true;
+    });
 
     return {
       customerId: customer.id,
@@ -219,7 +252,7 @@ export async function lookupProfile(
         visitedAt: v.visited_at,
         channel: v.channel,
       })),
-      recentOrders: orders.results.map((o) => ({
+      recentOrders: scopedOrders.map((o) => ({
         id: String(o.id ?? ''),
         totalCents: Number(o.total_cents ?? o.total ?? 0),
         placedAt: String(o.placed_at ?? o.created_at ?? ''),

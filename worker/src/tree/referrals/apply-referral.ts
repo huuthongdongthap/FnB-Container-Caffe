@@ -8,7 +8,8 @@ function genId(prefix: string): string {
   return prefix + Date.now().toString(36) + rand;
 }
 
-export async function applyReferralForNewCustomer(db: D1Database, newCustomerId: string, referralCode: string): Promise<Record<string, unknown>> {
+export async function applyReferralForNewCustomer(db: D1Database, newCustomerId: string, referralCode: string, tenantId?: string): Promise<Record<string, unknown>> {
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() : null;
   if (!referralCode) {
     return { success: false, reason: 'no_code' };
   }
@@ -45,9 +46,12 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
       ? referrer
       : await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string; tenant_id?: string | null }>();
     if (referrerWithTenant && referrerWithTenant.tenant_id !== undefined) {
+      const refTenant = (referrerWithTenant.tenant_id && referrerWithTenant.tenant_id.trim()) || 'default';
+      if (effectiveTenant && refTenant !== effectiveTenant) {
+        return { success: false, reason: 'referrer_not_found' };
+      }
       const referee = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(newCustomerId).first<{ id: string; tenant_id?: string | null }>();
       if (referee && referee.tenant_id !== undefined) {
-        const refTenant = (referrerWithTenant.tenant_id && referrerWithTenant.tenant_id.trim()) || 'default';
         const custTenant = (referee.tenant_id && referee.tenant_id.trim()) || 'default';
         if (refTenant !== custTenant) {
           return { success: false, reason: 'referrer_not_found' };

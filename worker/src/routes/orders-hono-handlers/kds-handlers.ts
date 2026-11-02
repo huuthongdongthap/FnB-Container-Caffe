@@ -170,7 +170,7 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
           let cust: { id: string } | null = null;
           try {
             cust = await c.env.AURA_DB.prepare(
-              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
             ).bind(orderRow.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant).first<{ id: string }>();
           } catch {
             cust = await c.env.AURA_DB.prepare(
@@ -183,7 +183,11 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
         if (refCustomerId && orderTotal >= 20000) {
           const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
           const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
-          await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy).catch(() => {});
+          const orderTenantForRef =
+            typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
+              ? orderRow.tenant_id.trim()
+              : undefined;
+          await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
         }
       }
     } catch {

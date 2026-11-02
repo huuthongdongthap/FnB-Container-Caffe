@@ -106,10 +106,17 @@ export async function creditLoyaltyIfEligible(
     return;
   }
 
+  const rawOrderTenant = (orderRow as Record<string, unknown>).tenant_id;
+  const orderTenantForAccrual =
+    typeof rawOrderTenant === 'string' && rawOrderTenant.trim()
+      ? rawOrderTenant.trim()
+      : undefined;
+
   await applyAccrual(db, policy, {
     orderId,
     customerId,
     orderTotalVnd: total,
+    ...(orderTenantForAccrual ? { tenantId: orderTenantForAccrual } : {}),
   }).catch((err) => {
     log.error('Loyalty accrual failed', { orderId, error: String(err) });
   });

@@ -264,6 +264,10 @@ export async function rewardReferralOnFirstOrder(
 
   const now = nowIso();
 
+  if (orderAmountVnd < policy.minOrderVnd) {
+    return { success: false, reason: 'order_below_min', referral_id: referral.id };
+  }
+
   if (policy.bonusType === 'points') {
     // ── points mode ──────────────────────────────────────────────────────
     const pointsToAward = policy.pointsReferrer;
@@ -294,6 +298,12 @@ export async function rewardReferralOnFirstOrder(
 
     if (policy.pointsReferee > 0) {
       try {
+        const refereeBefore = await db
+          .prepare('SELECT loyalty_points FROM customers WHERE id = ?')
+          .bind(refereeId)
+          .first<{ loyalty_points?: number }>()
+          .catch(() => null);
+        const refereeBalanceAfter = Number(refereeBefore?.loyalty_points ?? 0) + policy.pointsReferee;
         await db
           .prepare(
             'UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE id = ?',
@@ -302,13 +312,14 @@ export async function rewardReferralOnFirstOrder(
           .run();
         await db
           .prepare(
-            'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
+            'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
           )
           .bind(
             genId('ptl_'),
             refereeId,
             policy.pointsReferee,
             'referral_welcome',
+            refereeBalanceAfter,
             `Referral welcome bonus: +${policy.pointsReferee} points`,
             now,
           )
@@ -322,10 +333,6 @@ export async function rewardReferralOnFirstOrder(
   }
 
   // ── cashback mode ─────────────────────────────────────────────────────
-  if (orderAmountVnd < policy.minOrderVnd) {
-    return { success: false, reason: 'order_below_min', referral_id: referral.id };
-  }
-
   const cashbackVnd = policy.cashbackReferrerVnd;
 
   // Ensure referrer has wallet
@@ -494,12 +501,111 @@ export async function reverseReferralCashback(
     .prepare("SELECT * FROM referrals WHERE id = ? AND status = 'completed'")
     .bind(referralId)
     .first<ReferralRow>();
-  if (!referral || !referral.cashback_awarded_vnd) {
+  if (!referral) {
+    return { success: false, reason: 'not_applicable', referral_id: referralId };
+  }
+
+  const now = nowIso();
+
+  if (!referral.cashback_awarded_vnd && referral.bonus_type === 'points') {
+    const referrerLog = await db
+      .prepare(
+        "SELECT points_change FROM loyalty_point_logs WHERE customer_id = ? AND reason = 'referral' AND points_change > 0 ORDER BY created_at DESC LIMIT 1",
+      )
+      .bind(referral.referrer_id)
+      .first<{ points_change?: number }>()
+      .catch(() => null);
+    const pointsToReverse = Number(referrerLog?.points_change ?? DEFAULT_REFERRAL_POLICY.pointsReferrer);
+    const referrerRow = await db
+      .prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?')
+      .bind(referral.referrer_id)
+      .first<{ loyalty_points?: number; lifetime_points?: number }>()
+      .catch(() => null);
+    const newRefPoints = Math.max(0, Number(referrerRow?.loyalty_points ?? 0) - pointsToReverse);
+    const newRefLifetime = Math.max(0, Number(referrerRow?.lifetime_points ?? 0) - pointsToReverse);
+
+    await db
+      .prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
+      .bind(newRefPoints, newRefLifetime, now, referral.referrer_id)
+      .run();
+    await db
+      .prepare(
+        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .bind(
+        genId('ptl_'),
+        referral.referrer_id,
+        -pointsToReverse,
+        'referral_reversal',
+        newRefPoints,
+        `Referral reversal (${referralId}): -${pointsToReverse} points`,
+        now,
+      )
+      .run()
+      .catch(() => {});
+    await db
+      .prepare("UPDATE referrals SET status = 'reversed', reward_paid_at = ? WHERE id = ?")
+      .bind(now, referralId)
+      .run();
+    await db
+      .prepare(
+        'UPDATE referral_codes SET total_points_earned = CASE WHEN COALESCE(total_points_earned, 0) >= ? THEN total_points_earned - ? ELSE 0 END WHERE code = ?',
+      )
+      .bind(pointsToReverse, pointsToReverse, referral.referral_code)
+      .run()
+      .catch(() => {});
+
+    if (referral.referred_customer_id) {
+      try {
+        const welcomeLog = await db
+          .prepare(
+            "SELECT points_change FROM loyalty_point_logs WHERE customer_id = ? AND reason = 'referral_welcome' AND points_change > 0 ORDER BY created_at DESC LIMIT 1",
+          )
+          .bind(referral.referred_customer_id)
+          .first<{ points_change?: number }>()
+          .catch(() => null);
+        const welcomePts = Number(welcomeLog?.points_change ?? 0);
+        if (welcomePts > 0) {
+          const refereeRow = await db
+            .prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?')
+            .bind(referral.referred_customer_id)
+            .first<{ loyalty_points?: number; lifetime_points?: number }>()
+            .catch(() => null);
+          const nextRefereePts = Math.max(0, Number(refereeRow?.loyalty_points ?? 0) - welcomePts);
+          const nextRefereeLife = Math.max(0, Number(refereeRow?.lifetime_points ?? 0) - welcomePts);
+          await db
+            .prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
+            .bind(nextRefereePts, nextRefereeLife, now, referral.referred_customer_id)
+            .run();
+          await db
+            .prepare(
+              'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .bind(
+              genId('ptl_'),
+              referral.referred_customer_id,
+              -welcomePts,
+              'referral_welcome_reversal',
+              nextRefereePts,
+              `Referral welcome reversal (${referralId}): -${welcomePts} points`,
+              now,
+            )
+            .run()
+            .catch(() => {});
+        }
+      } catch {
+        // Optional referee points reversal
+      }
+    }
+
+    return { success: true, referrer_id: referral.referrer_id, referral_id: referralId, reward_points: -pointsToReverse, new_balance: newRefPoints };
+  }
+
+  if (!referral.cashback_awarded_vnd) {
     return { success: false, reason: 'not_applicable', referral_id: referralId };
   }
 
   const debitVnd = referral.cashback_awarded_vnd;
-  const now = nowIso();
 
   let wallet = effectiveTenant
     ? await db
@@ -556,6 +662,17 @@ export async function reverseReferralCashback(
   );
 
   await db.batch(batch);
+
+  try {
+    await db
+      .prepare(
+        'UPDATE referral_codes SET total_cashback_earned_vnd = CASE WHEN COALESCE(total_cashback_earned_vnd, 0) >= ? THEN total_cashback_earned_vnd - ? ELSE 0 END WHERE code = ?',
+      )
+      .bind(debitVnd, debitVnd, referral.referral_code)
+      .run();
+  } catch {
+    // Optional column/table in partial schemas
+  }
 
   // Also reverse referee welcome bonus if credited on this referral
   if (referral.referred_customer_id) {

@@ -45,33 +45,88 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Promotion has expired' }, 400);
     }
 
-    if (promotion.max_uses && promotion.current_uses >= promotion.max_uses) {
+    const maxUses = Number(promotion.max_uses ?? promotion.usage_limit ?? 0);
+    const currentUses = Number(promotion.current_uses ?? promotion.used_count ?? promotion.usage_count ?? 0);
+    if (maxUses > 0 && currentUses >= maxUses) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 400);
     }
 
     const callerCustomerId = String(user?.customerId || user?.id || '');
+    const perCustomerLimit = Number(
+      promotion.usage_limit_per_customer ?? promotion.per_customer_limit ?? promotion.max_uses_per_customer ?? 0
+    );
+    if (perCustomerLimit > 0 && callerCustomerId) {
+      const custUsage = await db
+        .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
+        .bind(body.promotionId, callerCustomerId)
+        .first<{ cnt: number }>()
+        .catch(() => null);
+      if (Number(custUsage?.cnt ?? 0) >= perCustomerLimit) {
+        return c.json({ success: false, error: 'Per-customer promotion usage limit reached' }, 400);
+      }
+    }
+
+    let orderRow: Record<string, unknown> | null = null;
     if (body.orderId) {
       try {
-        const orderRow = await db.prepare('SELECT * FROM orders WHERE id = ? LIMIT 1').bind(body.orderId).first<Record<string, unknown>>();
+        orderRow = await db.prepare('SELECT * FROM orders WHERE id = ? LIMIT 1').bind(body.orderId).first<Record<string, unknown>>();
         if (orderRow && orderRow.id) {
           if (!matchesTenantRow(orderRow, tenantId)) {
             return c.json({ success: false, error: 'Order not found' }, 404);
           }
-          if (user?.role === 'customer' && orderRow.customer_id !== undefined && orderRow.customer_id !== null && String(orderRow.customer_id).trim() !== '') {
-            if (String(orderRow.customer_id) !== callerCustomerId && String(orderRow.customer_id) !== String(user.id)) {
+          if (user?.role === 'customer') {
+            const ordCustId = orderRow.customer_id !== undefined && orderRow.customer_id !== null
+              ? String(orderRow.customer_id).trim()
+              : '';
+            if (!ordCustId || (ordCustId !== callerCustomerId && ordCustId !== String(user.id))) {
               return c.json({ success: false, error: 'Order not found' }, 404);
             }
           }
           if (typeof orderRow.status === 'string' && ['cancelled', 'failed'].includes(orderRow.status.toLowerCase())) {
             return c.json({ success: false, error: 'Cannot apply promotion to a cancelled order' }, 409);
           }
-        } else if (tenantId !== 'default' && tenantId !== '*') {
+        } else if (user?.role === 'customer' || (tenantId !== 'default' && tenantId !== '*')) {
           return c.json({ success: false, error: 'Order not found' }, 404);
         }
       } catch {
-        if (tenantId !== 'default' && tenantId !== '*') {
+        if (user?.role === 'customer' || (tenantId !== 'default' && tenantId !== '*')) {
           return c.json({ success: false, error: 'Order not found' }, 404);
         }
+      }
+    }
+
+    const orderBaseAmount = orderRow && orderRow.id
+      ? Number(orderRow.subtotal ?? orderRow.total_amount ?? orderRow.total ?? 0)
+      : 0;
+    const minOrderValue = Number(promotion.min_order_value ?? promotion.min_order_amount ?? promotion.min_order ?? 0);
+    if (orderRow && orderRow.id && minOrderValue > 0 && orderBaseAmount < minOrderValue) {
+      return c.json({ success: false, error: 'Order does not meet promotion minimum value' }, 400);
+    }
+
+    const rawDiscountType = String(promotion.discount_type ?? promotion.type ?? '').toLowerCase();
+    const promoDiscountVal = Number(promotion.discount_value ?? promotion.value ?? promotion.percent ?? 0);
+    const maxDiscountCap = Number(
+      promotion.max_discount_value ?? promotion.max_discount_amount ?? promotion.max_discount ?? 0
+    );
+    if (promoDiscountVal > 0) {
+      let maxAllowedDiscount = Infinity;
+      if (rawDiscountType === 'fixed' || rawDiscountType === 'fixed_amount' || rawDiscountType === 'amount') {
+        maxAllowedDiscount = promoDiscountVal;
+      } else if (rawDiscountType === 'percentage' || rawDiscountType === 'percent') {
+        if (orderRow && orderRow.id && orderBaseAmount > 0) {
+          maxAllowedDiscount = Math.round((orderBaseAmount * promoDiscountVal) / 100);
+        } else if (maxDiscountCap > 0) {
+          maxAllowedDiscount = maxDiscountCap;
+        }
+      }
+      if (maxDiscountCap > 0 && maxDiscountCap < maxAllowedDiscount) {
+        maxAllowedDiscount = maxDiscountCap;
+      }
+      if (orderRow && orderRow.id && orderBaseAmount > 0 && orderBaseAmount < maxAllowedDiscount) {
+        maxAllowedDiscount = orderBaseAmount;
+      }
+      if (Number.isFinite(maxAllowedDiscount) && Number(body.discountAmount) > maxAllowedDiscount) {
+        return c.json({ success: false, error: 'Discount amount exceeds promotion allowance' }, 400);
       }
     }
 

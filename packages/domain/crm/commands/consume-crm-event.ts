@@ -30,6 +30,13 @@ export interface CrmConsumeResult {
 export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmConsumeResult> {
   const { db, event } = input;
   const { eventType, customerId, orderId, payload } = event;
+  const rawEventTenant =
+    (typeof (event as unknown as Record<string, unknown>).tenantId === 'string' &&
+      String((event as unknown as Record<string, unknown>).tenantId).trim()) ||
+    (typeof payload?.tenantId === 'string' && String(payload.tenantId).trim()) ||
+    (typeof payload?.tenant_id === 'string' && String(payload.tenant_id).trim()) ||
+    '';
+  const eventTenant = rawEventTenant || undefined;
 
   try {
     switch (eventType) {
@@ -53,6 +60,7 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
             customerId,
             orderTotalVnd: total,
             cashbackUsedVnd: Number(payload.cashbackUsed || 0),
+            ...(eventTenant ? { tenantId: eventTenant } : {}),
           });
           loyaltyOk = aRes.ok;
         }
@@ -74,6 +82,7 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
           orderId,
           customerId,
           refundAmountVnd: total,
+          ...(eventTenant ? { tenantId: eventTenant } : {}),
         });
         const ok = rRes ? rRes.ok !== false : true;
         return { ok, processed: ok, actionTaken: ok ? 'refund_accrual_reversed' : 'refund_reversal_failed' };
@@ -95,6 +104,7 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
             orderId,
             customerId,
             orderTotalVnd: total,
+            ...(eventTenant ? { tenantId: eventTenant } : {}),
           });
           accrualOk = aRes ? aRes.ok !== false : true;
         }

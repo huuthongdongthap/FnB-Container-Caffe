@@ -76,7 +76,9 @@ export async function getCustomerAccount(
           `SELECT * FROM orders
            WHERE (customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?))
              AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
-           ORDER BY created_at DESC LIMIT ?`,
+              OR (customer_id = ?1 OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?2))
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3
+           ORDER BY created_at DESC LIMIT ?4`,
         )
         .bind(customerId, nonEmptyPhone, customerTenant, orderLimit)
         .all<Record<string, unknown>>()

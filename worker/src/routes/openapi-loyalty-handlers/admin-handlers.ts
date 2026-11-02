@@ -27,28 +27,34 @@ async function accountBelongsToTenant(
   tenantId: string
 ): Promise<boolean> {
   if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    return matchesTenantRow(row, tenantId);
+  const rawAccountTenant = 'tenant_id' in row && row.tenant_id !== undefined
+    ? String(row.tenant_id ?? '').trim()
+    : '';
+  if (rawAccountTenant && rawAccountTenant !== 'default' && !matchesTenantRow(row, tenantId)) {
+    return false;
   }
   const custId = String(row.customer_id ?? row.id ?? '').replace(/^la_/, '');
-  if (!custId) return tenantId === 'default';
+  if (custId) {
+    const custRow = (await db
+      .prepare('SELECT * FROM customers WHERE id = ?')
+      .bind(custId)
+      .first()
+      .catch(() => null)) as Record<string, unknown> | null;
+    if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
+      return matchesTenantRow(custRow, tenantId);
+    }
 
-  const custRow = (await db
-    .prepare('SELECT * FROM customers WHERE id = ?')
-    .bind(custId)
-    .first()
-    .catch(() => null)) as Record<string, unknown> | null;
-  if (custRow) {
-    return matchesTenantRow(custRow, tenantId);
+    const userRow = (await db
+      .prepare('SELECT id, tenant_id FROM users WHERE id = ?')
+      .bind(custId)
+      .first()
+      .catch(() => null)) as Record<string, unknown> | null;
+    if (userRow && 'tenant_id' in userRow && userRow.tenant_id !== undefined) {
+      return matchesTenantRow(userRow, tenantId);
+    }
   }
-
-  const userRow = (await db
-    .prepare('SELECT id, tenant_id FROM users WHERE id = ?')
-    .bind(custId)
-    .first()
-    .catch(() => null)) as Record<string, unknown> | null;
-  if (userRow) {
-    return matchesTenantRow(userRow, tenantId);
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
+    return matchesTenantRow(row, tenantId);
   }
 
   return tenantId === 'default';
@@ -104,10 +110,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const { account } = await getLoyaltyAccountWithFallback(db, body.customerId, now, tenantId);
 
-    if (!account) {
-      return c.json({ success: false, error: 'Loyalty account not found for customer' }, 404);
-    }
-    if ('tenant_id' in account && account.tenant_id !== undefined && !matchesTenantRow(account as Record<string, unknown>, tenantId)) {
+    if (!account || !(await accountBelongsToTenant(db, account as Record<string, unknown>, tenantId))) {
       return c.json({ success: false, error: 'Loyalty account not found for customer' }, 404);
     }
 
@@ -297,6 +300,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (tenantId !== '*') {
       let allAccounts: any[] = [];
+      let scopedQuerySucceeded = false;
       try {
         await db.prepare(
           `INSERT OR IGNORE INTO loyalty_accounts (
@@ -317,17 +321,21 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ).run().catch(() => {});
         const res = (await db.prepare('SELECT * FROM loyalty_accounts').all()) as { results?: any[] };
         allAccounts = res?.results || [];
+        scopedQuerySucceeded = true;
       } catch {
         const res = (await db
           .prepare(
             'SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers'
           )
           .all()
-          .catch(() => ({ results: [] }))) as { results?: any[] };
-        allAccounts = res?.results || [];
+          .catch(() => null)) as { results?: any[] } | null;
+        if (res) {
+          allAccounts = res.results || [];
+          scopedQuerySucceeded = true;
+        }
       }
 
-      if (tenantId !== 'default' || allAccounts.length > 0) {
+      if (scopedQuerySucceeded || tenantId !== 'default') {
         const scopedAccounts: any[] = [];
         const scopedAccountIds = new Set<string>();
         const scopedCustomerIds = new Set<string>();

@@ -130,7 +130,11 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
           if (refCustomerId && orderAmount >= 20000) {
             const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
             const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
-            await rewardReferralOnFirstOrder(db, refCustomerId, payment.order_id, orderAmount, refPolicy);
+            const orderTenantForRef =
+              typeof orderRecord.tenant_id === 'string' && String(orderRecord.tenant_id).trim()
+                ? String(orderRecord.tenant_id).trim()
+                : undefined;
+            await rewardReferralOnFirstOrder(db, refCustomerId, payment.order_id, orderAmount, refPolicy, orderTenantForRef);
           }
         } catch (err) { log.warn('PayOS referral reward error (non-blocking)', { message: (err as Error).message }); }
       }

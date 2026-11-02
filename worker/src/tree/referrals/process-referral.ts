@@ -8,13 +8,31 @@ function genId(prefix: string): string {
   return prefix + Date.now().toString(36) + rand;
 }
 
-export async function processReferralOnFirstOrder(db: D1Database, customerId: string): Promise<Record<string, unknown>> {
+export async function processReferralOnFirstOrder(db: D1Database, customerId: string, tenantId?: string): Promise<Record<string, unknown>> {
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() : null;
   const pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral>();
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
   }
 
-  const referrer = await db.prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?').bind(pending.referrer_id).first<Customer>();
+  let referrer: (Customer & { tenant_id?: string | null }) | null = null;
+  if (effectiveTenant) {
+    try {
+      referrer = await db.prepare(
+        "SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(pending.referrer_id, effectiveTenant).first<Customer & { tenant_id?: string | null }>();
+    } catch {
+      referrer = await db.prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?').bind(pending.referrer_id).first<Customer & { tenant_id?: string | null }>();
+    }
+    if (referrer && 'tenant_id' in referrer && referrer.tenant_id !== undefined) {
+      const refTenant = (referrer.tenant_id && String(referrer.tenant_id).trim()) || 'default';
+      if (refTenant !== effectiveTenant) {
+        referrer = null;
+      }
+    }
+  } else {
+    referrer = await db.prepare('SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?').bind(pending.referrer_id).first<Customer>();
+  }
   if (!referrer) {
     return { success: false, reason: 'referrer_not_found' };
   }
@@ -24,7 +42,17 @@ export async function processReferralOnFirstOrder(db: D1Database, customerId: st
   const newPoints = (referrer.loyalty_points || 0) + POINTS;
   const newLifetimePoints = (referrer.lifetime_points || 0) + POINTS;
 
-  await db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?').bind(newPoints, newLifetimePoints, now, referrer.id).run();
+  if (effectiveTenant) {
+    try {
+      await db.prepare(
+        "UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(newPoints, newLifetimePoints, now, referrer.id, effectiveTenant).run();
+    } catch {
+      await db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?').bind(newPoints, newLifetimePoints, now, referrer.id).run();
+    }
+  } else {
+    await db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?').bind(newPoints, newLifetimePoints, now, referrer.id).run();
+  }
   await db.prepare(
     'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(genId('ptl_'), referrer.id, POINTS, 'referral', newPoints, `Gi?i thi?u b?n: +${POINTS} di?m (legacy)`, now).run();

@@ -4,6 +4,11 @@ import { getDatabase } from '../../lib/db';
 import { getTenantId } from '../../middleware/tenant';
 
 export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
+  const user = c.get('user');
+  const allowedSummaryRoles = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'cashier'];
+  if (!user || !allowedSummaryRoles.includes(String(user.role || ''))) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
   const db = getDatabase(c);
   const query = ((c.req as any).valid ? (c.req as any).valid('query') : null) || c.req.query();
   const { locationId, dateFrom, dateTo } = query;

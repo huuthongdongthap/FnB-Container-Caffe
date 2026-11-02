@@ -107,6 +107,11 @@ export async function updateOrder(
   }
 
       // Reverse loyalty accrual if order had already earned points/cashback
+      const rawOrderTenantForCancel = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
+      const orderTenantForCancel =
+        typeof rawOrderTenantForCancel === 'string' && rawOrderTenantForCancel.trim()
+          ? rawOrderTenantForCancel.trim()
+          : undefined;
       try {
         const earnRow = await db.prepare(
           "SELECT customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
@@ -120,6 +125,7 @@ export async function updateOrder(
               customerId: earnRow.customer_id,
               refundAmountVnd: Number(results[0]?.total ?? 0),
               reason: 'order_cancelled',
+              ...(orderTenantForCancel ? { tenantId: orderTenantForCancel } : {}),
             });
           }
         }
@@ -159,7 +165,7 @@ export async function updateOrder(
       if (refRow) {
         try {
           const { reverseReferralCashback } = await import('@aura/domain-crm');
-          await reverseReferralCashback(db, refRow.id);
+          await reverseReferralCashback(db, refRow.id, orderTenantForCancel);
         } catch (revErr) {
           log.error('Reverse cashback error (non-blocking):', { message: (revErr as Error).message });
         }
@@ -202,7 +208,7 @@ if (['served', 'completed'].includes(body.status as string)) {
           let visitCustomer: { id: string } | null = null;
           try {
             visitCustomer = await db.prepare(
-              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
             ).bind(order.customer_email, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
           } catch {
             visitCustomer = await db.prepare(
@@ -249,7 +255,7 @@ if (['served', 'completed'].includes(body.status as string)) {
             let customer: { id: string } | null = null;
             try {
               customer = await db.prepare(
-                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) LIMIT 1"
+                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
               ).bind(order.customer_email, order.customer_phone, orderTenant, orderTenant).first<{ id: string }>();
             } catch {
               customer = await db.prepare(
@@ -262,8 +268,12 @@ if (['served', 'completed'].includes(body.status as string)) {
           if (customerId) {
             const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
             const refPolicy = await resolveReferralPolicy(env.AUTH_KV as any).catch(() => DEFAULT_REFERRAL_POLICY);
+            const orderTenantForRef =
+              typeof order.tenant_id === 'string' && order.tenant_id.trim()
+                ? order.tenant_id.trim()
+                : undefined;
             const result = await rewardReferralOnFirstOrder(
-              db, customerId, id, order.total, refPolicy
+              db, customerId, id, order.total, refPolicy, orderTenantForRef
             );
             if (result.success) {
               log.info('Refer v3: +10k cashback granted', { customer_id: customerId });

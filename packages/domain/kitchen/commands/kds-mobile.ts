@@ -40,7 +40,7 @@ export async function getKdsMobile(
     const tenantClause = tenantId === '*'
       ? ''
       : tenantId === 'default'
-        ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
+        ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
         : ' AND o.tenant_id = ?';
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
     let orders: { results: unknown[] };

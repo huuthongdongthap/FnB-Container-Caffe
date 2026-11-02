@@ -55,7 +55,7 @@ recommendationsRouter.get('/frequently-bought-together', async (c) => {
   const { results: affinities } = await db.prepare(`
     SELECT item_b AS id, co_occurrence_count, affinity_score
     FROM ai_product_affinities
-    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND item_a = ?
+    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND item_a = ?
     ORDER BY affinity_score DESC, co_occurrence_count DESC
     LIMIT ?
   `).bind(tenantId, tenantId, itemId, limit).all<{ id: string; co_occurrence_count: number; affinity_score: number }>().catch(() => ({ results: [] }));
@@ -90,7 +90,7 @@ recommendationsRouter.get('/trending', async (c) => {
   const hoursAgo = new Date(Date.now() - range * 3600000).toISOString();
   const { results: orders } = await db.prepare(`
     SELECT items FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
+    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
     ORDER BY created_at DESC LIMIT 200
   `).bind(tenantId, tenantId, hoursAgo).all<{ items: string }>().catch(() => ({ results: [] }));
 
@@ -128,7 +128,7 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'm
 
   const { results: orders } = await db.prepare(`
     SELECT items FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND status != 'cancelled'
+    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled'
     ORDER BY created_at DESC LIMIT 500
   `).bind(rawTenant, rawTenant).all<{ items: string }>();
 

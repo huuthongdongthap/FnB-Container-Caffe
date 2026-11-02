@@ -4,8 +4,10 @@ import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
 import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
+import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { canAccessOrder } from '@aura/domain-customer';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
+import { restoreInventoryForOrder } from '@aura/domain-inventory';
 import { getDatabase } from '../../lib/db';
 import { getTenantId } from '../../middleware/tenant';
 import { handleCancelOrder } from './order-cancel-handlers';
@@ -68,6 +70,24 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
   if (!access.allowed) {
     return c.json({ success: false, error: access.reason || 'Forbidden' }, 403);
   }
+  if (isTerminal(existing.status)) {
+    return c.json({ success: false, error: `Cannot transition terminal order (${existing.status})` }, 400);
+  }
+  if (user?.role === 'customer') {
+    const forbiddenCustomerFields = [
+      'confirmed_at', 'confirmedAt', 'preparing_at', 'preparingAt',
+      'ready_at', 'readyAt', 'completed_at', 'completedAt',
+      'served_at', 'servedAt', 'cancelled_at', 'cancelledAt',
+      'payment_status', 'paymentStatus', 'assigned_staff_id', 'assignedStaffId',
+    ];
+    if (
+      body.status !== 'cancelled' ||
+      !['pending', 'confirmed'].includes(existing.status) ||
+      forbiddenCustomerFields.some((k) => body[k] !== undefined)
+    ) {
+      return c.json({ success: false, error: 'Customers may only cancel pending or confirmed orders' }, 403);
+    }
+  }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
@@ -76,13 +96,22 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
 
   if (body.status !== undefined) {
     if (existing.status !== body.status) {
-      if (isTerminal(existing.status)) {
-        return c.json({ success: false, error: `Cannot transition terminal order (${existing.status})` }, 400);
-      }
       const structural = canTransition(existing.status, body.status);
       if (!structural.ok) return c.json({ success: false, error: structural.error }, 400);
       const authCheck = canActorTransition(toActorRole(user?.role), existing.status, body.status);
       if (!authCheck.ok) return c.json({ success: false, error: authCheck.error }, 403);
+      const tenantId = getTenantId(c);
+      const transition = await executeKdsStatusTransition(db, id, body.status, user?.role, {
+        tenantId: tenantId === '*' ? (existing.tenant_id || 'default') : tenantId,
+        kv: c.env?.AUTH_KV,
+        env: c.env as unknown as Record<string, unknown>,
+      });
+      if (!transition.success) {
+        return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
+      }
+      if (body.status === 'cancelled') {
+        await restoreInventoryForOrder({ AURA_DB: db as any }, id).catch(() => {});
+      }
     }
 
     updates.push('status = ?');

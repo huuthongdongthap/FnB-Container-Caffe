@@ -84,7 +84,7 @@ export async function getCustomer360(
          o.customer_id = ?
          OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
        )
-       AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default'))
+       AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default') OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
        ORDER BY o.created_at DESC LIMIT ?`,
     )
     .bind(customerId, customerId, orderLimit)

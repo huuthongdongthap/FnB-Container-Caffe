@@ -28,7 +28,7 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
 
     try {
       let canonicalQuery =
-        "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || 'T' || time) AS start_time, COALESCE(reservation_time, date || 'T' || time) AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
+        "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, COALESCE(reservation_time, date || 'T' || time) AS start_time, COALESCE(reservation_time, date || 'T' || time) AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
       const canonicalParams: unknown[] = [tenantId, tenantId];
       if (status) {
         canonicalQuery += ' AND status = ?';
@@ -42,7 +42,7 @@ export function registerBookingsHandler(router: Hono<{ Bindings: Env }>): void {
     } catch {
       try {
         let fallbackQuery =
-          "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)";
+          "SELECT id, cal_booking_uid AS cal_uid, customer_name AS attendee_name, customer_email AS attendee_email, reservation_time AS start_time, reservation_time AS end_time, status, special_requests AS metadata, tenant_id, created_at, updated_at FROM reservations WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
         const fallbackParams: unknown[] = [tenantId, tenantId];
         if (status) {
           fallbackQuery += ' AND status = ?';

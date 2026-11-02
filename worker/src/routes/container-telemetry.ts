@@ -138,12 +138,12 @@ containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin'
       SELECT t.*
       FROM container_telemetry_logs t
       INNER JOIN (
-        SELECT container_id, COALESCE(NULLIF(tenant_id, ''), 'default') as norm_tenant, MAX(created_at) as max_created
+        SELECT container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') as norm_tenant, MAX(created_at) as max_created
         FROM container_telemetry_logs
-        WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)
-        GROUP BY container_id, COALESCE(NULLIF(tenant_id, ''), 'default')
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+        GROUP BY container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default')
       ) latest ON t.container_id = latest.container_id
-        AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = latest.norm_tenant
+        AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = latest.norm_tenant
         AND t.created_at = latest.max_created
     `).bind(tenantId, tenantId).all<{
       id: string; container_id: string; tenant_id?: string | null; power_source: string; battery_percentage: number | null;
@@ -186,7 +186,7 @@ containerTelemetryRouter.get('/containers/:id/history', requireAuth(['owner', 'm
 
   try {
     const { results } = await db.prepare(
-      "SELECT * FROM container_telemetry_logs WHERE container_id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) ORDER BY created_at DESC LIMIT 50"
+      "SELECT * FROM container_telemetry_logs WHERE container_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 50"
     ).bind(containerId, tenantId, tenantId).all<Record<string, unknown>>();
 
     const filtered = (results || []).filter((row) => matchesTenantRow(row, tenantId));

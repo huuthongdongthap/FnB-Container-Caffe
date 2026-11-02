@@ -39,7 +39,7 @@ staffTipsRouter.get('/', async (c) => {
     WHERE date(o.created_at) = ? AND o.tip_amount > 0`;
   const params: unknown[] = [date, date];
   if (tenantId !== '*') {
-    query += " AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?";
+    query += " AND (COALESCE(NULLIF(o.tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?3)";
     params.push(tenantId);
   }
   if (staffId) { query += ' AND o.updated_by = ?'; params.push(staffId); }
@@ -90,7 +90,7 @@ staffTipsRouter.get('/:staffId', async (c) => {
                 COUNT(DISTINCT o.id) AS order_count
          FROM orders o
          WHERE o.updated_by = ? AND o.tip_amount > 0
-           AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?
+           AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
            AND date(o.created_at) >= date(?, '-' || ? || ' days')
          GROUP BY date(o.created_at)
          ORDER BY date DESC`

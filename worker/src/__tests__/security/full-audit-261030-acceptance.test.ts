@@ -5334,4 +5334,445 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       sql.close();
     }
   });
+
+  it('enforces OpenAPI Orders customer mutation & tenant boundaries (AF1), CRM segments/lookup/referral points integrity (AF2), Promotions usage cap & order validation (AF3), and Loyalty customer-tenant authority & empty summary isolation (AF4)', async () => {
+    const { OpenAPIHono } = await import('@hono/zod-openapi');
+    const { handleOpenApiUpdateOrder } = await import('../../routes/openapi-orders-handlers/order-write-handlers');
+    const { handleCancelOrder } = await import('../../routes/openapi-orders-handlers/order-cancel-handlers');
+    const { handleGetOrderSummary } = await import('../../routes/openapi-orders-handlers/order-summary-handlers');
+    const { getOrder } = await import('../../../../packages/domain/order/queries/get-order');
+    const { buildSegment } = await import('../../../../packages/domain/crm/commands/segments');
+    const { lookupProfile } = await import('../../../../packages/domain/crm/lookup-profile');
+    const { rewardReferralOnFirstOrder, reverseReferralCashback, DEFAULT_REFERRAL_POLICY } = await import('../../../../packages/domain/crm/commands/referral');
+    const { registerUsageHandlers } = await import('../../routes/openapi-promotions-handlers/usage-handlers');
+    const { getLoyaltyAccountWithFallback } = await import('../../routes/openapi-loyalty-handlers/loyalty-db-helpers');
+    const { registerAdminHandlers } = await import('../../routes/openapi-loyalty-handlers/admin-handlers');
+
+    const sql = new DatabaseSync(':memory:');
+    function statement(query: string, values: unknown[] = []): any {
+      return {
+        bind(...args: unknown[]) { return statement(query, args); },
+        async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+        async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+        async run() {
+          const r = sql.prepare(query).run(...(values as any[]));
+          return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+        },
+      };
+    }
+    const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+
+    try {
+      const nowIso = new Date().toISOString();
+      sql.exec(`
+        CREATE TABLE orders (
+          id TEXT PRIMARY KEY,
+          items TEXT,
+          total INTEGER DEFAULT 0,
+          subtotal INTEGER DEFAULT 0,
+          shipping_fee INTEGER DEFAULT 0,
+          discount INTEGER DEFAULT 0,
+          status TEXT DEFAULT 'pending',
+          customer_id TEXT,
+          customer_name TEXT,
+          customer_phone TEXT,
+          customer_address TEXT,
+          payment_method TEXT DEFAULT 'cash',
+          payment_status TEXT DEFAULT 'pending',
+          table_id TEXT,
+          order_type TEXT DEFAULT 'dine_in',
+          notes TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE order_items (
+          id TEXT PRIMARY KEY,
+          order_id TEXT,
+          product_id TEXT,
+          name TEXT,
+          quantity INTEGER DEFAULT 1,
+          unit_price INTEGER DEFAULT 0,
+          subtotal INTEGER DEFAULT 0
+        );
+        CREATE TABLE payments (
+          id TEXT PRIMARY KEY,
+          order_id TEXT,
+          amount INTEGER DEFAULT 0,
+          method TEXT,
+          status TEXT
+        );
+        CREATE TABLE cafe_tables (
+          id TEXT PRIMARY KEY,
+          table_number INTEGER,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          visit_count INTEGER DEFAULT 0,
+          total_spent INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE customer_identities (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          identifier_type TEXT,
+          identifier_value TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE consents (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          purpose TEXT,
+          granted INTEGER DEFAULT 1,
+          revoked_at TEXT
+        );
+        CREATE TABLE visits (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          visited_at TEXT,
+          channel TEXT
+        );
+        CREATE TABLE referrals (
+          id TEXT PRIMARY KEY,
+          referrer_id TEXT,
+          referred_customer_id TEXT,
+          referral_code TEXT,
+          status TEXT DEFAULT 'pending',
+          bonus_type TEXT,
+          cashback_awarded_vnd INTEGER DEFAULT 0,
+          first_order_id TEXT,
+          first_order_amount INTEGER DEFAULT 0,
+          reward_paid_at TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE referral_codes (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          code TEXT UNIQUE,
+          times_used INTEGER DEFAULT 0,
+          total_points_earned INTEGER DEFAULT 0,
+          total_cashback_earned_vnd INTEGER DEFAULT 0,
+          created_at TEXT
+        );
+        CREATE TABLE loyalty_point_logs (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          order_id TEXT,
+          points_change INTEGER,
+          reason TEXT,
+          balance_after INTEGER,
+          description TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE promotions (
+          id TEXT PRIMARY KEY,
+          code TEXT,
+          name TEXT,
+          type TEXT DEFAULT 'percentage',
+          discount_type TEXT DEFAULT 'percentage',
+          discount_value REAL DEFAULT 10,
+          min_order_value REAL DEFAULT 100000,
+          max_discount_value REAL DEFAULT 25000,
+          max_uses INTEGER DEFAULT 10,
+          current_uses INTEGER DEFAULT 0,
+          usage_count INTEGER DEFAULT 0,
+          usage_limit_per_customer INTEGER DEFAULT 1,
+          is_active INTEGER DEFAULT 1,
+          valid_from TEXT,
+          valid_to TEXT,
+          applicable_items TEXT,
+          excluded_items TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE promotion_usages (
+          id TEXT PRIMARY KEY,
+          promotion_id TEXT,
+          order_id TEXT,
+          customer_id TEXT,
+          discount_amount REAL,
+          idempotency_key TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE loyalty_accounts (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT UNIQUE,
+          current_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          tier TEXT DEFAULT 'bronze',
+          order_count INTEGER DEFAULT 0,
+          total_spent INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          last_activity_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE loyalty_transactions (
+          id TEXT PRIMARY KEY,
+          account_id TEXT,
+          customer_id TEXT,
+          type TEXT,
+          points INTEGER,
+          balance_after INTEGER,
+          order_id TEXT,
+          reward_id TEXT,
+          description TEXT,
+          reason TEXT,
+          idempotency_key TEXT,
+          created_by TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE audit_logs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          action TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+      `);
+
+      const ordDefId = '11111111-2222-4333-8444-555555555501';
+      const ordBId = '11111111-2222-4333-8444-555555555502';
+      const ordSmallId = '11111111-2222-4333-8444-555555555503';
+      const ordDef2Id = '11111111-2222-4333-8444-555555555504';
+      const missingOrdId = '99999999-9999-4999-8999-999999999999';
+
+      // Seed orders (note: orders table intentionally lacks points_earned/cashback_earned to exercise getOrder fallback!)
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, subtotal, status, customer_id, customer_name, customer_phone, tenant_id, created_at, updated_at)
+         VALUES
+          (?, '[]', 120000, 120000, 'pending', 'cust-af-1', 'Cust 1', '0909111222', 'default', ?, ?),
+          (?, '[]', 150000, 150000, 'pending', 'cust-af-1', 'Cust 1 Store B', '0909111222', 'store-b', ?, ?),
+          (?, '[]', 50000, 50000, 'pending', 'cust-af-1', 'Cust 1 Small', '0909111222', 'default', ?, ?)`
+      ).run(ordDefId, nowIso, nowIso, ordBId, nowIso, nowIso, ordSmallId, nowIso, nowIso);
+
+      const env: any = { AURA_DB: db };
+
+      // AF1: Customer cannot call PATCH /api/orders/:id to modify notes/customer without cancelling, cannot cancel across tenants, cannot view store summary, and getOrder fallback enforces tenant isolation
+      const orderApp = new OpenAPIHono<any>();
+      orderApp.use('*', async (c, next) => {
+        c.set('user', { id: 'cust-af-1', role: 'customer', tenantId: 'default' });
+        c.set('tenantId', 'default');
+        await next();
+      });
+      orderApp.patch('/api/orders/:id', handleOpenApiUpdateOrder as any);
+      orderApp.post('/api/orders/:id/cancel', handleCancelOrder as any);
+      orderApp.get('/api/orders/summary', handleGetOrderSummary as any);
+
+      const custNotesPatchRes = await orderApp.fetch(
+        new Request(`http://localhost/api/orders/${ordDefId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: 'Customer tampering notes without cancelling' }),
+        }),
+        env
+      );
+      expect(custNotesPatchRes.status).toBe(403);
+
+      const custCrossTenantCancelRes = await orderApp.fetch(
+        new Request(`http://localhost/api/orders/${ordBId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Cross-tenant cancel attempt' }),
+        }),
+        env
+      );
+      expect(custCrossTenantCancelRes.status).toBe(404);
+
+      const custSummaryRes = await orderApp.fetch(
+        new Request('http://localhost/api/orders/summary'),
+        env
+      );
+      expect(custSummaryRes.status).toBe(403);
+
+      const crossGetOrderRes = await getOrder(
+        new Request(`http://localhost/api/orders/${ordBId}`),
+        env,
+        ordBId,
+        'default'
+      );
+      expect(crossGetOrderRes.status).toBe(404);
+
+      // AF2: lookupProfile rejects empty phone and ignores cross-tenant customer_identities; rewardReferralOnFirstOrder enforces minOrderVnd in points mode and reverseReferralCashback reverses points referrals
+      sql.prepare(
+        `INSERT INTO customers (id, name, phone, loyalty_tier, loyalty_points, lifetime_points, tenant_id, created_at, updated_at)
+         VALUES
+          ('cust-af-ref', 'Referrer', '0909333444', 'silver', 50, 50, 'default', ?, ?),
+          ('cust-af-new', 'Referee', '0909555666', 'bronze', 20, 20, 'default', ?, ?),
+          ('cust-af-b-only', 'Store B Customer', '0909777888', 'gold', 200, 200, 'store-b', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, created_at)
+         VALUES ('cid-af-b', 'cust-af-b-only', 'phone', '0909777888', ?)`
+      ).run(nowIso);
+
+      const emptyLookup = await lookupProfile(db, '   ', { tenantId: 'default' });
+      expect(emptyLookup.found).toBe(false);
+
+      const crossIdentityLookup = await lookupProfile(db, '0909777888', { tenantId: 'default' });
+      expect(crossIdentityLookup.found).toBe(false);
+
+      const sameTenantIdentityLookup = await lookupProfile(db, '0909777888', { tenantId: 'store-b' });
+      expect(sameTenantIdentityLookup.found).toBe(true);
+      expect(sameTenantIdentityLookup.customerId).toBe('cust-af-b-only');
+
+      const segDefault = await buildSegment(db, 'dormant_60d', undefined, { tenantId: 'default' });
+      expect(segDefault.customers.some((c) => c.id === 'cust-af-b-only')).toBe(false);
+
+      sql.prepare(
+        `INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at)
+         VALUES ('rc-af-1', 'cust-af-ref', 'REF-AF1', 1, 0, ?)`
+      ).run(nowIso);
+      sql.prepare(
+        `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, status, created_at)
+         VALUES ('ref-af-1', 'cust-af-ref', 'cust-af-new', 'REF-AF1', 'pending', ?)`
+      ).run(nowIso);
+
+      const pointsPolicy = { ...DEFAULT_REFERRAL_POLICY, bonusType: 'points' as const, minOrderVnd: 50000, pointsReferrer: 100, pointsReferee: 50 };
+      const belowMinPointsReward = await rewardReferralOnFirstOrder(db, 'cust-af-new', ordSmallId, 30000, pointsPolicy, 'default');
+      expect(belowMinPointsReward.success).toBe(false);
+      expect(belowMinPointsReward.reason).toBe('order_below_min');
+
+      const validPointsReward = await rewardReferralOnFirstOrder(db, 'cust-af-new', ordDefId, 120000, pointsPolicy, 'default');
+      expect(validPointsReward.success).toBe(true);
+      const refereeWelcomeLog = sql.prepare(
+        "SELECT balance_after FROM loyalty_point_logs WHERE customer_id = 'cust-af-new' AND reason = 'referral_welcome'"
+      ).get() as { balance_after: number };
+      expect(refereeWelcomeLog.balance_after).toBe(70);
+
+      const reversedPointsRef = await reverseReferralCashback(db, 'ref-af-1', 'default');
+      expect(reversedPointsRef.success).toBe(true);
+      const referrerAfterRev = sql.prepare("SELECT loyalty_points FROM customers WHERE id = 'cust-af-ref'").get() as { loyalty_points: number };
+      const refereeAfterRev = sql.prepare("SELECT loyalty_points FROM customers WHERE id = 'cust-af-new'").get() as { loyalty_points: number };
+      expect(referrerAfterRev.loyalty_points).toBe(50);
+      expect(refereeAfterRev.loyalty_points).toBe(20);
+
+      // AF3: POST /api/promotions/use enforces order existence for customer, minOrderValue, discountAmount cap, and per-customer limit
+      const promoId = '33333333-3333-4333-8333-333333333333';
+      sql.prepare(
+        `INSERT INTO promotions (id, code, name, type, discount_type, discount_value, min_order_value, max_discount_value, max_uses, current_uses, usage_limit_per_customer, is_active, tenant_id, created_at, updated_at)
+         VALUES (?, 'AF3PROMO', 'AF3 Promo', 'percentage', 10, 100000, 20000, 10, 0, 1, 1, 'default', ?, ?)`
+          .replace("'percentage', 10", "'percentage', 'percentage', 10")
+      ).run(promoId, nowIso, nowIso);
+
+      const promoApp = new OpenAPIHono<any>();
+      promoApp.use('*', async (c, next) => {
+        c.set('user', { id: 'cust-af-1', customerId: 'cust-af-1', role: 'customer', tenantId: 'default' });
+        c.set('tenantId', 'default');
+        await next();
+      });
+      registerUsageHandlers(promoApp);
+
+      // Fake orderId rejected for customer (404)
+      const fakeOrderPromoRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ promotionId: promoId, orderId: missingOrdId, discountAmount: 10000 }),
+        }),
+        env
+      );
+      expect(fakeOrderPromoRes.status).toBe(404);
+
+      // Order below min_order_value (50000 < 100000) rejected (400)
+      const belowMinPromoRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ promotionId: promoId, orderId: ordSmallId, discountAmount: 5000 }),
+        }),
+        env
+      );
+      expect(belowMinPromoRes.status).toBe(400);
+
+      // Inflated discountAmount (50000 > 10% of 120000 = 12000) rejected (400)
+      const inflatedDiscountRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ promotionId: promoId, orderId: ordDefId, discountAmount: 50000 }),
+        }),
+        env
+      );
+      expect(inflatedDiscountRes.status).toBe(400);
+
+      // Valid usage succeeds (200)
+      const validPromoUseRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ promotionId: promoId, orderId: ordDefId, discountAmount: 12000 }),
+        }),
+        env
+      );
+      expect(validPromoUseRes.status).toBe(200);
+
+      // Second usage by same customer exceeds usage_limit_per_customer = 1 (400)
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, subtotal, status, customer_id, tenant_id, created_at, updated_at)
+         VALUES (?, '[]', 150000, 150000, 'pending', 'cust-af-1', 'default', ?, ?)`
+      ).run(ordDef2Id, nowIso, nowIso);
+      const perCustLimitRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ promotionId: promoId, orderId: ordDef2Id, discountAmount: 15000 }),
+        }),
+        env
+      );
+      expect(perCustLimitRes.status).toBe(400);
+
+      // AF4: Loyalty account with table-default tenant_id='default' owned by store-b customer is isolated to store-b, and empty tenant summary does not leak global transactions
+      sql.prepare(
+        `INSERT INTO loyalty_accounts (id, customer_id, current_points, lifetime_points, tier, tenant_id, last_activity_at, created_at, updated_at)
+         VALUES ('la_cust-af-b-only', 'cust-af-b-only', 200, 200, 'gold', 'default', ?, ?, ?)`
+      ).run(nowIso, nowIso, nowIso);
+
+      const leakCheckDefault = await getLoyaltyAccountWithFallback(db, 'cust-af-b-only', nowIso, 'default');
+      expect(leakCheckDefault.account).toBeNull();
+
+      const validCheckStoreB = await getLoyaltyAccountWithFallback(db, 'cust-af-b-only', nowIso, 'store-b');
+      expect(validCheckStoreB.account).not.toBeNull();
+      expect(validCheckStoreB.account.customer_id).toBe('cust-af-b-only');
+
+      // Delete default customers/accounts and verify default summary does not fall through to store-b's loyalty_transactions
+      sql.exec("DELETE FROM customers WHERE tenant_id = 'default'; DELETE FROM loyalty_accounts WHERE customer_id != 'cust-af-b-only';");
+      sql.prepare(
+        `INSERT INTO loyalty_transactions (id, account_id, customer_id, type, points, balance_after, description, created_at)
+         VALUES ('ltx-b-1', 'la_cust-af-b-only', 'cust-af-b-only', 'earn', 200, 200, 'Store B earn', ?)`
+      ).run(nowIso);
+
+      const loyaltyAdminApp = new OpenAPIHono<any>();
+      loyaltyAdminApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-def', role: 'manager', tenantId: 'default' });
+        c.set('tenantId', 'default');
+        await next();
+      });
+      registerAdminHandlers(loyaltyAdminApp);
+
+      const summaryDefRes = await loyaltyAdminApp.fetch(
+        new Request('http://localhost/api/loyalty/admin/summary'),
+        env
+      );
+      expect(summaryDefRes.status).toBe(200);
+      const summaryDefJson = (await summaryDefRes.json()) as { data: { totalMembers: number; totalPointsIssued: number } };
+      expect(summaryDefJson.data.totalMembers).toBe(0);
+      expect(summaryDefJson.data.totalPointsIssued).toBe(0);
+    } finally {
+      sql.close();
+    }
+  });
 });

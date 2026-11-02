@@ -46,7 +46,7 @@ franchiseRouter.get('/locations', async (c) => {
   const params: unknown[] = [];
   if (targetTenant !== '*') {
     if (targetTenant === 'default') {
-      sql += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     } else {
       sql += ' AND tenant_id = ?';
     }
@@ -141,7 +141,7 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
   let query = `
     SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
     FROM orders
-    WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND status != 'cancelled'
+    WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1) AND status != 'cancelled'
   `;
   const params: unknown[] = [location.tenant_id || 'default'];
 
