@@ -4550,7 +4550,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/SELECT id FROM subscription_invoices WHERE subscription_id = \? AND period_start = \?/i.test(sql)) {
             return invoices.find((i) => i.subscription_id === args[0] && i.period_start === args[1]) ?? null;
           }
-          if (/SELECT COUNT\(\*\) as count, COALESCE\(SUM\(amount_vnd\), 0\) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = 'default'/i.test(sql)) {
+          if (/SELECT COUNT\(\*\) as count, COALESCE\(SUM\(amount_vnd\), 0\) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\((?:TRIM\(tenant_id\)|tenant_id), ''\), 'default'\) = 'default'/i.test(sql)) {
             const defActive = subscriptions.filter(
               (s) => s.status === 'active' && ((String(s.tenant_id ?? '').trim()) || 'default') === 'default'
             );
@@ -4562,7 +4562,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/SELECT COUNT\(\*\) as count FROM subscriptions WHERE status = 'cancelled'/i.test(sql)) {
             return { count: 0 };
           }
-          if (/SELECT COUNT\(\*\) as count FROM subscriptions WHERE created_at >= \? AND COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = 'default'/i.test(sql)) {
+          if (/SELECT COUNT\(\*\) as count FROM subscriptions WHERE created_at >= \? AND COALESCE\(NULLIF\((?:TRIM\(tenant_id\)|tenant_id), ''\), 'default'\) = 'default'/i.test(sql)) {
             const defNew = subscriptions.filter(
               (s) => ((String(s.tenant_id ?? '').trim()) || 'default') === 'default'
             );
@@ -5634,6 +5634,439 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(lookupBody.ok).toBe(true);
       expect(lookupBody.member.cashback_balance).toBe(5000);
       mockDb.prepare = origPrepare;
+    });
+  });
+
+  // =========================================================================
+  // Suite 23: Phase S1–S3 — Loyalty Cashback/Rewards Routes, Checkin Approve Wallet,
+  //           CRM Accrual/Reversal/Referral Wallets & Subscription MRR Whitespace Normalization
+  // =========================================================================
+  describe('Suite 23: Loyalty Cashback/Rewards Routes, Checkin Approve Wallet, CRM Accrual/Reversal/Referral Wallets & Subscription MRR Whitespace Normalization (S1–S3)', () => {
+    it('scopes /api/loyalty/cashback & /rewards & /redeem by store tenant, scopes checkin approve wallet, scopes CRM applyAccrual/reverseAccrual/referral wallets by tenant, and normalizes whitespace tenant_id in updateMRRSnapshot & subscription stats/trend (S1–S3)', async () => {
+      const { loyaltyRouter } = await import('../../routes/loyalty');
+      const { checkinRouter } = await import('../../routes/checkin');
+      const { applyAccrual } = await import('../../../../packages/domain/crm/commands/accrual');
+      const { reverseAccrual } = await import('../../../../packages/domain/crm/commands/refund-reversal');
+      const { rewardReferralOnFirstOrder } = await import('../../../../packages/domain/crm/commands/referral');
+      const { processReferralCashbackOnFirstOrder } = await import('../../tree/referrals/referral-cashback');
+      const { updateMRRSnapshot } = await import('../../tree/subscriptions/mrr-calculator');
+      const { getStatsHandler, getMRRTrend } = await import('../../tree/subscriptions/sub-handlers');
+      const { Hono } = await import('hono');
+
+      const customers: Array<Record<string, unknown>> = [
+        {
+          id: 'cust_fran_s1',
+          name: 'SaDec Customer S1',
+          phone: '0901239999',
+          email: 'fran_s1@aura.vn',
+          loyalty_points: 500,
+          lifetime_points: 500,
+          loyalty_tier: 'gold',
+          tenant_id: 'tenant_sadec_02',
+        },
+        {
+          id: 'cust_def_ref',
+          name: 'Default Referrer',
+          phone: '0901230000',
+          email: 'def_ref@aura.vn',
+          loyalty_points: 100,
+          lifetime_points: 100,
+          loyalty_tier: 'silver',
+          tenant_id: 'default',
+        },
+      ];
+
+      const wallets: Array<Record<string, unknown>> = [
+        {
+          id: 'wal_def_s1',
+          customer_id: 'cust_fran_s1',
+          balance: 900000,
+          total_earned: 900000,
+          total_spent: 0,
+          tenant_id: 'default',
+        },
+        {
+          id: 'wal_fran_s1',
+          customer_id: 'cust_fran_s1',
+          balance: 25000,
+          total_earned: 25000,
+          total_spent: 0,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const cashbackTxs: Array<Record<string, unknown>> = [
+        {
+          id: 'ctx_def_1',
+          wallet_id: 'wal_def_s1',
+          customer_id: 'cust_fran_s1',
+          type: 'earn',
+          amount: 900000,
+          created_at: '2026-10-01T00:00:00Z',
+        },
+        {
+          id: 'ctx_fran_1',
+          wallet_id: 'wal_fran_s1',
+          customer_id: 'cust_fran_s1',
+          type: 'earn',
+          amount: 25000,
+          created_at: '2026-10-02T00:00:00Z',
+        },
+      ];
+
+      const rewards: Array<Record<string, unknown>> = [
+        { id: 'rew_def_only', title: 'Default Store Mug', point_cost: 100, tenant_id: 'default' },
+        { id: 'rew_fran_only', title: 'SaDec Phin Filter', point_cost: 100, tenant_id: 'tenant_sadec_02' },
+        { id: 'rew_global', title: 'Global Sticker', point_cost: 50 },
+      ];
+
+      const checkins: Array<Record<string, unknown>> = [
+        {
+          id: 'ci_fran_new_wal',
+          customer_id: 'cust_fran_new_wal',
+          customer_name: 'SaDec Checkin Guest',
+          checkin_date: '2026-11-02',
+          checkin_time: '08:30:00',
+          reward_amount: 5000,
+          status: 'pending',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const orders: Array<Record<string, unknown>> = [
+        {
+          id: 'ord_fran_s2',
+          customer_id: 'cust_fran_s1',
+          total: 100000,
+          cashback_used: 0,
+          points_earned: 13,
+          cashback_earned: 7000,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const referrals: Array<Record<string, unknown>> = [
+        {
+          id: 'ref_cross_s2',
+          referrer_id: 'cust_def_ref',
+          referred_customer_id: 'cust_fran_s1',
+          referral_code: 'REFDEF99',
+          status: 'pending',
+          bonus_type: 'cashback',
+        },
+      ];
+
+      const subscriptions: Array<Record<string, unknown>> = [
+        {
+          id: 'sub_def_ws',
+          plan_id: 'plan_1',
+          status: 'active',
+          amount_vnd: 1500000,
+          zone: 'Zone A',
+          tenant_id: '   ',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 'sub_fran_1',
+          plan_id: 'plan_1',
+          status: 'active',
+          amount_vnd: 2500000,
+          zone: 'Zone B',
+          tenant_id: 'tenant_sadec_02',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+
+      const mrrSnapshots: Array<Record<string, unknown>> = [];
+
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        first: vi.fn(async () => {
+          if (isAccountLookup(sql)) {
+            if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
+            if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
+          }
+          if (/SELECT id FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql) ||
+              /SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id\s+FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql) ||
+              /SELECT id, tenant_id FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return customers.find((c) => c.id === cid && ((String(c.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            return customers.find((c) => c.id === args[0]) ?? null;
+          }
+          if (/SELECT id(?:, balance(?:, total_earned)?)? FROM cashback_wallets WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return wallets.find((w) => w.customer_id === cid && ((String(w.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT \* FROM rewards WHERE id = \?/i.test(sql)) {
+            return rewards.find((r) => r.id === args[0]) ?? null;
+          }
+          if (/SELECT \* FROM checkins WHERE id = \?/i.test(sql)) {
+            return checkins.find((ci) => ci.id === args[0]) ?? null;
+          }
+          if (/FROM orders WHERE id = \?/i.test(sql)) {
+            return orders.find((o) => o.id === args[0]) ?? null;
+          }
+          if (/FROM referrals WHERE referred_customer_id = \?/i.test(sql)) {
+            return referrals.find((r) => r.referred_customer_id === args[0] && r.status === 'pending') ?? null;
+          }
+          if (/FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = 'default'/i.test(sql)) {
+            const matching = subscriptions.filter(
+              (s) => s.status === 'active' && ((String(s.tenant_id ?? '').trim()) || 'default') === 'default'
+            );
+            return {
+              count: matching.length,
+              mrr: matching.reduce((acc, s) => acc + Number(s.amount_vnd || 0), 0),
+            };
+          }
+          if (/FROM subscriptions WHERE status = 'active' AND \(\? = '\*' OR COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?\)/i.test(sql)) {
+            const t = String(args[args.length - 1] ?? 'default');
+            const matching = subscriptions.filter(
+              (s) => s.status === 'active' && (t === '*' || ((String(s.tenant_id ?? '').trim()) || 'default') === t)
+            );
+            return {
+              count: matching.length,
+              mrr: matching.reduce((acc, s) => acc + Number(s.amount_vnd || 0), 0),
+              avg: matching.length > 0 ? matching.reduce((acc, s) => acc + Number(s.amount_vnd || 0), 0) / matching.length : 0,
+              under_1m: 0,
+              from_1m_to_3m: matching.length,
+              from_3m_to_5m: 0,
+              above_5m: 0,
+            };
+          }
+          return null;
+        }),
+        all: vi.fn(async () => {
+          if (/SELECT \* FROM cashback_transactions WHERE wallet_id = \?/i.test(sql)) {
+            return { results: cashbackTxs.filter((tx) => tx.wallet_id === args[0]) };
+          }
+          if (/SELECT \* FROM rewards ORDER BY point_cost ASC/i.test(sql)) {
+            return { results: rewards };
+          }
+          if (/SELECT \* FROM mrr_snapshots/i.test(sql)) {
+            return { results: [] };
+          }
+          return { results: [] };
+        }),
+        run: vi.fn(async () => {
+          if (/INSERT INTO cashback_wallets \(id, customer_id, balance, total_earned, total_spent, created_at, updated_at, tenant_id\)/i.test(sql)) {
+            wallets.push({
+              id: args[0],
+              customer_id: args[1],
+              balance: args[2],
+              total_earned: args[3],
+              total_spent: 0,
+              created_at: args[4],
+              updated_at: args[5],
+              tenant_id: args[6],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE cashback_wallets\s+SET balance = MAX\(0, balance - \?\), updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const rev = Number(args[0]);
+            const cid = String(args[2]);
+            const t = String(args[3]);
+            const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+            if (w) w.balance = Math.max(0, Number(w.balance) - rev);
+            return { success: true, meta: { changes: w ? 1 : 0 } };
+          }
+          if (/INSERT INTO mrr_snapshots/i.test(sql)) {
+            mrrSnapshots.push({
+              id: args[0],
+              snapshot_date: args[1],
+              mrr_vnd: args[2],
+              active_subscriptions: args[4],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        }),
+      });
+
+      const batchExecuted: Array<{ sql: string; args: unknown[] }> = [];
+      const mockDb = {
+        prepare: vi.fn((sql: string) => {
+          const base = makeStmt(sql, []);
+          return {
+            ...base,
+            bind: vi.fn((...args: unknown[]) => makeStmt(sql, args)),
+          };
+        }),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
+          for (const s of stmts) {
+            batchExecuted.push({ sql: s.sql, args: s.args });
+            if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+              const nextBal = Number(s.args[0]);
+              const earned = Number(s.args[1]);
+              const cid = String(s.args[3]);
+              const t = String(s.args[4]);
+              const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+              if (w) {
+                w.balance = nextBal;
+                w.total_earned = Number(w.total_earned) + earned;
+              }
+            }
+          }
+          return [];
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+      });
+
+      // 1. S1: /api/loyalty/cashback scopes wallet lookup by storeTenant ('tenant_sadec_02')
+      //        Returns only ctx_fran_1 (25,000 VND) and never leaks ctx_def_1 (900,000 VND)
+      const custToken = await generateJWT(
+        { id: 'cust_fran_s1', sub: 'cust_fran_s1', role: 'customer', tenantId: 'tenant_sadec_02' } as any,
+        TEST_JWT_SECRET,
+        3600
+      );
+      const cashbackRes = await loyaltyRouter.fetch(
+        new Request('https://api.test/cashback', {
+          headers: { Authorization: `Bearer ${custToken}` },
+        }),
+        franEnv
+      );
+      expect(cashbackRes.status).toBe(200);
+      const cashbackBody = (await cashbackRes.json()) as { data: Array<{ id: string; amount: number }> };
+      expect(cashbackBody.data).toHaveLength(1);
+      expect(cashbackBody.data[0].id).toBe('ctx_fran_1');
+
+      // 2. S1: /api/loyalty/rewards filters out 'default' tenant-only rewards for 'tenant_sadec_02' customer,
+      //        and /api/loyalty/redeem rejects redeeming 'rew_def_only' with 404
+      const rewardsRes = await loyaltyRouter.fetch(
+        new Request('https://api.test/rewards', {
+          headers: { Authorization: `Bearer ${custToken}` },
+        }),
+        franEnv
+      );
+      expect(rewardsRes.status).toBe(200);
+      const rewardsBody = (await rewardsRes.json()) as { data: Array<{ id: string }> };
+      expect(rewardsBody.data.map((r) => r.id)).toEqual(['rew_fran_only', 'rew_global']);
+
+      const crossRedeemRes = await loyaltyRouter.fetch(
+        new Request('https://api.test/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custToken}` },
+          body: JSON.stringify({ reward_id: 'rew_def_only' }),
+        }),
+        franEnv
+      );
+      expect(crossRedeemRes.status).toBe(404);
+
+      // 3. S1: PATCH /api/checkin/:id/approve creates cashback_wallets row with checkin's tenant_id ('tenant_sadec_02')
+      const checkinApp = new Hono<{ Bindings: Env }>();
+      checkinApp.route('/api/checkin', checkinRouter);
+      const approveRes = await checkinApp.fetch(
+        await authRequest('PATCH', '/api/checkin/ci_fran_new_wal/approve', 'supervisor', 'tenant_sadec_02'),
+        franEnv
+      );
+      expect(approveRes.status).toBe(200);
+      const createdCheckinWal = wallets.find((w) => w.customer_id === 'cust_fran_new_wal');
+      expect(createdCheckinWal).toBeDefined();
+      expect(createdCheckinWal?.tenant_id).toBe('tenant_sadec_02');
+      expect(createdCheckinWal?.balance).toBe(5000);
+
+      // 4. S2: applyAccrual & reverseAccrual with tenantId='tenant_sadec_02' update ONLY the 'tenant_sadec_02' wallet
+      //        and reject cross-tenant customer accrual
+      const basePolicy = {
+        tiers: [{ tierName: 'gold', minPoints: 200, cashbackRate: 0.07, pointMultiplier: 1.3, expiryDays: 365 }],
+        defaultTier: { tierName: 'bronze', minPoints: 0, cashbackRate: 0.03, pointMultiplier: 1.0, expiryDays: 365 },
+        campaignMultiplier: 1.0,
+        maxCapPerTx: 50000,
+        campaignCode: null,
+        expiresAt: null,
+      };
+      const crossAccrual = await applyAccrual(mockDb as any, basePolicy, {
+        orderId: 'ord_fran_s2',
+        customerId: 'cust_def_ref',
+        orderTotalVnd: 100000,
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(crossAccrual).toEqual({ ok: false, reason: 'customer_not_found' });
+
+      const validAccrual = await applyAccrual(mockDb as any, basePolicy, {
+        orderId: 'ord_fran_s2',
+        customerId: 'cust_fran_s1',
+        orderTotalVnd: 100000,
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(validAccrual.ok).toBe(true);
+      // Franchise wallet updated from 25,000 -> 32,000; Default wallet untouched at 900,000
+      expect(wallets.find((w) => w.id === 'wal_fran_s1')?.balance).toBe(32000);
+      expect(wallets.find((w) => w.id === 'wal_def_s1')?.balance).toBe(900000);
+
+      const validReversal = await reverseAccrual(mockDb as any, basePolicy, {
+        orderId: 'ord_fran_s2',
+        customerId: 'cust_fran_s1',
+        refundAmountVnd: 100000,
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(validReversal.ok).toBe(true);
+      expect(wallets.find((w) => w.id === 'wal_fran_s1')?.balance).toBe(25000);
+      expect(wallets.find((w) => w.id === 'wal_def_s1')?.balance).toBe(900000);
+
+      // 5. S2: rewardReferralOnFirstOrder & processReferralCashbackOnFirstOrder block cross-tenant referrer reward when tenantId is passed
+      const crossDomainReferral = await rewardReferralOnFirstOrder(
+        mockDb as any,
+        'cust_fran_s1',
+        'ord_fran_s2',
+        100000,
+        undefined,
+        'tenant_sadec_02'
+      );
+      expect(crossDomainReferral.success).toBe(false);
+      expect(crossDomainReferral.reason).toBe('referrer_not_found');
+
+      const crossTreeReferral = await processReferralCashbackOnFirstOrder(
+        mockDb as any,
+        'cust_fran_s1',
+        'ord_fran_s2',
+        100000,
+        'tenant_sadec_02'
+      );
+      expect(crossTreeReferral.success).toBe(false);
+      expect(crossTreeReferral.reason).toBe('referrer_not_found');
+
+      // 6. S3: updateMRRSnapshot, getStatsHandler, and getMRRTrend normalize whitespace-only tenant_id ('   ') to 'default'
+      await updateMRRSnapshot(mockDb as any);
+      expect(mrrSnapshots).toHaveLength(1);
+      expect(mrrSnapshots[0].mrr_vnd).toBe(1500000);
+      expect(mrrSnapshots[0].active_subscriptions).toBe(1);
+
+      const subApp = new Hono<{ Bindings: Env }>();
+      subApp.get('/api/subscriptions/stats', getStatsHandler);
+      subApp.get('/api/subscriptions/mrr-trend', getMRRTrend);
+      const defEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+      });
+
+      const defStatsRes = await subApp.fetch(
+        await authRequest('GET', '/api/subscriptions/stats', 'manager', 'default'),
+        defEnv
+      );
+      expect(defStatsRes.status).toBe(200);
+      const defStatsBody = (await defStatsRes.json()) as { data: { mrr_vnd: number; active_subscriptions: number } };
+      expect(defStatsBody.data.mrr_vnd).toBe(1500000);
+      expect(defStatsBody.data.active_subscriptions).toBe(1);
+
+      const defTrendRes = await subApp.fetch(
+        await authRequest('GET', '/api/subscriptions/mrr-trend', 'manager', 'default'),
+        defEnv
+      );
+      expect(defTrendRes.status).toBe(200);
+      const defTrendBody = (await defTrendRes.json()) as { data: { snapshots: Array<{ mrr_vnd: number }> } };
+      expect(defTrendBody.data.snapshots[0].mrr_vnd).toBe(1500000);
     });
   });
 });

@@ -133,14 +133,14 @@ productsRouter.get('/', async (c) => {
   return c.json({ success: true, data: filtered });
 });
 
-async function isCrossTenantCategory(db: D1Database, categoryId: string | undefined, tenantId: string): Promise<boolean> {
+async function isCrossTenantCategory(db: Env['AURA_DB'], categoryId: string | undefined, tenantId: string): Promise<boolean> {
   if (!categoryId || tenantId === '*') return false;
   const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).first<Record<string, unknown>>().catch(() => null);
   if (row) {
     return !matchesTenantRow(row, tenantId);
   }
   const allRes = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).all<Record<string, unknown>>().catch(() => null);
-  const matchedById = (allRes?.results || []).find((r) => String(r.id ?? '') === categoryId);
+  const matchedById = (allRes?.results || []).find((r: Record<string, unknown>) => String(r.id ?? '') === categoryId);
   if (matchedById) {
     return !matchesTenantRow(matchedById, tenantId);
   }

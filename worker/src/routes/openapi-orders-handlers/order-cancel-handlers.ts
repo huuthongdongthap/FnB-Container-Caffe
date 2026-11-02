@@ -101,17 +101,21 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
            SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
                used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
                usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
-           WHERE id = ?`
-        ).bind(redRow.promotion_id).run().catch(async () => {
-          await db.prepare(
-            'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ?'
-          ).bind(redRow.promotion_id).run().catch(() => {});
+           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(redRow.promotion_id, promoTenant).run().catch(async () => {
+          if (promoTenant === 'default') {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ?'
+            ).bind(redRow.promotion_id).run().catch(() => {});
+          }
         });
       } else if (redRow.code) {
         await db.prepare(
           `UPDATE promotions
-           SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END
-           WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
+           SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
+               used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
+               usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
+           WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
         ).bind(redRow.code, promoTenant).run().catch(async () => {
           if (promoTenant === 'default') {
             await db.prepare(

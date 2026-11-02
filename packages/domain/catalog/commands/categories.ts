@@ -43,8 +43,11 @@ categoriesRouter.get('/tree', async (c) => {
 categoriesRouter.post('/reorder', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c);
-  const body = (await c.req.json()) as { items?: Array<{ id: string; sort_order?: number; sortOrder?: number; displayOrder?: number }> };
-  const items = Array.isArray(body?.items) ? body.items : [];
+  const body = (await c.req.json()) as {
+    items?: Array<{ id: string; sort_order?: number; sortOrder?: number; displayOrder?: number }>;
+    order?: Array<{ id: string; sort_order?: number; sortOrder?: number; displayOrder?: number }>;
+  };
+  const items = Array.isArray(body?.items) ? body.items : Array.isArray(body?.order) ? body.order : [];
   for (const item of items) {
     const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(item.id).first<Record<string, unknown>>().catch(() => null);
     if (!existing || (tenantId !== '*' && !matchesTenantRow(existing, tenantId))) {

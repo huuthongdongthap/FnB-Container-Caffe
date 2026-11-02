@@ -120,7 +120,7 @@ loyaltyRouter.get('/cashback', async(c) => {
   const custRecord = cust as unknown as Record<string, unknown>;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
   const storeTenant = c.env.PILOT_TENANT_ID
-    ? resolvePilotStore(c.env).tenantId
+    ? resolvePilotStore(c.env as unknown as Record<string, unknown>)
     : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
@@ -174,7 +174,7 @@ loyaltyRouter.get('/rewards', async(c) => {
   const custRecord = cust as unknown as Record<string, unknown>;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
   const storeTenant = c.env.PILOT_TENANT_ID
-    ? resolvePilotStore(c.env).tenantId
+    ? resolvePilotStore(c.env as unknown as Record<string, unknown>)
     : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const db = c.env.AURA_DB;
 
@@ -219,7 +219,7 @@ loyaltyRouter.post('/redeem', async(c) => {
   const custRecord = cust as unknown as Record<string, unknown>;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
   const storeTenant = c.env.PILOT_TENANT_ID
-    ? resolvePilotStore(c.env).tenantId
+    ? resolvePilotStore(c.env as unknown as Record<string, unknown>)
     : (rawCustTenant && rawCustTenant !== '*' ? rawCustTenant : 'default');
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;

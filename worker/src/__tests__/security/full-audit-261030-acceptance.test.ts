@@ -4951,4 +4951,387 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       sql.close();
     }
   });
+
+  it('enforces Catalog cross-tenant category & reorder fail-closed guards, QR Host allowlist & tenant slug isolation, CRM cashback refund clawback & empty-phone guard, and Order Pricing/Split-Bill tenant isolation (AE1–AE4)', async () => {
+    const { OpenAPIHono } = await import('@hono/zod-openapi');
+    const { categoriesRouter } = await import('../../../../packages/domain/catalog/commands/categories');
+    const { productsRouter } = await import('../../../../packages/domain/catalog/commands/products');
+    const { registerCategoryReadHandlers } = await import('../../routes/openapi-categories-handlers/read-handlers');
+    const { registerProductMutationHandlers } = await import('../../routes/openapi-products-handlers/mutation-handlers');
+    const { qrRouter } = await import('../../../../packages/domain/table/commands/qr-scan');
+    const { tablesRouter } = await import('../../../../packages/domain/table/commands/tables');
+    const { bulkGenerateSlugs } = await import('../../tree/qr/generator');
+    const { signQRUrl } = await import('../../tree/qr/signer');
+    const { adminQRRouter } = await import('../../routes/admin-qr');
+    const { reverseAccrual } = await import('../../../../packages/domain/crm/commands/refund-reversal');
+    const { loadPolicy } = await import('../../../../packages/domain/crm/commands/loyalty-policy');
+    const { getCustomer360 } = await import('../../../../packages/domain/crm/commands/customer-360');
+    const { resolveServerProductPrice } = await import('../../../../packages/domain/catalog/policies/pricing-resolver');
+    const { splitOrders } = await import('../../../../packages/domain/order/commands/split-orders');
+    const { issueStaffSession } = await import('../../lib/staff-session');
+
+    const sql = new DatabaseSync(':memory:');
+    function statement(query: string, values: unknown[] = []): any {
+      return {
+        bind(...args: unknown[]) { return statement(query, args); },
+        async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
+        async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
+        async run() {
+          const r = sql.prepare(query).run(...(values as any[]));
+          return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+        },
+      };
+    }
+    const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map((s: any) => s.run())); } };
+    try {
+      const nowIso = new Date().toISOString();
+      sql.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          email TEXT,
+          name TEXT,
+          phone TEXT,
+          role TEXT,
+          password_hash TEXT,
+          is_active INTEGER DEFAULT 1,
+          auth_version INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE categories (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          description TEXT,
+          image_url TEXT,
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE products (
+          id TEXT PRIMARY KEY,
+          category_id TEXT,
+          name TEXT,
+          slug TEXT,
+          description TEXT,
+          price INTEGER,
+          compare_at_price INTEGER,
+          image_url TEXT,
+          tags TEXT,
+          is_available INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE cafe_tables (
+          id TEXT PRIMARY KEY,
+          table_number INTEGER,
+          code TEXT,
+          name TEXT,
+          zone TEXT DEFAULT 'indoor',
+          capacity INTEGER DEFAULT 4,
+          status TEXT DEFAULT 'Available',
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE table_qr_codes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          table_id TEXT,
+          slug TEXT UNIQUE,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT
+        );
+        CREATE TABLE customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          cashback_balance_vnd INTEGER DEFAULT 0,
+          total_cashback_earned_vnd INTEGER DEFAULT 0,
+          total_spent INTEGER DEFAULT 0,
+          visit_count INTEGER DEFAULT 0,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE orders (
+          id TEXT PRIMARY KEY,
+          items TEXT,
+          total INTEGER,
+          points_earned INTEGER DEFAULT 0,
+          cashback_earned INTEGER DEFAULT 0,
+          status TEXT,
+          customer_id TEXT,
+          customer_name TEXT,
+          customer_phone TEXT,
+          payment_method TEXT,
+          payment_status TEXT,
+          table_id TEXT,
+          order_type TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE cashback_wallets (
+          customer_id TEXT PRIMARY KEY,
+          balance INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          updated_at TEXT
+        );
+        CREATE TABLE loyalty_point_logs (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          order_id TEXT,
+          points_change INTEGER,
+          reason TEXT,
+          balance_after INTEGER,
+          description TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE loyalty_audit_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id TEXT,
+          action TEXT,
+          amount_vnd INTEGER,
+          order_id TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+      `);
+
+      sql.prepare(
+        `INSERT INTO users (id, email, name, role, is_active, auth_version, tenant_id, created_at, updated_at)
+         VALUES
+          ('mgr-def-ae', 'mgr-def-ae@aura.vn', 'Def Mgr', 'manager', 1, 1, 'default', ?, ?),
+          ('mgr-b-ae', 'mgr-b-ae@aura.vn', 'Store B Mgr', 'manager', 1, 1, 'store-b', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      const catDefId = '11111111-1111-4111-8111-111111111132';
+      const catBId = '22222222-2222-4222-8222-222222222232';
+      sql.prepare(
+        `INSERT INTO categories (id, name, slug, sort_order, is_active, tenant_id, created_at, updated_at)
+         VALUES
+          (?, 'Default Coffee', 'coffee-def', 1, 1, 'default', ?, ?),
+          (?, 'Store B Coffee', 'coffee-b', 2, 1, 'store-b', ?, ?)`
+      ).run(catDefId, nowIso, nowIso, catBId, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO products (id, category_id, name, slug, price, is_available, sort_order, tenant_id, created_at, updated_at)
+         VALUES
+          ('prod-def-ae', ?, 'Default Espresso', 'shared-espresso', 35000, 1, 1, 'default', ?, ?),
+          ('prod-b-ae', ?, 'Store B Matcha', 'store-b-matcha', 55000, 1, 1, 'store-b', ?, ?)`
+      ).run(catDefId, nowIso, nowIso, catBId, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO cafe_tables (id, table_number, code, name, zone, capacity, status, tenant_id, created_at, updated_at)
+         VALUES
+          ('tbl-def-1', 1, 'T1', 'Default Table 1', 'indoor', 4, 'Available', 'default', ?, ?),
+          ('tbl-b-10', 10, 'T10', 'Store B Table 10', 'patio', 4, 'Available', 'store-b', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO table_qr_codes (table_id, slug, tenant_id, created_at)
+         VALUES
+          ('tbl-def-1', 'table-1', 'default', ?),
+          ('10', 'legacy-num-10', 'default', ?),
+          ('tbl-missing-999', 'dangling-slug', 'default', ?)`
+      ).run(nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO customers (id, name, phone, loyalty_points, lifetime_points, cashback_balance_vnd, total_cashback_earned_vnd, total_spent, tenant_id, created_at, updated_at)
+         VALUES
+          ('cust-ae-1', 'Alice', '0901112222', 100, 100, 5000, 5000, 100000, 'default', ?, ?),
+          ('cust-ae-empty', 'NoPhone Guest', '', 0, 0, 0, 0, 0, 'default', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO cashback_wallets (customer_id, balance, tenant_id, updated_at)
+         VALUES ('cust-ae-1', 5000, 'default', ?)`
+      ).run(nowIso);
+
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, points_earned, cashback_earned, status, customer_id, customer_name, customer_phone, payment_method, payment_status, tenant_id, created_at, updated_at)
+         VALUES
+          ('ord-ae-cashback', '[]', 100000, 100, 5000, 'completed', 'cust-ae-1', 'Alice', '0901112222', 'cash', 'paid', 'default', ?, ?),
+          ('ord-ae-anon', '[]', 80000, 0, 0, 'completed', 'other-cust', 'Anon', '', 'cash', 'paid', 'default', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      const kvStore = new Map<string, string>();
+      const qrSecret = 'qr-signing-secret-min-16-chars';
+      const env: any = {
+        AURA_DB: db,
+        JWT_SECRET: 'test-jwt-secret-key-min-16-chars',
+        QR_SIGNING_SECRET: qrSecret,
+        PUBLIC_URL: 'https://auracaffe.vn',
+        AUTH_KV: {
+          get: async (k: string) => kvStore.get(k) ?? null,
+          put: async (k: string, v: string) => { kvStore.set(k, v); },
+          delete: async (k: string) => { kvStore.delete(k); },
+        },
+      };
+
+      const defMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-def-ae'").get();
+      const bMgrAccount: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-b-ae'").get();
+      const { token: defToken } = await issueStaffSession(env, defMgrAccount, { sessionType: 'staff-web' });
+      const { token: bToken } = await issueStaffSession(env, bMgrAccount, { sessionType: 'staff-web' });
+
+      // AE1: Cross-tenant category ownership rejected on POST /api/products & fail-closed POST /api/categories/reorder
+      const crossCatProdRes = await productsRouter.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Spoof Cat Item', price: 40000, category_id: catBId }),
+        }),
+        env
+      );
+      expect(crossCatProdRes.status).toBe(404);
+
+      const crossReorderRes = await categoriesRouter.fetch(
+        new Request('http://localhost/reorder', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: [{ id: catDefId, sort_order: 99 }, { id: catBId, sort_order: 1 }] }),
+        }),
+        env
+      );
+      expect(crossReorderRes.status).toBe(404);
+      const catDefAfter = sql.prepare('SELECT sort_order FROM categories WHERE id = ?').get(catDefId) as { sort_order: number };
+      expect(catDefAfter.sort_order).toBe(1);
+
+      const openApiCatApp = new OpenAPIHono<any>();
+      openApiCatApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-b-ae', role: 'manager', tenantId: 'store-b' });
+        await next();
+      });
+      registerCategoryReadHandlers(openApiCatApp);
+      registerProductMutationHandlers(openApiCatApp);
+
+      const catPageBRes = await openApiCatApp.fetch(new Request('http://localhost/api/categories?page=1&limit=1'), env);
+      expect(catPageBRes.status).toBe(200);
+      const catPageBJson = (await catPageBRes.json()) as { data: { categories: Array<{ id: string }>; meta: { total: number } } };
+      expect(catPageBJson.data.categories.map((c) => c.id)).toEqual([catBId]);
+      expect(catPageBJson.data.meta.total).toBe(1);
+
+      const sameSlugBRes = await openApiCatApp.fetch(
+        new Request('http://localhost/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            categoryId: catBId,
+            name: 'Store B Espresso',
+            slug: 'shared-espresso',
+            price: 38000,
+          }),
+        }),
+        env
+      );
+      expect(sameSlugBRes.status).toBe(201);
+
+      // AE2: QR Host header sanitization on GET /api/tables, numeric fallback tenant guard on GET /api/qr/:slug, bulkGenerateSlugs tenant prefixing, and admin download fail-closed
+      const poisonedHostQrRes = await tablesRouter.fetch(
+        new Request('http://localhost/', {
+          headers: {
+            Authorization: `Bearer ${defToken}`,
+            Host: 'evil.attacker.com',
+            'X-Forwarded-Proto': 'javascript',
+          },
+        }),
+        env
+      );
+      expect(poisonedHostQrRes.status).toBe(200);
+      const poisonedHostJson = (await poisonedHostQrRes.json()) as { data: Array<{ id: string; qr_code_url: string }> };
+      expect(poisonedHostJson.data[0].qr_code_url.startsWith('http://localhost:3000/')).toBe(true);
+
+      const signedLegacy10Path = await signQRUrl('legacy-num-10', qrSecret);
+      const signedQuery = signedLegacy10Path.split('?')[1];
+      const crossNumericScanRes = await qrRouter.fetch(
+        new Request(`http://localhost/legacy-num-10?${signedQuery}`),
+        env
+      );
+      expect(crossNumericScanRes.status).toBe(404);
+
+      const bulkB = await bulkGenerateSlugs(db, [
+        { id: 'tbl-b-10', table_number: 10, zone: 'patio', status: 'Available', capacity: 4, tenant_id: 'store-b' } as any,
+      ]);
+      expect(bulkB.get('tbl-b-10')).toBe('store-b-10-patio');
+
+      const dlMissingRes = await adminQRRouter.fetch(
+        new Request('http://localhost/dangling-slug/download', {
+          headers: { Authorization: `Bearer ${defToken}` },
+        }),
+        env
+      );
+      expect(dlMissingRes.status).toBe(404);
+
+      // AE3: CRM reverseAccrual claws back cashback_earned and rejects cross-customer refund; getCustomer360 ignores empty phone
+      const policy = await loadPolicy(db);
+      const wrongCustomerRefund = await reverseAccrual(db, policy, {
+        orderId: 'ord-ae-cashback',
+        customerId: 'cust-ae-empty',
+        refundAmountVnd: 100000,
+        reason: 'spoofed_refund',
+      });
+      expect(wrongCustomerRefund.ok).toBe(false);
+
+      const validCashbackRefund = await reverseAccrual(db, policy, {
+        orderId: 'ord-ae-cashback',
+        customerId: 'cust-ae-1',
+        refundAmountVnd: 100000,
+        reason: 'full_refund',
+      });
+      expect(validCashbackRefund.ok).toBe(true);
+      const walletAfter = sql.prepare("SELECT balance FROM cashback_wallets WHERE customer_id = 'cust-ae-1'").get() as { balance: number };
+      expect(walletAfter.balance).toBe(0);
+      const orderAfter = sql.prepare("SELECT cashback_earned, points_earned FROM orders WHERE id = 'ord-ae-cashback'").get() as { cashback_earned: number; points_earned: number };
+      expect(orderAfter.cashback_earned).toBe(0);
+      expect(orderAfter.points_earned).toBe(0);
+
+      const emptyPhone360 = await getCustomer360(db, 'cust-ae-empty');
+      expect(emptyPhone360?.recentEvents.events).toHaveLength(0);
+
+      // AE4: resolveServerProductPrice and splitOrders enforce tenant isolation on products
+      const crossPrice = await resolveServerProductPrice(db, {
+        productId: 'prod-b-ae',
+        tenantId: 'default',
+      });
+      expect(crossPrice.available).toBe(false);
+      expect(crossPrice.rejection?.code).toBe('item_not_found');
+
+      const splitCrossTenantRes = await splitOrders(
+        new Request('http://localhost/api/orders/split', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${defToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table_id: 'tbl-def-1',
+            orders: [
+              {
+                items: [{ id: 'prod-def-ae', name: 'Default Espresso', price: 35000, quantity: 1 }],
+                total: 35000,
+                customer_name: 'Guest 1',
+                customer_phone: '0901112222',
+              },
+              {
+                items: [{ id: 'prod-b-ae', name: 'Store B Matcha', price: 55000, quantity: 1 }],
+                total: 55000,
+                customer_name: 'Guest 2',
+                customer_phone: '0903334444',
+              },
+            ],
+          }),
+        }),
+        env
+      );
+      expect(splitCrossTenantRes.status).toBe(400);
+    } finally {
+      sql.close();
+    }
+  });
 });

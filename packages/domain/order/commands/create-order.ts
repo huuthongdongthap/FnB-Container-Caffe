@@ -172,9 +172,16 @@ export async function createOrder(
     try { await db.batch(statements); }
     catch (error) {
       if (appliedPromo?.reservedInPlace) {
+        const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         await db.prepare(
-          'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = ?'
-        ).bind(appliedPromo.code).run().catch(() => {});
+          "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END, current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(appliedPromo.code, promoTenant).run().catch(async () => {
+          if (promoTenant === 'default') {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = ?'
+            ).bind(appliedPromo.code).run().catch(() => {});
+          }
+        });
       }
       // A concurrent same-key request either committed the entire order or nothing.
       const saved = idem ? await findReplay() : null;
@@ -183,9 +190,16 @@ export async function createOrder(
     }
     if (appliedPromo) {
       if (!appliedPromo.reservedInPlace) {
+        const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         await db.prepare(
-          'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
-        ).bind(appliedPromo.code).run().catch(() => {});
+          "UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
+        ).bind(appliedPromo.code, promoTenant).run().catch(async () => {
+          if (promoTenant === 'default') {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+            ).bind(appliedPromo.code).run().catch(() => {});
+          }
+        });
       }
       await db.prepare(
         'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
