@@ -2,8 +2,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileAuthProvider, useMobileAuth } from '../use-mobile-auth';
 import { useAuthStore } from '../stores/use-auth-store';
-import { readClientSession, saveClientSession, invalidateClientSession } from '@/lib/client-session';
+import { readClientSession, saveClientSession, invalidateClientSession, storedDevice } from '@/lib/client-session';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
+import { ADMIN_SHELL_ROLES, KDS_SHELL_ROLES } from '@/components/auth/ProtectedRoute';
+import { canAccess } from '@/pages/mobile/mobile-layout-constants';
 
 const staff = { id: 'staff', name: 'Staff', email: '', role: 'staff', tenantId: 'cafe-a' };
 const token = (suffix = 1, web = false, ttl = 1000) => `e30.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + ttl, sessionType: web ? 'staff-web' : 'staff-mobile', suffix }))}.fixture`;
@@ -109,5 +111,21 @@ describe('mobile session lifecycle', () => {
     vi.mocked(fetch).mockResolvedValueOnce(reply({ error: 'Old request', code: 'SESSION_REVOKED' }, 401));
     await expect(apiFetch('/api/private', { headers: { Authorization: `Bearer ${original}` } })).rejects.toMatchObject({ status: 401 });
     expect(readClientSession().token).toBe(token(3));
+  });
+  it('switches enrolled device cleanly when logging in with a new explicitDevice and admits supervisor/shipper roles', async () => {
+    saveClientSession(token(1), staff, 'audit-device-staff');
+    const waiter = { ...staff, id: 'waiter-1', role: 'waiter' };
+    const tokB = token(2);
+    const { result } = renderHook(useMobileAuth, { wrapper });
+    await act(async () => {
+      await result.current.login(tokB, waiter, 'audit-device-waiter');
+    });
+    expect(storedDevice()).toBe('audit-device-waiter');
+    expect(localStorage.getItem('mobile_device')).toBe('audit-device-waiter');
+    expect(localStorage.getItem('aura_device_token')).toBe('audit-device-waiter');
+    expect(ADMIN_SHELL_ROLES).toEqual(expect.arrayContaining(['supervisor', 'shipper']));
+    expect(KDS_SHELL_ROLES).toEqual(expect.arrayContaining(['supervisor', 'shipper']));
+    expect(canAccess('orders', 'supervisor')).toBe(true);
+    expect(canAccess('orders', 'shipper')).toBe(true);
   });
 });

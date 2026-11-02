@@ -1,11 +1,11 @@
 import type { Tab } from './mobile-layout-types';
 
 export const ROLE_ACCESS: Record<Tab, string[]> = {
-  kds: ['kitchen', 'barista', 'chef', 'bep', 'staff', 'manager', 'owner', 'admin'],
-  orders: ['waiter', 'phuc_vu', 'cashier', 'staff', 'manager', 'owner', 'admin'],
-  tables: ['waiter', 'phuc_vu', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'manager', 'owner', 'admin'],
-  notifications: ['waiter', 'phuc_vu', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'manager', 'owner', 'admin'],
-  profile: ['waiter', 'phuc_vu', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'manager', 'owner', 'admin'],
+  kds: ['kitchen', 'barista', 'chef', 'bep', 'staff', 'supervisor', 'manager', 'owner', 'admin'],
+  orders: ['waiter', 'phuc_vu', 'cashier', 'shipper', 'staff', 'supervisor', 'manager', 'owner', 'admin'],
+  tables: ['waiter', 'phuc_vu', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'supervisor', 'manager', 'owner', 'admin'],
+  notifications: ['waiter', 'phuc_vu', 'cashier', 'shipper', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'supervisor', 'manager', 'owner', 'admin'],
+  profile: ['waiter', 'phuc_vu', 'cashier', 'shipper', 'kitchen', 'barista', 'chef', 'bep', 'staff', 'supervisor', 'manager', 'owner', 'admin'],
 };
 
 export const TABS: Array<{ id: Tab; label: string; icon: string }> = [

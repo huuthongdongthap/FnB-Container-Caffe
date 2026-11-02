@@ -100,6 +100,9 @@ ALTER TABLE payment_transactions ADD COLUMN currency TEXT DEFAULT 'VND';
 ALTER TABLE payment_transactions ADD COLUMN transaction_ref TEXT;
 ALTER TABLE payment_transactions ADD COLUMN gateway_response TEXT;
 
+ALTER TABLE ha_device_states ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE happy_hour_windows ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+
 -- 7. Backfill newly added parity columns on loyalty_accounts & tier_configs
 UPDATE loyalty_accounts
 SET points_balance = COALESCE(current_points, 0),

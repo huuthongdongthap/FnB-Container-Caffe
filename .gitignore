@@ -49,3 +49,14 @@ failed-suites.json
 /tables_*.py
 /tmp_*.py
 /debug_*.py
+
+# Mekong bootstrap scaffold (local tooling wiring — not part of the app)
+HARNESS.md
+LICENSE
+pyproject.toml
+dna/
+scripts/mcp_server.py
+scripts/hooks/
+src/__init__.py
+src/main.py
+tests/test_main.py

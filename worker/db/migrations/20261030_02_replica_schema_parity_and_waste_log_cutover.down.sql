@@ -7,6 +7,9 @@ DROP INDEX IF EXISTS idx_waste_log_date;
 DROP INDEX IF EXISTS idx_waste_log_item;
 DROP TABLE IF EXISTS waste_log;
 
+ALTER TABLE happy_hour_windows DROP COLUMN tenant_id;
+ALTER TABLE ha_device_states DROP COLUMN tenant_id;
+
 ALTER TABLE payment_transactions DROP COLUMN gateway_response;
 ALTER TABLE payment_transactions DROP COLUMN transaction_ref;
 ALTER TABLE payment_transactions DROP COLUMN currency;

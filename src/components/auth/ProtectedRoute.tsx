@@ -6,8 +6,8 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    Redirects to /admin/login if no valid token.
    ═══════════════════════════════════════════════════════════════════ */
 
-export const ADMIN_SHELL_ROLES = ['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier'] as const;
-export const KDS_SHELL_ROLES = ['owner', 'admin', 'manager', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'bep'] as const;
+export const ADMIN_SHELL_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'shipper'] as const;
+export const KDS_SHELL_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'shipper', 'kitchen', 'barista', 'chef', 'bep'] as const;
 const KITCHEN_ONLY_ROLES = ['kitchen', 'barista', 'chef', 'bep'] as const;
 
 interface ProtectedRouteProps {

@@ -204,7 +204,8 @@ export default function MobileLogin() {
       }
       const trimmedDevice = deviceToken.trim();
       localStorage.setItem('aura_device_token', trimmedDevice);
-      await login(data.token, staffProfile);
+      localStorage.setItem('mobile_device', trimmedDevice);
+      await login(data.token, staffProfile, trimmedDevice);
       navigate('/mobile', { replace: true });
     } catch {
       setError('Không kết nối được máy chủ / Server connection error');
