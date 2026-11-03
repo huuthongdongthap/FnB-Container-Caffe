@@ -7,6 +7,10 @@ import { exportSchema } from './helpers';
 export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/export?start=YYYY-MM-DD&end=YYYY-MM-DD
   router.get('/export', async (c) => {
+    const user = (c as unknown as { get?: (k: string) => { role?: string } | undefined }).get?.('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(String(user.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const parsed = exportSchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(

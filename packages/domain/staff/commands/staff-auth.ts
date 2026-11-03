@@ -34,10 +34,21 @@ async function hashPin(pin: string): Promise<string> {
   return `pin$pbkdf2$100000$${saltB64}$${hashB64}`;
 }
 
+function constantTimeStringEqual(a: string, b: string): boolean {
+  const maxLen = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < maxLen; i++) {
+    const codeA = i < a.length ? a.charCodeAt(i) : 0;
+    const codeB = i < b.length ? b.charCodeAt(i) : 0;
+    diff |= codeA ^ codeB;
+  }
+  return diff === 0;
+}
+
 async function verifyPin(pin: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
   if (parts.length !== 5 || parts[0] !== 'pin') return false;
-  const [, , , saltB64] = parts;
+  const [, , , saltB64, expectedB64] = parts;
   try {
     const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
     const keyMaterial = await crypto.subtle.importKey(
@@ -47,7 +58,8 @@ async function verifyPin(pin: string, stored: string): Promise<boolean> {
       { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
       keyMaterial, 256
     );
-    return btoa(String.fromCharCode(...new Uint8Array(bits))) === parts[4];
+    const actualB64 = btoa(String.fromCharCode(...new Uint8Array(bits)));
+    return constantTimeStringEqual(actualB64, expectedB64);
   } catch {
     return false;
   }
@@ -115,7 +127,7 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
     `INSERT INTO staff_devices (id, staff_id, device_name, device_token, pin_hash, role, created_at, updated_at)
      SELECT ?, ?, ?, ?, ?, ?, ?, ? FROM users
      WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
-       AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
+       AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
      ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
        role = excluded.role, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
      WHERE staff_devices.staff_id = excluded.staff_id`,
@@ -232,10 +244,6 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
     const { device_token, device_name, staff_id, pin } = parsed.data;
-    const role: StaffDeviceRole = hasExplicitRole && isExtendedValidRole
-      ? normalizeDeviceRole(requestedRole)
-      : normalizeDeviceRole(parsed.data.role);
-
     if (!staff_id) return errorResponse('staff_id là bắt buộc', 400);
     const caller = c.get('user');
     if (!caller) return errorResponse('Vui lòng đăng nhập', 401);
@@ -244,8 +252,17 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     if (!state.ok || !isStaffRole(state.account.role)) return errorResponse('Tài khoản không tồn tại', 404);
     const account = state.account;
     if (!isAccountActive(account)) throw new StaffSessionError('STAFF_ACCOUNT_INACTIVE');
-    if (staffTenant(account) !== (caller.tenantId || 'default')) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    const callerTenant = caller.tenantId?.trim() || 'default';
+    if (staffTenant(account) !== callerTenant) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    const accountRole = normalizeDeviceRole(account.role);
+    const role: StaffDeviceRole = hasExplicitRole && isExtendedValidRole
+      ? normalizeDeviceRole(requestedRole)
+      : accountRole;
+    if (hasExplicitRole && role !== accountRole && !(accountRole === 'staff' && MANAGER_MANAGED_ROLES.has(role))) {
+      return errorResponse('Không đủ quyền đăng ký thiết bị cho vai trò này', 403);
+    }
     if ((account.role === 'owner' && caller.role !== 'owner')
+      || ((account.role === 'admin' || role === 'admin') && caller.role !== 'admin')
       || (caller.role === 'manager' && (!MANAGER_MANAGED_ROLES.has(account.role) || !MANAGER_MANAGED_ROLES.has(role)))) {
       return errorResponse('Không đủ quyền đăng ký thiết bị cho tài khoản này', 403);
     }
@@ -293,18 +310,40 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
     if (!state.ok) return errorResponse('Tài khoản không tồn tại', 404);
     const account = state.account;
     const caller = c.get('user');
-    if (staffTenant(account) !== (caller?.tenantId || 'default')) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    const callerTenant = caller?.tenantId?.trim() || 'default';
+    if (staffTenant(account) !== callerTenant) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     if ((account.role === 'owner' && callerRole !== 'owner')
+      || ((account.role === 'admin' || device.role === 'admin') && callerRole !== 'admin')
       || (callerRole === 'manager' && !MANAGER_MANAGED_ROLES.has(account.role))) return errorResponse('Không đủ quyền xóa thiết bị', 403);
     // The invalidation and removal commit together. Removing this device also
     // invalidates every already-issued session for its account in the pilot.
+    const now = new Date().toISOString();
     try {
+      const updateUserStmt = callerTenant !== '*'
+        ? c.env.AURA_DB.prepare(
+            "UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(now, device.staff_id, callerTenant)
+        : c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
+            .bind(now, device.staff_id);
       await c.env.AURA_DB.batch([
-        c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
-          .bind(new Date().toISOString(), device.staff_id),
+        updateUserStmt,
         c.env.AURA_DB.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(deviceId, device.staff_id),
       ]);
-    } catch { throw new SessionUnavailableError(); }
+    } catch (batchErr) {
+      if (callerTenant !== '*' && String((batchErr as Error)?.message || '').toLowerCase().includes('no such column')) {
+        try {
+          await c.env.AURA_DB.batch([
+            c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
+              .bind(now, device.staff_id),
+            c.env.AURA_DB.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(deviceId, device.staff_id),
+          ]);
+        } catch {
+          throw new SessionUnavailableError();
+        }
+      } else {
+        throw new SessionUnavailableError();
+      }
+    }
 
     return jsonResponse({ success: true, message: 'Đã hủy đăng ký thiết bị' });
   } catch (err) {
@@ -323,12 +362,14 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
     if (!callerRole || !callerId) return errorResponse('Vui lòng đăng nhập', 401);
 
     const caller = c.get('user');
-    const roleClause = callerRole === 'manager' ? " AND u.role IN ('staff','waiter','cashier','kitchen','barista','chef')"
-      : ['owner', 'admin'].includes(callerRole) ? '' : ' AND d.staff_id = ?';
-    const values = [caller?.tenantId || 'default', ...(['owner', 'admin', 'manager'].includes(callerRole) ? [] : [callerId])];
+    const callerTenant = caller?.tenantId?.trim() || 'default';
+    const roleClause = callerRole === 'manager' ? " AND u.role IN ('staff','waiter','cashier','kitchen','barista','chef','supervisor','shipper')"
+      : callerRole === 'owner' ? " AND u.role != 'admin'"
+      : callerRole === 'admin' ? '' : ' AND d.staff_id = ?';
+    const values = [callerTenant, ...(['owner', 'admin', 'manager'].includes(callerRole) ? [] : [callerId])];
     const rows = await c.env.AURA_DB.prepare(`SELECT d.id, d.staff_id, d.device_name, d.role, d.last_login_at, d.created_at
       FROM staff_devices d JOIN users u ON u.id = d.staff_id
-      WHERE COALESCE(NULLIF(u.tenant_id, ''), 'default') = ?${roleClause} ORDER BY d.created_at DESC`).bind(...values).all();
+      WHERE COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?${roleClause} ORDER BY d.created_at DESC`).bind(...values).all();
 
     return jsonResponse({
       success: true,

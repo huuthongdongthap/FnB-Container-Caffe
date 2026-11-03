@@ -12,7 +12,8 @@ export interface CanonicalTable {
   capacity: number;
   zone: string;
   status: TablePhysicalStatus;
-  operating_unit_id?: string;
+  operating_unit_id?: string | null;
+  tenant_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -28,6 +29,8 @@ export interface CanonicalReservation {
   zone: string;
   status: ReservationLifecycleStatus;
   notes: string | null;
+  operating_unit_id?: string | null;
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
 }

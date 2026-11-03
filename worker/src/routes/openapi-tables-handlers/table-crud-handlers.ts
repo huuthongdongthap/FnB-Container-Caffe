@@ -3,16 +3,7 @@ import type { Env } from '../../types/env';
 import { TableRoutes } from '../../schemas/tables';
 import { formatTable, isAllowedLocationForTenant, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 
 export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/tables - List tables with pagination and filtering
@@ -70,7 +61,7 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let cafeWhere = 'WHERE 1=1';
     const cafeParams: (string | number)[] = [];
     if (tenantId !== '*') {
-      cafeWhere += " AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = ?";
+      cafeWhere += " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?";
       cafeParams.push(tenantId);
     }
     if (search) {
@@ -102,36 +93,85 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       ).bind(...cafeParams).first()) as { total: number } | null;
       total = countResult?.total || 0;
 
-      const rows = (await db.prepare(
-        `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
-         FROM cafe_tables t
-         LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
-         ${cafeWhere}
-         ORDER BY ${orderClause}
-         LIMIT ? OFFSET ?`
-      ).bind(...cafeParams, limit, offset).all()) as { results: any[] };
+      let rows: { results: any[] };
+      try {
+        rows = (await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')
+           ${cafeWhere}
+           ORDER BY ${orderClause}
+           LIMIT ? OFFSET ?`
+        ).bind(...cafeParams, limit, offset).all()) as { results: any[] };
+      } catch {
+        rows = (await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           ${cafeWhere}
+           ORDER BY ${orderClause}
+           LIMIT ? OFFSET ?`
+        ).bind(...cafeParams, limit, offset).all()) as { results: any[] };
+      }
       tableRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
     } catch {
       try {
-        const countResult = (await db.prepare(
-          `SELECT COUNT(*) as total FROM tables t ${whereClause}`
-        ).bind(...params).first()) as { total: number } | null;
-        total = countResult?.total || 0;
-
-        const rows = (await db.prepare(
-          `SELECT t.*, z.name as zone_name
-           FROM tables t
-           LEFT JOIN table_zones z ON t.zone_id = z.id
-           ${whereClause}
-           ORDER BY ${legacyOrderClause}
-           LIMIT ? OFFSET ?`
-        ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
-        const filteredRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
         if (tenantId !== '*') {
-          total = filteredRows.length;
-          tableRows = filteredRows.slice(offset, offset + limit);
+          try {
+            const tenantWhere = `${whereClause} AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?`;
+            const tenantParams = [...params, tenantId];
+            const countResult = (await db.prepare(
+              `SELECT COUNT(*) as total FROM tables t ${tenantWhere}`
+            ).bind(...tenantParams).first()) as { total: number } | null;
+            total = countResult?.total || 0;
+
+            const rows = (await db.prepare(
+              `SELECT t.*, z.name as zone_name
+               FROM tables t
+               LEFT JOIN table_zones z ON t.zone_id = z.id
+               ${tenantWhere}
+               ORDER BY ${legacyOrderClause}
+               LIMIT ? OFFSET ?`
+            ).bind(...tenantParams, limit, offset).all()) as { results: any[] };
+            const rawRows = rows.results || [];
+            const filteredRows = rawRows.filter((r) => matchesTenantRow(r, tenantId));
+            if (filteredRows.length !== rawRows.length) {
+              total = filteredRows.length;
+            }
+            tableRows = filteredRows;
+          } catch {
+            const countResult = (await db.prepare(
+              `SELECT COUNT(*) as total FROM tables t ${whereClause}`
+            ).bind(...params).first()) as { total: number } | null;
+            total = countResult?.total || 0;
+
+            const rows = (await db.prepare(
+              `SELECT t.*, z.name as zone_name
+               FROM tables t
+               LEFT JOIN table_zones z ON t.zone_id = z.id
+               ${whereClause}
+               ORDER BY ${legacyOrderClause}
+               LIMIT ? OFFSET ?`
+            ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+            const filteredRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
+            total = filteredRows.length;
+            tableRows = filteredRows.slice(offset, offset + limit);
+          }
         } else {
-          tableRows = filteredRows;
+          const countResult = (await db.prepare(
+            `SELECT COUNT(*) as total FROM tables t ${whereClause}`
+          ).bind(...params).first()) as { total: number } | null;
+          total = countResult?.total || 0;
+
+          const rows = (await db.prepare(
+            `SELECT t.*, z.name as zone_name
+             FROM tables t
+             LEFT JOIN table_zones z ON t.zone_id = z.id
+             ${whereClause}
+             ORDER BY ${legacyOrderClause}
+             LIMIT ? OFFSET ?`
+          ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+          tableRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
         }
       } catch {
         let legacyWhere = 'WHERE 1=1';
@@ -152,24 +192,59 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           legacyWhere += ' AND t.capacity >= ?';
           legacyParams.push(Number(capacity));
         }
-        const countResult = (await db.prepare(
-          `SELECT COUNT(*) as total FROM cafe_tables t ${legacyWhere}`
-        ).bind(...legacyParams).first()) as { total: number } | null;
-        total = countResult?.total || 0;
-
-        const rows = (await db.prepare(
-          `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
-           FROM cafe_tables t
-           ${legacyWhere}
-           ORDER BY t.table_number ${safeDirection}
-           LIMIT ? OFFSET ?`
-        ).bind(...legacyParams, fetchLimit, fetchOffset).all()) as { results: any[] };
-        const filteredRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
         if (tenantId !== '*') {
-          total = filteredRows.length;
-          tableRows = filteredRows.slice(offset, offset + limit);
+          try {
+            const tenantLegacyWhere = `${legacyWhere} AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?`;
+            const tenantLegacyParams = [...legacyParams, tenantId];
+            const countResult = (await db.prepare(
+              `SELECT COUNT(*) as total FROM cafe_tables t ${tenantLegacyWhere}`
+            ).bind(...tenantLegacyParams).first()) as { total: number } | null;
+            total = countResult?.total || 0;
+
+            const rows = (await db.prepare(
+              `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+               FROM cafe_tables t
+               ${tenantLegacyWhere}
+               ORDER BY t.table_number ${safeDirection}
+               LIMIT ? OFFSET ?`
+            ).bind(...tenantLegacyParams, limit, offset).all()) as { results: any[] };
+            const rawRows = rows.results || [];
+            const filteredRows = rawRows.filter((r) => matchesTenantRow(r, tenantId));
+            if (filteredRows.length !== rawRows.length) {
+              total = filteredRows.length;
+            }
+            tableRows = filteredRows;
+          } catch {
+            const countResult = (await db.prepare(
+              `SELECT COUNT(*) as total FROM cafe_tables t ${legacyWhere}`
+            ).bind(...legacyParams).first()) as { total: number } | null;
+            total = countResult?.total || 0;
+
+            const rows = (await db.prepare(
+              `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+               FROM cafe_tables t
+               ${legacyWhere}
+               ORDER BY t.table_number ${safeDirection}
+               LIMIT ? OFFSET ?`
+            ).bind(...legacyParams, fetchLimit, fetchOffset).all()) as { results: any[] };
+            const filteredRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
+            total = filteredRows.length;
+            tableRows = filteredRows.slice(offset, offset + limit);
+          }
         } else {
-          tableRows = filteredRows;
+          const countResult = (await db.prepare(
+            `SELECT COUNT(*) as total FROM cafe_tables t ${legacyWhere}`
+          ).bind(...legacyParams).first()) as { total: number } | null;
+          total = countResult?.total || 0;
+
+          const rows = (await db.prepare(
+            `SELECT t.*, t.zone as zone_id, t.zone as zone_name, CAST(t.table_number AS TEXT) as code, 1 as is_active
+             FROM cafe_tables t
+             ${legacyWhere}
+             ORDER BY t.table_number ${safeDirection}
+             LIMIT ? OFFSET ?`
+          ).bind(...legacyParams, fetchLimit, fetchOffset).all()) as { results: any[] };
+          tableRows = (rows.results || []).filter((r) => matchesTenantRow(r, tenantId));
         }
       }
     }
@@ -190,12 +265,21 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let row: any = null;
     try {
-      row = await db.prepare(
-        `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
-         FROM cafe_tables t
-         LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        row = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        row = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     } catch {
       try {
         row = await db.prepare(
@@ -230,6 +314,9 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const writeTenant = tenantId === '*' ? 'default' : tenantId;
     const body = c.req.valid('json');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
@@ -388,16 +475,25 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_create', 'table', id, JSON.stringify(body), now);
+    await writeTableAuditLog(db, user.id, 'table_create', 'table', id, JSON.stringify(body), now, writeTenant);
 
     let created: any = null;
     try {
-      created = await db.prepare(
-        `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
-         FROM cafe_tables t
-         LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        created = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        created = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     } catch {
       try {
         created = await db.prepare(
@@ -428,6 +524,25 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
+    const hasStructuralUpdate = [
+      'code',
+      'name',
+      'zoneId',
+      'capacity',
+      'position',
+      'x',
+      'y',
+      'dimensions',
+      'width',
+      'height',
+      'rotation',
+      'isActive',
+      'locationId',
+      'metadata',
+    ].some((field) => body[field] !== undefined);
+    if (hasStructuralUpdate && user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     let existing: any = null;
@@ -548,40 +663,79 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(id);
 
     if (updates.length > 1) {
+      const fullCafeUpdates = [...updates];
+      const fullCafeParams = [...params];
+      if (body.zoneId !== undefined) {
+        fullCafeUpdates.unshift('zone = ?');
+        fullCafeParams.unshift(body.zoneId);
+      }
+      if (canUpdateTableNum !== null) {
+        fullCafeUpdates.unshift('table_number = ?');
+        fullCafeParams.unshift(canUpdateTableNum);
+      }
       try {
-        const fullCafeUpdates = [...updates];
-        const fullCafeParams = [...params];
-        if (body.zoneId !== undefined) {
-          fullCafeUpdates.unshift('zone = ?');
-          fullCafeParams.unshift(body.zoneId);
+        if (tenantId !== '*') {
+          try {
+            await db.prepare(
+              `UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(...fullCafeParams, tenantId).run();
+          } catch {
+            await db.prepare(`UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ?`).bind(...fullCafeParams).run();
+          }
+        } else {
+          await db.prepare(`UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ?`).bind(...fullCafeParams).run();
         }
-        if (canUpdateTableNum !== null) {
-          fullCafeUpdates.unshift('table_number = ?');
-          fullCafeParams.unshift(canUpdateTableNum);
-        }
-        await db.prepare(`UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ?`).bind(...fullCafeParams).run();
       } catch {
         try {
-          await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+          if (tenantId !== '*') {
+            try {
+              await db.prepare(
+                `UPDATE tables SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              ).bind(...params, tenantId).run();
+            } catch {
+              await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+            }
+          } else {
+            await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+          }
         } catch {
           if (cafeUpdates.length > 0) {
-            await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
+            if (tenantId !== '*') {
+              try {
+                await db.prepare(
+                  `UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+                ).bind(...cafeParams, id, tenantId).run();
+              } catch {
+                await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
+              }
+            } else {
+              await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
+            }
           }
         }
       }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_update', 'table', id, JSON.stringify(body), now);
+    await writeTableAuditLog(db, user.id, 'table_update', 'table', id, JSON.stringify(body), now, tenantId);
 
     let updated: any = null;
     try {
-      updated = await db.prepare(
-        `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
-         FROM cafe_tables t
-         LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
-         WHERE t.id = ?`
-      ).bind(id).first();
+      try {
+        updated = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')
+           WHERE t.id = ?`
+        ).bind(id).first();
+      } catch {
+        updated = await db.prepare(
+          `SELECT t.*, COALESCE(t.zone_id, t.zone) as zone_id, COALESCE(z.name, t.zone) as zone_name, COALESCE(t.code, CAST(t.table_number AS TEXT)) as code, COALESCE(t.is_active, 1) as is_active
+           FROM cafe_tables t
+           LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id
+           WHERE t.id = ?`
+        ).bind(id).first();
+      }
     } catch {
       try {
         updated = await db.prepare(
@@ -611,6 +765,9 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     let existing: any = null;
@@ -630,9 +787,17 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Check for active sessions
     let sessions: { count: number } | null = null;
     try {
-      sessions = (await db.prepare('SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN (\'active\', \'occupied\')').bind(id).first()) as { count: number } | null;
+      sessions = (await db.prepare(
+        "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'ordering', 'paid') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      ).bind(id, tenantId, tenantId).first()) as { count: number } | null;
     } catch {
-      sessions = null;
+      try {
+        sessions = (await db.prepare(
+          "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'ordering', 'paid')"
+        ).bind(id).first()) as { count: number } | null;
+      } catch {
+        sessions = null;
+      }
     }
     if (sessions && sessions.count > 0) {
       return c.json({ success: false, error: 'Cannot delete table with active sessions' }, 409);
@@ -641,22 +806,50 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Check for orders
     let orders: { count: number } | null = null;
     try {
-      orders = (await db.prepare('SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN (\'completed\', \'cancelled\')').bind(id).first()) as { count: number } | null;
+      orders = (await db.prepare(
+        "SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      ).bind(id, tenantId, tenantId).first()) as { count: number } | null;
     } catch {
-      orders = null;
+      try {
+        orders = (await db.prepare(
+          "SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')"
+        ).bind(id).first()) as { count: number } | null;
+      } catch {
+        orders = null;
+      }
     }
     if (orders && orders.count > 0) {
       return c.json({ success: false, error: 'Cannot delete table with active orders' }, 409);
     }
 
     try {
-      await db.prepare('DELETE FROM cafe_tables WHERE id = ?').bind(id).run();
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            "DELETE FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(id, tenantId).run();
+        } catch {
+          await db.prepare('DELETE FROM cafe_tables WHERE id = ?').bind(id).run();
+        }
+      } else {
+        await db.prepare('DELETE FROM cafe_tables WHERE id = ?').bind(id).run();
+      }
     } catch {
-      await db.prepare('DELETE FROM tables WHERE id = ?').bind(id).run();
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            "DELETE FROM tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(id, tenantId).run();
+        } catch {
+          await db.prepare('DELETE FROM tables WHERE id = ?').bind(id).run();
+        }
+      } else {
+        await db.prepare('DELETE FROM tables WHERE id = ?').bind(id).run();
+      }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_delete', 'table', id, JSON.stringify({ name: existing.name, code: existing.code }), now);
+    await writeTableAuditLog(db, user.id, 'table_delete', 'table', id, JSON.stringify({ name: existing.name, code: existing.code }), now, tenantId);
 
     return c.json({ success: true, data: { success: true } });
   });
@@ -667,6 +860,9 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const tenantId = getTenantId(c);
     const body = c.req.valid('json');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     const { tableIds, status } = body;
@@ -692,24 +888,60 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     for (const tableId of tableIds) {
       try {
-        await db.prepare(
-          'UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?'
-        ).bind(status, now, tableId).run();
+        if (tenantId !== '*') {
+          try {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(status, now, tableId, tenantId).run();
+          } catch {
+            await db.prepare(
+              'UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?'
+            ).bind(status, now, tableId).run();
+          }
+        } else {
+          await db.prepare(
+            'UPDATE cafe_tables SET status = ?, updated_at = ? WHERE id = ?'
+          ).bind(status, now, tableId).run();
+        }
       } catch {
         try {
-          await db.prepare(
-            'UPDATE tables SET status = ?, updated_at = ? WHERE id = ?'
-          ).bind(status, now, tableId).run();
+          if (tenantId !== '*') {
+            try {
+              await db.prepare(
+                "UPDATE tables SET status = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(status, now, tableId, tenantId).run();
+            } catch {
+              await db.prepare(
+                'UPDATE tables SET status = ?, updated_at = ? WHERE id = ?'
+              ).bind(status, now, tableId).run();
+            }
+          } else {
+            await db.prepare(
+              'UPDATE tables SET status = ?, updated_at = ? WHERE id = ?'
+            ).bind(status, now, tableId).run();
+          }
         } catch {
-          await db.prepare(
-            'UPDATE cafe_tables SET status = ? WHERE id = ?'
-          ).bind(status, tableId).run();
+          if (tenantId !== '*') {
+            try {
+              await db.prepare(
+                "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(status, tableId, tenantId).run();
+            } catch {
+              await db.prepare(
+                'UPDATE cafe_tables SET status = ? WHERE id = ?'
+              ).bind(status, tableId).run();
+            }
+          } else {
+            await db.prepare(
+              'UPDATE cafe_tables SET status = ? WHERE id = ?'
+            ).bind(status, tableId).run();
+          }
         }
       }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_bulk_status', 'table', 'multiple', JSON.stringify({ tableIds, status }), now);
+    await writeTableAuditLog(db, user.id, 'table_bulk_status', 'table', 'multiple', JSON.stringify({ tableIds, status }), now, tenantId);
 
     return c.json({ success: true, data: { success: true, updated: tableIds.length } });
   });

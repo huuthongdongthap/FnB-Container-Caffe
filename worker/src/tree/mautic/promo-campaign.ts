@@ -68,7 +68,11 @@ export async function triggerPromoCampaign(
       const contact = toMauticContact(customer);
       const contactId = await client.createOrUpdateContact(contact);
       await client.addContactToCampaign(contactId, parseInt(campaignCfg, 10));
-      await trackEnrollment(db, customer.id as string, 'promo', campaignCfg, contactId, 'enrolled');
+      if (scopedTenant) {
+        await trackEnrollment(db, customer.id as string, 'promo', campaignCfg, contactId, 'enrolled', scopedTenant);
+      } else {
+        await trackEnrollment(db, customer.id as string, 'promo', campaignCfg, contactId, 'enrolled');
+      }
       enrolled++;
     } catch {
       // skip on error

@@ -24,15 +24,19 @@ export type GroupBy = 'hour' | 'day' | 'category' | 'payment';
 
 // ───── Queries ─────
 
-function buildTenantFilter(tenantId?: string, tableAlias?: string): { clause: string; binds: string[] } {
+export function buildTenantFilter(
+  tenantId?: string,
+  tableAlias?: string,
+  prefix: 'AND' | 'WHERE' = 'AND'
+): { clause: string; binds: string[] } {
   if (!tenantId || tenantId === '*') {
     return { clause: '', binds: [] };
   }
   const col = tableAlias ? `${tableAlias}.tenant_id` : 'tenant_id';
   if (tenantId === 'default') {
-    return { clause: ` AND (${col} = ? OR ${col} IS NULL)`, binds: [tenantId] };
+    return { clause: ` ${prefix} (${col} = ? OR ${col} IS NULL OR ${col} = '' OR TRIM(${col}) = '')`, binds: [tenantId] };
   }
-  return { clause: ` AND ${col} = ?`, binds: [tenantId] };
+  return { clause: ` ${prefix} TRIM(${col}) = ?`, binds: [tenantId] };
 }
 
 const AGGREGATE_SQL = `

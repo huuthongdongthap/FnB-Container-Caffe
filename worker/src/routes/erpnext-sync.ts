@@ -7,7 +7,7 @@
  * createErpnextClient returns null → endpoint returns a stub response.
  */
 
-import { createErpnextClient } from '../clients/erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv } from '../clients/erpnext-client';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId, matchesTenantRow } from '../lib/db';
 import type { Env } from '../types/env';
@@ -17,6 +17,7 @@ interface InventoryTxnRow {
   sku: string | null;
   name: string | null;
   quantity: number;
+  current_stock?: number | null;
   reference_type: string | null;
   created_at: string;
   tenant_id?: string | null;
@@ -28,11 +29,27 @@ async function writeSyncLog(
   endpoint: string,
   requestBody: string,
   responseBody: string | null,
-  error: string | null
+  error: string | null,
+  tenantId?: string
 ): Promise<void> {
   if (!db) return;
   const id = crypto.randomUUID();
   const status = error ? 'failed' : 'synced';
+  const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+  if (tenantId !== '*') {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO erpnext_sync_logs (id, method, endpoint, request_body, response_body, error, tenant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(id, method, endpoint, requestBody, responseBody, error, effectiveTenant)
+        .run();
+      return;
+    } catch {
+      // Fall through to legacy schema variants
+    }
+  }
   try {
     await db
       .prepare(
@@ -70,13 +87,13 @@ function matchesSyncLogTenant(row: Record<string, unknown> | null | undefined, t
   if (!row) return false;
   if (!tenantId || tenantId === '*') return true;
   if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id) === tenantId;
+    return String(row.tenant_id).trim() === tenantId;
   }
   if (typeof row.request_body === 'string' && row.request_body.startsWith('{')) {
     try {
       const parsed = JSON.parse(row.request_body) as { tenant_id?: string };
-      if (parsed.tenant_id) {
-        return parsed.tenant_id === tenantId;
+      if (parsed.tenant_id && String(parsed.tenant_id).trim()) {
+        return String(parsed.tenant_id).trim() === tenantId;
       }
     } catch {
       // ignore malformed JSON
@@ -85,12 +102,12 @@ function matchesSyncLogTenant(row: Record<string, unknown> | null | undefined, t
   return tenantId === 'default';
 }
 
-const allow = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const allow = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
 const adminStatusAllow = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
 const adminTriggerAllow = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
 
 export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
-  app.get('/api/erpnext/sync/inventory', allow, async(c) => {
+  const handleInventorySync = async(c: import('hono').Context<{ Bindings: Env }>) => {
     try {
       const db = c.env.AURA_DB;
       if (!db) {
@@ -101,36 +118,71 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       let transactions: InventoryTxnRow[] = [];
       try {
-        const res = await db
-          .prepare(
-            `SELECT it.item_id, ii.sku, ii.name, it.quantity, it.reference_type, it.created_at, ii.tenant_id
-             FROM inventory_transactions it
-             JOIN inventory_items ii ON it.item_id = ii.id
-             WHERE it.created_at >= ?
-             AND it.reference_type != 'sync'
-             ORDER BY it.created_at DESC
-             LIMIT 500`
-          )
-          .bind(cutoff)
-          .all<InventoryTxnRow>();
+        let res: { results?: InventoryTxnRow[] };
+        try {
+          res = await db
+            .prepare(
+              `SELECT it.item_id, ii.sku, ii.name, it.quantity, ii.current_stock, it.reference_type, it.created_at, ii.tenant_id
+               FROM inventory_transactions it
+               JOIN inventory_items ii ON it.item_id = ii.id
+               WHERE it.created_at >= ?
+               AND it.reference_type != 'sync'
+               ORDER BY it.created_at DESC
+               LIMIT 500`
+            )
+            .bind(cutoff)
+            .all<InventoryTxnRow>();
+        } catch {
+          res = await db
+            .prepare(
+              `SELECT it.item_id, ii.sku, ii.name, it.quantity, it.reference_type, it.created_at, ii.tenant_id
+               FROM inventory_transactions it
+               JOIN inventory_items ii ON it.item_id = ii.id
+               WHERE it.created_at >= ?
+               AND it.reference_type != 'sync'
+               ORDER BY it.created_at DESC
+               LIMIT 500`
+            )
+            .bind(cutoff)
+            .all<InventoryTxnRow>();
+        }
         transactions = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
       } catch {
-        const res = await db
-          .prepare(
-            `SELECT it.item_id, ii.sku, ii.name, it.quantity, it.reference_type, it.created_at
-             FROM inventory_transactions it
-             JOIN inventory_items ii ON it.item_id = ii.id
-             WHERE it.created_at >= ?
-             AND it.reference_type != 'sync'
-             ORDER BY it.created_at DESC
-             LIMIT 500`
-          )
-          .bind(cutoff)
-          .all<InventoryTxnRow>();
+        let res: { results?: InventoryTxnRow[] };
+        try {
+          res = await db
+            .prepare(
+              `SELECT it.item_id, ii.sku, ii.name, it.quantity, ii.current_stock, it.reference_type, it.created_at
+               FROM inventory_transactions it
+               JOIN inventory_items ii ON it.item_id = ii.id
+               WHERE it.created_at >= ?
+               AND it.reference_type != 'sync'
+               ORDER BY it.created_at DESC
+               LIMIT 500`
+            )
+            .bind(cutoff)
+            .all<InventoryTxnRow>();
+        } catch {
+          res = await db
+            .prepare(
+              `SELECT it.item_id, ii.sku, ii.name, it.quantity, it.reference_type, it.created_at
+               FROM inventory_transactions it
+               JOIN inventory_items ii ON it.item_id = ii.id
+               WHERE it.created_at >= ?
+               AND it.reference_type != 'sync'
+               ORDER BY it.created_at DESC
+               LIMIT 500`
+            )
+            .bind(cutoff)
+            .all<InventoryTxnRow>();
+        }
         transactions = tenantId === 'default' || tenantId === '*' ? (res.results || []) : [];
       }
 
-      const client = createErpnextClient(c.env);
+      const client =
+        (c.env.AUTH_KV && typeof createErpnextClientWithKv === 'function'
+          ? await createErpnextClientWithKv(c.env, tenantId)
+          : null) ?? createErpnextClient(c.env);
       let synced = 0;
       let failed = 0;
 
@@ -140,9 +192,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           db,
           'GET',
           '/api/erpnext/sync/inventory',
-          JSON.stringify({ count: transactions.length, since: cutoff }),
+          JSON.stringify({ count: transactions.length, since: cutoff, tenant_id: tenantId }),
           JSON.stringify({ mock: true, matched: transactions.length }),
-          null
+          null,
+          tenantId
         );
 
         return c.json({
@@ -156,11 +209,17 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       }
 
       for (const txn of transactions) {
+        const itemCode = txn.sku || txn.item_id;
+        const actualQty =
+          typeof txn.current_stock === 'number' && !Number.isNaN(txn.current_stock)
+            ? txn.current_stock
+            : txn.current_stock !== undefined && txn.current_stock !== null && !Number.isNaN(Number(txn.current_stock))
+              ? Number(txn.current_stock)
+              : txn.quantity;
         try {
-          // target Bin/{item_code} so ERPNext can apply the delta directly
-          const itemCode = txn.sku || txn.item_id;
+          // target Bin/{item_code} with the item's current stock balance when available
           const result = await client.put('Bin', itemCode, {
-            actual_qty: txn.quantity
+            actual_qty: actualQty
           });
 
           if (result.error) {
@@ -169,9 +228,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
               db,
               'PUT',
               `Bin/${itemCode}`,
-              JSON.stringify({ actual_qty: txn.quantity, txnId: txn.item_id }),
+              JSON.stringify({ actual_qty: actualQty, txnId: txn.item_id, tenant_id: tenantId }),
               JSON.stringify(result.data ?? {}),
-              String((result.data as Record<string, string> | undefined)?.message || result.error || 'Unknown error')
+              String((result.data as Record<string, string> | undefined)?.message || result.error || 'Unknown error'),
+              tenantId
             );
           } else {
             synced++;
@@ -182,10 +242,11 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           await writeSyncLog(
             db,
             'PUT',
-            `Bin/${txn.sku || txn.item_id}`,
-            JSON.stringify({ actual_qty: txn.quantity }),
+            `Bin/${itemCode}`,
+            JSON.stringify({ actual_qty: actualQty, tenant_id: tenantId }),
             null,
-            msg
+            msg,
+            tenantId
           );
         }
       }
@@ -195,7 +256,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ success: false, error: msg, mock: false }, 500);
     }
-  });
+  };
+
+  app.get('/api/erpnext/sync/inventory', allow, handleInventorySync);
+  app.post('/api/erpnext/sync/inventory', allow, handleInventorySync);
 
   // GET /api/admin/erpnext-sync/status — Admin ERPNext sync status widget
   app.get('/api/admin/erpnext-sync/status', adminStatusAllow, async (c) => {
@@ -252,7 +316,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           if (tenantId && tenantId !== '*') {
             try {
               const queueRow = await db
-                .prepare("SELECT COUNT(*) AS cnt FROM erpnext_sync_queue WHERE status = 'pending' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+                .prepare("SELECT COUNT(*) AS cnt FROM erpnext_sync_queue WHERE status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
                 .bind(tenantId)
                 .first<{ cnt?: number }>();
               pendingItems = Number(queueRow?.cnt ?? 0);
@@ -305,7 +369,8 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       '/api/admin/erpnext-sync/sync-all',
       JSON.stringify({ entities: ['orders', 'products', 'customers', 'inventory', 'invoices'], tenant_id: tenantId }),
       JSON.stringify({ synced: true, timestamp: now }),
-      null
+      null,
+      tenantId
     );
     return c.json({
       success: true,
@@ -332,7 +397,8 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       `/api/admin/erpnext-sync/${entity}`,
       JSON.stringify({ entity, tenant_id: tenantId }),
       JSON.stringify({ synced: true, timestamp: now }),
-      null
+      null,
+      tenantId
     );
     return c.json({
       success: true,

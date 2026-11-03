@@ -70,7 +70,8 @@ export async function getOccupancyAnalytics(
     const twentyFourHoursAgoSec = Math.floor(Date.now() / 1000) - 86400;
 
     // 1. Current active person detections (last 5 minutes)
-    const scopedTenant = tenantId && tenantId !== '*' ? tenantId : null;
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const scopedTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : null;
     let activeRows: { results?: Array<{ camera: string; count: number; last_seen: string | null }> };
     if (scopedTenant) {
       try {

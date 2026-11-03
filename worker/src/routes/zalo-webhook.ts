@@ -18,6 +18,7 @@ export const zaloWebhookRouter = new Hono<{ Bindings: Env }>();
 const zaloWebhookSchema = z.object({
   event_name: z.string().max(64).default('user_send_text'),
   app_id: z.string().max(64).optional(),
+  timestamp: z.union([z.string().max(32), z.number()]).optional(),
   sender: z.object({
     id: z.string().max(64)
   }).optional(),
@@ -51,7 +52,7 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function verifyZaloSignature(
+export async function verifyZaloSignature(
   rawBody: string,
   signatureHeader: string,
   secret: string,
@@ -121,6 +122,7 @@ zaloWebhookRouter.post('/', async (c) => {
   );
   const signatureHeader = c.req.header('X-ZaloOA-Signature') || c.req.header('x-zalooa-signature');
 
+  const timestampRaw = body.timestamp !== undefined ? String(body.timestamp).trim() : '';
   if (!zaloSecret) {
     if (!allowUnsignedDev) {
       return c.json({ success: false, error: 'Zalo webhook secret is not configured' }, 503);
@@ -130,10 +132,13 @@ zaloWebhookRouter.post('/', async (c) => {
       return c.json({ success: false, error: 'Missing Zalo webhook signature' }, 401);
     }
     const appId = String(body.app_id || envRecord.ZALO_APP_ID || '');
-    const timestamp = String(body.timestamp || '');
-    const valid = await verifyZaloSignature(rawBody, signatureHeader, zaloSecret, appId, timestamp);
+    const valid = await verifyZaloSignature(rawBody, signatureHeader, zaloSecret, appId, timestampRaw);
     if (!valid) {
       return c.json({ success: false, error: 'Invalid Zalo webhook signature' }, 401);
+    }
+    const tsNum = Number(timestampRaw);
+    if (Number.isFinite(tsNum) && tsNum > 1000000000000 && Math.abs(Date.now() - tsNum) > 10 * 60 * 1000) {
+      return c.json({ success: false, error: 'Stale Zalo webhook timestamp' }, 401);
     }
   }
 
@@ -143,16 +148,37 @@ zaloWebhookRouter.post('/', async (c) => {
   }
 
   const { event_name, sender, message, user_phone } = parsed.data;
+  const rawTenant = c.get('user' as never)
+    ? getTenantId(c)
+    : (
+        c.req.query('tenant_id') ||
+        c.req.header('X-Tenant-ID') ||
+        c.req.header('x-tenant-id') ||
+        String(envRecord.PILOT_TENANT_ID || envRecord.DEFAULT_TENANT_ID || '')
+      ).trim();
+  const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
+
+  const msgId = message?.msg_id?.trim() || '';
+  const authKv = c.env?.AUTH_KV as
+    | { get(_k: string): Promise<string | null>; put(_k: string, _v: string, _opts?: { expirationTtl?: number }): Promise<void> }
+    | undefined;
+  if (msgId && authKv && typeof authKv.get === 'function') {
+    const dedupKey = tenantId === 'default' ? `zalo_msg:${msgId}` : `zalo_msg:${tenantId}:${msgId}`;
+    const alreadyProcessed = await authKv.get(dedupKey).catch(() => null);
+    if (alreadyProcessed) {
+      return c.json({ success: true, deduplicated: true, message: 'Duplicate message ignored' });
+    }
+    if (typeof authKv.put === 'function') {
+      await authKv.put(dedupKey, '1', { expirationTtl: 86400 }).catch(() => {});
+    }
+  }
+
   const userText = message?.text?.trim() || '';
 
   if (event_name !== 'user_send_text' || !userText) {
     return c.json({ success: true, message: 'Event ignored or empty text' });
   }
 
-  const rawTenant = c.get('user' as never)
-    ? getTenantId(c)
-    : (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
-  const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 

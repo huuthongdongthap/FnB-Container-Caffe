@@ -333,6 +333,7 @@ describe('reverseReferralCashback', () => {
     const db = makeSeqD1(
       [
         { first: { id: REFERRAL_ID, cashback_awarded_vnd: 10000, referrer_id: 'cust_ref_01' } },
+        {}, // CAS status update (run only)
         { first: null }, // no wallet → insert in batch
       ],
       t,
@@ -342,8 +343,8 @@ describe('reverseReferralCashback', () => {
     expect(result.debited_vnd).toBe(10000);
     expect(result.new_balance).toBe(0); // max(0, 0 - 10000)
     expect(t.batchCount).toBe(1);
-    // wallet insert + wallet update + tx insert + referral update + audit insert = 5
-    expect(t.batchLengths[0]).toBe(5);
+    // CAS referral update runs outside batch; batch = wallet insert + wallet update + tx insert + audit insert = 4
+    expect(t.batchLengths[0]).toBe(4);
   });
 
   it('success: uses existing wallet and computes correct new balance', async () => {
@@ -351,6 +352,7 @@ describe('reverseReferralCashback', () => {
     const db = makeSeqD1(
       [
         { first: { id: REFERRAL_ID, cashback_awarded_vnd: 10000, referrer_id: 'cust_ref_01' } },
+        {}, // CAS status update (run only)
         { first: { id: 'cbw_existing', balance: 20000 } },
       ],
       t,
@@ -359,7 +361,7 @@ describe('reverseReferralCashback', () => {
     expect(result.success).toBe(true);
     expect(result.new_balance).toBe(10000); // 20000 - 10000
     expect(t.batchCount).toBe(1);
-    // No wallet insert: wallet update + tx insert + referral update + audit insert = 4
-    expect(t.batchLengths[0]).toBe(4);
+    // No wallet insert: wallet update + tx insert + audit insert = 3
+    expect(t.batchLengths[0]).toBe(3);
   });
 });

@@ -310,4 +310,75 @@ describe('subscribePush', () => {
     const res = await subscribePush(ctx);
     expect(res.status).toBe(500);
   });
+
+  it('Phase W1-W4: enforces tenant isolation across mobile notifications/push, catalog whitespace tenant_id, Mixpost auto-post, Cal.com booking tables, and HA webhook', async () => {
+    // 1. W2: getNotifications suppresses cross-tenant notification rows and subscribePush binds tenant_id
+    const mixedNotifs = [
+      { id: 'NTF_OWN', type: 'order_ready', title_vi: 'Món A', title_en: 'Dish A', body_vi: null, body_en: null, data: '{}', read_at: null, created_at: '2026-07-10T10:00:00Z', tenant_id: 'tenant_sadec_02' },
+      { id: 'NTF_OTHER', type: 'order_ready', title_vi: 'Món B', title_en: 'Dish B', body_vi: null, body_en: null, data: '{}', read_at: null, created_at: '2026-07-10T10:00:00Z', tenant_id: 'default' },
+    ];
+    const storeBGetCtx: any = makeCtx('waiter', 'USR_W', '/mobile/notifications', 'GET', undefined, makeDb(mixedNotifs));
+    storeBGetCtx.get = (k: string) => (k === 'user' ? { id: 'USR_W', role: 'waiter', tenantId: 'tenant_sadec_02' } : undefined);
+    const getRes = await getNotifications(storeBGetCtx);
+    const getJson = await getRes.json();
+    expect(getJson.notifications).toHaveLength(1);
+    expect(getJson.notifications[0].id).toBe('NTF_OWN');
+
+    const capturedSubBinds: unknown[][] = [];
+    const subDb: any = {
+      prepare: (_sql: string) => ({
+        bind: (...args: unknown[]) => {
+          capturedSubBinds.push(args);
+          return { run: async () => ({ success: true, changes: 1 }) };
+        },
+      }),
+    };
+    const storeBSubCtx: any = makeCtx('waiter', 'USR_W', '/mobile/notifications/subscribe', 'POST', validPayload, subDb);
+    storeBSubCtx.get = (k: string) => (k === 'user' ? { id: 'USR_W', role: 'waiter', tenantId: 'tenant_sadec_02' } : undefined);
+    const subRes = await subscribePush(storeBSubCtx);
+    expect(subRes.status).toBe(201);
+    expect(capturedSubBinds[0]).toContain('tenant_sadec_02');
+
+    // 2. W1: matchesCatalogTenant normalizes whitespace-only tenant_id to 'default'
+    const { matchesCatalogTenant } = await import('../../routes/openapi-products-handlers/helpers');
+    expect(matchesCatalogTenant({ id: 'P1', tenant_id: '   ' }, 'default')).toBe(true);
+    expect(matchesCatalogTenant({ id: 'P1', tenant_id: ' tenant_sadec_02 ' }, 'tenant_sadec_02')).toBe(true);
+    expect(matchesCatalogTenant({ id: 'P1', tenant_id: 'tenant_sadec_02' }, 'default')).toBe(false);
+
+    // 3. W3: createReservationFromBooking filters out cross-tenant cafe_tables
+    const { createReservationFromBooking } = await import('../../tree/cal-booking/process-booking');
+    const calDb: any = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => null,
+          all: async () => ({
+            results: sql.includes('cafe_tables')
+              ? [{ id: 'T-OTHER', capacity: 4, zone: 'A', status: 'Available', tenant_id: 'tenant_sadec_02' }]
+              : [],
+          }),
+          run: async () => ({ success: true, changes: 1 }),
+        }),
+      }),
+    };
+    const calRes = await createReservationFromBooking(calDb, {
+      uid: 'cal-w3',
+      startTime: '2026-07-10T18:00:00+07:00',
+      attendees: [{ name: 'Guest', email: 'g@aura.vn' }],
+    }, 'default');
+    expect('error' in calRes).toBe(true);
+
+    // 4. W4: handleHAWebhook blocks cross-tenant overwrite on ha_device_states
+    const { handleHAWebhook } = await import('../../tree/homeassistant/presence');
+    const haDb: any = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => (sql.includes('SELECT tenant_id FROM ha_device_states') ? { tenant_id: 'tenant_sadec_02' } : null),
+          run: async () => ({ success: true, changes: 1 }),
+        }),
+      }),
+    };
+    const haRes = await handleHAWebhook({ AURA_DB: haDb }, { entity_id: 'light.patio', state: 'on' }, 'default');
+    expect(haRes.success).toBe(false);
+    expect(haRes.action_taken).toBe('cross_tenant_blocked:light.patio');
+  });
 });

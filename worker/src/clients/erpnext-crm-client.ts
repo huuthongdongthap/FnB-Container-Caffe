@@ -242,9 +242,10 @@ export function createErpnextCrmClient(env: CrmEnv): ErpnextCrmClient | null {
 }
 
 export async function createErpnextCrmClientWithKv(
-  env: CrmEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
+  env: CrmEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
+  tenantId?: string,
 ): Promise<ErpnextCrmClient | null> {
-  const client = await createErpnextClientWithKv(env);
+  const client = await createErpnextClientWithKv(env, tenantId);
   if (!client) {
     return null;
   }

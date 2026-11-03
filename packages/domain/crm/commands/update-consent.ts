@@ -32,6 +32,7 @@ export interface ConsentUpdate {
     | 'kitchen'
     | 'barista'
     | 'chef';
+  tenantId?: string;
 }
 
 export type UpdateConsentInput = ConsentUpdate;
@@ -57,6 +58,7 @@ const VALID_PURPOSES = ['marketing', 'order', 'analytics', 'referral', 'loyalty'
 export async function updateConsent(
   db: D1Database,
   update: ConsentUpdate,
+  tenantId?: string,
 ): Promise<ConsentResult> {
   if (!VALID_PURPOSES.includes(update.purpose)) {
     return { ok: false, error: `Invalid consent purpose: ${update.purpose}`, code: 'invalid_purpose' };
@@ -67,6 +69,29 @@ export async function updateConsent(
     return { ok: false, error: 'Staff consent changes require actor_id !== customer_id', code: 'forbidden' };
   }
 
+  const effectiveTenant = (tenantId ?? update.tenantId)?.trim() || 'default';
+  const isWildcard = effectiveTenant === '*';
+  if (!isWildcard) {
+    try {
+      const custRow = await db
+        .prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1')
+        .bind(update.customerId)
+        .first<{ id: string; tenant_id?: string | null }>();
+      if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
+        const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+        if (custTenant !== effectiveTenant) {
+          return { ok: false, error: 'Forbidden: customer belongs to another tenant', code: 'forbidden' };
+        }
+      } else if (!custRow && effectiveTenant !== 'default') {
+        return { ok: false, error: 'Forbidden: customer not found in tenant', code: 'forbidden' };
+      }
+    } catch (err) {
+      if (!/no such column:\s*tenant_id/i.test(String(err)) && effectiveTenant !== 'default') {
+        return { ok: false, error: 'Forbidden: tenant verification failed', code: 'forbidden' };
+      }
+    }
+  }
+
   try {
     const id = genId('c_');
     const now = new Date().toISOString();
@@ -75,21 +100,42 @@ export async function updateConsent(
     const revokedAt = update.granted ? null : now;
 
     try {
-      await db
-        .prepare(
-          'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
-        )
-        .bind(now, update.customerId, update.purpose)
-        .run();
+      if (!isWildcard) {
+        try {
+          await db
+            .prepare(
+              "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(now, update.customerId, update.purpose, effectiveTenant)
+            .run();
+        } catch (revokeErr) {
+          if (/no such column:\s*tenant_id/i.test(String(revokeErr)) && effectiveTenant === 'default') {
+            await db
+              .prepare(
+                'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
+              )
+              .bind(now, update.customerId, update.purpose)
+              .run();
+          }
+        }
+      } else {
+        await db
+          .prepare(
+            'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
+          )
+          .bind(now, update.customerId, update.purpose)
+          .run();
+      }
     } catch {
       // Optional prior-row revocation when table/column is available
     }
 
+    const insertTenant = isWildcard ? 'default' : effectiveTenant;
     try {
       await db
         .prepare(
-          `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, tenant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -100,28 +146,71 @@ export async function updateConsent(
           update.policyVersion ?? null,
           grantedAt,
           revokedAt,
+          insertTenant,
         )
         .run();
     } catch {
-      await db
-        .prepare(
-          `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          id,
-          update.customerId,
-          update.purpose,
-          granted,
-          update.source,
-          update.policyVersion ?? null,
-          grantedAt,
-          revokedAt,
-          update.actorId,
-          now,
-          now,
-        )
-        .run();
+      try {
+        await db
+          .prepare(
+            `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_by, tenant_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            id,
+            update.customerId,
+            update.purpose,
+            granted,
+            update.source,
+            update.policyVersion ?? null,
+            grantedAt,
+            revokedAt,
+            update.actorId,
+            insertTenant,
+            now,
+            now,
+          )
+          .run();
+      } catch {
+        try {
+          await db
+            .prepare(
+              `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              id,
+              update.customerId,
+              update.purpose,
+              granted,
+              update.source,
+              update.policyVersion ?? null,
+              grantedAt,
+              revokedAt,
+            )
+            .run();
+        } catch {
+          await db
+            .prepare(
+              `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              id,
+              update.customerId,
+              update.purpose,
+              granted,
+              update.source,
+              update.policyVersion ?? null,
+              grantedAt,
+              revokedAt,
+              update.actorId,
+              now,
+              now,
+            )
+            .run();
+        }
+      }
     }
 
     log.info('consent_updated', {

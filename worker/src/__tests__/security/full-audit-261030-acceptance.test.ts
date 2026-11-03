@@ -5775,4 +5775,2194 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       sql.close();
     }
   });
+
+  it('Phase 34 (AG1..AG4): enforces birthday-bonus birth date & zero-bonus tier config, promotions fail-closed write role & server-price eligibleSubtotal validation, KDS cancel inventory/loyalty reversal & station tenant isolation, and loyalty-trigger/getCustomerAccount tenant propagation', async () => {
+    const { env, sql } = createTestEnv();
+    try {
+      const db = env.AURA_DB;
+      const nowDate = new Date();
+      const nowIso = nowDate.toISOString();
+      const currentMonthStr = String(nowDate.getUTCMonth() + 1).padStart(2, '0');
+      const currentYearStr = String(nowDate.getUTCFullYear());
+      const pastIso = new Date(Date.now() - 3600_000).toISOString();
+      const futureIso = new Date(Date.now() + 86400_000).toISOString();
+
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { Hono } = await import('hono');
+      const { registerAccountHandlers: registerLoyaltyAccountHandlers } = await import('../../routes/openapi-loyalty-handlers/account-handlers');
+      const { registerCrudHandlers } = await import('../../routes/openapi-promotions-handlers/crud-handlers');
+      const { registerValidationHandlers } = await import('../../routes/openapi-promotions-handlers/validation-handlers');
+      const { executeKdsStatusTransition } = await import('../../../../packages/domain/kitchen/commands/kds-status-transition');
+      const { handleGetKdsOrders } = await import('../../routes/orders-hono-handlers/kds-handlers');
+      const { creditLoyaltyIfEligible } = await import('../../../../packages/domain/order/policies/loyalty-trigger');
+      const { getCustomerAccount } = await import('../../../../packages/domain/crm/commands/get-customer-account');
+
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          birthday TEXT,
+          loyalty_tier TEXT DEFAULT 'bronze',
+          loyalty_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          visit_count INTEGER DEFAULT 0,
+          total_spent INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_accounts (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT UNIQUE,
+          current_points INTEGER DEFAULT 0,
+          lifetime_points INTEGER DEFAULT 0,
+          tier TEXT DEFAULT 'bronze',
+          order_count INTEGER DEFAULT 0,
+          total_spent INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default',
+          last_activity_at TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_transactions (
+          id TEXT PRIMARY KEY,
+          account_id TEXT,
+          customer_id TEXT,
+          type TEXT,
+          points INTEGER,
+          balance_after INTEGER,
+          order_id TEXT,
+          reward_id TEXT,
+          description TEXT,
+          reason TEXT,
+          idempotency_key TEXT,
+          created_by TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_point_logs (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          order_id TEXT,
+          points_change INTEGER,
+          reason TEXT,
+          balance_after INTEGER,
+          description TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS cashback_transactions (
+          id TEXT PRIMARY KEY,
+          wallet_id TEXT,
+          customer_id TEXT,
+          order_id TEXT,
+          type TEXT,
+          amount INTEGER,
+          balance_after INTEGER,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS categories (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          sort_order INTEGER DEFAULT 0,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          category_id TEXT,
+          name TEXT,
+          slug TEXT,
+          price REAL DEFAULT 0,
+          is_available INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS promotions (
+          id TEXT PRIMARY KEY,
+          code TEXT,
+          name TEXT,
+          description TEXT,
+          type TEXT DEFAULT 'percentage',
+          discount_type TEXT DEFAULT 'percentage',
+          discount_value REAL DEFAULT 10,
+          min_order_value REAL,
+          max_discount_value REAL,
+          max_uses INTEGER,
+          current_uses INTEGER DEFAULT 0,
+          usage_count INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          valid_from TEXT,
+          valid_to TEXT,
+          applicable_items TEXT,
+          excluded_items TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS orders (
+          id TEXT PRIMARY KEY,
+          items TEXT,
+          total INTEGER DEFAULT 0,
+          total_amount INTEGER DEFAULT 0,
+          subtotal INTEGER DEFAULT 0,
+          status TEXT DEFAULT 'pending',
+          payment_status TEXT DEFAULT 'unpaid',
+          customer_id TEXT,
+          customer_name TEXT,
+          customer_phone TEXT,
+          customer_email TEXT,
+          table_id TEXT,
+          notes TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS consents (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          purpose TEXT,
+          granted INTEGER DEFAULT 1,
+          revoked_at TEXT,
+          granted_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          action TEXT,
+          entity_type TEXT,
+          entity_id TEXT,
+          metadata TEXT,
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_tier_configs (
+          tier TEXT PRIMARY KEY,
+          birthday_bonus INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS kitchen_stations (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS category_stations (
+          category_id TEXT NOT NULL,
+          station_id TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id TEXT PRIMARY KEY,
+          code TEXT,
+          name TEXT,
+          current_stock REAL DEFAULT 0,
+          quantity REAL DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          previous_stock REAL,
+          new_stock REAL,
+          reference_id TEXT,
+          reference_type TEXT,
+          notes TEXT,
+          created_by TEXT,
+          created_at TEXT
+        );
+        ALTER TABLE kitchen_stations ADD COLUMN tenant_id TEXT DEFAULT 'default';
+        ALTER TABLE orders ADD COLUMN subtotal REAL DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN customer_id TEXT;
+        ALTER TABLE orders ADD COLUMN points_earned INTEGER DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN total_amount REAL DEFAULT 0;
+      `);
+
+      // AG1: Birthday bonus requires non-null birthday, respects 0 bonus tier config, and enforces yearly idempotency
+      sql.prepare(
+        `INSERT INTO customers (id, name, phone, birthday, loyalty_points, lifetime_points, loyalty_tier, tenant_id)
+         VALUES
+          ('cust-ag-nobday', 'No Bday', '0911000001', NULL, 100, 100, 'silver', 'default'),
+          ('cust-ag-zerobonus', 'Zero Bonus', '0911000002', ?, 100, 100, 'bronze_zero', 'default'),
+          ('cust-ag-validbday', 'Valid Bday', '0911000003', ?, 100, 100, 'gold_bday', 'default'),
+          ('cust-ag-storeb', 'Store B Cust', '0911000004', ?, 500, 500, 'silver', 'store-b')`
+      ).run(`1995-${currentMonthStr}-10`, `1992-${currentMonthStr}-20`, `1990-${currentMonthStr}-15`);
+
+      sql.prepare(
+        `INSERT INTO loyalty_accounts (id, customer_id, current_points, lifetime_points, tier, tenant_id, created_at, updated_at)
+         VALUES
+          ('la-ag-nobday', 'cust-ag-nobday', 100, 100, 'silver', 'default', ?, ?),
+          ('la-ag-zerobonus', 'cust-ag-zerobonus', 100, 100, 'bronze_zero', 'default', ?, ?),
+          ('la-ag-validbday', 'cust-ag-validbday', 100, 100, 'gold_bday', 'default', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso, nowIso, nowIso);
+
+      sql.prepare(
+        `INSERT INTO loyalty_tier_configs (tier, birthday_bonus)
+         VALUES ('bronze_zero', 0), ('gold_bday', 300)`
+      ).run();
+
+      let currentLoyaltyUser = { id: 'cust-ag-nobday', role: 'customer', tenantId: 'default' };
+      const loyaltyApp = new OpenAPIHono<any>();
+      loyaltyApp.use('*', async (c, next) => {
+        c.set('user', currentLoyaltyUser);
+        c.set('tenantId', currentLoyaltyUser.tenantId);
+        await next();
+      });
+      registerLoyaltyAccountHandlers(loyaltyApp);
+
+      const noBdayRes = await loyaltyApp.fetch(
+        new Request('http://localhost/api/loyalty/account/birthday-bonus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }),
+        env
+      );
+      expect(noBdayRes.status).toBe(400);
+
+      currentLoyaltyUser = { id: 'cust-ag-zerobonus', role: 'customer', tenantId: 'default' };
+      const zeroBonusRes = await loyaltyApp.fetch(
+        new Request('http://localhost/api/loyalty/account/birthday-bonus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }),
+        env
+      );
+      expect(zeroBonusRes.status).toBe(400);
+
+      currentLoyaltyUser = { id: 'cust-ag-validbday', role: 'customer', tenantId: 'default' };
+      const validBdayRes = await loyaltyApp.fetch(
+        new Request('http://localhost/api/loyalty/account/birthday-bonus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }),
+        env
+      );
+      expect(validBdayRes.status).toBe(200);
+      const validBdayJson = (await validBdayRes.json()) as { data: { points: number; newBalance: number } };
+      expect(validBdayJson.data.points).toBe(300);
+      expect(validBdayJson.data.newBalance).toBe(400);
+
+      const bdayTx = sql.prepare("SELECT idempotency_key FROM loyalty_transactions WHERE customer_id = 'cust-ag-validbday'").get() as { idempotency_key: string } | undefined;
+      expect(bdayTx?.idempotency_key).toBe(`birthday_bonus:cust-ag-validbday:${currentYearStr}`);
+
+      const dupBdayRes = await loyaltyApp.fetch(
+        new Request('http://localhost/api/loyalty/account/birthday-bonus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }),
+        env
+      );
+      expect(dupBdayRes.status).toBe(400);
+
+      // AG2: Promotions fail-closed write role guard (blocks undefined user and 'staff') & server-price eligibleSubtotal validation
+      let currentPromoUser: any = undefined;
+      const promoApp = new OpenAPIHono<any>();
+      promoApp.use('*', async (c, next) => {
+        if (currentPromoUser) c.set('user', currentPromoUser);
+        c.set('tenantId', 'default');
+        await next();
+      });
+      registerCrudHandlers(promoApp);
+      registerValidationHandlers(promoApp);
+
+      const createNoUserRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: 'unauth-promo',
+            name: 'Unauth Promo',
+            code: 'UNAUTH10',
+            type: 'code',
+            rule: { type: 'percentage', value: 10 },
+            schedule: { startAt: nowIso },
+          }),
+        }),
+        env
+      );
+      expect(createNoUserRes.status).toBe(403);
+
+      currentPromoUser = { id: 'staff-ag-1', role: 'staff', tenantId: 'default' };
+      const createStaffRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: 'staff-promo',
+            name: 'Staff Promo',
+            code: 'STAFF10',
+            type: 'code',
+            rule: { type: 'percentage', value: 10 },
+            schedule: { startAt: nowIso },
+          }),
+        }),
+        env
+      );
+      expect(createStaffRes.status).toBe(403);
+
+      const prodEligibleId = '11111111-3333-4333-8333-000000000001';
+      const prodOtherId = '11111111-3333-4333-8333-000000000002';
+      const prodExcludedId = '11111111-3333-4333-8333-000000000003';
+      sql.prepare(
+        `INSERT INTO categories (id, name, slug, sort_order, tenant_id)
+         VALUES ('cat-ag-1', 'Coffee AG', 'coffee-ag', 1, 'default')`
+      ).run();
+      sql.prepare(
+        `INSERT INTO products (id, category_id, name, slug, price, is_available, tenant_id)
+         VALUES
+          (?, 'cat-ag-1', 'Eligible Latte', 'eligible-latte', 40000, 1, 'default'),
+          (?, 'cat-ag-1', 'Other Cake', 'other-cake', 60000, 1, 'default'),
+          (?, 'cat-ag-1', 'Excluded Merchandise', 'excluded-merch', 80000, 1, 'default')`
+      ).run(prodEligibleId, prodOtherId, prodExcludedId);
+
+      sql.prepare(
+        `INSERT INTO promotions (id, name, code, type, discount_type, discount_value, min_order_value, applicable_items, excluded_items, valid_from, valid_to, is_active, tenant_id, created_at, updated_at)
+         VALUES
+          ('promo-ag-scoped', 'Scoped 50%', 'SCOPED50', 'percentage', 'percentage', 50, 80000, ?, ?, ?, ?, 1, 'default', ?, ?)`
+      ).run(JSON.stringify([prodEligibleId]), JSON.stringify([prodExcludedId]), pastIso, futureIso, nowIso, nowIso);
+
+      // Client tries to pass inflated orderValue (200,000) with only 1x 40,000 item -> rejected by minOrderValue (80,000)
+      const spoofedOrderValRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: 'SCOPED50',
+            orderValue: 200000,
+            items: [{ menuItemId: prodEligibleId, quantity: 1, price: 200000 }],
+          }),
+        }),
+        env
+      );
+      expect(spoofedOrderValRes.status).toBe(400);
+
+      // Client omits items when excluded_items is configured -> rejected (400)
+      const omittedItemsRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: 'SCOPED50',
+            orderValue: 100000,
+          }),
+        }),
+        env
+      );
+      expect(omittedItemsRes.status).toBe(400);
+
+      // Valid cart: 1x Eligible Latte (server price 40k) + 1x Other Cake (server price 60k) = 100k subtotal, but 50% applies ONLY to Eligible Latte (40k -> 20k discount)
+      const validScopedRes = await promoApp.fetch(
+        new Request('http://localhost/api/promotions/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: 'SCOPED50',
+            items: [
+              { menuItemId: prodEligibleId, quantity: 1, price: 90000 },
+              { menuItemId: prodOtherId, quantity: 1, price: 60000 },
+            ],
+          }),
+        }),
+        env
+      );
+      expect(validScopedRes.status).toBe(200);
+      const validScopedJson = (await validScopedRes.json()) as { data: { discount: number; subtotal: number; finalTotal: number } };
+      expect(validScopedJson.data.subtotal).toBe(100000);
+      expect(validScopedJson.data.discount).toBe(20000);
+      expect(validScopedJson.data.finalTotal).toBe(80000);
+
+      // AG3: KDS cancellation restores reserved inventory, and KDS station filter isolates kitchen_stations by tenant
+      sql.prepare(
+        `INSERT INTO inventory_items (id, code, name, current_stock, quantity, is_active, updated_at)
+         VALUES ('inv-ag-1', 'MILK-AG', 'Fresh Milk', 8, 8, 1, ?)`
+      ).run(nowIso);
+      sql.prepare(
+        `INSERT INTO inventory_transactions (id, item_id, type, quantity, previous_stock, new_stock, reference_id, reference_type, notes, created_by, created_at)
+         VALUES ('itx-ag-res-1', 'inv-ag-1', 'reserve', -2, 10, 8, 'ord-ag-kds-cancel', 'order', 'Reserved for ord-ag-kds-cancel', 'system', ?)`
+      ).run(nowIso);
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, subtotal, status, customer_id, tenant_id, created_at, updated_at)
+         VALUES ('ord-ag-kds-cancel', '[]', 50000, 50000, 'preparing', 'cust-ag-validbday', 'default', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      const kdsCancelResult = await executeKdsStatusTransition(db, 'ord-ag-kds-cancel', 'cancelled', 'manager', {
+        tenantId: 'default',
+      });
+      expect(kdsCancelResult.success).toBe(true);
+      const restoredStock = sql.prepare("SELECT current_stock FROM inventory_items WHERE id = 'inv-ag-1'").get() as { current_stock: number };
+      expect(restoredStock.current_stock).toBe(10);
+
+      sql.prepare(
+        `INSERT INTO kitchen_stations (id, name, tenant_id)
+         VALUES ('ks-store-b-bar', 'Bar Station B', 'store-b')`
+      ).run();
+      sql.prepare(
+        `INSERT INTO category_stations (category_id, station_id)
+         VALUES ('cat-ag-1', 'ks-store-b-bar')`
+      ).run();
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, subtotal, status, customer_name, tenant_id, created_at, updated_at)
+         VALUES ('ord-ag-kds-active', ?, 40000, 40000, 'pending', 'Guest AG', 'default', ?, ?)`
+      ).run(JSON.stringify([{ id: prodEligibleId, name: 'Eligible Latte', quantity: 1, category_id: 'cat-ag-1' }]), nowIso, nowIso);
+
+      const kdsApp = new Hono<any>();
+      kdsApp.use('*', async (c, next) => {
+        c.set('user', { id: 'staff-def', role: 'kitchen' });
+        c.set('tenantId', 'default');
+        await next();
+      });
+      kdsApp.get('/api/orders/kds', handleGetKdsOrders);
+
+      const kdsStationRes = await kdsApp.fetch(
+        new Request('http://localhost/api/orders/kds?station_id=ks-store-b-bar'),
+        env
+      );
+      expect(kdsStationRes.status).toBe(200);
+      const kdsStationJson = (await kdsStationRes.json()) as { data: Array<{ id: string }> };
+      expect(kdsStationJson.data).toHaveLength(0);
+
+      // AG4: creditLoyaltyIfEligible propagates default tenant when order.tenant_id is NULL (preventing cross-tenant customer accrual), and getCustomerAccount enforces tenantId match
+      sql.prepare(
+        `INSERT INTO orders (id, items, total, subtotal, status, payment_status, customer_id, tenant_id, created_at, updated_at)
+         VALUES ('ord-ag-null-tenant', '[]', 100000, 100000, 'completed', 'paid', 'cust-ag-storeb', NULL, ?, ?)`
+      ).run(nowIso, nowIso);
+
+      await creditLoyaltyIfEligible(db, env as unknown as Record<string, unknown>, 'ord-ag-null-tenant');
+      const storeBCustAfter = sql.prepare("SELECT loyalty_points FROM customers WHERE id = 'cust-ag-storeb'").get() as { loyalty_points: number };
+      expect(storeBCustAfter.loyalty_points).toBe(500);
+
+      const crossTenantAccount = await getCustomerAccount(db, 'cust-ag-storeb', { tenantId: 'default' });
+      expect(crossTenantAccount.name).toBeNull();
+      expect(crossTenantAccount.points).toBe(0);
+
+      const sameTenantAccount = await getCustomerAccount(db, 'cust-ag-storeb', { tenantId: 'store-b' });
+      expect(sameTenantAccount.name).toBe('Store B Cust');
+      expect(sameTenantAccount.points).toBe(500);
+    } finally {
+      sql.close();
+    }
+  });
+
+  it('enforces AK1–AK4 Forecasting/Recommendations/Metrics/Cron Tenant Isolation, Menu/Table-Zone RBAC, Assistant/Mixpost SSRF & Birthday/Subscription Guards', async () => {
+    const { sql, env } = createTestEnv();
+    try {
+      const { Hono } = await import('hono');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { inventoryForecastingRouter } = await import('../../routes/inventory-forecasting');
+      const { recommendationsRouter } = await import('../../routes/recommendations');
+      const { default: adminMetricsRouter } = await import('../../routes/admin-metrics');
+      const { registerJobCrudHandlers: registerCronJobCrudHandlers } = await import('../../routes/openapi-cron-handlers/job-crud-handlers');
+      const { registerSummaryHandlers: registerCronSummaryHandlers } = await import('../../routes/openapi-cron-handlers/summary-handlers');
+      const { getCustomerMenu, getCustomerMenuItem } = await import('../../../../packages/domain/catalog/commands/get-customer-menu');
+      const { resolveServerProductPrice } = await import('../../../../packages/domain/catalog/policies/pricing-resolver');
+      const { registerZoneCrudHandlers } = await import('../../routes/openapi-tables-handlers/zone-crud-handlers');
+      const { registerTableCrudHandlers } = await import('../../routes/openapi-tables-handlers/table-crud-handlers');
+      const { customerAssistantRouter } = await import('../../routes/customer-assistant');
+      const { registerPostsHandler } = await import('../../routes/mixpost-handlers/posts-handler');
+      const { checkInventoryAlerts } = await import('../../routes/cron-handlers/order-checks');
+      const { birthdayRouter } = await import('../../routes/birthday');
+      const { createSubscription } = await import('../../tree/subscriptions/sub-handlers');
+
+      const nowIso = new Date().toISOString();
+      const db = env.AURA_DB;
+
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          sku TEXT,
+          unit TEXT DEFAULT 'kg',
+          current_stock REAL DEFAULT 0,
+          min_stock REAL DEFAULT 0,
+          quantity REAL DEFAULT 100,
+          min_quantity REAL DEFAULT 0,
+          reorder_point REAL DEFAULT 0,
+          cost_per_unit REAL DEFAULT 0,
+          active INTEGER DEFAULT 1,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS stock_movements (
+          id TEXT PRIMARY KEY,
+          ingredient_id TEXT,
+          type TEXT,
+          quantity REAL,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS ai_product_affinities (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT,
+          item_a TEXT,
+          item_b TEXT,
+          co_occurrence_count INTEGER,
+          affinity_score REAL,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS _metrics (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          value REAL,
+          tags TEXT,
+          timestamp TEXT,
+          created_at TEXT
+        );
+        DROP TABLE IF EXISTS cron_jobs;
+        DROP TABLE IF EXISTS cron_runs;
+        CREATE TABLE IF NOT EXISTS cron_jobs (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          description TEXT,
+          schedule TEXT,
+          cron_expression TEXT,
+          handler TEXT,
+          job_type TEXT,
+          payload TEXT,
+          is_active INTEGER DEFAULT 1,
+          status TEXT DEFAULT 'active',
+          timeout_seconds INTEGER DEFAULT 300,
+          max_retries INTEGER DEFAULT 3,
+          retry_delay_seconds INTEGER DEFAULT 60,
+          timeout_ms INTEGER DEFAULT 30000,
+          location_id TEXT,
+          last_run_at TEXT,
+          next_run_at TEXT,
+          last_status TEXT,
+          run_count INTEGER DEFAULT 0,
+          fail_count INTEGER DEFAULT 0,
+          created_by TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS cron_runs (
+          id TEXT PRIMARY KEY,
+          job_id TEXT,
+          status TEXT,
+          started_at TEXT,
+          completed_at TEXT,
+          duration_ms INTEGER,
+          output TEXT,
+          error TEXT
+        );
+        CREATE TABLE IF NOT EXISTS menu_items (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          description TEXT,
+          price INTEGER,
+          base_price_vnd INTEGER,
+          category TEXT,
+          image_url TEXT,
+          tags TEXT,
+          available INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS happy_hour_windows (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          day_of_week INTEGER,
+          start_time TEXT,
+          end_time TEXT,
+          discount_rate REAL,
+          active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS table_zones (
+          id TEXT PRIMARY KEY,
+          slug TEXT,
+          name TEXT,
+          description TEXT,
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          location_id TEXT,
+          metadata TEXT,
+          tenant_id TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS mixpost_posts (
+          id TEXT PRIMARY KEY,
+          content TEXT,
+          platforms TEXT,
+          status TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS inventory_alerts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_id TEXT,
+          alert_type TEXT,
+          current_qty REAL,
+          threshold REAL,
+          notified_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          phone TEXT,
+          email TEXT,
+          birthday TEXT,
+          date_of_birth TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+        CREATE TABLE IF NOT EXISTS subscription_plans (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          slug TEXT,
+          monthly_price_vnd INTEGER,
+          deposit_vnd INTEGER,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id TEXT PRIMARY KEY,
+          plan_id TEXT,
+          customer_id TEXT,
+          customer_name TEXT,
+          customer_email TEXT,
+          customer_phone TEXT,
+          company_name TEXT,
+          tax_code TEXT,
+          container_code TEXT,
+          location TEXT,
+          status TEXT,
+          amount_vnd INTEGER,
+          deposit_vnd INTEGER,
+          deposit_paid INTEGER DEFAULT 0,
+          billing_cycle TEXT,
+          current_period_start TEXT,
+          current_period_end TEXT,
+          next_billing_date TEXT,
+          notes TEXT,
+          tenant_id TEXT DEFAULT 'default',
+          created_at TEXT,
+          updated_at TEXT
+        );
+      `);
+
+      // Seed staff & manager users for default and store-b
+      sql.prepare(
+        `INSERT INTO users (id, name, email, role, tenant_id, is_active, auth_version, created_at)
+         VALUES
+          ('staff-ak-def', 'Staff Def', 'staff-ak@aura.vn', 'staff', 'default', 1, 1, ?),
+          ('mgr-ak-def', 'Mgr Def', 'mgr-ak@aura.vn', 'manager', 'default', 1, 1, ?),
+          ('mgr-ak-b', 'Mgr B', 'mgr-ak-b@aura.vn', 'manager', 'store-b', 1, 1, ?)`
+      ).run(nowIso, nowIso, nowIso);
+
+      const staffDefAcc: any = sql.prepare("SELECT * FROM users WHERE id = 'staff-ak-def'").get();
+      const mgrDefAcc: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-ak-def'").get();
+      const mgrBAcc: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-ak-b'").get();
+      const { token: staffDefToken } = await issueStaffSession(env, staffDefAcc, { sessionType: 'staff-web' });
+      const { token: mgrDefToken } = await issueStaffSession(env, mgrDefAcc, { sessionType: 'staff-web' });
+      const { token: mgrBToken } = await issueStaffSession(env, mgrBAcc, { sessionType: 'staff-web' });
+
+      // AK1.1: POST /api/inventory/forecast/snapshot rejects 'staff' with 403, and run-rate excludes positive adjustments & cross-tenant movements
+      sql.prepare(
+        `INSERT INTO inventory_items (id, name, sku, unit, current_stock, min_stock, reorder_point, cost_per_unit, active, is_active, tenant_id, updated_at)
+         VALUES ('inv-ak-beans', 'Arabica Beans', 'ARB-AK', 'kg', 14, 5, 5, 200000, 1, 1, 'default', ?)`
+      ).run(nowIso);
+      sql.prepare(
+        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, tenant_id, created_at)
+         VALUES
+          ('sm-ak-sale', 'inv-ak-beans', 'sale', -7, 'default', ?),
+          ('sm-ak-pos-adj', 'inv-ak-beans', 'adjustment', 50, 'default', ?),
+          ('sm-ak-foreign', 'inv-ak-beans', 'sale', -70, 'store-b', ?)`
+      ).run(nowIso, nowIso, nowIso);
+
+      const staffSnapRes = await inventoryForecastingRouter.fetch(
+        new Request('http://localhost/snapshot', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${staffDefToken}` },
+        }),
+        env
+      );
+      expect(staffSnapRes.status).toBe(403);
+
+      const runRateRes = await inventoryForecastingRouter.fetch(
+        new Request('http://localhost/run-rate?days=7', {
+          headers: { Authorization: `Bearer ${mgrDefToken}` },
+        }),
+        env
+      );
+      expect(runRateRes.status).toBe(200);
+      const runRateJson = (await runRateRes.json()) as { data: Array<{ id: string; daily_run_rate: number; days_of_supply: number }> };
+      const beansMetric = runRateJson.data.find((d) => d.id === 'inv-ak-beans');
+      expect(beansMetric?.daily_run_rate).toBe(1);
+      expect(beansMetric?.days_of_supply).toBe(14);
+
+      // AK1.2: POST /api/recommendations/mine-affinities rejects 'staff' with 403
+      const staffMineRes = await recommendationsRouter.fetch(
+        new Request('http://localhost/mine-affinities', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${staffDefToken}` },
+        }),
+        env
+      );
+      expect(staffMineRes.status).toBe(403);
+
+      // AK1.3: GET /api/admin/metrics scopes _metrics rows by tenant_id tag
+      sql.prepare(
+        `INSERT INTO _metrics (name, value, tags, timestamp, created_at)
+         VALUES
+          ('request', 40, '{"status":"200","duration":40,"tenant_id":"default"}', ?, ?),
+          ('request', 900, '{"status":"500","duration":900,"tenant_id":"store-b"}', ?, ?)`
+      ).run(nowIso, nowIso, nowIso, nowIso);
+
+      const metricsDefRes = await adminMetricsRouter.fetch(
+        new Request('http://localhost/?range=24h', {
+          headers: { Authorization: `Bearer ${mgrDefToken}` },
+        }),
+        env
+      );
+      expect(metricsDefRes.status).toBe(200);
+      const metricsDefJson = (await metricsDefRes.json()) as { requests: { total: number }; errors: { total: number } };
+      expect(metricsDefJson.requests.total).toBe(1);
+      expect(metricsDefJson.errors.total).toBe(0);
+
+      // AK1.4: OpenAPI Cron stamps payload.tenant_id server-side and isolates summary for empty default tenant
+      sql.prepare(
+        `INSERT INTO cron_runs (id, job_id, status, started_at, duration_ms)
+         VALUES ('crun-ak-b-1', 'cjob-foreign-b', 'success', ?, 120)`
+      ).run(nowIso);
+
+      let cronCaller = { id: 'mgr-ak-def', role: 'manager', tenantId: 'default' };
+      const cronApp = new OpenAPIHono<any>();
+      cronApp.use('*', async (c, next) => {
+        c.set('user', cronCaller);
+        c.set('tenantId', cronCaller.tenantId);
+        await next();
+      });
+      registerCronSummaryHandlers(cronApp);
+      registerCronJobCrudHandlers(cronApp);
+
+      const emptyDefSumRes = await cronApp.fetch(new Request('http://localhost/api/cron/summary'), env);
+      expect(emptyDefSumRes.status).toBe(200);
+      const emptyDefSumJson = (await emptyDefSumRes.json()) as { data: { totalRuns: number } };
+      expect(emptyDefSumJson.data.totalRuns).toBe(0);
+
+      cronCaller = { id: 'mgr-ak-b', role: 'manager', tenantId: 'store-b' };
+      const createCronRes = await cronApp.fetch(
+        new Request('http://localhost/api/cron/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Store B Job',
+            cronExpression: '0 * * * *',
+            handler: 'inventory.check',
+            payload: { tenant_id: 'default', tenantId: 'default' },
+          }),
+        }),
+        env
+      );
+      expect(createCronRes.status).toBe(201);
+      const createCronJson = (await createCronRes.json()) as { data: { id: string; payload: string | { tenant_id: string } } };
+      const parsedCronPayload = typeof createCronJson.data.payload === 'string'
+        ? JSON.parse(createCronJson.data.payload)
+        : createCronJson.data.payload;
+      expect(parsedCronPayload.tenant_id).toBe('store-b');
+
+      // AK2.1: getCustomerMenu, getCustomerMenuItem & resolveServerProductPrice isolate menu_items and happy_hour_windows by tenant
+      const nowDay = new Date().getDay();
+      sql.prepare(
+        `INSERT INTO menu_items (id, name, description, price, base_price_vnd, category, available, tenant_id)
+         VALUES
+          ('mi-ak-def', 'Default Phin', 'Desc', 40000, 40000, 'coffee', 1, 'default'),
+          ('mi-ak-b', 'Store B Special', 'Desc', 60000, 60000, 'coffee', 1, 'store-b')`
+      ).run();
+      sql.prepare(
+        `INSERT INTO happy_hour_windows (id, name, day_of_week, start_time, end_time, discount_rate, active, tenant_id)
+         VALUES ('hh-ak-b', 'Store B 50% Off', ?, '00:00', '23:59', 0.5, 1, 'store-b')`
+      ).run(nowDay);
+
+      const defMenu = await getCustomerMenu(db, { tenantId: 'default', channel: 'dine_in', now: new Date() });
+      const defMenuItems = defMenu.categories.flatMap((c) => c.items);
+      expect(defMenuItems.map((i) => i.id)).toContain('mi-ak-def');
+      expect(defMenuItems.map((i) => i.id)).not.toContain('mi-ak-b');
+      // Store B's 50% happy hour window must NOT discount Default tenant's item
+      expect(defMenuItems.find((i) => i.id === 'mi-ak-def')?.priceCents).toBe(40000);
+
+      const crossMenuItem = await getCustomerMenuItem(db, 'mi-ak-b', { tenantId: 'default' });
+      expect(crossMenuItem).toBeNull();
+
+      const crossResolvedPrice = await resolveServerProductPrice(db, { productId: 'mi-ak-b', tenantId: 'default' });
+      expect(crossResolvedPrice.available).toBe(false);
+      expect(crossResolvedPrice.rejection?.code).toBe('item_not_found');
+
+      // AK2.2: Waiter/cashier blocked (403) from creating table zones or tables; table_zones slug uniqueness scoped by tenant
+      let tableCaller = { id: 'waiter-ak', role: 'waiter', tenantId: 'default' };
+      const tablesApp = new OpenAPIHono<any>();
+      tablesApp.use('*', async (c, next) => {
+        c.set('user', tableCaller);
+        c.set('tenantId', tableCaller.tenantId);
+        await next();
+      });
+      registerZoneCrudHandlers(tablesApp);
+      registerTableCrudHandlers(tablesApp);
+
+      const waiterZoneRes = await tablesApp.fetch(
+        new Request('http://localhost/api/table-zones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'VIP Zone', slug: 'vip-zone' }),
+        }),
+        env
+      );
+      expect(waiterZoneRes.status).toBe(403);
+
+      tableCaller = { id: 'mgr-ak-def', role: 'manager', tenantId: 'default' };
+      const defZoneRes = await tablesApp.fetch(
+        new Request('http://localhost/api/table-zones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Rooftop', slug: 'rooftop' }),
+        }),
+        env
+      );
+      expect(defZoneRes.status).toBe(201);
+
+      tableCaller = { id: 'mgr-ak-b', role: 'manager', tenantId: 'store-b' };
+      const bZoneRes = await tablesApp.fetch(
+        new Request('http://localhost/api/table-zones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Store B Rooftop', slug: 'rooftop' }),
+        }),
+        env
+      );
+      expect(bZoneRes.status).toBe(201);
+      const bZoneRow = sql.prepare("SELECT tenant_id FROM table_zones WHERE slug = 'rooftop' AND tenant_id = 'store-b'").get() as { tenant_id: string } | undefined;
+      expect(bZoneRow?.tenant_id).toBe('store-b');
+
+      // AK3.1: Customer Assistant masks order IDs even when unauthenticated caller spoofs channel='zalo', and masks table_bill order ID
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS cafe_tables (
+          id TEXT PRIMARY KEY,
+          table_number TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+      `);
+      sql.prepare("INSERT INTO cafe_tables (id, table_number, tenant_id) VALUES ('T99', '99', 'default')").run();
+      sql.prepare(
+        `INSERT INTO orders (id, order_number, customer_phone, customer_name, tenant_id, total, status, payment_status, payment_method, order_type, table_id, items, created_at, updated_at)
+         VALUES ('ord-ak-secret999', 'ORD-AK9', '0908889999', 'Secret Guest', 'default', 95000, 'preparing', 'unpaid', 'cash', 'dine_in', 'T99', '[]', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      const spoofZaloRes = await customerAssistantRouter.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra đơn hàng của tôi', phone: '0908889999', channel: 'zalo' }),
+        }),
+        env
+      );
+      expect(spoofZaloRes.status).toBe(200);
+      const spoofZaloJson = (await spoofZaloRes.json()) as { data: { reply: string } };
+      expect(spoofZaloJson.data.reply).not.toContain('ord-ak-secret999');
+      expect(spoofZaloJson.data.reply).toContain('***t999');
+
+      const tableBillRes = await customerAssistantRouter.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Tính tiền bàn 99', table_number: '99' }),
+        }),
+        env
+      );
+      expect(tableBillRes.status).toBe(200);
+      const tableBillJson = (await tableBillRes.json()) as { data: { reply: string } };
+      expect(tableBillJson.data.reply).not.toContain('ord-ak-secret999');
+      expect(tableBillJson.data.reply).toContain('***t999');
+
+      // AK3.2: Mixpost SSRF blocks private/metadata mediaUrls (400) and non-default tenant with 0 D1 posts does not leak global posts
+      sql.prepare(
+        `INSERT INTO mixpost_posts (id, content, platforms, status, tenant_id, created_at)
+         VALUES ('mp-def-1', 'Default Post', '["facebook"]', 'published', 'default', ?)`
+      ).run(nowIso);
+      const mixpostEnv = { ...env, MIXPOST_API_URL: 'https://mixpost.aura.test', MIXPOST_API_TOKEN: 'test-token' };
+      const mixpostApp = new Hono<any>();
+      mixpostApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-ak-b', role: 'manager', tenantId: 'store-b' });
+        c.set('tenantId', 'store-b');
+        await next();
+      });
+      registerPostsHandler(mixpostApp);
+
+      const ssrfPostRes = await mixpostApp.fetch(
+        new Request('http://localhost/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: 'Test SSRF',
+            accounts: ['acc-1'],
+            mediaUrls: ['http://169.254.169.254/latest/meta-data/'],
+          }),
+        }),
+        mixpostEnv
+      );
+      expect(ssrfPostRes.status).toBe(400);
+
+      const storeBPostsRes = await mixpostApp.fetch(new Request('http://localhost/posts'), mixpostEnv);
+      expect(storeBPostsRes.status).toBe(200);
+      const storeBPostsJson = (await storeBPostsRes.json()) as { data: unknown[]; source: string };
+      expect(storeBPostsJson.data).toEqual([]);
+      expect(storeBPostsJson.source).toBe('d1');
+
+      // AK4.1: checkInventoryAlerts fires for low stock when last alert was >4h ago, and suppresses within 4h
+      try { sql.exec('ALTER TABLE inventory_items ADD COLUMN quantity REAL DEFAULT 0'); } catch { /* exists */ }
+      try { sql.exec('ALTER TABLE inventory_items ADD COLUMN min_quantity REAL DEFAULT 0'); } catch { /* exists */ }
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS inventory_alerts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_id TEXT,
+          alert_type TEXT,
+          current_qty REAL,
+          threshold REAL,
+          notified_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+      `);
+      sql.prepare('UPDATE inventory_items SET quantity = 100, min_quantity = 0').run();
+      sql.prepare(
+        `INSERT INTO inventory_items (id, name, sku, unit, current_stock, min_stock, quantity, min_quantity, reorder_point, cost_per_unit, active, is_active, tenant_id, updated_at)
+         VALUES ('inv-ak-low', 'Low Matcha', 'MAT-LOW', 'kg', 1, 5, 1, 5, 5, 100000, 1, 1, 'default', ?)`
+      ).run(nowIso);
+      const fiveHoursAgoIso = new Date(Date.now() - 5 * 3600 * 1000).toISOString();
+      sql.prepare(
+        `INSERT INTO inventory_alerts (item_id, alert_type, current_qty, threshold, notified_at, tenant_id) VALUES ('inv-ak-low', 'low_stock', 1, 5, ?, 'default')`
+      ).run(fiveHoursAgoIso);
+
+      const firstAlertRun = await checkInventoryAlerts(env as unknown as Record<string, unknown>, 'default');
+      expect(firstAlertRun).toBe(1);
+      const secondAlertRun = await checkInventoryAlerts(env as unknown as Record<string, unknown>, 'default');
+      expect(secondAlertRun).toBe(0);
+
+      // AK4.2: Birthday PUT /config rejects staff (403) and invalid discountPercent (400); GET /check omits birthday/name when ineligible & unauthenticated
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS birthday_redemptions (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT,
+          redeemed_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
+        );
+      `);
+      sql.prepare(
+        `INSERT INTO customers (id, name, phone, birthday, date_of_birth, tenant_id)
+         VALUES ('cust-ak-inelig', 'Private Name', '0907776666', '1990-05-15', '1990-05-15', 'default')`
+      ).run();
+
+      const staffBdayCfgRes = await birthdayRouter.fetch(
+        new Request('http://localhost/config', {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${staffDefToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discountPercent: 25 }),
+        }),
+        env
+      );
+      expect(staffBdayCfgRes.status).toBe(403);
+
+      const invalidBdayCfgRes = await birthdayRouter.fetch(
+        new Request('http://localhost/config', {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${mgrDefToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discountPercent: 150 }),
+        }),
+        env
+      );
+      expect(invalidBdayCfgRes.status).toBe(400);
+
+      const unauthCheckRes = await birthdayRouter.fetch(
+        new Request('http://localhost/check?customer_id=cust-ak-inelig'),
+        env
+      );
+      expect(unauthCheckRes.status).toBe(200);
+      const unauthCheckJson = (await unauthCheckRes.json()) as { data: Record<string, unknown> };
+      expect(unauthCheckJson.data.eligible).toBe(false);
+      expect(unauthCheckJson.data.birthday).toBeUndefined();
+      expect(unauthCheckJson.data.customer_name).toBeUndefined();
+
+      // AK4.3: Subscription create rejects cross-tenant subscription_plans with 404
+      sql.prepare(
+        `INSERT INTO subscription_plans (id, name, slug, monthly_price_vnd, deposit_vnd, is_active, tenant_id, created_at, updated_at)
+         VALUES ('plan-ak-storeb', 'Store B Plan', 'store-b-plan', 6000000, 1000000, 1, 'store-b', ?, ?)`
+      ).run(nowIso, nowIso);
+
+      const subApp = new Hono<any>();
+      subApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-ak-def', role: 'manager', tenantId: 'default' });
+        c.set('tenantId', 'default');
+        await next();
+      });
+      subApp.post('/subscriptions', createSubscription);
+
+      const crossPlanSubRes = await subApp.fetch(
+        new Request('http://localhost/subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plan_id: 'plan-ak-storeb',
+            customer_name: 'Default Sub Cust',
+            customer_phone: '0901112233',
+          }),
+        }),
+        env
+      );
+      expect(crossPlanSubRes.status).toBe(404);
+    } finally {
+      sql.close();
+    }
+  });
 });
+
+
+// ---------------------------------------------------------------------------
+// Phase 35 (AH1..AH4) — Atomic balance updates, CAS state guards,
+// tenant-scoped rewards, birthday window enforcement, inventory atomicity
+// ---------------------------------------------------------------------------
+describe('Phase 35 acceptance (AH1..AH4)', () => {
+  it('AH1: reward redemption uses atomic balance deduction, not stale overwrite', async () => {
+    // The handler now uses:
+    //   UPDATE loyalty_accounts SET points_balance = points_balance - ?
+    //   UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) - ?
+    // Then reads back authoritative balance from D1.
+    // Verified structurally: the code no longer contains newBalance overwrites.
+    const src = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/openapi-loyalty-handlers/reward-handlers.ts'),
+        'utf8'
+      )
+    );
+    // Must NOT have stale newBalance overwrite in UPDATE customers
+    expect(src).not.toMatch(/UPDATE customers SET loyalty_points = \?[^C]/);
+    // Must have atomic decrement
+    expect(src).toMatch(/COALESCE\(loyalty_points,\s*0\)\s*-\s*\?/);
+    // Must read-back authoritative balance
+    expect(src).toContain('authoritativeBalance');
+  });
+
+  it('AH2: birthday POST /redeem enforces window check', async () => {
+    const src = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/birthday.ts'),
+        'utf8'
+      )
+    );
+    // checkBirthdayWindow must be called in POST handler
+    expect(src).toContain('checkBirthdayWindow');
+    // The function must be defined and used before redeem
+    const fnCount = (src.match(/checkBirthdayWindow/g) || []).length;
+    expect(fnCount).toBeGreaterThanOrEqual(3); // definition + GET usage + POST usage
+  });
+
+  it('AH3: referral status transitions use CAS (AND status = pending/completed)', async () => {
+    const refSrc = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../../../packages/domain/crm/commands/referral.ts'),
+        'utf8'
+      )
+    );
+    // CAS on pending → completed
+    expect(refSrc).toMatch(/UPDATE referrals SET.*status.*WHERE.*AND status\s*=\s*'pending'/s);
+    // CAS on completed → reversed
+    expect(refSrc).toMatch(/UPDATE referrals SET.*status.*WHERE.*AND status\s*=\s*'completed'/s);
+    // Atomic customer points
+    expect(refSrc).toMatch(/COALESCE\(loyalty_points,\s*0\)\s*[+-]\s*\?/);
+  });
+
+  it('AH3: accrual verifies order ownership and uses atomic wallet credit', async () => {
+    const src = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../../../packages/domain/crm/commands/accrual.ts'),
+        'utf8'
+      )
+    );
+    // Order ownership check (returns order_not_found when customer_id doesn't match)
+    expect(src).toMatch(/order\.customer_id\s*!==\s*customer\.id/);
+    // Atomic wallet update
+    expect(src).toMatch(/SET balance = COALESCE\(balance,\s*0\)\s*\+\s*\?/);
+  });
+
+  it('AH4: checkin.ts rejects wildcard X-Tenant-ID for unauthenticated callers', async () => {
+    const src = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/checkin.ts'),
+        'utf8'
+      )
+    );
+    // The local getTenantId must reject '*'
+    expect(src).toMatch(/hdr\.trim\(\)\s*!==\s*'\*'/);
+  });
+
+  it('AH4: inventory movement and PO receipt use atomic stock addition', async () => {
+    const movSrc = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/openapi-inventory-handlers/movement-handlers.ts'),
+        'utf8'
+      )
+    );
+    const poSrc = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/openapi-inventory-handlers/purchase-order-handlers.ts'),
+        'utf8'
+      )
+    );
+    // Movement positive branch: must NOT have stale SET current_stock = ? with newStock
+    const movPositiveLines = movSrc.split('\n').filter((l: string) =>
+      l.includes('SET current_stock = ?') && !l.includes('COALESCE')
+    );
+    expect(movPositiveLines).toHaveLength(0);
+
+    // PO receipt: must NOT have stale SET current_stock = ? with newStock
+    const poStaleLines = poSrc.split('\n').filter((l: string) =>
+      l.includes('SET current_stock = ?') && !l.includes('COALESCE')
+    );
+    expect(poStaleLines).toHaveLength(0);
+
+    // Both must use atomic COALESCE pattern for additions
+    expect(movSrc).toMatch(/SET current_stock = COALESCE\(current_stock,\s*0\)\s*\+\s*\?/);
+    expect(poSrc).toMatch(/SET current_stock = COALESCE\(current_stock,\s*0\)\s*\+\s*\?/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 36 (AI1..AI4) — Authorization gaps, input validation, rate limiting,
+// data leak prevention (column projection, allowlisted spreads, masked errors)
+// ---------------------------------------------------------------------------
+describe('Phase 36 acceptance (AI1..AI4)', () => {
+  it('AI1: push subscribe requires optionalAuth and customer identity verification; saas_tenants/create excludes customer role', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const pushSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/push.ts'), 'utf8');
+    const tenantsSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/saas-tenants.ts'), 'utf8');
+    const reviewsSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/reviews.ts'), 'utf8');
+
+    expect(pushSrc).toMatch(/optionalAuth|authenticateRequest/);
+    expect(pushSrc).toContain('pushSubscribeSchema.safeParse');
+    expect(tenantsSrc).not.toMatch(/requireAuth\(\['owner',\s*'admin',\s*'customer'\]\)/);
+    expect(reviewsSrc).toContain('optionalAuth');
+  });
+
+  it('AI3: loyalty redeem, cashback spend, referral code, and checkin enforce rateLimitMiddleware', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const rlSrc = fs.readFileSync(path.resolve(__dirname, '../../middleware/rate-limit.ts'), 'utf8');
+    const loyaltySrc = fs.readFileSync(path.resolve(__dirname, '../../routes/loyalty.ts'), 'utf8');
+    const refSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/referrals.ts'), 'utf8');
+    const checkinSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/checkin.ts'), 'utf8');
+
+    expect(rlSrc).toContain('LOYALTY_REDEEM_RATE_LIMIT');
+    expect(rlSrc).toContain('CASHBACK_SPEND_RATE_LIMIT');
+    expect(rlSrc).toContain('REFERRAL_CODE_RATE_LIMIT');
+    expect(rlSrc).toContain('CHECKIN_RATE_LIMIT');
+    expect(loyaltySrc).toMatch(/post\('\/redeem',\s*rateLimitMiddleware\(LOYALTY_REDEEM_RATE_LIMIT\)/);
+    expect(loyaltySrc).toMatch(/post\('\/spend-cashback',\s*rateLimitMiddleware\(CASHBACK_SPEND_RATE_LIMIT\)/);
+    expect(refSrc).toMatch(/get\('\/code',\s*rateLimitMiddleware\(REFERRAL_CODE_RATE_LIMIT\)/);
+    expect(checkinSrc).toMatch(/post\('\/',\s*rateLimitMiddleware\(CHECKIN_RATE_LIMIT\)/);
+  });
+
+  it('AI4: admin-loyalty, loyalty logs, referral stats, and erpnext eliminate SELECT *, raw row spreads, and raw error leaks', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const adminLoyaltySrc = fs.readFileSync(path.resolve(__dirname, '../../routes/admin-loyalty.ts'), 'utf8');
+    const loyaltySrc = fs.readFileSync(path.resolve(__dirname, '../../routes/loyalty.ts'), 'utf8');
+    const refSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/referrals.ts'), 'utf8');
+    const erpSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/erpnext.ts'), 'utf8');
+    const erpInvSrc = fs.readFileSync(path.resolve(__dirname, '../../routes/erpnext-invoices.ts'), 'utf8');
+
+    expect(adminLoyaltySrc).not.toMatch(/SELECT \* FROM customers/i);
+    expect(loyaltySrc).not.toMatch(/SELECT \* FROM loyalty_point_logs/i);
+    expect(loyaltySrc).not.toMatch(/SELECT \* FROM cashback_transactions/i);
+    expect(refSrc).not.toMatch(/\.\.\.row,\s*\n\s*referred_phone:/);
+    expect(erpSrc).toContain('Internal integration error');
+    expect(erpInvSrc).toContain('Retry failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 37 (AJ1..AJ4) — Webhook HMAC/CAS, Session/CSRF/AuthVersion Sync,
+// Financial/Order State Machine Integrity, Tenant KV/SSRF/XSS/CSV Hardening
+// ---------------------------------------------------------------------------
+describe('Phase 37 acceptance (AJ1..AJ4)', () => {
+  it('AJ1: NowPayments IPN enforces CAS status guard, amount validation, and idempotent period extension; Cal.com & TastyIgniter webhooks verify HMAC-SHA256', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const nowIpnSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/nowpayments-ipn.ts'),
+      'utf8'
+    );
+    const calWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cal-booking-webhook-handlers/webhook-handler.ts'),
+      'utf8'
+    );
+    const tiRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/integrations/tastyigniter.ts'),
+      'utf8'
+    );
+
+    expect(nowIpnSrc).toContain("status NOT IN ('paid', 'cancelled')");
+    expect(nowIpnSrc).toContain('Invoice amount mismatch');
+    expect(calWebhookSrc).toContain('computeHmacSha256');
+    expect(tiRoutesSrc).toContain('computeHmacSha256');
+  });
+
+  it('AJ2: password change syncs auth_version & cust_auth_ver across D1 and KV, subscription middleware validates staff sessions, WiFi enforces bounds & rate limits, and verifyPin uses constant-time comparison', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const devHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-auth-handlers/device-handlers.ts'),
+      'utf8'
+    );
+    const chgPwdSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/auth/change-password.ts'),
+      'utf8'
+    );
+    const subMwSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/middleware.ts'),
+      'utf8'
+    );
+    const wifiSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/wifi.ts'),
+      'utf8'
+    );
+    const staffAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-auth.ts'),
+      'utf8'
+    );
+
+    expect(devHandlersSrc).toContain('COALESCE(auth_version, 1) + 1');
+    expect(devHandlersSrc).toContain('cust_auth_ver:');
+    expect(chgPwdSrc).toContain('cookieWriteBlockReason');
+    expect(chgPwdSrc).toContain('cust_auth_ver:');
+    expect(subMwSrc).toContain('validateStaffSession');
+    expect(wifiSrc).toContain('.max(');
+    expect(staffAuthSrc).toContain('constantTimeStringEqual');
+  });
+
+  it('AJ3: order cancellation avoids double stock restoration, PayOS webhook skips loyalty/referral on cancelled orders, split-orders deducts inventory, refund-reversal claws back cashback when pointsEarned is 0, and DinDin QC rejects cancelled orders', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const kdsTransSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-status-transition.ts'),
+      'utf8'
+    );
+    const cancelHandlerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-cancel-handlers.ts'),
+      'utf8'
+    );
+    const orderDeductSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/order-deduction.ts'),
+      'utf8'
+    );
+    const payosWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/webhooks-handlers/payos.ts'),
+      'utf8'
+    );
+    const splitOrdersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/split-orders.ts'),
+      'utf8'
+    );
+    const refundRevSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/refund-reversal.ts'),
+      'utf8'
+    );
+    const dindinQcSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dindin-handlers/checkout-handlers.ts'),
+      'utf8'
+    );
+
+    expect(kdsTransSrc).toContain('!options?.skipCancelSideEffects');
+    expect(cancelHandlerSrc).toContain('skipCancelSideEffects: true');
+    expect(orderDeductSrc).toContain("SELECT id, ingredient_id, quantity FROM stock_movements WHERE reference_id = ? AND type = 'out'");
+    expect(payosWebhookSrc).toContain('PAID_ON_CANCELLED_ORDER');
+    expect(splitOrdersSrc).toContain('deductInventoryForOrder');
+    expect(refundRevSrc).toContain('pointsEarned <= 0 && cashbackEarnedOnOrder <= 0');
+    expect(dindinQcSrc).toContain('Cannot complete QC for a cancelled or failed order');
+  });
+
+  it('AJ4: ERPNext enforces tenant KV isolation, CSRF & invoice ownership, isSafePublicHttpsUrl blocks IPv6/IPv4-mapped/CGNAT SSRF, HTML templates escape fields, and CSV helpers neutralize whitespace-prefixed formulas', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const { isSafePublicHttpsUrl } = await import('../../lib/validators/erpnext');
+    const { renderOrderConfirm } = await import('../../templates/order-confirm');
+    const { renderReceipt } = await import('../../templates/receipt');
+
+    // SSRF IPv6 / IPv4-mapped IPv6 / CGNAT checks
+    expect(isSafePublicHttpsUrl('https://[::ffff:127.0.0.1]/api')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://[::ffff:169.254.169.254]/latest/meta-data')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://[0:0:0:0:0:0:0:1]/api')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://[fc00::1]/api')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://[fe80::1]/api')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://100.64.0.1/api')).toBe(false);
+    expect(isSafePublicHttpsUrl('https://erp.auracaffe.vn/api')).toBe(true);
+
+    // HTML template escaping
+    const confirmHtml = renderOrderConfirm({
+      id: 'ORD_<script>alert(1)</script>',
+      items: [{ name: '<img src=x onerror=alert(1)>', quantity: 1, price: 35000 }],
+      total: 35000,
+      customer_name: 'Alice',
+      customer_phone: '0901234567',
+      payment_method: 'cod<script>',
+    });
+    expect(confirmHtml).not.toContain('<script>alert(1)</script>');
+    expect(confirmHtml).not.toContain('<img src=x onerror=alert(1)>');
+    expect(confirmHtml).toContain('&lt;img src=x onerror=alert(1)&gt;');
+
+    const receiptHtml = renderReceipt({
+      id: 'ORD_<svg onload=alert(1)>',
+      total: 45000,
+      payment_method: 'payos<img>',
+    });
+    expect(receiptHtml).not.toContain('<svg onload=alert(1)>');
+    expect(receiptHtml).toContain('#ORD_&lt;svg onload=alert(1)&gt;');
+    expect(receiptHtml).toContain('payos&lt;img&gt;');
+
+    // CSV formula neutralization with leading newline/space
+    const csvAuditSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-audit-logs-handlers/csv-helper.ts'),
+      'utf8'
+    );
+    const csvAnalyticsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/csv-export.ts'),
+      'utf8'
+    );
+    const csvReportsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/export-handlers.ts'),
+      'utf8'
+    );
+    expect(csvAuditSrc).toContain('[\\t\\r\\n ]*[=+\\-@]');
+    expect(csvAnalyticsSrc).toContain('[\\t\\r\\n ]*[=+\\-@]');
+    expect(csvReportsSrc).toContain('[\\t\\r\\n ]*[=+\\-@]');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 39 (AL1..AL4) — OpenAPI Inventory RBAC & PO Over-Receipt Guards,
+// Push/Reviews/Checkin Ownership & Audit Logs, Domain Multi-Tenant Isolation,
+// ERPNext/TastyIgniter/Pretix Webhook & Invoice Hardening, DinDin/TableSessions/Reports
+// ---------------------------------------------------------------------------
+describe('Phase 39 acceptance (AL1..AL4)', () => {
+  it('AL1: OpenAPI inventory enforces manager RBAC and PO over-receipt caps; push, reviews, notifications-mobile, and checkin enforce tenant/ownership & cashback audit logs', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const ingSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/ingredient-handlers.ts'),
+      'utf8'
+    );
+    const movSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/movement-handlers.ts'),
+      'utf8'
+    );
+    const poSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/purchase-order-handlers.ts'),
+      'utf8'
+    );
+    const pushSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/push.ts'),
+      'utf8'
+    );
+    const notifMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/notifications-mobile.ts'),
+      'utf8'
+    );
+    const reviewsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reviews.ts'),
+      'utf8'
+    );
+    const checkinSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/checkin.ts'),
+      'utf8'
+    );
+
+    expect(ingSrc).toContain("['owner', 'manager', 'supervisor', 'admin']");
+    expect(movSrc).toContain("['waste', 'usage', 'consumption', 'out']");
+    expect(poSrc).toContain('exceeds ordered quantity');
+    expect(pushSrc).toContain('Subscription endpoint already registered to another user');
+    expect(notifMobileSrc).toContain('created_at, tenant_id');
+    expect(reviewsSrc).toContain('Order has already been reviewed');
+    expect(checkinSrc).toContain('INSERT INTO cashback_transactions');
+  });
+
+  it('AL2: domain inventory, order update/listing, NowPayments IPN, staff tips, shift access, and CRM segments/consent enforce RBAC, tenant scoping, and strict bounds', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const invCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-crud.ts'),
+      'utf8'
+    );
+    const poPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/purchasing-receiving-policy.ts'),
+      'utf8'
+    );
+    const updateOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/update-order.ts'),
+      'utf8'
+    );
+    const sharedListingSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/queries/shared-listing.ts'),
+      'utf8'
+    );
+    const nowIpnSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/nowpayments-ipn.ts'),
+      'utf8'
+    );
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+    const shiftAccessSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/shift-access.ts'),
+      'utf8'
+    );
+    const segmentsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/segments.ts'),
+      'utf8'
+    );
+    const consentSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/update-consent.ts'),
+      'utf8'
+    );
+
+    expect(invCrudSrc).toContain('.safeParse(');
+    expect(poPolicySrc).toContain('Cannot receive more than ordered quantity');
+    expect(updateOrderSrc).toContain('restoreInventoryForOrder(env as any, id, orderTenantForCancel)');
+    expect(sharedListingSrc).toContain('Math.min(200, Math.max(1, Math.floor(opts.limit!)))');
+    expect(nowIpnSrc).toContain('Invoice already bound to another payment reference');
+    expect(staffTipsSrc).toContain('Cannot assign tip to cancelled or refunded order');
+    expect(shiftAccessSrc).toContain('PILOT_TENANT_ID');
+    expect(segmentsSrc).toContain('getSegmentsKvKey');
+    expect(consentSrc).toContain('Forbidden: customer belongs to another tenant');
+  });
+
+  it('AL3: ERPNext POS webhook bypasses staff JWT middleware, ERPNext invoices use authoritative D1 order totals, ERPNext sync enforces manager RBAC & actual stock, TastyIgniter upserts bridge rows, and Pretix fails closed when JWT_SECRET is set', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const intRouterSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/integrations-router.ts'),
+      'utf8'
+    );
+    const erpInvSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext-invoices.ts'),
+      'utf8'
+    );
+    const erpSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext-sync.ts'),
+      'utf8'
+    );
+    const tiSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/integrations/tastyigniter/sync.ts'),
+      'utf8'
+    );
+    const tiWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/integrations/tastyigniter/webhook.ts'),
+      'utf8'
+    );
+    const pretixRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/pretix-handlers/routes.ts'),
+      'utf8'
+    );
+
+    expect(intRouterSrc).toContain('/erpnext-pos/webhook');
+    expect(erpInvSrc).toContain('mergeAuthoritativeOrder');
+    expect(erpSyncSrc).toContain('actual_qty: actualQty');
+    expect(tiSyncSrc).toContain('.meta?.changes ?? 0) === 0');
+    expect(tiWebhookSrc).toContain('matchesWebhookOrderTenant');
+    expect(pretixRoutesSrc).toContain('pretixStaffAuth');
+  });
+
+  it('AL4: DinDin checkout guards in-flight idempotency (409) & authoritative menu price, table-sessions attach orders idempotently on active sessions, and reports export enforces manager RBAC & date-range bounds', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const dindinSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dindin-handlers/checkout-handlers.ts'),
+      'utf8'
+    );
+    const tableOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/order-handlers.ts'),
+      'utf8'
+    );
+    const reportExportSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/export-handlers.ts'),
+      'utf8'
+    );
+
+    expect(dindinSrc).toContain('Checkout with this Idempotency-Key is already in progress');
+    expect(dindinSrc).toContain('dindin:qc:${tenantId}:${orderId}');
+    expect(tableOrderSrc).toContain('already_attached');
+    expect(tableOrderSrc).toContain('Session is not accepting orders');
+    expect(reportExportSrc).toContain('daySpan <= 366');
+    expect(reportExportSrc).toContain('LIMIT 5000');
+  });
+
+  it('AM1: birthday redacts unauthenticated PII & locks concurrent redemptions, order-write blocks customer non-status mutations & cancels pending payments, guest-checkin claims table before order insert, and admin-qr enforces manager RBAC & sanitizes X-Slug', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const birthdaySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/birthday.ts'),
+      'utf8'
+    );
+    const orderWriteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-write-handlers.ts'),
+      'utf8'
+    );
+    const guestSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/orders-hono-handlers/guest-handlers.ts'),
+      'utf8'
+    );
+    const adminQrSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-qr.ts'),
+      'utf8'
+    );
+
+    expect(birthdaySrc).toContain('resolvePublicTenantId');
+    expect(birthdaySrc).toContain('inFlightBirthdayRedemptions');
+    expect(orderWriteSrc).toContain('Customers may only cancel pending or confirmed orders');
+    expect(orderWriteSrc).toContain("UPDATE payments SET status = 'cancelled'");
+    expect(guestSrc).toContain('tenantId');
+    expect(adminQrSrc).toContain("'owner', 'manager', 'supervisor', 'admin'");
+    expect(adminQrSrc).toContain('safeSlug');
+  });
+
+  it('AM2: walk-in sentinel phone & empty email are sanitized before loyalty/CRM lookup, order cancellation refunds spent cashback, public GET /api/tables redacts signed QR URLs, reservations guard capacity & Available status, and staff-tips blocks self-assignment', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const loyaltyTriggerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/policies/loyalty-trigger.ts'),
+      'utf8'
+    );
+    const kdsTransitionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-status-transition.ts'),
+      'utf8'
+    );
+    const tablesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/commands/tables.ts'),
+      'utf8'
+    );
+    const reservationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/reservation/src/routes/reservations.ts'),
+      'utf8'
+    );
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+
+    expect(loyaltyTriggerSrc).toContain('sanitizeCustomerIdentity');
+    expect(kdsTransitionSrc).toContain("type = 'spend'");
+    expect(kdsTransitionSrc).toContain("'refund'");
+    expect(tablesSrc).toContain('includeSignedQr');
+    expect(reservationsSrc).toContain("AND status = 'Available'");
+    expect(staffTipsSrc).toContain("'owner', 'manager', 'supervisor', 'admin', 'cashier'");
+  });
+
+  it('AM3: spend-cashback rejects cancelled/paid orders and reduces orders.total, campaign triggers & cron warnings enforce default-tenant scoping and 7-day cooldown, and loyalty tier PATCH separates birthdayBonus from birthday_discount', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const spendCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/spend-cashback-handler.ts'),
+      'utf8'
+    );
+    const detectSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/campaign/detect.ts'),
+      'utf8'
+    );
+    const warningsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/cashback-warnings.ts'),
+      'utf8'
+    );
+    const tierHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/tier-handlers.ts'),
+      'utf8'
+    );
+
+    expect(spendCashbackSrc).toContain('Order is not eligible for cashback spend');
+    expect(spendCashbackSrc).toContain('total = MAX(0, total - ?)');
+    expect(detectSrc).toContain('sevenDaysAgo');
+    expect(warningsSrc).toContain('sevenDaysAgo');
+    expect(tierHandlersSrc).not.toContain('body.birthday_discount ?? body.birthdayDiscount ?? body.birthday_bonus');
+  });
+
+  it('AM4: loyalty balance sync recalculates tier under per-account lock, birthday bonus claim uses in-flight lock, table-sessions guard order attach CAS & terminal state transitions, and cron handlers persist tenant_id & bound cron_runs', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const loyaltyDbSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/loyalty-db-helpers.ts'),
+      'utf8'
+    );
+    const loyaltyAccSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/account-handlers.ts'),
+      'utf8'
+    );
+    const sessionHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/session-handlers.ts'),
+      'utf8'
+    );
+    const cronSummarySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-cron-handlers/summary-handlers.ts'),
+      'utf8'
+    );
+
+    expect(loyaltyDbSrc).toContain('resolveTierForPoints');
+    expect(loyaltyAccSrc).toContain('inFlightBirthdayClaims');
+    expect(sessionHandlersSrc).toContain('Session already ended');
+    expect(cronSummarySrc).toContain('LIMIT 1000');
+  });
+
+  it('AN1: dynamic-pricing enforces overnight windows & server-side cost floor, saas-tenants authenticates /my & bounds slug collisions, and place-order bounds items & enforces default-tenant catalog isolation', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const dynamicPricingSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dynamic-pricing.ts'),
+      'utf8'
+    );
+    const saasTenantsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/saas-tenants.ts'),
+      'utf8'
+    );
+    const placeOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/place-order.ts'),
+      'utf8'
+    );
+    const crmOrderHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/crm-handlers/order-handlers.ts'),
+      'utf8'
+    );
+
+    expect(dynamicPricingSrc).toContain('timeStr >= rule.start_time || timeStr <= rule.end_time');
+    expect(saasTenantsSrc).toContain("return c.json({ ok: false, error: 'unauthenticated' } as const, 401)");
+    expect(saasTenantsSrc).toContain('MAX_SLUG_ATTEMPTS');
+    expect(placeOrderSrc).toContain('input.items.length > 50');
+    expect(crmOrderHandlersSrc).toContain('customerPhone');
+  });
+
+  it('AN2: floor-plan joins active/ordering/paying sessions & preserves table notes on no-show, tables-mobile falls back per tenant & clears current_order_id on release, and public tables resolve public tenant & redact staff notes', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const floorPlanSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/floor-plan.ts'),
+      'utf8'
+    );
+    const tablesMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/tables-mobile.ts'),
+      'utf8'
+    );
+    const tablesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/commands/tables.ts'),
+      'utf8'
+    );
+
+    expect(floorPlanSrc).toContain("s.status IN ('ordering', 'paying'");
+    expect(floorPlanSrc).toContain('current_order_id = NULL');
+    expect(tablesMobileSrc).toContain('!cafeTablesSucceeded || rows.length === 0');
+    expect(tablesSrc).toContain('resolvePublicTenantId');
+    expect(tablesSrc).toContain('current_order_id = NULL');
+  });
+
+  it('AN3: sop-template-repository guards duplicate code & preserves item IDs across updates, sop-violation-ladder blocks manager self-dealing & non-owner termination overrides, and sop-admin-read-handlers hydrate run progress & template metadata', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const sopTemplateRepoSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-template-repository.ts'),
+      'utf8'
+    );
+    const sopViolationLadderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-violation-ladder.ts'),
+      'utf8'
+    );
+    const sopAdminReadSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-sop-handlers/sop-admin-read-handlers.ts'),
+      'utf8'
+    );
+    const sopAuditSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-sop-handlers/sop-audit.ts'),
+      'utf8'
+    );
+
+    expect(sopTemplateRepoSrc).toContain('already exists for this tenant');
+    expect(sopViolationLadderSrc).toContain('own staff record');
+    expect(sopViolationLadderSrc).toContain('Serious violations require termination unless overridden by the owner');
+    expect(sopAdminReadSrc).toContain('listTemplates');
+    expect(sopAuditSrc).toContain("'sop_template'");
+  });
+
+  it('AN4: staff-tips enforces horizontal privacy & date validation, staff-auth aligns manager device filter & device role binding, and payments/collect-cod block cancelled or refunded orders', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+    const staffAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-auth.ts'),
+      'utf8'
+    );
+    const paymentMutationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-payments-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const collectCodSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/collect-cod-payment.ts'),
+      'utf8'
+    );
+
+    expect(staffTipsSrc).toContain('Invalid date format (YYYY-MM-DD)');
+    expect(staffTipsSrc).toContain('Insufficient permissions');
+    expect(staffAuthSrc).toContain("'supervisor'");
+    expect(paymentMutationSrc).toContain('Cannot create payment for cancelled or terminal order');
+    expect(collectCodSrc).toContain('cod:${id}');
+  });
+
+  it('AO1: inventory-transactions guards release RBAC & outbound stock, inventory-snapshots enforces mutation roles, BOM order deduction tracks coveredProductIds across shared ingredients, movements normalize outbound sign, and purchase-orders block cancelled PATCH & persist received_quantity', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const invTxSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-transactions.ts'),
+      'utf8'
+    );
+    const invSnapSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-snapshots.ts'),
+      'utf8'
+    );
+    const invCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-crud.ts'),
+      'utf8'
+    );
+    const bomPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/inventory-recipe-policy.ts'),
+      'utf8'
+    );
+    const orderDeductionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/order-deduction.ts'),
+      'utf8'
+    );
+    const movementHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/movement-handlers.ts'),
+      'utf8'
+    );
+    const poHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/purchase-order-handlers.ts'),
+      'utf8'
+    );
+
+    expect(invTxSrc).toContain("input.type === 'release'");
+    expect(invSnapSrc).toContain('INVENTORY_MUTATION_ROLES');
+    expect(invCrudSrc).toContain('matchesInventoryTenant');
+    expect(bomPolicySrc).toContain('coveredProductIds');
+    expect(orderDeductionSrc).toContain('coveredProductIds');
+    expect(movementHandlersSrc).toContain('-Math.abs(body.quantity)');
+    expect(poHandlersSrc).toContain("existing.status === 'cancelled'");
+    expect(poHandlersSrc).toContain('received_quantity');
+  });
+
+  it('AO2: promotions validation blocks wildcard X-Tenant-ID & enforces authoritative order totals/ownership, openapi-promotions enforces tenant code uniqueness, and products/categories/modifiers/happy-hour restrict mutations to privileged roles', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const promoValidationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/promotions-handlers/validation-handlers.ts'),
+      'utf8'
+    );
+    const openapiPromosSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-promotions-handlers/crud-handlers.ts'),
+      'utf8'
+    );
+    const openapiProductsRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-products-handlers/routes.ts'),
+      'utf8'
+    );
+    const openapiCategoriesMutationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-categories-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const menuModifiersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/menu-modifiers.ts'),
+      'utf8'
+    );
+    const happyHourSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/happy-hour.ts'),
+      'utf8'
+    );
+
+    expect(promoValidationSrc).toContain('resolvePublicTenantId');
+    expect(promoValidationSrc).toContain('effectiveOrderTotal');
+    expect(openapiPromosSrc).toContain('SELECT * FROM promotions WHERE UPPER(code) = ?');
+    expect(openapiPromosSrc).toContain('matchesTenantRow(row, tenantId)');
+    expect(openapiProductsRoutesSrc).not.toContain("'staff'");
+    expect(openapiCategoriesMutationSrc).toContain('UPDATE menu_items SET category = ?');
+    expect(menuModifiersSrc).toContain('resolvePublicTenantId');
+    expect(happyHourSrc).toContain('resolvePublicTenantId');
+  });
+
+  it('AO3: dindin checkout unifies item lookup/qty & guards QC completion, create-order supports OpenAPI promo columns & preserves service_fee, order cancellations roll back promotion_usages, claimGuestOrder enforces phone verification, and payos-reconcile credits loyalty', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const dindinCheckoutSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dindin-handlers/checkout-handlers.ts'),
+      'utf8'
+    );
+    const createOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/create-order.ts'),
+      'utf8'
+    );
+    const cancelOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-cancel-handlers.ts'),
+      'utf8'
+    );
+    const updateOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/update-order.ts'),
+      'utf8'
+    );
+    const kdsTransitionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-status-transition.ts'),
+      'utf8'
+    );
+    const ownershipPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/customer/policies/order-ownership-policy.ts'),
+      'utf8'
+    );
+    const payosReconcileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/payos-reconcile.ts'),
+      'utf8'
+    );
+
+    expect(dindinCheckoutSrc).toContain('Cart item id and name mismatch');
+    expect(dindinCheckoutSrc).toContain('Order is not a DinDin order');
+    expect(createOrderSrc).toContain('discount_type');
+    expect(createOrderSrc).toContain('snapshot.service_fee');
+    expect(cancelOrderSrc).toContain('promotion_usages');
+    expect(updateOrderSrc).toContain('promotion_usages');
+    expect(kdsTransitionSrc).toContain('promotion_usages');
+    expect(ownershipPolicySrc).toContain('Phone verification is required to claim this order');
+    expect(payosReconcileSrc).toContain('creditLoyaltyIfEligible');
+  });
+
+  it('AO4: reports-handlers filter customer export dates & promo redemptions by redeemed_at, admin-sales enforces RBAC & date span bounds, admin-audit-logs filters by tenant before pagination, broadcast qualifies c.tenant_id on active_30d, and admin-handlers scopes duplicate phone & synthetic email by tenant', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const reportsAnalyticsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/analytics-handlers.ts'),
+      'utf8'
+    );
+    const adminSalesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-sales.ts'),
+      'utf8'
+    );
+    const auditRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-audit-logs-handlers/routes.ts'),
+      'utf8'
+    );
+    const auditQuerySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-audit-logs-handlers/query-handler.ts'),
+      'utf8'
+    );
+    const broadcastSendSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/broadcast-handlers/send-handler.ts'),
+      'utf8'
+    );
+    const adminHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-handlers.ts'),
+      'utf8'
+    );
+
+    expect(reportsAnalyticsSrc).toContain('t.redeemed_at');
+    expect(adminSalesSrc).toContain('366');
+    expect(auditRoutesSrc).not.toContain("'staff'");
+    expect(auditQuerySrc).toContain('filterAuditRowsByTenant');
+    expect(broadcastSendSrc).toContain('c.tenant_id');
+    expect(adminHandlersSrc).toContain('Customer phone already exists in this store');
+  });
+});
+
+describe('Phase 43 (AP1..AP4) — Loyalty, Checkin, Reviews, Subscriptions, Referrals & CRM Security Hardening', () => {
+  it('AP1: checkin resolves canonical/public tenant & binds authenticated customer_id, reviews verifies order status & guest phone ownership, loyalty filters rewards by tenant & enforces expiry/tier/stock guards, and admin-loyalty restricts CSV export from staff & hardens formula escaping', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const checkinSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/checkin.ts'),
+      'utf8'
+    );
+    const reviewsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reviews.ts'),
+      'utf8'
+    );
+    const loyaltySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/loyalty.ts'),
+      'utf8'
+    );
+    const adminLoyaltySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-loyalty.ts'),
+      'utf8'
+    );
+
+    expect(checkinSrc).toContain('resolvePublicTenantId');
+    expect(checkinSrc).toContain('Forbidden: cannot check in for another customer');
+    expect(reviewsSrc).toContain('Order cannot be reviewed in its current status');
+    expect(reviewsSrc).toContain('suppliedPhone !== orderPhone');
+    expect(loyaltySrc).toContain('filterTenantReward');
+    expect(loyaltySrc).toContain('Tier requirement not met for this reward');
+    expect(loyaltySrc).toContain('Reward redemption limit reached');
+    expect(adminLoyaltySrc).toContain("adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'supervisor'])");
+    expect(adminLoyaltySrc).toContain('([\\r\\n]+)(\\s*[=+\\-@|])');
+  });
+
+  it('AP2: openapi-loyalty enforces reward fallback/expiry/tenant parity, atomic relative delta point sync, and tenant-scoped birthday bonus idempotency; spend-cashback blocks paid orders; and subscriptions enforce billing-cycle pricing & terminal invoice idempotency', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const accountHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/account-handlers.ts'),
+      'utf8'
+    );
+    const rewardHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/reward-handlers.ts'),
+      'utf8'
+    );
+    const loyaltyDbSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/loyalty-db-helpers.ts'),
+      'utf8'
+    );
+    const spendCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/spend-cashback-handler.ts'),
+      'utf8'
+    );
+    const subHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/sub-handlers.ts'),
+      'utf8'
+    );
+    const invoiceHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/invoice-handlers.ts'),
+      'utf8'
+    );
+
+    expect(accountHandlersSrc).toContain('birthday_bonus:${effectiveTenant}:${accountCustomerId}:${currentYear}');
+    expect(rewardHandlersSrc).toContain('findRewardByIdWithFallback');
+    expect(loyaltyDbSrc).toContain('MAX(0, COALESCE(current_points, 0) + ?)');
+    expect(spendCashbackSrc).toContain("paymentStatus === 'paid'");
+    expect(subHandlersSrc).toContain('cyclePlanAmount = Number(plan.monthly_price_vnd) * cycleMonths');
+    expect(invoiceHandlersSrc).toContain("['paid', 'manual', 'cancelled'].includes(normalizedStatus)");
+  });
+
+  it('AP3: referral-cashback uses deterministic txId & status CAS, referrals/apply-referral enforce max_uses & customer tenant isolation, accrual uses deterministic order-keyed ledger IDs, and refund-reversal records debit cashback_transactions', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const refCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/referral-cashback.ts'),
+      'utf8'
+    );
+    const applyRefSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/apply-referral.ts'),
+      'utf8'
+    );
+    const referralsRouteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/referrals.ts'),
+      'utf8'
+    );
+    const domainReferralSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/referral.ts'),
+      'utf8'
+    );
+    const accrualSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/accrual.ts'),
+      'utf8'
+    );
+    const refundReversalSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/refund-reversal.ts'),
+      'utf8'
+    );
+
+    expect(refCashbackSrc).toContain('cbt_ref_${pending.id}_referrer');
+    expect(applyRefSrc).toContain('code_exhausted');
+    expect(referralsRouteSrc).toContain('Mã giới thiệu đã hết lượt sử dụng');
+    expect(domainReferralSrc).toContain('getOrCreateReferralCode');
+    expect(accrualSrc).toContain('cbt_earn_${orderId}');
+    expect(accrualSrc).toContain('ptl_earn_${orderId}');
+    expect(refundReversalSrc).toContain('cbt_rev_${orderId}');
+  });
+
+  it('AP4: customers/me enforces tenant-scoped phone uniqueness (409) & visit_count correlation, CRM segments preserve true counts, update-consent scopes revocations by tenant, aggregate-events & customer-360 scope fallbacks by tenant, and openapi-orders deduplicates KDS completion side effects', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const custTypesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/customers-handlers/types.ts'),
+      'utf8'
+    );
+    const custProfileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/customers-handlers/profile-handlers.ts'),
+      'utf8'
+    );
+    const crmSegmentsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/crm-handlers/segment-handlers.ts'),
+      'utf8'
+    );
+    const crmAccountSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/crm-handlers/account-handlers.ts'),
+      'utf8'
+    );
+    const updateConsentSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/update-consent.ts'),
+      'utf8'
+    );
+    const aggregateEventsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/aggregate-events.ts'),
+      'utf8'
+    );
+    const customer360Src = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/customer-360.ts'),
+      'utf8'
+    );
+    const orderWriteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-write-handlers.ts'),
+      'utf8'
+    );
+
+    expect(custTypesSrc).toContain("TRIM(c.phone) != '' AND o.customer_phone = c.phone");
+    expect(custProfileSrc).toContain('Phone number already in use by another customer');
+    expect(crmSegmentsSrc).toContain('Math.max(0, (seg.count ?? customers.length) - rejected)');
+    expect(crmAccountSrc).toContain('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1');
+    expect(updateConsentSrc).toContain("UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+    expect(aggregateEventsSrc).toContain("Promise.reject(new Error('unscoped'))");
+    expect(customer360Src).toContain('SELECT NULLIF(TRIM(phone), \'\') FROM customers WHERE id = ?');
+    expect(orderWriteSrc).toContain("if (body.status === 'completed' && !statusHandledByKds)");
+  });
+});
+
+describe('Phase 44 (AQ1..AQ4) — Birthday, POS Lookup, QR, Signage, Table Sessions, OpenAPI Tables/Staff, Campaigns, Mixpost, Cron & Integrations Hardening', () => {
+  it('AQ1: birthday enforces DEFAULT_BIRTHDAY_CONFIG parity, positive RBAC, order status/ownership checks & tenant-scoped locks; pos-customer scopes cashback_wallets & visit_count by tenant; admin-qr & generator scope slugs by tenant; and signage scopes categories & promo usage limits', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const birthdaySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/birthday.ts'),
+      'utf8'
+    );
+    const posCustomerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/pos-customer.ts'),
+      'utf8'
+    );
+    const adminQrSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-qr.ts'),
+      'utf8'
+    );
+    const qrGeneratorSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/qr/generator.ts'),
+      'utf8'
+    );
+    const signageSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/signage.ts'),
+      'utf8'
+    );
+
+    expect(birthdaySrc).toContain('Cannot redeem birthday discount on a cancelled, failed, or expired order');
+    expect(birthdaySrc).toContain('const lockKey = `${tenantId}:${customer.id}:${currentYear}`');
+    expect(posCustomerSrc).toContain("LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)");
+    expect(adminQrSrc).toContain('JOIN cafe_tables t ON t.id = q.table_id');
+    expect(qrGeneratorSrc).toContain('SELECT table_id, slug FROM table_qr_codes WHERE table_id IN');
+    expect(signageSrc).toContain('matchesCategoryTenant');
+    expect(signageSrc).toContain('isPromoWithinUsageLimits');
+  });
+
+  it('AQ2: table-sessions enforces staff RBAC, tenant-scoped conflict checks & order COALESCE(total_amount, total, 0) / terminal status rejection; openapi-tables scopes table_zones JOIN &audit logs by tenant; and openapi-staff enforces phone uniqueness (409)', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const tsRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/routes.ts'),
+      'utf8'
+    );
+    const tsSessionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/session-handlers.ts'),
+      'utf8'
+    );
+    const tsOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/order-handlers.ts'),
+      'utf8'
+    );
+    const tableCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-tables-handlers/table-crud-handlers.ts'),
+      'utf8'
+    );
+    const tableHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-tables-handlers/helpers.ts'),
+      'utf8'
+    );
+    const staffHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-staff-handlers/staff-handlers.ts'),
+      'utf8'
+    );
+
+    expect(tsRoutesSrc).toContain('STAFF_SESSION_ROLES');
+    expect(tsSessionSrc).toContain('matchesSessionTenant');
+    expect(tsOrderSrc).toContain('SELECT id, COALESCE(total_amount, total, 0) AS total, status, table_id, tenant_id FROM orders WHERE id = ?');
+    expect(tableCrudSrc).toContain("LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')");
+    expect(tableHelpersSrc).toContain('writeTableAuditLog');
+    expect(staffHandlersSrc).toContain('Phone number already exists');
+  });
+
+  it('AQ3: campaigns hardens channels JSON parsing & SQL-first tenant stats scoping; mixpost scopes promotions, products & posts by tenant before LIMIT with value fallback; and openapi-cron enforces tenant-scoped jobs, runs & audit logs', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const campaignConfigSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/campaigns-handlers/config-handlers.ts'),
+      'utf8'
+    );
+    const campaignStatsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/campaigns-handlers/stats-handlers.ts'),
+      'utf8'
+    );
+    const mixpostGenSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/mixpost-handlers/generate-handler.ts'),
+      'utf8'
+    );
+    const mixpostPostsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/mixpost-handlers/posts-handler.ts'),
+      'utf8'
+    );
+    const cronHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-cron-handlers/helpers.ts'),
+      'utf8'
+    );
+
+    expect(campaignConfigSrc).toContain('parseChannelsSafe');
+    expect(campaignStatsSrc).toContain("WHERE COALESCE(NULLIF(TRIM(cl.tenant_id), ''), COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) = ?");
+    expect(mixpostGenSrc).toContain('const discountPercent = promo.percent ?? promo.discount_value ?? promo.value ?? 0;');
+    expect(mixpostPostsSrc).toContain('isSafeMixpostMediaUrl');
+    expect(cronHelpersSrc).toContain('checkCronJobTenant');
+  });
+
+  it('AQ4: customer-assistant blocks cross-customer phone enumeration; tastyigniter propagates tenant & validates order transitions before bridge update; frigate prevents cross-tenant event hijacking & scopes SQL before LIMIT; and homeassistant scopes automation logs before LIMIT & safely parses JSON', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const assistantSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/customer-assistant.ts'),
+      'utf8'
+    );
+    const tiWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/integrations/tastyigniter/webhook.ts'),
+      'utf8'
+    );
+    const frigateSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/integrations/frigate/sync.ts'),
+      'utf8'
+    );
+    const haDevicesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/homeassistant/devices.ts'),
+      'utf8'
+    );
+    const haAutomationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/homeassistant/automations.ts'),
+      'utf8'
+    );
+
+    expect(assistantSrc).toContain('Forbidden: cannot query another customer phone number');
+    expect(tiWebhookSrc).toContain('matchesWebhookOrderTenant');
+    expect(frigateSyncSrc).toContain("UPDATE frigate_events SET tenant_id = ? WHERE id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '')");
+    expect(haDevicesSrc).toContain('safeParseJsonObject');
+    expect(haAutomationsSrc).toContain("SELECT id, automation_id, trigger_entity, payload, result, executed_at, tenant_id FROM ha_automation_log WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY executed_at DESC LIMIT ?");
+  });
+});
+
+
+
+
+

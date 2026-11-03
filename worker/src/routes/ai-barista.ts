@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { optionalAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { resolvePublicTenantId } from '../middleware/tenant';
 
 export const aiBaristaRouter = new Hono<{ Bindings: Env }>();
 
@@ -18,14 +18,9 @@ aiBaristaRouter.use('/*', async (c, next) => {
   return next();
 });
 
-function resolveBaristaTenantId(c: Parameters<typeof getTenantId>[0]): string {
-  if (c.get?.('user')) {
-    const raw = getTenantId(c);
-    return raw === '*' ? 'default' : raw;
-  }
-  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') return 'default';
-  return raw;
+function resolveBaristaTenantId(c: Parameters<typeof resolvePublicTenantId>[0]): string {
+  const resolved = resolvePublicTenantId(c);
+  return resolved === '*' ? 'default' : resolved;
 }
 
 interface SpecialtyItem {

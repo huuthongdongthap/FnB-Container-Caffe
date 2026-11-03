@@ -22,13 +22,20 @@ function matchesCustomerTenant(customer: CustomerRecord, tenantId?: string): boo
  * High-level notify: resolve customer then send ZNS.
  * Falls back to pos_only if Zalo unavailable.
  */
-export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Database }, params: ZnsNotifyInput): Promise<ZnsResult> {
+export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Database }, params: ZnsNotifyInput, tenantOverride?: string): Promise<ZnsResult> {
+  const effectiveTenant = params.tenantId ?? tenantOverride;
   let customer: CustomerRecord | null = null;
   if (env.AURA_DB) {
     try {
-      customer = await env.AURA_DB.prepare(
-        'SELECT id, name, phone, zalo, tenant_id FROM customers WHERE id = ?'
-      ).bind(params.customer_id).first<CustomerRecord>();
+      if (effectiveTenant) {
+        customer = await env.AURA_DB.prepare(
+          "SELECT id, name, phone, zalo, tenant_id FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+        ).bind(params.customer_id, effectiveTenant, effectiveTenant).first<CustomerRecord>();
+      } else {
+        customer = await env.AURA_DB.prepare(
+          'SELECT id, name, phone, zalo, tenant_id FROM customers WHERE id = ?'
+        ).bind(params.customer_id).first<CustomerRecord>();
+      }
     } catch {
       try {
         customer = await env.AURA_DB.prepare(
@@ -40,7 +47,7 @@ export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: 
     }
   }
 
-  if (customer && !matchesCustomerTenant(customer, params.tenantId)) {
+  if (customer && !matchesCustomerTenant(customer, effectiveTenant)) {
     customer = null;
   }
 
@@ -56,7 +63,8 @@ export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: 
   const result = await sendZNS(env, {
     phone: sendPhone,
     template_key: params.template_key,
-    data: { ...params.data, name: customer.name }
+    data: { ...params.data, name: customer.name },
+    tenantId: effectiveTenant || 'default'
   });
 
   if (result.ok) {

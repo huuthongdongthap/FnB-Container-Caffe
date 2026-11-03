@@ -3,10 +3,10 @@
  * Frequently bought together, trending item velocity, and personalized suggestions.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, resolvePilotStore, resolvePublicTenantId as resolveRecommendationsTenantId } from '../middleware/tenant';
 
 export const recommendationsRouter = new Hono<{ Bindings: Env }>();
 
@@ -16,15 +16,6 @@ recommendationsRouter.use('/*', async (c, next) => {
   }
   return next();
 });
-
-function resolveRecommendationsTenantId(c: Parameters<typeof getTenantId>[0]): string {
-  if (c.get?.('user')) {
-    return getTenantId(c);
-  }
-  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') return 'default';
-  return raw;
-}
 
 const FALLBACK_PAIRINGS = [
   { id: 'croissant_bo', name: 'Bánh sừng bò bơ Pháp', category: 'pastry', reason: 'Món ăn kèm hoàn hảo với cà phê' },
@@ -40,8 +31,7 @@ interface OrderItem {
   quantity?: number;
 }
 
-// GET /api/recommendations/frequently-bought-together
-recommendationsRouter.get('/frequently-bought-together', async (c) => {
+async function handleFrequentlyBoughtTogether(c: Context<{ Bindings: Env }>) {
   const itemId = c.req.query('item_id');
   if (!itemId) {
     return c.json({ success: false, error: 'item_id query parameter is required' }, 400);
@@ -77,10 +67,9 @@ recommendationsRouter.get('/frequently-bought-together', async (c) => {
     .map(p => ({ id: p.id, name: p.name, reason: p.reason, score: 0.75 }));
 
   return c.json({ success: true, data: fallbacks });
-});
+}
 
-// GET /api/recommendations/trending
-recommendationsRouter.get('/trending', async (c) => {
+async function handleTrending(c: Context<{ Bindings: Env }>) {
   const range = c.req.query('range') === '24h' ? 24 : 168; // 24h or 7d
   const rawLimit = parseInt(c.req.query('limit') || '5', 10);
   const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 5;
@@ -88,21 +77,36 @@ recommendationsRouter.get('/trending', async (c) => {
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const hoursAgo = new Date(Date.now() - range * 3600000).toISOString();
-  const { results: orders } = await db.prepare(`
-    SELECT items FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
-    ORDER BY created_at DESC LIMIT 200
-  `).bind(tenantId, tenantId, hoursAgo).all<{ items: string }>().catch(() => ({ results: [] }));
+  let orders: { items: string; status?: string }[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT items FROM orders
+      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+        AND created_at >= ?
+      ORDER BY created_at DESC LIMIT 200
+    `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>();
+    orders = res.results || [];
+  } catch {
+    const res = await db.prepare(`
+      SELECT items FROM orders
+      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
+      ORDER BY created_at DESC LIMIT 200
+    `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>().catch(() => ({ results: [] }));
+    orders = res.results || [];
+  }
 
   const counts = new Map<string, { count: number; name: string }>();
   for (const o of orders || []) {
+    const status = typeof o.status === 'string' ? o.status.trim().toLowerCase() : '';
+    if (status && ['cancelled', 'failed', 'rejected', 'expired'].includes(status)) continue;
     try {
       const items = (typeof o.items === 'string' ? JSON.parse(o.items) : o.items) as OrderItem[];
       for (const item of items) {
         const id = item.product_id || item.id;
         if (!id) continue;
         const current = counts.get(id) || { count: 0, name: item.name || id };
-        current.count += item.quantity || 1;
+        current.count += Math.max(1, Number(item.quantity) || 1);
         counts.set(id, current);
       }
     } catch { /* skip malformed */ }
@@ -118,24 +122,87 @@ recommendationsRouter.get('/trending', async (c) => {
   }));
 
   return c.json({ success: true, data: finalTrending });
+}
+
+// GET /api/recommendations
+recommendationsRouter.get('/', async (c) => {
+  if (c.req.query('item_id')) {
+    return handleFrequentlyBoughtTogether(c);
+  }
+  return handleTrending(c);
 });
 
-// POST /api/recommendations/mine-affinities (Staff/Owner)
-recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']), async (c) => {
+// GET /api/recommendations/frequently-bought-together
+recommendationsRouter.get('/frequently-bought-together', handleFrequentlyBoughtTogether);
+
+// GET /api/recommendations/trending
+recommendationsRouter.get('/trending', handleTrending);
+
+// POST /api/recommendations/mine-affinities (Owner/Manager/Supervisor/Admin)
+recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
+  const user = c.get('user' as never) as { role?: string } | undefined;
+  if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
   const rawTenant = getTenantId(c);
-  const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
+  const explicitTarget = (
+    c.req.query('tenant_id') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    resolvePilotStore(c.env)
+  ).trim();
+  const targetTenant = rawTenant === '*'
+    ? (!explicitTarget || explicitTarget === '*' ? 'default' : explicitTarget)
+    : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  const { results: orders } = await db.prepare(`
-    SELECT items FROM orders
-    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled'
-    ORDER BY created_at DESC LIMIT 500
-  `).bind(rawTenant, rawTenant).all<{ items: string }>();
+  let orders: { items: string; status?: string; tenant_id?: string | null }[] = [];
+  try {
+    const res = await db.prepare(`
+      SELECT items FROM orders
+      WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+        AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+      ORDER BY created_at DESC LIMIT 500
+    `).bind(targetTenant).all<{ items: string; status?: string; tenant_id?: string | null }>();
+    orders = res.results || [];
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT items FROM orders
+        WHERE status != 'cancelled' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        ORDER BY created_at DESC LIMIT 500
+      `).bind(targetTenant).all<{ items: string; status?: string; tenant_id?: string | null }>();
+      orders = res.results || [];
+    } catch {
+      if (targetTenant === 'default') {
+        const res = await db.prepare(`
+          SELECT items FROM orders
+          WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+          ORDER BY created_at DESC LIMIT 500
+        `).all<{ items: string; status?: string }>().catch(() =>
+          db.prepare(`
+            SELECT items FROM orders
+            WHERE status != 'cancelled'
+            ORDER BY created_at DESC LIMIT 500
+          `).all<{ items: string; status?: string }>().catch(() => ({ results: [] }))
+        );
+        orders = res.results || [];
+      } else {
+        orders = [];
+      }
+    }
+  }
 
   const coOccur = new Map<string, Map<string, number>>();
   const itemCounts = new Map<string, number>();
 
   for (const o of orders || []) {
+    const status = typeof o.status === 'string' ? o.status.trim().toLowerCase() : '';
+    if (status && ['cancelled', 'failed', 'rejected', 'expired'].includes(status)) continue;
+    if ('tenant_id' in o && o.tenant_id !== undefined) {
+      const rowTenant = String(o.tenant_id || '').trim() || 'default';
+      if (rowTenant !== targetTenant) continue;
+    }
     try {
       const raw = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
       const ids = Array.from(new Set((raw as OrderItem[]).map(i => i.product_id || i.id).filter(Boolean))) as string[];

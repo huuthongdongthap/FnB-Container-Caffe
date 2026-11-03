@@ -190,19 +190,22 @@ export function toRun(
     }));
 
   const ruleMap = new Map(templateItems.map((item) => [item.id, item]));
-  const rules: SopTemplateItem[] = items
-    .map((item) => ruleMap.get(item.templateItemId))
-    .filter((item): item is SopTemplateItemRow => item !== undefined)
-    .map((item) => ({
-      id: item.id,
-      templateId: item.template_id,
-      label: item.label,
-      description: item.description,
-      requireValue: item.requires_value,
-      requireNote: item.requires_note,
-      orderIndex: item.order_index,
-      isCritical: item.is_critical,
-    }));
+  const sourceRules: SopTemplateItemRow[] =
+    items.length > 0
+      ? items
+          .map((item, idx) => ruleMap.get(item.templateItemId) ?? templateItems[idx])
+          .filter((item): item is SopTemplateItemRow => item !== undefined)
+      : templateItems;
+  const rules: SopTemplateItem[] = sourceRules.map((item) => ({
+    id: item.id,
+    templateId: item.template_id,
+    label: item.label,
+    description: item.description,
+    requireValue: item.requires_value,
+    requireNote: item.requires_note,
+    orderIndex: item.order_index,
+    isCritical: item.is_critical,
+  }));
 
   return {
     id: row.id,

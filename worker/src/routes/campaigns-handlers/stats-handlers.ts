@@ -16,44 +16,66 @@ async function queryTenantScopedCampaignStats(
   tenantId: string
 ): Promise<AggregatedTriggerStats[] | null> {
   try {
-    const rawLogsRes = await db.prepare(
-      'SELECT trigger, status, sent_at, customer_id, tenant_id FROM campaign_logs'
-    ).all<{
+    type RawLogRow = {
       trigger: string;
       status: string;
       sent_at: string | null;
       customer_id: string | null;
       tenant_id?: string | null;
-    }>().catch(async () => {
-      return db.prepare(
-        'SELECT trigger, status, sent_at, customer_id FROM campaign_logs'
-      ).all<{
-        trigger: string;
-        status: string;
-        sent_at: string | null;
-        customer_id: string | null;
-        tenant_id?: string | null;
-      }>();
-    });
+      customer_tenant_id?: string | null;
+    };
 
-    const logRows = rawLogsRes?.results || [];
+    let logRows: RawLogRow[] = [];
+    let usedScopedSql = false;
+    try {
+      const scopedRes = await db.prepare(
+        `SELECT cl.trigger, cl.status, cl.sent_at, cl.customer_id, cl.tenant_id, c.tenant_id AS customer_tenant_id
+         FROM campaign_logs cl
+         LEFT JOIN customers c ON c.id = cl.customer_id
+         WHERE COALESCE(NULLIF(TRIM(cl.tenant_id), ''), COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) = ?
+         LIMIT 5000`
+      ).bind(tenantId).all<RawLogRow>();
+      if (scopedRes?.results && scopedRes.results.length > 0) {
+        logRows = scopedRes.results;
+        usedScopedSql = true;
+      }
+    } catch {
+      // Schema or custom mock DB may not support tenant_id join on campaign_logs/customers
+    }
+
+    if (!usedScopedSql) {
+      const rawLogsRes = await db.prepare(
+        'SELECT trigger, status, sent_at, customer_id, tenant_id FROM campaign_logs LIMIT 5000'
+      ).all<RawLogRow>().catch(async () => {
+        return db.prepare(
+          'SELECT trigger, status, sent_at, customer_id FROM campaign_logs LIMIT 5000'
+        ).all<RawLogRow>();
+      });
+      logRows = rawLogsRes?.results || [];
+    }
+
     if (logRows.length === 0) {
       return tenantId === 'default' ? null : [];
     }
 
     const custTenantMap = new Map<string, string>();
-    try {
-      const custRes = await db.prepare('SELECT id, tenant_id FROM customers').all<{
-        id: string;
-        tenant_id?: string | null;
-      }>();
-      for (const c of custRes?.results || []) {
-        if (c && c.id) {
-          custTenantMap.set(c.id, (c.tenant_id && String(c.tenant_id).trim()) || 'default');
+    const needsCustomerLookup = logRows.some(
+      (r) => !(r.tenant_id && String(r.tenant_id).trim()) && !(r.customer_tenant_id && String(r.customer_tenant_id).trim()) && Boolean(r.customer_id)
+    );
+    if (needsCustomerLookup) {
+      try {
+        const custRes = await db.prepare('SELECT id, tenant_id FROM customers LIMIT 5000').all<{
+          id: string;
+          tenant_id?: string | null;
+        }>();
+        for (const c of custRes?.results || []) {
+          if (c && c.id) {
+            custTenantMap.set(c.id, (c.tenant_id && String(c.tenant_id).trim()) || 'default');
+          }
         }
+      } catch {
+        // Optional tenant_id column on customers
       }
-    } catch {
-      // Optional tenant_id column on customers
     }
 
     const byTrigger = new Map<string, {
@@ -65,7 +87,8 @@ async function queryTenantScopedCampaignStats(
 
     for (const row of logRows) {
       const directTenant = row.tenant_id && String(row.tenant_id).trim();
-      const custTenant = row.customer_id ? custTenantMap.get(row.customer_id) : undefined;
+      const joinedCustTenant = row.customer_tenant_id && String(row.customer_tenant_id).trim();
+      const custTenant = joinedCustTenant || (row.customer_id ? custTenantMap.get(row.customer_id) : undefined);
       const resolvedTenant = directTenant || custTenant || 'default';
       if (resolvedTenant !== tenantId) continue;
 
@@ -112,18 +135,22 @@ export function registerCampaignStatsHandlers(router: Hono<{ Bindings: Env }>): 
     }
 
     if (results === null) {
-      const { results: groupRows } = await db.prepare(`
-        SELECT
-          trigger,
-          COUNT(*) as total_sent,
-          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as success_count,
-          MAX(sent_at) as last_run_at,
-          COUNT(DISTINCT customer_id) as unique_customers
-        FROM campaign_logs
-        GROUP BY trigger
-        ORDER BY trigger
-      `).all<AggregatedTriggerStats>();
-      results = groupRows || [];
+      if (tenantId !== '*' && tenantId !== 'default') {
+        results = [];
+      } else {
+        const { results: groupRows } = await db.prepare(`
+          SELECT
+            trigger,
+            COUNT(*) as total_sent,
+            SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as success_count,
+            MAX(sent_at) as last_run_at,
+            COUNT(DISTINCT customer_id) as unique_customers
+          FROM campaign_logs
+          GROUP BY trigger
+          ORDER BY trigger
+        `).all<AggregatedTriggerStats>();
+        results = groupRows || [];
+      }
     }
 
     const stats: Record<string, {

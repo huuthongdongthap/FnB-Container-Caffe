@@ -12,15 +12,33 @@ import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const stationId = c.req.query('station_id') || c.req.query('station');
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
     try {
-      const { results: mappings } = await db.prepare(
-        'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
-      ).all<Record<string, unknown>>();
-      categoryIndex = buildIndexFromDbRows(mappings || []);
+      let mappings: Record<string, unknown>[] = [];
+      if (tenantId === '*') {
+        const res = await db.prepare(
+          'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+        ).all<Record<string, unknown>>();
+        mappings = res.results || [];
+      } else {
+        try {
+          const res = await db.prepare(
+            "SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id WHERE COALESCE(NULLIF(TRIM(ks.tenant_id), ''), 'default') = ?"
+          ).bind(tenantId).all<Record<string, unknown>>();
+          mappings = res.results || [];
+        } catch {
+          if (tenantId === 'default') {
+            const res = await db.prepare(
+              'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+            ).all<Record<string, unknown>>();
+            mappings = res.results || [];
+          }
+        }
+      }
+      categoryIndex = buildIndexFromDbRows(mappings);
     } catch {
       // Table unseeded or mock DB
     }
@@ -29,8 +47,8 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const tenantClause = tenantId === '*'
     ? ''
     : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?1)';
   const statement = db.prepare(
     `SELECT * FROM orders WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
   );
@@ -39,9 +57,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const kdsOrders: KdsOrder[] = [];
   for (const order of results || []) {
     const rawOrder = order as unknown as Record<string, unknown>;
-    if (rawOrder.order_type === 'delivery' && rawOrder.payment_status !== 'paid') {
-      continue;
-    }
+    if (rawOrder.order_type === 'delivery' && rawOrder.payment_status !== 'paid') continue;
     let items: OrderItem[] = [];
     if (Array.isArray(order.items)) {
       items = order.items;
@@ -53,18 +69,14 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     }
 
     if (stationId && categoryIndex) {
-      items = items.filter(item => {
+      items = items.filter((item) => {
         const catId = (item.category_id || (item as any).categoryId || '') as string;
-        const mapping = categoryIndex.get(catId);
-        return mapping?.station_id === stationId;
+        return categoryIndex!.get(catId)?.station_id === stationId;
       });
       if (items.length === 0) continue;
     }
 
-    const elapsed = Math.round(
-      (Date.now() - new Date(order.created_at).getTime()) / 60000
-    );
-
+    const elapsed = Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000);
     kdsOrders.push({
       id: order.id,
       customer_name: order.customer_name,
@@ -85,49 +97,42 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   const id = c.req.param('id')!;
   const body = typeof forcedStatus === 'string' ? { status: forcedStatus } : await c.req.json().catch(() => null);
   const parsed = updateOrderStatusSchema.safeParse(body);
-  if (!parsed.success) {
-    return zodErrorResponse(c, parsed.error);
-  }
+  if (!parsed.success) return zodErrorResponse(c, parsed.error);
   const { status } = parsed.data;
-
   const user = c.get('user' as any) as { role?: string } | undefined;
 
   let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
   try {
-    const ctx = c.executionCtx;
-    if (ctx) waitUntilFn = (p) => ctx.waitUntil(p);
-  } catch {
-    // Context without Cloudflare executionCtx (e.g. test harness)
-  }
+    if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
+  } catch { /* absent in test harness */ }
 
-  const result = await executeKdsStatusTransition(
-    db,
-    id,
-    status,
-    user?.role,
-    {
-      tenantId: getTenantId(c),
-      kv: c.env.AUTH_KV,
-      env: c.env as unknown as Record<string, unknown>,
-      waitUntil: waitUntilFn,
-    }
-  );
+  const result = await executeKdsStatusTransition(db, id, status, user?.role, {
+    tenantId: getTenantId(c).trim() || 'default',
+    kv: c.env.AUTH_KV,
+    env: c.env as unknown as Record<string, unknown>,
+    waitUntil: waitUntilFn,
+  });
 
-  if (!result.success) {
-    return c.json({ success: false, error: result.error }, (result.statusCode || 400) as any);
-  }
-
-  if (result.idempotent) {
-    return c.json({ success: true, message: `Order ${id} is already ${status}`, idempotent: true });
-  }
-
+  if (!result.success) return c.json({ success: false, error: result.error }, (result.statusCode || 400) as any);
+  if (result.idempotent) return c.json({ success: true, message: `Order ${id} is already ${status}`, idempotent: true });
   return c.json({ success: true, message: `Order ${id} → ${status}` });
 }
+
+type CodOrderLookupRow = {
+  id: string;
+  total?: number | null;
+  total_amount?: number | null;
+  customer_id?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  tenant_id?: string | null;
+};
 
 export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   const id = c.req.param('id');
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
-  const result = await collectCodPayment(c.env.AURA_DB, id, getTenantId(c));
+  const callerTenant = getTenantId(c).trim() || 'default';
+  const result = await collectCodPayment(c.env.AURA_DB, id, callerTenant);
   if (result.success === false) return c.json({ success: false, error: result.error }, result.statusCode);
   if (!result.idempotent && c.env.AUTH_KV) {
     await publishOrderEvent(c.env.AUTH_KV, id, result.status, { previousStatus: result.status }).catch(() => {});
@@ -136,46 +141,33 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
     try {
       let orderRow = await c.env.AURA_DB.prepare(
         'SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ?'
-      ).bind(id).first<{
-        id: string;
-        total?: number | null;
-        total_amount?: number | null;
-        customer_id?: string | null;
-        customer_phone?: string | null;
-        customer_email?: string | null;
-        tenant_id?: string | null;
-      }>().catch(() => null);
+      ).bind(id).first<CodOrderLookupRow>().catch(() => null);
       if (!orderRow) {
         orderRow = await c.env.AURA_DB.prepare(
           'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
-        ).bind(id).first<{
-          id: string;
-          total?: number | null;
-          total_amount?: number | null;
-          customer_id?: string | null;
-          customer_phone?: string | null;
-          customer_email?: string | null;
-          tenant_id?: string | null;
-        }>().catch(() => null);
+        ).bind(id).first<CodOrderLookupRow>().catch(() => null);
       }
       if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
         const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
         await creditLoyaltyIfEligible(c.env.AURA_DB, c.env as unknown as Record<string, unknown>, id).catch(() => {});
-        let refCustomerId = orderRow.customer_id || null;
-        if (!refCustomerId && (orderRow.customer_phone || orderRow.customer_email)) {
-          const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
+        const digits = String(orderRow.customer_phone || '').replace(/\D/g, '');
+        const normalizedPhone = digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
+        const trimmedEmail = typeof orderRow.customer_email === 'string' ? orderRow.customer_email.trim() : '';
+        const sanitizedEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
+        let refCustomerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
+        if (!refCustomerId && (normalizedPhone || sanitizedEmail)) {
           const orderTenant = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
             ? orderRow.tenant_id.trim()
-            : getTenantId(c);
+            : callerTenant;
           let cust: { id: string } | null = null;
           try {
             cust = await c.env.AURA_DB.prepare(
               "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-            ).bind(orderRow.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant).first<{ id: string }>();
+            ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
           } catch {
             cust = await c.env.AURA_DB.prepare(
               'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-            ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+            ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
           }
           refCustomerId = cust?.id ?? null;
         }
@@ -183,16 +175,13 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
         if (refCustomerId && orderTotal >= 20000) {
           const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
           const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
-          const orderTenantForRef =
-            typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
-              ? orderRow.tenant_id.trim()
-              : undefined;
+          const orderTenantForRef = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
+            ? orderRow.tenant_id.trim()
+            : undefined;
           await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
         }
       }
-    } catch {
-      // Non-blocking post-payment loyalty/referral trigger
-    }
+    } catch { /* Non-blocking post-payment loyalty/referral trigger */ }
   }
   return c.json({ success: true, message: result.idempotent ? 'Already paid' : 'Marked as paid', order_id: id });
 }

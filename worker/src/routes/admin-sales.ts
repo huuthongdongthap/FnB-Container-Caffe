@@ -19,10 +19,12 @@ const salesCsvSchema = z
   .object({
     range: z.enum(VALID_RANGES).optional(),
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start must be YYYY-MM-DD').optional(),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD').optional()
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD').optional(),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD').optional(),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be YYYY-MM-DD').optional()
   })
   .refine(
-    (data) => !(data.range && (data.start || data.end)),
+    (data) => !(data.range && (data.start || data.end || data.startDate || data.endDate)),
     { message: 'range cannot be combined with start/end' }
   );
 
@@ -52,7 +54,7 @@ function formatDate(d: Date): string {
  * Escape a CSV field per RFC 4180 and neutralize spreadsheet formula triggers.
  */
 function escapeCsv(value: string): string {
-  const safe = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value;
+  const safe = /^[\t\r\n ]*[=+\-@]/.test(value) ? `'${value}` : value;
   if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
@@ -67,7 +69,17 @@ adminSalesRouter.use('*', async(c, next) => {
   await next();
 });
 
+const SALES_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
 adminSalesRouter.get('/csv', async(c) => {
+  const user = c.get('user' as never) as { role?: string } | undefined;
+  if (user?.role && !SALES_EXPORT_ALLOWED_ROLES.includes(String(user.role).toLowerCase())) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+  if (!user?.role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+
   const parsed = salesCsvSchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
@@ -76,7 +88,7 @@ adminSalesRouter.get('/csv', async(c) => {
     }, 400);
   }
 
-  const { range, start: rawStart, end: rawEnd } = parsed.data;
+  const { range, start: rawStart, end: rawEnd, startDate: rawStartDate, endDate: rawEndDate } = parsed.data;
 
   let startDate: string;
   let endDate: string;
@@ -87,8 +99,19 @@ adminSalesRouter.get('/csv', async(c) => {
     startDate = formatDate(new Date(Date.now() - hours * 3600000));
   } else {
     // Default to last 30 days if neither range nor start/end provided
-    startDate = rawStart || formatDate(new Date(Date.now() - 720 * 3600000));
-    endDate = rawEnd || formatDate(new Date());
+    startDate = rawStart || rawStartDate || formatDate(new Date(Date.now() - 720 * 3600000));
+    endDate = rawEnd || rawEndDate || formatDate(new Date());
+  }
+
+  if (startDate && endDate) {
+    const startMs = Date.parse(startDate);
+    const endMs = Date.parse(endDate);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || startMs > endMs) {
+      return c.json({ success: false, error: 'startDate must be on or before endDate' }, 400);
+    }
+    if ((endMs - startMs) / 86_400_000 > 366) {
+      return c.json({ success: false, error: 'Date range cannot exceed 366 days' }, 400);
+    }
   }
 
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
@@ -99,11 +122,12 @@ adminSalesRouter.get('/csv', async(c) => {
     const res = await db.prepare(`
       SELECT id, customer_name, items, total, payment_method, status, created_at
       FROM orders
-      WHERE (? = '*' OR tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '')))
+      WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
         AND status != 'cancelled'
         AND created_at >= ? || ' 00:00:00'
         AND created_at <= ? || ' 23:59:59'
       ORDER BY created_at ASC
+      LIMIT 5000
     `).bind(tenantId, tenantId, tenantId, startDate, endDate).all<SalesCsvRow>();
     results = res.results;
   } catch (err) {
@@ -117,6 +141,7 @@ adminSalesRouter.get('/csv', async(c) => {
         AND created_at >= ? || ' 00:00:00'
         AND created_at <= ? || ' 23:59:59'
       ORDER BY created_at ASC
+      LIMIT 5000
     `).bind(startDate, endDate).all<SalesCsvRow>();
     results = res.results;
   }

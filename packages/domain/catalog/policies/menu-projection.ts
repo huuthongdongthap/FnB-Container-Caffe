@@ -67,6 +67,24 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
   if (!row) return;
 
   const projection = mapProductToMenuProjection(row, row.category_slug);
+  const rawTenant = (row as unknown as { tenant_id?: string | null }).tenant_id;
+  const effectiveTenant = rawTenant && String(rawTenant).trim() ? String(rawTenant).trim() : 'default';
+
+  const upsertWithTenantSql = `
+    INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, tenant_id, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      category = excluded.category,
+      name = excluded.name,
+      price = excluded.price,
+      description = excluded.description,
+      image_url = excluded.image_url,
+      tags = excluded.tags,
+      badge = excluded.badge,
+      available = excluded.available,
+      tenant_id = excluded.tenant_id,
+      updated_at = CURRENT_TIMESTAMP
+  `;
 
   const upsertSql = `
     INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
@@ -84,7 +102,7 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
   `;
 
   try {
-    await db.prepare(upsertSql).bind(
+    await db.prepare(upsertWithTenantSql).bind(
       projection.id,
       projection.category,
       projection.name,
@@ -93,10 +111,25 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
       projection.image_url,
       projection.tags,
       projection.badge,
-      projection.available
+      projection.available,
+      effectiveTenant
     ).run();
   } catch {
-    // Graceful fallback when menu_items projection table or columns are unmigrated
+    try {
+      await db.prepare(upsertSql).bind(
+        projection.id,
+        projection.category,
+        projection.name,
+        projection.price,
+        projection.description,
+        projection.image_url,
+        projection.tags,
+        projection.badge,
+        projection.available
+      ).run();
+    } catch {
+      // Graceful fallback when menu_items projection table or columns are unmigrated
+    }
   }
 }
 
@@ -161,10 +194,12 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
   const products = results || [];
   for (const product of products) {
     const proj = mapProductToMenuProjection(product, product.category_slug);
+    const rawTenant = (product as unknown as { tenant_id?: string | null }).tenant_id;
+    const effectiveTenant = rawTenant && String(rawTenant).trim() ? String(rawTenant).trim() : 'default';
     try {
       await db.prepare(`
-        INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, tenant_id, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           category = excluded.category,
           name = excluded.name,
@@ -174,6 +209,7 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
           tags = excluded.tags,
           badge = excluded.badge,
           available = excluded.available,
+          tenant_id = excluded.tenant_id,
           updated_at = CURRENT_TIMESTAMP
       `).bind(
         proj.id,
@@ -184,10 +220,38 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
         proj.image_url,
         proj.tags,
         proj.badge,
-        proj.available
+        proj.available,
+        effectiveTenant
       ).run();
     } catch {
-      // Graceful fallback when menu_items projection table is unmigrated
+      try {
+        await db.prepare(`
+          INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(id) DO UPDATE SET
+            category = excluded.category,
+            name = excluded.name,
+            price = excluded.price,
+            description = excluded.description,
+            image_url = excluded.image_url,
+            tags = excluded.tags,
+            badge = excluded.badge,
+            available = excluded.available,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(
+          proj.id,
+          proj.category,
+          proj.name,
+          proj.price,
+          proj.description,
+          proj.image_url,
+          proj.tags,
+          proj.badge,
+          proj.available
+        ).run();
+      } catch {
+        // Graceful fallback when menu_items projection table is unmigrated
+      }
     }
   }
   return { count: products.length };

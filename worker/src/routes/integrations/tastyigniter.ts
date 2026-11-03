@@ -20,6 +20,7 @@ import {
   getTiMenuCache
 } from '../../tree/integrations/tastyigniter/sync';
 import { processTIWebhook, type TIWebhookPayload } from '../../tree/integrations/tastyigniter/webhook';
+import { computeHmacSha256, timingSafeEqual } from '@aura/domain-security';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
@@ -86,7 +87,14 @@ export function createTIRoutes() {
   // Pull menu from TI and cache locally (fire-and-forget).
   app.post('/sync/menu', allow, async(c) => {
     try {
-      const result = await syncTIToLocalMenu(c.env, c.executionCtx as unknown as ExecutionContext);
+      const tenantId = getTenantId(c);
+      let execCtx: ExecutionContext | undefined;
+      try {
+        execCtx = c.executionCtx as unknown as ExecutionContext;
+      } catch {
+        execCtx = undefined;
+      }
+      const result = await syncTIToLocalMenu(c.env, execCtx, tenantId);
       return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ti_sync_menu_error', { error: (err as Error).message });
@@ -122,7 +130,8 @@ export function createTIRoutes() {
   // Return cached menu from local DB.
   app.get('/menu', allow, async(c) => {
     try {
-      const { items } = await getTiMenuCache(c.env);
+      const tenantId = getTenantId(c);
+      const { items } = await getTiMenuCache(c.env, tenantId);
       const client = createTastyIgniterClient(c.env);
       return c.json({ items, mock: client === null ? true : undefined });
     } catch (err) {
@@ -145,28 +154,43 @@ export function createTIRoutes() {
       if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
       }
+      const rawBody = await c.req.text().catch(() => '');
       if (secret) {
         const sig =
           c.req.header('x-tastyigniter-signature') ??
           (!isProd ? (c.req.query('secret') ?? c.req.query('token')) : undefined);
-        const enc = new TextEncoder();
-        const aBytes = enc.encode(sig ?? '');
-        const bBytes = enc.encode(secret);
-        let diff = aBytes.length === bBytes.length ? 0 : 1;
-        if (diff === 0) {
-          for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+        if (!sig) {
+          return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
-        if (!sig || diff !== 0) {
+        const directMatch = await timingSafeEqual(sig, secret);
+        let hmacMatch = false;
+        if (!directMatch) {
+          const hmacHex = await computeHmacSha256(rawBody, secret);
+          const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
+          hmacMatch = await timingSafeEqual(normalizedSig, hmacHex.toLowerCase());
+        }
+        if (!directMatch && !hmacMatch) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
       }
 
-      const body = await c.req.json<TIWebhookPayload>();
+      let body: TIWebhookPayload | null = null;
+      try {
+        body = JSON.parse(rawBody) as TIWebhookPayload;
+      } catch {
+        return c.json({ error: 'Invalid JSON payload' }, 400);
+      }
       if (!body || typeof body !== 'object') {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
-      const result = await processTIWebhook(c.env as Record<string, unknown>, body);
+      const explicitTenant = (
+        c.req.header('X-Tenant-ID') ||
+        c.req.header('x-tenant-id') ||
+        c.req.query('tenant_id') ||
+        ''
+      ).trim() || undefined;
+      const result = await processTIWebhook(c.env as Record<string, unknown>, body, explicitTenant);
       return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ti_webhook_error', { error: (err as Error).message });

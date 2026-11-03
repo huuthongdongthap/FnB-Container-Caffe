@@ -40,7 +40,8 @@ export async function triggerAutomation(
       : 'dispatched to HA webhook';
 
     const now = new Date().toISOString();
-    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const effectiveTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : 'default';
 
     try {
       await db
@@ -74,6 +75,17 @@ export async function triggerAutomation(
   }
 }
 
+function safeParsePayload(raw: unknown): unknown {
+  if (typeof raw !== 'string') {
+    return raw ?? {};
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export async function getAutomationLog(
   env: Record<string, unknown>,
   limit = 50,
@@ -97,12 +109,23 @@ export async function getAutomationLog(
     }
 
     let results: Array<AutomationLogEntry & { tenant_id?: string | null }> = [];
+    const cleanTenant = tenantId ? tenantId.trim() : '';
     try {
-      const res = await db
-        .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at, tenant_id FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
-        .bind(clamped)
-        .all<AutomationLogEntry & { tenant_id?: string | null }>();
-      results = res?.results || [];
+      if (cleanTenant && cleanTenant !== '*') {
+        const res = await db
+          .prepare(
+            "SELECT id, automation_id, trigger_entity, payload, result, executed_at, tenant_id FROM ha_automation_log WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY executed_at DESC LIMIT ?"
+          )
+          .bind(cleanTenant, cleanTenant, clamped)
+          .all<AutomationLogEntry & { tenant_id?: string | null }>();
+        results = res?.results || [];
+      } else {
+        const res = await db
+          .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at, tenant_id FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
+          .bind(clamped)
+          .all<AutomationLogEntry & { tenant_id?: string | null }>();
+        results = res?.results || [];
+      }
     } catch {
       const res = await db
         .prepare('SELECT id, automation_id, trigger_entity, payload, result, executed_at FROM ha_automation_log ORDER BY executed_at DESC LIMIT ?')
@@ -117,7 +140,7 @@ export async function getAutomationLog(
         id: r.id,
         automation_id: r.automation_id,
         trigger_entity: r.trigger_entity,
-        payload: JSON.parse(r.payload as string),
+        payload: safeParsePayload(r.payload),
         result: r.result,
         executed_at: r.executed_at
       }));

@@ -25,7 +25,8 @@ export async function registerStaff(request: Request, env: Record<string, unknow
     if (!session || 'blocked' in session) return errorResponse('Vui lòng đăng nhập', 401);
     if (!session.account || !['owner', 'admin'].includes(session.account.role)) return errorResponse('Không đủ quyền tạo nhân viên', 403);
     const actorTenant = staffTenant(session.account);
-    if (tenant_id && tenant_id !== actorTenant) return errorResponse('Không được tạo nhân viên tại cửa hàng khác', 403);
+    const requestedTenant = tenant_id ? tenant_id.trim() : '';
+    if (requestedTenant && requestedTenant !== actorTenant) return errorResponse('Không được tạo nhân viên tại cửa hàng khác', 403);
 
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;

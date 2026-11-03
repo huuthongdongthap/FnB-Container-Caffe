@@ -12,7 +12,7 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
   try {
     const invoiceId = c.req.param('id');
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
 
     let inv: Record<string, unknown> | null = null;
     try {

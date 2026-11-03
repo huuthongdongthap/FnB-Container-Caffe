@@ -10,15 +10,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
-
-function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if (!row) return false;
-  if (!('tenant_id' in row) || row.tenant_id === undefined) return tenantId === 'default';
-  const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
-  return rowTenant === tenantId;
-}
+import { getTenantId, matchesTenantRow } from '../middleware/tenant';
 
 export interface FloorPlanTable {
   id: string;
@@ -57,10 +49,10 @@ floorPlanRouter.get('/', async (c) => {
   const query = `SELECT t.*,
          s.id AS session_id, s.status AS session_status, s.opened_at AS session_opened_at,
          s.order_count AS session_order_count, s.total_amount AS session_total_amount,
-         s.customer_name AS session_customer_name
+         s.customer_name AS session_customer_name, s.tenant_id AS session_tenant_id
        FROM cafe_tables t
        LEFT JOIN table_sessions s
-         ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paid'))
+         ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paying', 'paid'))
        WHERE 1=1${filterSql}${orderSql}`;
 
   let results: Record<string, unknown>[] = [];
@@ -70,36 +62,82 @@ floorPlanRouter.get('/', async (c) => {
     results = res.results || [];
   } catch {
     try {
-      const fallbackQuery = `SELECT t.*,
-           s.id AS session_id, s.status AS session_status, s.started_at AS session_opened_at,
-           CASE WHEN s.current_order_id IS NOT NULL THEN 1 ELSE 0 END AS session_order_count,
-           0 AS session_total_amount,
-           NULL AS session_customer_name
+      const legacySessionQuery = `SELECT t.*,
+           s.id AS session_id, s.status AS session_status, s.opened_at AS session_opened_at,
+           s.order_count AS session_order_count, s.total_amount AS session_total_amount,
+           s.customer_name AS session_customer_name
          FROM cafe_tables t
          LEFT JOIN table_sessions s
-           ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paid'))
+           ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paying', 'paid'))
          WHERE 1=1${filterSql}${orderSql}`;
-      const stmt = params.length ? db.prepare(fallbackQuery).bind(...params) : db.prepare(fallbackQuery);
+      const stmt = params.length ? db.prepare(legacySessionQuery).bind(...params) : db.prepare(legacySessionQuery);
       const res = await stmt.all<Record<string, unknown>>();
       results = res.results || [];
     } catch {
       try {
-        const tablesOnlyQuery = `SELECT t.* FROM cafe_tables t WHERE 1=1${filterSql}${orderSql}`;
-        const stmt = params.length ? db.prepare(tablesOnlyQuery).bind(...params) : db.prepare(tablesOnlyQuery);
+        const fallbackQuery = `SELECT t.*,
+             s.id AS session_id, s.status AS session_status, s.started_at AS session_opened_at,
+             CASE WHEN s.current_order_id IS NOT NULL THEN 1 ELSE 0 END AS session_order_count,
+             0 AS session_total_amount,
+             NULL AS session_customer_name
+           FROM cafe_tables t
+           LEFT JOIN table_sessions s
+             ON s.table_id = t.id AND (s.status = 'active' OR s.status IN ('ordering', 'paying', 'paid'))
+           WHERE 1=1${filterSql}${orderSql}`;
+        const stmt = params.length ? db.prepare(fallbackQuery).bind(...params) : db.prepare(fallbackQuery);
         const res = await stmt.all<Record<string, unknown>>();
         results = res.results || [];
       } catch {
-        const minimalQuery = 'SELECT t.* FROM cafe_tables t ORDER BY t.table_number';
-        const res = await db.prepare(minimalQuery).all<Record<string, unknown>>();
-        results = res.results || [];
+        try {
+          const tablesOnlyQuery = `SELECT t.* FROM cafe_tables t WHERE 1=1${filterSql}${orderSql}`;
+          const stmt = params.length ? db.prepare(tablesOnlyQuery).bind(...params) : db.prepare(tablesOnlyQuery);
+          const res = await stmt.all<Record<string, unknown>>();
+          results = res.results || [];
+        } catch {
+          const minimalQuery = 'SELECT t.* FROM cafe_tables t ORDER BY t.table_number';
+          const res = await db.prepare(minimalQuery).all<Record<string, unknown>>();
+          results = res.results || [];
+        }
       }
     }
   }
 
   results = results.filter((r) => matchesTenantRow(r, tenantId));
 
+  // Deduplicate by table id so a table with multiple joined session rows appears at most once
+  const dedupedByTableId = new Map<string, Record<string, unknown>>();
+  for (const r of results) {
+    const tableKey = String(r.id);
+    const existing = dedupedByTableId.get(tableKey);
+    if (!existing) {
+      dedupedByTableId.set(tableKey, r);
+      continue;
+    }
+    const rSessionTenantMatches = !('session_tenant_id' in r) || r.session_tenant_id === undefined || tenantId === '*'
+      ? true
+      : ((typeof r.session_tenant_id === 'string' && r.session_tenant_id.trim() ? r.session_tenant_id.trim() : 'default') === tenantId);
+    const existingSessionTenantMatches = !('session_tenant_id' in existing) || existing.session_tenant_id === undefined || tenantId === '*'
+      ? true
+      : ((typeof existing.session_tenant_id === 'string' && existing.session_tenant_id.trim() ? existing.session_tenant_id.trim() : 'default') === tenantId);
+    const rHasValidSession = r.session_id != null && rSessionTenantMatches;
+    const existingHasValidSession = existing.session_id != null && existingSessionTenantMatches;
+    if (rHasValidSession && !existingHasValidSession) {
+      dedupedByTableId.set(tableKey, r);
+    } else if (rHasValidSession && existingHasValidSession) {
+      const rOpened = String(r.session_opened_at ?? '');
+      const existingOpened = String(existing.session_opened_at ?? '');
+      if (rOpened > existingOpened) {
+        dedupedByTableId.set(tableKey, r);
+      }
+    }
+  }
+  results = Array.from(dedupedByTableId.values());
+
   const tables: FloorPlanTable[] = results.map((r) => {
-    const hasSession = r.session_id != null;
+    const sessionTenantMatches = !('session_tenant_id' in r) || r.session_tenant_id === undefined || tenantId === '*'
+      ? true
+      : ((typeof r.session_tenant_id === 'string' && r.session_tenant_id.trim() ? r.session_tenant_id.trim() : 'default') === tenantId);
+    const hasSession = r.session_id != null && sessionTenantMatches;
     return {
       id: String(r.id),
       table_number: Number(r.table_number),
@@ -138,7 +176,7 @@ floorPlanRouter.get('/summary', async (c) => {
   let rows: { results: { status: string; c: number }[] };
   try {
     rows = await db.prepare(
-      'SELECT status, COUNT(*) AS c FROM cafe_tables WHERE (? = \'*\' OR tenant_id = ? OR (? = \'default\' AND (tenant_id IS NULL OR tenant_id = \'\'))) GROUP BY status'
+      'SELECT status, COUNT(*) AS c FROM cafe_tables WHERE (? = \'*\' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = \'default\' AND (tenant_id IS NULL OR tenant_id = \'\' OR TRIM(tenant_id) = \'\'))) GROUP BY status'
     ).bind(tenantId, tenantId, tenantId).all<{ status: string; c: number }>();
   } catch (err) {
     if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
@@ -170,42 +208,120 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
   if (!matchesTenantRow(table, tenantId)) return c.json({ success: false, error: 'Table not found' }, 404);
 
   const now = new Date().toISOString();
+  const noteParam = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
   try {
-    await db.prepare(
-      'UPDATE cafe_tables SET status = \'Overdue\', notes = COALESCE(?, notes) WHERE id = ?'
-    ).bind(String(body.notes || 'No-show — awaiting auto-release'), id).run();
+    if (tenantId && tenantId !== '*') {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Overdue', notes = COALESCE(?, notes, 'No-show — awaiting auto-release') WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(noteParam, id, tenantId).run();
+    } else {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Overdue', notes = COALESCE(?, notes, 'No-show — awaiting auto-release') WHERE id = ?"
+      ).bind(noteParam, id).run();
+    }
   } catch {
-    await db.prepare(
-      'UPDATE cafe_tables SET status = \'Overdue\' WHERE id = ?'
-    ).bind(id).run();
+    try {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Overdue', notes = COALESCE(?, notes, 'No-show — awaiting auto-release') WHERE id = ?"
+      ).bind(noteParam, id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE cafe_tables SET status = \'Overdue\' WHERE id = ?'
+      ).bind(id).run();
+    }
   }
 
-  // Close any active session on the table (no-show).
-  let session: { id: string } | null = null;
+  // Close any open session on the table (no-show).
+  let session: { id: string; tenant_id?: string | null } | null = null;
   try {
-    session = await db.prepare(
-      'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
-    ).bind(id).first<{ id: string }>();
+    if (tenantId && tenantId !== '*') {
+      session = await db.prepare(
+        "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+        db.prepare(
+          "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+        ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            "SELECT id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+          ).bind(id).first<{ id: string }>()
+        )
+      );
+      if (!session) {
+        session = await db.prepare(
+          "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(id, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+          ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+            db.prepare(
+              'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+            ).bind(id).first<{ id: string }>()
+          )
+        );
+      }
+    } else {
+      session = await db.prepare(
+        "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+      ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+        db.prepare(
+          "SELECT id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+        ).bind(id).first<{ id: string }>()
+      );
+      if (!session) {
+        session = await db.prepare(
+          'SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+        ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+          ).bind(id).first<{ id: string }>()
+        );
+      }
+    }
   } catch {
+    session = null;
+  }
+  if (session && !matchesTenantRow(session as unknown as Record<string, unknown>, tenantId)) {
     session = null;
   }
   if (session) {
     try {
       await db.prepare(
-        'UPDATE table_sessions SET status = \'no_show\', closed_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(now, now, session.id).run();
+        "UPDATE table_sessions SET status = 'no_show', closed_at = ?, updated_at = ? WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      ).bind(now, now, session.id, tenantId, tenantId).run();
     } catch {
       try {
         await db.prepare(
-          'UPDATE table_sessions SET status = \'no_show\', ended_at = ? WHERE id = ?'
-        ).bind(now, session.id).run();
+          'UPDATE table_sessions SET status = \'no_show\', closed_at = ?, updated_at = ? WHERE id = ?'
+        ).bind(now, now, session.id).run();
       } catch {
-        // table_sessions schema variation
+        try {
+          await db.prepare(
+            'UPDATE table_sessions SET status = \'no_show\', ended_at = ? WHERE id = ?'
+          ).bind(now, session.id).run();
+        } catch {
+          // table_sessions schema variation
+        }
       }
     }
-    await db.prepare(
-      'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
-    ).bind(id).run();
+    if (tenantId && tenantId !== '*') {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, tenantId).run().catch(() =>
+        db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
+      );
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, tenantId).run().catch(() =>
+        db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(id).run()
+      );
+    } else {
+      await db.prepare(
+        "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?"
+      ).bind(id).run().catch(() => null);
+      await db.prepare(
+        'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
+      ).bind(id).run();
+    }
   }
 
   return c.json({
@@ -224,30 +340,95 @@ floorPlanRouter.post('/:id/release', async (c) => {
   if (!matchesTenantRow(table, tenantId)) return c.json({ success: false, error: 'Table not found' }, 404);
 
   const now = new Date().toISOString();
-  await db.prepare(
-    'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
-  ).bind(id).run();
+  if (tenantId && tenantId !== '*') {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(id, tenantId).run().catch(() =>
+      db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
+    );
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(id, tenantId).run().catch(() =>
+      db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(id).run()
+    );
+  } else {
+    await db.prepare(
+      "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?"
+    ).bind(id).run().catch(() => null);
+    await db.prepare(
+      'UPDATE cafe_tables SET status = \'Available\' WHERE id = ?'
+    ).bind(id).run();
+  }
 
-  let session: { id: string } | null = null;
+  let session: { id: string; tenant_id?: string | null } | null = null;
   try {
-    session = await db.prepare(
-      'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
-    ).bind(id).first<{ id: string }>();
+    if (tenantId && tenantId !== '*') {
+      session = await db.prepare(
+        "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+        db.prepare(
+          "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+        ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            "SELECT id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+          ).bind(id).first<{ id: string }>()
+        )
+      );
+      if (!session) {
+        session = await db.prepare(
+          "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(id, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+          ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+            db.prepare(
+              'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+            ).bind(id).first<{ id: string }>()
+          )
+        );
+      }
+    } else {
+      session = await db.prepare(
+        "SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+      ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+        db.prepare(
+          "SELECT id FROM table_sessions WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')"
+        ).bind(id).first<{ id: string }>()
+      );
+      if (!session) {
+        session = await db.prepare(
+          'SELECT id, tenant_id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+        ).bind(id).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+          db.prepare(
+            'SELECT id FROM table_sessions WHERE table_id = ? AND status = \'active\''
+          ).bind(id).first<{ id: string }>()
+        );
+      }
+    }
   } catch {
+    session = null;
+  }
+  if (session && !matchesTenantRow(session as unknown as Record<string, unknown>, tenantId)) {
     session = null;
   }
   if (session) {
     try {
       await db.prepare(
-        'UPDATE table_sessions SET status = \'closed\', closed_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(now, now, session.id).run();
+        "UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      ).bind(now, now, session.id, tenantId, tenantId).run();
     } catch {
       try {
         await db.prepare(
-          'UPDATE table_sessions SET status = \'closed\', ended_at = ? WHERE id = ?'
-        ).bind(now, session.id).run();
+          'UPDATE table_sessions SET status = \'closed\', closed_at = ?, updated_at = ? WHERE id = ?'
+        ).bind(now, now, session.id).run();
       } catch {
-        // table_sessions schema variation
+        try {
+          await db.prepare(
+            'UPDATE table_sessions SET status = \'closed\', ended_at = ? WHERE id = ?'
+          ).bind(now, session.id).run();
+        } catch {
+          // table_sessions schema variation
+        }
       }
     }
   }

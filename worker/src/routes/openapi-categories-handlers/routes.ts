@@ -6,7 +6,7 @@ import { registerCategoryMutationHandlers } from './mutation-handlers';
 
 export const openApiCategoriesRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
 
 // Apply auth middleware to mutations only (keeping public GET routes unauthenticated)
 openApiCategoriesRouter.use('/api/categories', async (c, next) => {

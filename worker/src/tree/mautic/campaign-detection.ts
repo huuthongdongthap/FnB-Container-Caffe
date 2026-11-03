@@ -4,6 +4,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { resolvePilotStore, matchesTenantRow } from '../../middleware/tenant';
 import { getMauticClient } from './client-factory';
 import { toMauticContact } from './contact-mapper';
 import { trackEnrollment } from './enrollment-tracker';
@@ -15,7 +16,10 @@ async function detectAndEnroll(
   campaignId: string,
   campaignType: string,
   query: string,
-  queryParams: unknown[]
+  queryParams: unknown[],
+  tenantId?: string,
+  fallbackUnscopedQuery?: string,
+  fallbackUnscopedParams?: unknown[]
 ): Promise<{ detected: number; enrolled: number }> {
   const campaignCfg = env[campaignEnvVar] as string | undefined;
   if (!campaignCfg) {
@@ -38,27 +42,39 @@ async function detectAndEnroll(
     customers = (results || []) as Array<Record<string, unknown>>;
   } catch (err) {
     const msg = String((err as Error)?.message || '');
-    if (msg.includes('no such column') && query.includes('c.loyalty_tier')) {
+    const baseQuery = fallbackUnscopedQuery || query;
+    const baseParams = fallbackUnscopedParams || queryParams;
+    if (msg.includes('no such column') && baseQuery.includes('c.loyalty_tier')) {
       try {
-        const fallbackQuery = query
+        const fallbackQuery = baseQuery
           .replace('c.loyalty_tier', 'c.tier as loyalty_tier')
           .replace(/c\.date_of_birth/g, 'c.birthday');
-        const { results } = await db.prepare(fallbackQuery).bind(...queryParams).all();
+        const { results } = await db.prepare(fallbackQuery).bind(...baseParams).all();
         customers = (results || []) as Array<Record<string, unknown>>;
       } catch {
         try {
-          const canonicalQuery = query
+          const canonicalQuery = baseQuery
             .replace('c.loyalty_tier', 'c.tier as loyalty_tier')
             .replace('AND created_at > ?', 'AND enrolled_at > ?');
-          const { results } = await db.prepare(canonicalQuery).bind(...queryParams).all();
+          const { results } = await db.prepare(canonicalQuery).bind(...baseParams).all();
           customers = (results || []) as Array<Record<string, unknown>>;
         } catch {
           return { detected: 0, enrolled: 0 };
         }
       }
+    } else if (fallbackUnscopedQuery && fallbackUnscopedParams) {
+      try {
+        const { results } = await db.prepare(fallbackUnscopedQuery).bind(...fallbackUnscopedParams).all();
+        customers = (results || []) as Array<Record<string, unknown>>;
+      } catch {
+        return { detected: 0, enrolled: 0 };
+      }
     } else {
       return { detected: 0, enrolled: 0 };
     }
+  }
+  if (tenantId && tenantId !== '*') {
+    customers = customers.filter((row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId));
   }
   const detected = customers.length;
   let enrolled = 0;
@@ -68,7 +84,11 @@ async function detectAndEnroll(
       const contact = toMauticContact(customer);
       const contactId = await client.createOrUpdateContact(contact);
       await client.addContactToCampaign(contactId, parseInt(campaignCfg, 10));
-      await trackEnrollment(db, customer.id as string, campaignType, campaignCfg, contactId, 'enrolled');
+      const hasExplicitTenant =
+        Boolean(tenantId && tenantId !== '*' && tenantId !== 'default') ||
+        Boolean(env.PILOT_TENANT_ID || env.PILOT_STORE_ID);
+      const writeTenant = hasExplicitTenant && tenantId && tenantId !== '*' ? tenantId : undefined;
+      await trackEnrollment(db, customer.id as string, campaignType, campaignCfg, contactId, 'enrolled', writeTenant);
       enrolled++;
     } catch {
       // skip on error
@@ -78,14 +98,13 @@ async function detectAndEnroll(
   return { detected, enrolled };
 }
 
-export async function detectWinbackCandidates(env: Record<string, unknown>): Promise<{ detected: number; enrolled: number }> {
+export async function detectWinbackCandidates(
+  env: Record<string, unknown>,
+  tenantOverride?: string
+): Promise<{ detected: number; enrolled: number }> {
   const thirtyOneDaysAgo = new Date(Date.now() - 31 * 86400000).toISOString();
-  return detectAndEnroll(
-    env,
-    'MAUTIC_CAMPAIGN_WINBACK',
-    (env.MAUTIC_CAMPAIGN_WINBACK as string) || '10',
-    'winback',
-    `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
+  const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const unscopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
       (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
      FROM customers c
      WHERE c.phone IS NOT NULL AND c.phone != ''
@@ -99,20 +118,59 @@ export async function detectWinbackCandidates(env: Record<string, unknown>): Pro
        AND (
          SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id
        ) < ?
-     LIMIT 100`,
-    [thirtyOneDaysAgo, thirtyOneDaysAgo]
+     LIMIT 100`;
+  const unscopedParams = [thirtyOneDaysAgo, thirtyOneDaysAgo];
+
+  if (tenantId && tenantId !== '*') {
+    const scopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+        (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
+       FROM customers c
+       WHERE c.phone IS NOT NULL AND c.phone != ''
+         AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+         AND c.id NOT IN (
+           SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'winback'
+             AND created_at > ?
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         )
+         AND (
+           SELECT MAX(o2.created_at) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?
+         ) IS NOT NULL
+         AND (
+           SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id AND COALESCE(NULLIF(TRIM(o3.tenant_id), ''), 'default') = ?
+         ) < ?
+       LIMIT 100`;
+    return detectAndEnroll(
+      env,
+      'MAUTIC_CAMPAIGN_WINBACK',
+      (env.MAUTIC_CAMPAIGN_WINBACK as string) || '10',
+      'winback',
+      scopedQuery,
+      [tenantId, tenantId, thirtyOneDaysAgo, tenantId, tenantId, tenantId, thirtyOneDaysAgo],
+      tenantId,
+      unscopedQuery,
+      unscopedParams
+    );
+  }
+
+  return detectAndEnroll(
+    env,
+    'MAUTIC_CAMPAIGN_WINBACK',
+    (env.MAUTIC_CAMPAIGN_WINBACK as string) || '10',
+    'winback',
+    unscopedQuery,
+    unscopedParams
   );
 }
 
-export async function detectBirthdayCandidates(env: Record<string, unknown>): Promise<{ detected: number; enrolled: number }> {
+export async function detectBirthdayCandidates(
+  env: Record<string, unknown>,
+  tenantOverride?: string
+): Promise<{ detected: number; enrolled: number }> {
   const now = new Date();
   const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-  return detectAndEnroll(
-    env,
-    'MAUTIC_CAMPAIGN_BIRTHDAY',
-    (env.MAUTIC_CAMPAIGN_BIRTHDAY as string) || '20',
-    'birthday',
-    `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth as birthday
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const unscopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth as birthday
      FROM customers c
      WHERE c.date_of_birth IS NOT NULL
        AND substr(c.date_of_birth, 6, 2) = ?
@@ -121,7 +179,41 @@ export async function detectBirthdayCandidates(env: Record<string, unknown>): Pr
          SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'birthday'
            AND created_at > ?
        )
-     LIMIT 100`,
-    [currentMonth, new Date(now.getFullYear(), now.getMonth(), 1).toISOString()]
+     LIMIT 100`;
+  const unscopedParams = [currentMonth, monthStart];
+
+  if (tenantId && tenantId !== '*') {
+    const scopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth as birthday, c.tenant_id
+       FROM customers c
+       WHERE c.date_of_birth IS NOT NULL
+         AND substr(c.date_of_birth, 6, 2) = ?
+         AND c.phone IS NOT NULL AND c.phone != ''
+         AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+         AND c.id NOT IN (
+           SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'birthday'
+             AND created_at > ?
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         )
+       LIMIT 100`;
+    return detectAndEnroll(
+      env,
+      'MAUTIC_CAMPAIGN_BIRTHDAY',
+      (env.MAUTIC_CAMPAIGN_BIRTHDAY as string) || '20',
+      'birthday',
+      scopedQuery,
+      [currentMonth, tenantId, monthStart, tenantId],
+      tenantId,
+      unscopedQuery,
+      unscopedParams
+    );
+  }
+
+  return detectAndEnroll(
+    env,
+    'MAUTIC_CAMPAIGN_BIRTHDAY',
+    (env.MAUTIC_CAMPAIGN_BIRTHDAY as string) || '20',
+    'birthday',
+    unscopedQuery,
+    unscopedParams
   );
 }

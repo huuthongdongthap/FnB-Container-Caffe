@@ -52,7 +52,8 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
       if (!session) return errorResponse('Unauthorized', 401);
       if ('blocked' in session) return errorResponse(session.blocked, 403);
       // Authority comes from the verified D1 account, never an incidental JWT claim.
-      if (!session.account || !roles.includes(session.account.role) || session.account.tenant_id !== tenantId)
+      const accountTenant = (session.account?.tenant_id || '').trim() || 'default';
+      if (!session.account || !roles.includes(session.account.role) || accountTenant !== tenantId)
         return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
       direction = 'admin';
     }

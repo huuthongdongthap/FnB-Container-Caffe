@@ -15,6 +15,7 @@ export interface CampaignCustomer {
   last_order_date?: string;
   date_of_birth?: string;
   created_at?: string;
+  tenant_id?: string | null;
 }
 
 export interface CampaignMessage {
@@ -32,6 +33,7 @@ export interface CampaignResult {
   customer_id: string;
   sent: boolean;
   error?: string;
+  tenant_id?: string | null;
 }
 
 export interface CampaignLogRow {

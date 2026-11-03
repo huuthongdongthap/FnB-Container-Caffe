@@ -10,6 +10,7 @@ import { notifyTelegram } from '../notifications/telegram';
 import { deductInventoryForOrder } from '@aura/domain-inventory';
 import { syncOrderToERPNext } from 'worker/src/tree/erpnext/sync.js';
 import type { OrderSnapshotResult } from '../policies/order-snapshot';
+import { sanitizeCustomerIdentity } from '../policies/loyalty-trigger';
 
 const log = createLogger({ route: 'orders:side-effects' });
 
@@ -42,40 +43,44 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     : 'default';
 
   let customerIdForCapture: string | null = data.customer_id || null;
-  if (data.customer_email) {
+  const { normalizedPhone: validPhone, email: validEmail } = sanitizeCustomerIdentity(
+    data.customer_phone,
+    data.customer_email,
+  );
+  if (validEmail) {
     const newCustId = generateId('CUST_');
     try {
       await db.prepare(`
         INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id)
         VALUES (?, ?, ?, ?, 0, 0, 'bronze', ?)
         ON CONFLICT DO NOTHING
-      `).bind(newCustId, data.customer_email, data.customer_name, data.customer_phone, effectiveTenant).run();
+      `).bind(newCustId, validEmail, data.customer_name, validPhone, effectiveTenant).run();
     } catch {
       await db.prepare(`
         INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
         VALUES (?, ?, ?, ?, 0, 0, 'bronze')
         ON CONFLICT DO NOTHING
-      `).bind(newCustId, data.customer_email, data.customer_name, data.customer_phone).run();
+      `).bind(newCustId, validEmail, data.customer_name, validPhone).run().catch(() => {});
     }
     let linkedCust: { id: string } | null = null;
     try {
       linkedCust = await db.prepare(
         "SELECT id FROM customers WHERE email = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(data.customer_email, effectiveTenant).first<{ id: string }>();
+      ).bind(validEmail, effectiveTenant).first<{ id: string }>();
     } catch {
-      linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(data.customer_email).first<{ id: string }>();
+      linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(validEmail).first<{ id: string }>().catch(() => null);
     }
     if (linkedCust) customerIdForCapture = linkedCust.id;
-  } else if (data.customer_phone) {
-    const digits = String(data.customer_phone).replace(/\D/g, '');
-    if (digits.length >= 9 && digits.length <= 12) {
+  } else if (validPhone) {
+    const digits = validPhone;
+    if (digits.length >= 9 && digits.length <= 15) {
       let existing: { id: string } | null = null;
       try {
         existing = await db.prepare(
           "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         ).bind(digits, effectiveTenant).first<{ id: string }>();
       } catch {
-        existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>();
+        existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>().catch(() => null);
       }
       if (!existing) {
         const custId = generateId('CUST_');
@@ -95,7 +100,7 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
             INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
             VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)
             ON CONFLICT DO NOTHING
-          `).bind(custId, syntheticEmail, data.customer_name, digits, now, now).run();
+          `).bind(custId, syntheticEmail, data.customer_name, digits, now, now).run().catch(() => {});
         }
         const insertedForTenant = await db.prepare(
           "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
@@ -112,7 +117,7 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
               INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
               VALUES (?, ?, 0, 0, 0, ?, ?)
               ON CONFLICT DO NOTHING
-            `).bind(wid, insertedForTenant.id, now, now).run();
+            `).bind(wid, insertedForTenant.id, now, now).run().catch(() => {});
           }
           customerIdForCapture = insertedForTenant.id;
         }
@@ -132,13 +137,15 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
         const { identifyCustomer, linkOrder } = await import('@aura/domain-customer');
         const identity = await identifyCustomer({
           db, customerId: captureCustId,
-          phone: data.customer_phone, email: data.customer_email || undefined,
-          source: 'checkout'
+          phone: validPhone || undefined, email: validEmail || undefined,
+          source: 'checkout',
+          tenantId: effectiveTenant
         });
         if (identity) {
           await linkOrder({
             db, customerId: captureCustId, orderId,
-            total: snapshot.total, orderType: data.order_type || undefined
+            total: snapshot.total, orderType: data.order_type || undefined,
+            tenantId: effectiveTenant
           });
         }
       } catch (custErr) {
@@ -182,13 +189,13 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     title: 'Đơn hàng mới 🍳',
     body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
     data: { url: '/kds', orderId }
-  }, STAFF_PUSH_ROLE).catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
+  }, STAFF_PUSH_ROLE, undefined, effectiveTenant).catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
   if (ctx?.waitUntil) ctx.waitUntil(pushPromise);
 
   if (ctx?.waitUntil) {
     const mc = createMetricsCollector(db);
     ctx.waitUntil(mc.recordMetric('order_created', snapshot.total, {
-      payment_method: validatedMethod, is_anonymous: !data.customer_email
+      payment_method: validatedMethod, is_anonymous: !data.customer_email, tenant_id: effectiveTenant
     }));
   }
 
@@ -203,12 +210,12 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     log.warn('Inventory deduction failed for order', { orderId, message: (e as Error).message });
   }
 
-  if (data.customer_email) {
+  if (validEmail) {
     const { sendEmail } = await import('worker/src/lib/email.js');
     const { renderOrderConfirm } = await import('worker/src/templates/order-confirm.js');
     const paymentLabels: Record<string, string> = { cod: 'COD', payos: 'PayOS' };
     const emailPromise = sendEmail(env, {
-      to: data.customer_email,
+      to: validEmail,
       subject: `Xác nhận đơn hàng #${orderId} — AURA CAFE`,
       html: renderOrderConfirm({
         id: orderId,

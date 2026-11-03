@@ -61,7 +61,6 @@ export async function postStartSopRun(c: Context<{ Bindings: Env }>) {
       template,
       data: { item: shiftId ? { ...run, shiftId } : run },
     });
-    return jsonResponse({ success: true, run, template, data: { item: run } });
   } catch (err) {
     return sopError(err);
   }
@@ -76,12 +75,18 @@ export async function postCheckSopItem(c: Context<{ Bindings: Env }>) {
     const scope = sopScope(c.env, c.get('user'));
     const runId = c.req.param('id') ?? '';
     const itemId = c.req.param('itemId') ?? '';
+    if (!runId) return errorResponse('run id is required', 400);
+    if (!itemId) return errorResponse('item id is required', 400);
     const body = await c.req.json().catch(() => ({}));
     const isChecked = readBoolean(body, 'isChecked');
+    const note = readOptionalString(body, 'note');
+    if (typeof note === 'string' && note.length > 2000) {
+      return errorResponse('note must be at most 2000 characters', 400);
+    }
 
     const run = await setItemChecked(scope, runId, itemId, {
       isChecked,
-      note: readOptionalString(body, 'note'),
+      note,
       value: readOptionalNumber(body, 'value'),
     });
     await auditSopAction({
@@ -101,7 +106,9 @@ export async function postCheckSopItem(c: Context<{ Bindings: Env }>) {
 export async function postCompleteSopRun(c: Context<{ Bindings: Env }>) {
   try {
     const scope = sopScope(c.env, c.get('user'));
-    const run = await completeRunForStaff(scope, c.req.param('id') ?? '');
+    const runId = c.req.param('id') ?? '';
+    if (!runId) return errorResponse('run id is required', 400);
+    const run = await completeRunForStaff(scope, runId);
     await auditSopAction({
       db: c.env.AURA_DB,
       actor: auditActor(c),
@@ -122,8 +129,11 @@ export async function postAbandonSopRun(c: Context<{ Bindings: Env }>) {
     const body = await c.req.json().catch(() => ({}));
     const reason = readString(body, 'reason');
     if (!reason) return errorResponse('A reason is required to abandon a checklist', 400);
+    if (reason.length > 2000) return errorResponse('reason must be at most 2000 characters', 400);
+    const runId = c.req.param('id') ?? '';
+    if (!runId) return errorResponse('run id is required', 400);
 
-    const run = await abandonRunForStaff(scope, c.req.param('id') ?? '', { reason });
+    const run = await abandonRunForStaff(scope, runId, { reason });
     await auditSopAction({
       db: c.env.AURA_DB,
       actor: auditActor(c),
@@ -151,10 +161,14 @@ export async function postAppealMyViolation(c: Context<{ Bindings: Env }>) {
   try {
     const scope = sopScope(c.env, c.get('user'));
     const violationId = c.req.param('id') ?? '';
+    if (!violationId) return errorResponse('violation id is required', 400);
     const body = await c.req.json().catch(() => ({}));
     const explanation = readOptionalString(body, 'appealExplanation');
     if (typeof explanation !== 'string' || explanation.trim().length === 0) {
       return errorResponse('An explanation is required to appeal', 400);
+    }
+    if (explanation.length > 2000) {
+      return errorResponse('explanation must be at most 2000 characters', 400);
     }
 
     const violation = await appealOwnViolation(scope, violationId, explanation.trim());

@@ -4,6 +4,7 @@
  */
 
 import { triggerAutomation } from './automations';
+import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'ha-presence' });
@@ -47,12 +48,20 @@ export async function dispatchDiningPresence(
 
 export async function handleHAWebhook(
   env: Record<string, unknown>,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  tenantOverride?: string
 ): Promise<{ success: boolean; action_taken: string }> {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
   if (!db) {
     throw new Error('D1 database binding missing');
   }
+
+  const rawBodyTenant = typeof body.tenant_id === 'string' ? body.tenant_id.trim() : '';
+  const safeBodyTenant = rawBodyTenant && rawBodyTenant !== '*' ? rawBodyTenant : '';
+  const cleanOverride = typeof tenantOverride === 'string' ? tenantOverride.trim() : '';
+  const safeOverride = cleanOverride && cleanOverride !== '*' ? cleanOverride : '';
+  const pilotTenant = resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]).trim();
+  const effectiveTenant = safeOverride || safeBodyTenant || (pilotTenant && pilotTenant !== '*' ? pilotTenant : 'default');
 
   // 1. Device state update webhook from Home Assistant
   if (typeof body.entity_id === 'string' && typeof body.state === 'string') {
@@ -61,12 +70,42 @@ export async function handleHAWebhook(
     const attributes = body.attributes ? JSON.stringify(body.attributes) : '{}';
     const lastChanged = (body.last_changed as string) || new Date().toISOString();
 
-    await db
-      .prepare(
-        "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
-      )
-      .bind(entityId, state, attributes, lastChanged)
-      .run();
+    try {
+      const existing = await db
+        .prepare('SELECT tenant_id FROM ha_device_states WHERE entity_id = ?')
+        .bind(entityId)
+        .first<Record<string, unknown>>();
+      if (existing && 'tenant_id' in existing && existing.tenant_id !== undefined && !matchesTenantRow(existing, effectiveTenant)) {
+        return { success: false, action_taken: `cross_tenant_blocked:${entityId}` };
+      }
+    } catch {
+      // Optional tenant_id column in minimal test schemas
+    }
+
+    if (effectiveTenant !== 'default') {
+      try {
+        await db
+          .prepare(
+            "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated, tenant_id) VALUES (?, ?, ?, ?, datetime('now'), ?)"
+          )
+          .bind(entityId, state, attributes, lastChanged, effectiveTenant)
+          .run();
+      } catch {
+        await db
+          .prepare(
+            "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
+          )
+          .bind(entityId, state, attributes, lastChanged)
+          .run();
+      }
+    } else {
+      await db
+        .prepare(
+          "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
+        )
+        .bind(entityId, state, attributes, lastChanged)
+        .run();
+    }
 
     log.info('ha_webhook_device_updated', { entityId, state });
     return { success: true, action_taken: `device_updated:${entityId}` };
@@ -78,13 +117,23 @@ export async function handleHAWebhook(
     const triggerEntity = (body.trigger_entity as string) || null;
     const result = (body.result as string) || 'feedback_received';
     const payload = body.payload ?? body;
+    const serializedPayload = JSON.stringify(payload);
 
-    await db
-      .prepare(
-        "INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, datetime('now'))"
-      )
-      .bind(automationId, triggerEntity, JSON.stringify(payload), result)
-      .run();
+    try {
+      await db
+        .prepare(
+          "INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at, tenant_id) VALUES (?, ?, ?, ?, datetime('now'), ?)"
+        )
+        .bind(automationId, triggerEntity, serializedPayload, result, effectiveTenant)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          "INSERT INTO ha_automation_log (automation_id, trigger_entity, payload, result, executed_at) VALUES (?, ?, ?, ?, datetime('now'))"
+        )
+        .bind(automationId, triggerEntity, serializedPayload, result)
+        .run();
+    }
 
     log.info('ha_webhook_automation_logged', { automationId, result });
     return { success: true, action_taken: `automation_logged:${automationId}` };

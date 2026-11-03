@@ -10,7 +10,8 @@ import {
   getDeviceState,
   toggleDevice,
   getZoneDevices,
-  matchesHaTenant
+  matchesHaTenant,
+  safeParseJsonObject
 } from '../../tree/homeassistant/devices';
 import {
   triggerAutomation,
@@ -85,7 +86,7 @@ export function createHARouter() {
         .map((r) => ({
           entity_id: r.entity_id,
           state: r.state,
-          attributes: r.attributes ? JSON.parse(r.attributes) : null,
+          attributes: r.attributes ? safeParseJsonObject(r.attributes) : null,
           last_changed: r.last_changed,
           last_updated: r.last_updated
         }));
@@ -219,7 +220,9 @@ export function createHARouter() {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
-      const result = await handleHAWebhook(c.env as Record<string, unknown>, body);
+      const rawWebhookTenant = (c.req.header('x-tenant-id') ?? c.req.header('X-Tenant-ID') ?? '').trim();
+      const webhookTenant = rawWebhookTenant && rawWebhookTenant !== '*' ? rawWebhookTenant : undefined;
+      const result = await handleHAWebhook(c.env as Record<string, unknown>, body, webhookTenant);
       return c.json({ ...result, success: true });
     } catch (err) {
       log.error('ha_webhook_error', { error: (err as Error).message });

@@ -19,10 +19,12 @@ interface AppEnv {
 
 type AppContext = { Bindings: AppEnv };
 
+const INVENTORY_MUTATION_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
 export function inventorySnapshots(app: Hono<AppContext>) {
   app.get('/:id/snapshots', async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const itemId = c.req.param('id');
     const rawLimit = parseInt(c.req.query('limit') || '30', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 30;
@@ -57,37 +59,96 @@ export function inventorySnapshots(app: Hono<AppContext>) {
       params.push(to);
     }
 
-    query += ' ORDER BY date DESC LIMIT ?';
-    params.push(limit);
-
-    const results = await db.prepare(query).bind(...params).all();
-    return c.json({ snapshots: results.results || [] });
+    let results: { results: Record<string, unknown>[] };
+    if (tenantId !== '*') {
+      try {
+        const tenantQuery = `${query} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY date DESC LIMIT ?`;
+        results = await db.prepare(tenantQuery).bind(...params, tenantId, limit).all<Record<string, unknown>>();
+      } catch {
+        results = await db.prepare(`${query} ORDER BY date DESC LIMIT ?`).bind(...params, limit).all<Record<string, unknown>>();
+      }
+    } else {
+      results = await db.prepare(`${query} ORDER BY date DESC LIMIT ?`).bind(...params, limit).all<Record<string, unknown>>();
+    }
+    const snapshots = (results.results || []).filter(
+      (r) => !('tenant_id' in r) || r.tenant_id == null || matchesTenantRow(r, tenantId)
+    );
+    return c.json({ snapshots });
   });
 
   app.post('/:id/snapshots', async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
+    const userRole = (c as unknown as { get?: (k: string) => { role?: string } | undefined }).get?.('user')?.role;
+    if (userRole && !INVENTORY_MUTATION_ROLES.includes(userRole)) {
+      return c.json({ error: 'Insufficient permissions to record inventory snapshot' }, 403);
+    }
     const itemId = c.req.param('id');
-    const item = await db
+    let item = await db
       .prepare('SELECT * FROM inventory_items WHERE id = ?')
       .bind(itemId)
-      .first<{ current_stock: number; tenant_id?: string | null }>();
+      .first<{ current_stock: number; tenant_id?: string | null }>()
+      .catch(() => null);
+    if (!item) {
+      item = await db
+        .prepare('SELECT * FROM ingredients WHERE id = ?')
+        .bind(itemId)
+        .first<{ current_stock: number; tenant_id?: string | null }>()
+        .catch(() => null);
+    }
     if (!item || !matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)) {
       return c.json({ error: 'Item không tồn tại' }, 404);
     }
 
+    const effectiveTenant =
+      tenantId === '*'
+        ? (item.tenant_id && String(item.tenant_id).trim() && String(item.tenant_id).trim() !== '*'
+            ? String(item.tenant_id).trim()
+            : 'default')
+        : tenantId;
+
     const today = new Date().toISOString().slice(0, 10);
     const closing = item.current_stock || 0;
 
-    const existing = await db
-      .prepare('SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ?')
-      .bind(itemId, today)
-      .first<{ id: string; opening_stock: number } | null>();
+    let existing: { id: string; opening_stock: number } | null = null;
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        existing = await db
+          .prepare(
+            "SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(itemId, today, effectiveTenant)
+          .first<{ id: string; opening_stock: number } | null>();
+      } catch {
+        existing = await db
+          .prepare('SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ?')
+          .bind(itemId, today)
+          .first<{ id: string; opening_stock: number } | null>();
+      }
+    } else {
+      existing = await db
+        .prepare('SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ?')
+        .bind(itemId, today)
+        .first<{ id: string; opening_stock: number } | null>();
+    }
 
     let id: string;
     if (existing) {
       id = existing.id;
-      await db.prepare('UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ?').bind(closing, id).run();
+      if (effectiveTenant && effectiveTenant !== '*') {
+        try {
+          await db
+            .prepare(
+              "UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(closing, id, effectiveTenant)
+            .run();
+        } catch {
+          await db.prepare('UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ?').bind(closing, id).run();
+        }
+      } else {
+        await db.prepare('UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ?').bind(closing, id).run();
+      }
     } else {
       id = crypto.randomUUID();
       await db
@@ -96,6 +157,13 @@ export function inventorySnapshots(app: Hono<AppContext>) {
         )
         .bind(id, itemId, today, closing, closing)
         .run();
+    }
+    if (effectiveTenant && effectiveTenant !== '*') {
+      await db
+        .prepare('UPDATE inventory_snapshots SET tenant_id = ? WHERE id = ?')
+        .bind(effectiveTenant, id)
+        .run()
+        .catch(() => {});
     }
 
     return c.json(

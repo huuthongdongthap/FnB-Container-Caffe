@@ -4,6 +4,8 @@
  * GET /api/analytics/peak-hours?days=30
  */
 
+import { buildTenantFilter } from './summary';
+
 export interface PeakHourRow {
   hour: number;
   order_count: number;
@@ -19,13 +21,8 @@ export async function getPeakHours(
   days: number,
   tenantId?: string
 ): Promise<PeakHourRow[]> {
-  const hasTenant = Boolean(tenantId && tenantId !== '*');
-  const tenantClause = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
-  const binds: Array<number | string> = hasTenant && tenantId ? [days, tenantId] : [days];
+  const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId, 'o');
+  const binds: Array<number | string> = [days, ...tenantBinds];
   const { results } = await db.prepare(`
     SELECT
       CAST(strftime('%H', o.created_at) AS INTEGER) AS hour,

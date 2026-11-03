@@ -3,16 +3,17 @@ import { isTerminal } from '../../order/model/order-state-machine';
 
 type CollectionResult = { success: true; status: string; idempotent?: boolean }
   | { success: false; statusCode: 404 | 409; error: string };
-type Order = { total: number; status: string; payment_status: string; payment_method?: string; is_cod?: number };
+type Order = { total?: number; total_amount?: number; status: string; payment_status: string; payment_method?: string; is_cod?: number };
 
 /** Cash collection is one ledger transaction and never changes kitchen fulfillment. */
 export async function collectCodPayment(db: D1Database, id: string, tenantId: string): Promise<CollectionResult> {
-  const tenantClause = tenantId === '*'
+  const normTenant = (tenantId || '').trim() || 'default';
+  const tenantClause = normTenant === '*'
     ? ''
-    : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
-  const tenantBinds = tenantId === '*' ? [] : [tenantId];
+    : normTenant === 'default'
+      ? " AND (tenant_id = ? OR TRIM(tenant_id) = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?)';
+  const tenantBinds = normTenant === '*' ? [] : [normTenant, normTenant];
   let order: Order | null;
   try {
     order = await db.prepare(`SELECT total, status, payment_status, payment_method FROM orders WHERE id = ?${tenantClause}`)
@@ -23,24 +24,46 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
       .bind(id, ...tenantBinds).first<Order>();
   }
   if (!order) return { success: false, statusCode: 404, error: 'Order not found' };
-  if (isTerminal(order.status) && order.status !== 'completed') {
-    return { success: false, statusCode: 409, error: `Cannot collect a ${order.status} order` };
+  const normalizedStatus = String(order.status || '').trim().toLowerCase();
+  const normalizedPaymentStatus = String(order.payment_status || '').trim().toLowerCase();
+  const isUnpaidTerminal = ['cancelled', 'rejected', 'failed', 'expired'].includes(normalizedStatus)
+    || ((normalizedStatus === 'completed' || normalizedStatus === 'paid' || isTerminal(order.status)) && normalizedPaymentStatus !== 'paid');
+  if (isUnpaidTerminal) {
+    return { success: false, statusCode: 409, error: `Cannot collect a ${normalizedStatus || order.status} order` };
   }
   const cod = order.payment_method !== undefined ? ['cod', 'cash'].includes(order.payment_method) : order.is_cod === 1;
   if (!cod) return { success: false, statusCode: 409, error: 'Not a COD order' };
-  if (!['unpaid', 'pending', 'cod_pending', 'paid'].includes(order.payment_status)) {
+  if (normalizedPaymentStatus === 'refunded' || !['unpaid', 'pending', 'cod_pending', 'paid'].includes(normalizedPaymentStatus)) {
     return { success: false, statusCode: 409, error: 'Payment requires reconciliation' };
   }
-  const ledger = await db.prepare("SELECT id, status, amount FROM payments WHERE order_id = ? AND method IN ('cod', 'cash') LIMIT 2")
-    .bind(id).all<{ id: string; status: string; amount: number }>();
-  if (ledger.results.length > 1 || ledger.results.some(row => !['pending', 'completed', 'paid'].includes(row.status)
-    || Number(row.amount) !== Number(order.total))) {
+  const amount = Number(order.total ?? order.total_amount ?? 0);
+  let ledgerRows: Array<{ id: string; status: string; amount: number }> = [];
+  let hasPaymentsTable = true;
+  try {
+    const ledger = await db.prepare("SELECT id, status, amount FROM payments WHERE order_id = ? AND method IN ('cod', 'cash') LIMIT 2")
+      .bind(id).all<{ id: string; status: string; amount: number }>();
+    ledgerRows = ledger.results || [];
+  } catch (error) {
+    if (!/no such table:.*payments/i.test(String(error))) throw error;
+    hasPaymentsTable = false;
+  }
+  if (ledgerRows.length > 1 || ledgerRows.some(row => !['pending', 'completed', 'paid'].includes(row.status)
+    || Number(row.amount) !== amount)) {
     return { success: false, statusCode: 409, error: 'COD ledger requires reconciliation' };
   }
-  if (order.payment_status === 'paid' && ledger.results.length === 1 && ['completed', 'paid'].includes(ledger.results[0]!.status)) {
+  if (normalizedPaymentStatus === 'paid' && (!hasPaymentsTable || (ledgerRows.length === 1 && ['completed', 'paid'].includes(ledgerRows[0]!.status)))) {
     return { success: true, status: order.status, idempotent: true };
   }
   const now = new Date().toISOString();
+  if (!hasPaymentsTable) {
+    const res = await db.prepare(
+      `UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND status = ? AND payment_status = ?${tenantClause}`
+    ).bind(now, id, order.status, order.payment_status, ...tenantBinds).run();
+    if (!(res.meta?.changes > 0)) {
+      return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
+    }
+    return { success: true, status: order.status };
+  }
   const commit = (timestamp: boolean) => db.batch([
     db.prepare(`UPDATE orders SET payment_status = 'paid', ${timestamp ? 'cod_paid_at = COALESCE(cod_paid_at, ?), ' : ''}updated_at = ?
       WHERE id = ? AND status = ? AND payment_status = ?${tenantClause}`)
@@ -50,10 +73,10 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
       AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND status = ? AND payment_status = 'paid'${tenantClause})`)
       .bind(now, id, id, order!.status, ...tenantBinds),
     db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
-      SELECT ?, id, 'cod', total, 'completed', ?, ? FROM orders
+      SELECT ?, id, 'cod', ?, 'completed', ?, ? FROM orders
       WHERE id = ? AND status = ? AND payment_status = 'paid'${tenantClause}
       AND NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method IN ('cod', 'cash'))`)
-      .bind(`cod:${id}`, now, now, id, order!.status, ...tenantBinds, id),
+      .bind(`cod:${id}`, amount, now, now, id, order!.status, ...tenantBinds, id),
   ]);
   let results;
   try { results = await commit(true); }
@@ -68,3 +91,5 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
   }
   return { success: true, status: order.status };
 }
+
+export const collectCodOrderPayment = collectCodPayment;

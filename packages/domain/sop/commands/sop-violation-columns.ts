@@ -12,7 +12,8 @@ import { SOP_VIOLATION_ROLES, SopAccessError, type SopScope } from './sop-access
 
 /** Resolves the D1 binding from the scope's environment. */
 export function sopDatabase(scope: SopScope): D1Database {
-  const database = (scope.env as unknown as { AURA_DB?: unknown }).AURA_DB as D1Database | undefined;
+  const s = scope as unknown as { env?: { AURA_DB?: D1Database }; db?: D1Database };
+  const database = s?.env?.AURA_DB ?? s?.db;
   if (!database) throw new SopAccessError('D1 database binding missing', 503);
   return database;
 }

@@ -7,8 +7,54 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { getMetricSummary } from '../lib/metrics-collector';
+import { getTenantId } from '../middleware/tenant';
 
 const adminMetrics = new Hono<{ Bindings: Env }>();
+
+const TENANT_METRIC_PREDICATE =
+  " AND COALESCE(NULLIF(TRIM(tags ->> '$.tenant_id'), ''), 'default') = ?";
+
+async function queryMetricsFirst<T>(
+  db: D1Database,
+  baseSql: string,
+  baseBinds: unknown[],
+  tenantId: string
+): Promise<T | null> {
+  if (tenantId !== '*') {
+    try {
+      return await db
+        .prepare(`${baseSql}${TENANT_METRIC_PREDICATE}`)
+        .bind(...baseBinds, tenantId)
+        .first<T>();
+    } catch {
+      // Fallback when mock DB does not support json_extract on tags
+    }
+  }
+  return db.prepare(baseSql).bind(...baseBinds).first<T>();
+}
+
+async function queryMetricsAll<T>(
+  db: D1Database,
+  baseSql: string,
+  tailSql: string,
+  baseBinds: unknown[],
+  tenantId: string
+): Promise<{ results?: T[] }> {
+  if (tenantId !== '*') {
+    try {
+      return await db
+        .prepare(`${baseSql}${TENANT_METRIC_PREDICATE}${tailSql ? ` ${tailSql}` : ''}`)
+        .bind(...baseBinds, tenantId)
+        .all<T>();
+    } catch {
+      // Fallback when mock DB does not support json_extract on tags
+    }
+  }
+  return db
+    .prepare(`${baseSql}${tailSql ? ` ${tailSql}` : ''}`)
+    .bind(...baseBinds)
+    .all<T>();
+}
 
 interface LatencyRow { duration: number; }
 interface TopPathRow { path: string; cnt: number; }
@@ -37,26 +83,35 @@ adminMetrics.get('/', async(c) => {
   const hours = getRangeHours(range as Range);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
   const since = new Date(Date.now() - hours * 3600000).toISOString();
+  const tenantId = getTenantId(c as Parameters<typeof getTenantId>[0]);
 
   // If filter param is provided, query by metric name prefix using getMetricSummary
   if (filter) {
     try {
       const likePattern = filter.includes('*') ? filter.replace(/\*/g, '%') : `${filter}%`;
-      const nameRows = await db.prepare(
-        'SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ? ORDER BY name'
-      ).bind(likePattern, since).all<{ name: string }>();
+      const nameRows = await queryMetricsAll<{ name: string }>(
+        db,
+        'SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ?',
+        'ORDER BY name',
+        [likePattern, since],
+        tenantId
+      );
 
       const names = (nameRows.results || []).map(r => r.name);
       const summaries = await Promise.all(
-        names.map(name => getMetricSummary(db, name, range))
+        names.map(name => getMetricSummary(db, name, range, tenantId))
       );
 
       const filtered = summaries.filter(Boolean);
 
       if (filter.startsWith('web_vital')) {
-        const vitalRows = await db.prepare(
-          'SELECT name, json_extract(tags, \'$.rating\') as rating, COUNT(*) as cnt FROM _metrics WHERE name LIKE ? AND created_at >= ? GROUP BY name, rating'
-        ).bind(likePattern, since).all<{ name: string; rating: string | null; cnt: number }>();
+        const vitalRows = await queryMetricsAll<{ name: string; rating: string | null; cnt: number }>(
+          db,
+          'SELECT name, json_extract(tags, \'$.rating\') as rating, COUNT(*) as cnt FROM _metrics WHERE name LIKE ? AND created_at >= ?',
+          'GROUP BY name, rating',
+          [likePattern, since],
+          tenantId
+        );
 
         const vitals: Record<string, { good: number; needsImprovement: number; poor: number }> = {};
         for (const row of vitalRows.results || []) {
@@ -95,9 +150,13 @@ adminMetrics.get('/', async(c) => {
       }
 
       if (filter === 'request_duration_ms') {
-        const durationRows = await db.prepare(
-          'SELECT COALESCE(CAST(json_extract(tags, \'$.duration\') AS REAL), value) as duration FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ? ORDER BY duration'
-        ).bind(since).all<LatencyRow>();
+        const durationRows = await queryMetricsAll<LatencyRow>(
+          db,
+          'SELECT COALESCE(CAST(json_extract(tags, \'$.duration\') AS REAL), value) as duration FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ?',
+          'ORDER BY duration',
+          [since],
+          tenantId
+        );
 
         const durations = (durationRows.results || [])
           .map((r) => Number(r.duration))
@@ -108,9 +167,13 @@ adminMetrics.get('/', async(c) => {
         const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
         const p99 = durations.length > 0 ? durations[Math.floor(durations.length * 0.99)] : 0;
 
-        const dailyRows = await db.prepare(
-          'SELECT substr(created_at, 1, 10) as date, COUNT(*) as count FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ? GROUP BY substr(created_at, 1, 10) ORDER BY date DESC LIMIT 30'
-        ).bind(since).all<{ date: string; count: number }>();
+        const dailyRows = await queryMetricsAll<{ date: string; count: number }>(
+          db,
+          'SELECT substr(created_at, 1, 10) as date, COUNT(*) as count FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ?',
+          'GROUP BY substr(created_at, 1, 10) ORDER BY date DESC LIMIT 30',
+          [since],
+          tenantId
+        );
 
         return c.json({
           range,
@@ -142,16 +205,20 @@ adminMetrics.get('/', async(c) => {
 
   try {
     const [reqRow, errRow, orderRow, revenueRow] = await Promise.all([
-      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND created_at >= ?').bind(since).first<{ total: number }>(),
-      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND CAST(json_extract(tags, \'$.status\') AS INTEGER) >= 400 AND created_at >= ?').bind(since).first<{ total: number }>(),
-      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'order_created\' AND created_at >= ?').bind(since).first<{ total: number }>(),
-      db.prepare('SELECT COALESCE(SUM(value), 0) as total FROM _metrics WHERE name = \'revenue\' AND created_at >= ?').bind(since).first<{ total: number }>()
+      queryMetricsFirst<{ total: number }>(db, 'SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND created_at >= ?', [since], tenantId),
+      queryMetricsFirst<{ total: number }>(db, 'SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND CAST(json_extract(tags, \'$.status\') AS INTEGER) >= 400 AND created_at >= ?', [since], tenantId),
+      queryMetricsFirst<{ total: number }>(db, 'SELECT COUNT(*) as total FROM _metrics WHERE name = \'order_created\' AND created_at >= ?', [since], tenantId),
+      queryMetricsFirst<{ total: number }>(db, 'SELECT COALESCE(SUM(value), 0) as total FROM _metrics WHERE name = \'revenue\' AND created_at >= ?', [since], tenantId)
     ]);
 
     // Latency: get all durations for p50/p95 calculation
-    const latencyRows = await db.prepare(
-      'SELECT CAST(json_extract(tags, \'$.duration\') AS REAL) as duration FROM _metrics WHERE name = \'request\' AND created_at >= ? AND json_extract(tags, \'$.duration\') IS NOT NULL ORDER BY duration'
-    ).bind(since).all<LatencyRow>();
+    const latencyRows = await queryMetricsAll<LatencyRow>(
+      db,
+      'SELECT CAST(json_extract(tags, \'$.duration\') AS REAL) as duration FROM _metrics WHERE name = \'request\' AND created_at >= ? AND json_extract(tags, \'$.duration\') IS NOT NULL',
+      'ORDER BY duration',
+      [since],
+      tenantId
+    );
 
     const durations = (latencyRows.results || [])
       .map((r) => r.duration)
@@ -162,9 +229,13 @@ adminMetrics.get('/', async(c) => {
     const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
 
     // Top paths
-    const topPathRows = await db.prepare(
-      'SELECT json_extract(tags, \'$.path\') as path, COUNT(*) as cnt FROM _metrics WHERE name = \'request\' AND created_at >= ? GROUP BY path ORDER BY cnt DESC LIMIT 10'
-    ).bind(since).all<TopPathRow>();
+    const topPathRows = await queryMetricsAll<TopPathRow>(
+      db,
+      'SELECT json_extract(tags, \'$.path\') as path, COUNT(*) as cnt FROM _metrics WHERE name = \'request\' AND created_at >= ?',
+      'GROUP BY path ORDER BY cnt DESC LIMIT 10',
+      [since],
+      tenantId
+    );
 
     const metrics = {
       range,

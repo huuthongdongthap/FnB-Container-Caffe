@@ -123,10 +123,12 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
       if (!phone || !template) {
         return c.json({ error: 'phone and template required' }, 400);
       }
+      const tenantId = getTenantId(c);
       const result = await sendZNS(c.env as unknown as Record<string, unknown>, {
         phone,
         template_key: template,
-        data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 }
+        data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 },
+        tenantId
       });
       return c.json(result);
     } catch (err) {
@@ -137,7 +139,7 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   // ── Admin: Manual cashback expiry warning run ──
   app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner', 'admin', 'manager', 'supervisor']), audit('send_expiry_warnings'), async(c) => {
-    const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>);
+    const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>, getTenantId(c as any));
     return c.json({ ok: true, ...result });
   });
 }

@@ -18,22 +18,29 @@ export function createErpnextClient(env: ErpnextEnv): ErpnextClient | null {
 }
 
 export async function createErpnextClientWithKv(
-  env: ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
+  env: ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
+  tenantId?: string,
 ): Promise<ErpnextClient | null> {
-  // Try KV first (BYOK override)
+  const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
   let url = env.ERPNEXT_URL;
   let apiKey = env.ERPNEXT_API_KEY;
   let apiSecret = env.ERPNEXT_API_SECRET;
 
   if (env.AUTH_KV) {
     try {
-      const kvUrl = await env.AUTH_KV.get('erpnext:api_url');
-      const kvKey = await env.AUTH_KV.get('erpnext:api_key');
-      const kvSecret = await env.AUTH_KV.get('erpnext:api_secret');
+      const prefix = effectiveTenant === 'default' ? 'erpnext' : `erpnext:${effectiveTenant}`;
+      const kvUrl = await env.AUTH_KV.get(`${prefix}:api_url`);
+      const kvKey = await env.AUTH_KV.get(`${prefix}:api_key`);
+      const kvSecret = await env.AUTH_KV.get(`${prefix}:api_secret`);
       if (kvUrl && kvKey && kvSecret) {
         url = kvUrl;
         apiKey = kvKey;
         apiSecret = kvSecret;
+      } else if (effectiveTenant !== 'default') {
+        const defaultKvUrl = await env.AUTH_KV.get('erpnext:api_url');
+        if (defaultKvUrl) {
+          return null;
+        }
       }
     } catch {
       // KV unavailable — fallback to env

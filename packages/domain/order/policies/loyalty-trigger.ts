@@ -17,6 +17,18 @@ import { loadPolicy, applyAccrual } from '@aura/domain-crm';
 
 const log = createLogger({ route: 'orders' });
 
+export function sanitizeCustomerIdentity(
+  phone?: string | null,
+  email?: string | null,
+): { normalizedPhone: string | null; email: string | null } {
+  const digits = String(phone ?? '').replace(/\D/g, '');
+  const normalizedPhone =
+    digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
+  const trimmedEmail = typeof email === 'string' ? email.trim() : '';
+  const validEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
+  return { normalizedPhone, email: validEmail };
+}
+
 export async function creditLoyaltyIfEligible(
   db: D1Database,
   env: Record<string, unknown>,
@@ -55,20 +67,23 @@ export async function creditLoyaltyIfEligible(
     return;
   }
 
-  let customerId = orderRow.customer_id;
-  if (!customerId && (orderRow.customer_phone || orderRow.customer_email)) {
-    const normalizedPhone = String(orderRow.customer_phone || '').replace(/\D/g, '');
+  const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
+    orderRow.customer_phone,
+    orderRow.customer_email,
+  );
+  let customerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
+  if (!customerId && (normalizedPhone || sanitizedEmail)) {
     const rawTenant = (orderRow as Record<string, unknown>).tenant_id;
     const orderTenant = typeof rawTenant === 'string' && rawTenant.trim() ? rawTenant.trim() : 'default';
     let cust: { id: string } | null = null;
     try {
       cust = await db.prepare(
         "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-      ).bind(orderRow.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant, orderTenant).first<{ id: string }>();
+      ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant, orderTenant).first<{ id: string }>();
     } catch {
       cust = await db.prepare(
         'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-      ).bind(orderRow.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+      ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
     }
     customerId = cust?.id ?? null;
   }
@@ -110,13 +125,21 @@ export async function creditLoyaltyIfEligible(
   const orderTenantForAccrual =
     typeof rawOrderTenant === 'string' && rawOrderTenant.trim()
       ? rawOrderTenant.trim()
-      : undefined;
+      : 'default';
 
-  await applyAccrual(db, policy, {
+  const effectivePolicy =
+    (await loadPolicy(
+      db,
+      env?.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
+      new Date(),
+      orderTenantForAccrual
+    ).catch(() => null)) || policy;
+
+  await applyAccrual(db, effectivePolicy, {
     orderId,
     customerId,
     orderTotalVnd: total,
-    ...(orderTenantForAccrual ? { tenantId: orderTenantForAccrual } : {}),
+    tenantId: orderTenantForAccrual,
   }).catch((err) => {
     log.error('Loyalty accrual failed', { orderId, error: String(err) });
   });

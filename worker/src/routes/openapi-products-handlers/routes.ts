@@ -6,7 +6,7 @@ import { registerProductMutationHandlers } from './mutation-handlers';
 
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
 
 // Apply auth middleware to mutations only (keeping public GET routes unauthenticated)
 openApiProductsRouter.use('/api/products', async (c, next) => {

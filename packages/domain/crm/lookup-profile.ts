@@ -53,11 +53,12 @@ export interface LookupOptions {
 export async function lookupProfile(
   db: D1Database,
   phone: string,
-  opts: LookupOptions = {},
+  opts: LookupOptions | string = {},
 ): Promise<CrmProfile> {
-  const visitLimit = opts.visitLimit ?? 5;
-  const orderLimit = opts.orderLimit ?? 5;
-  const targetTenant = opts.tenantId && opts.tenantId !== '*' ? opts.tenantId : null;
+  const normalizedOpts: LookupOptions = typeof opts === 'string' ? { tenantId: opts } : (opts || {});
+  const visitLimit = normalizedOpts.visitLimit ?? 5;
+  const orderLimit = normalizedOpts.orderLimit ?? 5;
+  const targetTenant = normalizedOpts.tenantId && normalizedOpts.tenantId !== '*' ? normalizedOpts.tenantId : null;
 
   try {
     const rawPhone = String(phone ?? '').trim();
@@ -68,47 +69,74 @@ export async function lookupProfile(
     const normalized =
       digits.startsWith('84') && digits.length >= 11 ? '0' + digits.slice(2) : (digits || rawPhone);
 
-    let identity: { customer_id: string; value?: string } | null = null;
-    try {
-      identity = await db
-        .prepare(
-          `SELECT customer_id, identifier_value AS value FROM customer_identities
-           WHERE identifier_type = 'phone' AND (identifier_value = ?1 OR identifier_value = ?2)
-           ORDER BY created_at DESC LIMIT 1`,
-        )
-        .bind(rawPhone, normalized)
-        .first<{ customer_id: string; value?: string }>();
-    } catch {
+    let identity: { customer_id: string; value?: string; tenant_id?: string | null } | null = null;
+    if (targetTenant) {
       try {
         identity = await db
           .prepare(
-            `SELECT customer_id, value FROM customer_identities
-             WHERE type = 'phone' AND (value = ?1 OR value = ?2)
-             ORDER BY created_at DESC LIMIT 1`,
+            `SELECT ci.customer_id, ci.identifier_value AS value FROM customer_identities ci
+             LEFT JOIN customers c ON c.id = ci.customer_id
+             WHERE ci.identifier_type = 'phone' AND (ci.identifier_value = ?1 OR ci.identifier_value = ?2)
+               AND COALESCE(NULLIF(TRIM(ci.tenant_id), ''), COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) = ?3
+             ORDER BY ci.created_at DESC LIMIT 1`,
           )
-          .bind(rawPhone, normalized)
-          .first<{ customer_id: string; value?: string }>();
+          .bind(rawPhone, normalized, targetTenant)
+          .first<{ customer_id: string; value?: string; tenant_id?: string | null }>();
       } catch {
         identity = null;
       }
     }
 
-    if (identity?.customer_id && targetTenant) {
+    if (!identity) {
       try {
-        const idOwner = await db
-          .prepare('SELECT id, tenant_id FROM customers WHERE id = ?1')
-          .bind(identity.customer_id)
-          .first<{ id: string; tenant_id?: string | null }>();
-        if (!idOwner) {
-          identity = null;
-        } else if ('tenant_id' in idOwner && idOwner.tenant_id !== undefined) {
-          const ownerTenant = (idOwner.tenant_id && String(idOwner.tenant_id).trim()) || 'default';
-          if (ownerTenant !== targetTenant) {
-            identity = null;
-          }
-        }
+        identity = await db
+          .prepare(
+            `SELECT customer_id, identifier_value AS value FROM customer_identities
+             WHERE identifier_type = 'phone' AND (identifier_value = ?1 OR identifier_value = ?2)
+             ORDER BY created_at DESC LIMIT 1`,
+          )
+          .bind(rawPhone, normalized)
+          .first<{ customer_id: string; value?: string; tenant_id?: string | null }>();
       } catch {
-        identity = null;
+        try {
+          identity = await db
+            .prepare(
+              `SELECT customer_id, value FROM customer_identities
+               WHERE type = 'phone' AND (value = ?1 OR value = ?2)
+               ORDER BY created_at DESC LIMIT 1`,
+            )
+            .bind(rawPhone, normalized)
+            .first<{ customer_id: string; value?: string; tenant_id?: string | null }>();
+        } catch {
+          identity = null;
+        }
+      }
+    }
+
+    if (identity?.customer_id && targetTenant) {
+      if ('tenant_id' in identity && identity.tenant_id !== undefined) {
+        const idTenant = (identity.tenant_id && String(identity.tenant_id).trim()) || 'default';
+        if (idTenant !== targetTenant) {
+          identity = null;
+        }
+      }
+      if (identity?.customer_id) {
+        try {
+          const idOwner = await db
+            .prepare('SELECT id, tenant_id FROM customers WHERE id = ?1')
+            .bind(identity.customer_id)
+            .first<{ id: string; tenant_id?: string | null }>();
+          if (!idOwner) {
+            identity = null;
+          } else if ('tenant_id' in idOwner && idOwner.tenant_id !== undefined) {
+            const ownerTenant = (idOwner.tenant_id && String(idOwner.tenant_id).trim()) || 'default';
+            if (ownerTenant !== targetTenant) {
+              identity = null;
+            }
+          }
+        } catch {
+          identity = null;
+        }
       }
     }
 
@@ -171,13 +199,26 @@ export async function lookupProfile(
       }
     }
 
+    const resolvedTenant =
+      targetTenant ?? ((customer.tenant_id && String(customer.tenant_id).trim()) || 'default');
+
     const consents = await db
       .prepare(
         `SELECT purpose, granted FROM consents
-         WHERE customer_id = ?1 AND revoked_at IS NULL`,
+         WHERE customer_id = ?1 AND revoked_at IS NULL
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2`,
       )
-      .bind(customer.id)
-      .all<{ purpose: string; granted: number | boolean }>();
+      .bind(customer.id, resolvedTenant)
+      .all<{ purpose: string; granted: number | boolean }>()
+      .catch(() =>
+        db
+          .prepare(
+            `SELECT purpose, granted FROM consents
+             WHERE customer_id = ?1 AND revoked_at IS NULL`,
+          )
+          .bind(customer.id)
+          .all<{ purpose: string; granted: number | boolean }>(),
+      );
 
     const consentMarketing = consents.results.some(
       (c) => c.purpose === 'marketing' && (c.granted === 1 || c.granted === true),
@@ -190,13 +231,21 @@ export async function lookupProfile(
       .prepare(
         `SELECT visited_at, channel FROM visits
          WHERE customer_id = ?1
-         ORDER BY visited_at DESC LIMIT ?2`,
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2
+         ORDER BY visited_at DESC LIMIT ?3`,
       )
-      .bind(customer.id, visitLimit)
-      .all<{ visited_at: string; channel: string }>();
-
-    const resolvedTenant =
-      targetTenant ?? ((customer.tenant_id && String(customer.tenant_id).trim()) || 'default');
+      .bind(customer.id, resolvedTenant, visitLimit)
+      .all<{ visited_at: string; channel: string }>()
+      .catch(() =>
+        db
+          .prepare(
+            `SELECT visited_at, channel FROM visits
+             WHERE customer_id = ?1
+             ORDER BY visited_at DESC LIMIT ?2`,
+          )
+          .bind(customer.id, visitLimit)
+          .all<{ visited_at: string; channel: string }>(),
+      );
     const orders = await db
       .prepare(
         `SELECT * FROM orders
@@ -231,9 +280,9 @@ export async function lookupProfile(
       );
 
     const scopedOrders = (orders.results ?? []).filter((o) => {
-      if (targetTenant && 'tenant_id' in o && o.tenant_id !== undefined) {
+      if ('tenant_id' in o && o.tenant_id !== undefined) {
         const ordTenant = (o.tenant_id && String(o.tenant_id).trim()) || 'default';
-        return ordTenant === targetTenant;
+        return ordTenant === resolvedTenant;
       }
       return true;
     });

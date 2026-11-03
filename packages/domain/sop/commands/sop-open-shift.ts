@@ -30,16 +30,6 @@ export interface OpenShift {
   shift: string;
 }
 
-/** The shift a checklist is being recorded against. */
-export interface OpenShift {
-  /** String form of `staff_shifts.id`, matching `sop_runs.shift_id`. */
-  id: string;
-  /** ISO timestamp of the clock-in that opened this shift. */
-  clockIn: string;
-  /** The attendance row's own label ('attendance', 'scheduled', …). */
-  shift: string;
-}
-
 /** What was linked, so a caller cannot claim a write that the guard refused. */
 export interface SopRunShift {
   runId: string;

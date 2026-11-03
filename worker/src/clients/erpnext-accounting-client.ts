@@ -8,7 +8,7 @@
  * - PDF invoice generation
  */
 
-import { createErpnextClient, ErpnextClient } from './erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv, ErpnextClient } from './erpnext-client';
 import { mapOrderToInvoice, mapCustomerForInvoice } from '../lib/erpnext-mapper';
 
 // ---------------------------------------------------------------------------
@@ -18,6 +18,8 @@ import { mapOrderToInvoice, mapCustomerForInvoice } from '../lib/erpnext-mapper'
 export interface OrderInput {
   id: string;
   items?: string | Array<Record<string, unknown>>;
+  total?: number;
+  discount_amount?: number;
   customer_phone?: string;
   customer_email?: string;
   customer_name?: string;
@@ -61,6 +63,7 @@ export interface VatData {
 
 export interface WorkerEnv {
   AURA_DB?: D1Database;
+  AUTH_KV?: import('@cloudflare/workers-types').KVNamespace;
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;
   ERPNEXT_API_SECRET?: string;
@@ -79,10 +82,10 @@ export class ErpnextAccountingClient {
     this.auraDb = auraDb || null;
   }
 
-  async processOrderToInvoice(order: OrderInput, env: WorkerEnv): Promise<InvoiceResult> {
+  async processOrderToInvoice(order: OrderInput, env: WorkerEnv, tenantId?: string): Promise<InvoiceResult> {
     const db = env.AURA_DB || this.auraDb;
 
-    const existingMapping = await this._findMapping(order.id, db);
+    const existingMapping = await this._findMapping(order.id, db, tenantId);
     if (existingMapping) {
       return {
         success: true,
@@ -113,7 +116,7 @@ export class ErpnextAccountingClient {
         throw new Error('Failed to create Sales Invoice: no name returned from ERPNext');
       }
 
-      const mappingId = await this._createMapping(order.id, invoiceName, 'synced', db);
+      const mappingId = await this._createMapping(order.id, invoiceName, 'synced', db, tenantId);
 
       return {
         success: true,
@@ -129,10 +132,10 @@ export class ErpnextAccountingClient {
     }
   }
 
-  async getInvoiceByOrderId(orderId: string, env: WorkerEnv): Promise<Record<string, unknown> | null> {
+  async getInvoiceByOrderId(orderId: string, env: WorkerEnv, tenantId?: string): Promise<Record<string, unknown> | null> {
     const db = env.AURA_DB || this.auraDb;
 
-    const mapping = await this._findMapping(orderId, db);
+    const mapping = await this._findMapping(orderId, db, tenantId);
     if (!mapping) {
       return null;
     }
@@ -168,9 +171,19 @@ export class ErpnextAccountingClient {
   // Mapping persistence
   // =====================================================================
 
-  private async _findMapping(orderId: string, db: D1Database | null): Promise<ErpnextMapping | null> {
+  private async _findMapping(orderId: string, db: D1Database | null, tenantId?: string): Promise<ErpnextMapping | null> {
     if (!db) {
       return null;
+    }
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    if (tenantId !== '*') {
+      try {
+        return await db.prepare(
+          "SELECT id, erpnext_id, sync_status FROM erpnext_mappings WHERE local_type = ? AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind('order', orderId, effectiveTenant).first<ErpnextMapping>();
+      } catch {
+        // Fall through to legacy query if tenant_id column is absent
+      }
     }
     try {
       return await db.prepare(
@@ -181,16 +194,24 @@ export class ErpnextAccountingClient {
     }
   }
 
-  private async _createMapping(orderId: string, erpnextId: string, status: string, db: D1Database | null): Promise<number | null> {
+  private async _createMapping(orderId: string, erpnextId: string, status: string, db: D1Database | null, tenantId?: string): Promise<number | null> {
     if (!db) {
       return null;
     }
     const now = new Date().toISOString();
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
 
-    await db.prepare(`
-      INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, attempts, last_synced_at, created_at)
-      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-    `).bind('order', orderId, erpnextId, 'Sales Invoice', status, now, now).run();
+    try {
+      await db.prepare(`
+        INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, attempts, last_synced_at, created_at, tenant_id)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+      `).bind('order', orderId, erpnextId, 'Sales Invoice', status, now, now, effectiveTenant).run();
+    } catch {
+      await db.prepare(`
+        INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, attempts, last_synced_at, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      `).bind('order', orderId, erpnextId, 'Sales Invoice', status, now, now).run();
+    }
 
     const result = await db.prepare(
       'SELECT id FROM erpnext_mappings WHERE local_id = ? ORDER BY created_at DESC LIMIT 1'
@@ -281,6 +302,17 @@ export class ErpnextAccountingClient {
 
 export function createErpnextAccountingClient(env: WorkerEnv): ErpnextAccountingClient | null {
   const client = createErpnextClient(env);
+  if (!client) {
+    return null;
+  }
+  return new ErpnextAccountingClient(client, env.AURA_DB);
+}
+
+export async function createErpnextAccountingClientWithKv(
+  env: WorkerEnv,
+  tenantId?: string,
+): Promise<ErpnextAccountingClient | null> {
+  const client = await createErpnextClientWithKv(env, tenantId);
   if (!client) {
     return null;
   }

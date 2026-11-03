@@ -32,14 +32,14 @@ export async function syncContacts(
     const since = state.last_sync || new Date(Date.now() - 3600000).toISOString();
     const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
     const isWildcard = normalizedTenant === '*';
-    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const tenantParams = isWildcard ? [] : [normalizedTenant];
 
     let results: CustomerContact[] = [];
     try {
       const res = await db.prepare(
         `SELECT id, name, phone, email, tier, total_spent, visit_count, tenant_id,
-          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(orders.tenant_id, ''), 'default') = COALESCE(NULLIF(customers.tenant_id, ''), 'default')) as last_visit
+          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
          FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
       ).bind(since, ...tenantParams).all<CustomerContact>();
       results = (res.results || []).filter((r) =>
@@ -51,7 +51,7 @@ export async function syncContacts(
         try {
           const fallbackTenant = await db.prepare(
             `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count, tenant_id,
-              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(orders.tenant_id, ''), 'default') = COALESCE(NULLIF(customers.tenant_id, ''), 'default')) as last_visit
+              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
              FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
           ).bind(since, ...tenantParams).all<CustomerContact>();
           results = (fallbackTenant.results || []).filter((r) =>

@@ -2,26 +2,18 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 
 const PROMO_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions/use - Record promotion usage
   app.openapi(PromotionRoutes.use as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
-    const body = c.req.valid('json');
+    const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, any>;
+    const body = { ...rawBody, ...c.req.valid('json') };
     const now = new Date().toISOString();
 
     const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first()) as any;
@@ -56,11 +48,27 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       promotion.usage_limit_per_customer ?? promotion.per_customer_limit ?? promotion.max_uses_per_customer ?? 0
     );
     if (perCustomerLimit > 0 && callerCustomerId) {
-      const custUsage = await db
-        .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
-        .bind(body.promotionId, callerCustomerId)
-        .first<{ cnt: number }>()
-        .catch(() => null);
+      let custUsage: { cnt: number } | null = null;
+      if (tenantId && tenantId !== '*') {
+        try {
+          custUsage = await db
+            .prepare("SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(body.promotionId, callerCustomerId, tenantId)
+            .first<{ cnt: number }>();
+        } catch {
+          custUsage = await db
+            .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
+            .bind(body.promotionId, callerCustomerId)
+            .first<{ cnt: number }>()
+            .catch(() => null);
+        }
+      } else {
+        custUsage = await db
+          .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
+          .bind(body.promotionId, callerCustomerId)
+          .first<{ cnt: number }>()
+          .catch(() => null);
+      }
       if (Number(custUsage?.cnt ?? 0) >= perCustomerLimit) {
         return c.json({ success: false, error: 'Per-customer promotion usage limit reached' }, 400);
       }
@@ -95,11 +103,16 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const orderBaseAmount = orderRow && orderRow.id
-      ? Number(orderRow.subtotal ?? orderRow.total_amount ?? orderRow.total ?? 0)
-      : 0;
+    const fallbackBodyAmount = Number(
+      body.orderSubtotal ?? body.orderTotal ?? body.orderAmount ?? 0
+    );
+    const hasOrderAmount = Boolean((orderRow && orderRow.id) || fallbackBodyAmount > 0);
+    const orderBaseAmount =
+      orderRow && orderRow.id
+        ? Number(orderRow.subtotal ?? orderRow.total_amount ?? orderRow.total ?? 0)
+        : fallbackBodyAmount;
     const minOrderValue = Number(promotion.min_order_value ?? promotion.min_order_amount ?? promotion.min_order ?? 0);
-    if (orderRow && orderRow.id && minOrderValue > 0 && orderBaseAmount < minOrderValue) {
+    if (minOrderValue > 0 && (!hasOrderAmount || orderBaseAmount < minOrderValue)) {
       return c.json({ success: false, error: 'Order does not meet promotion minimum value' }, 400);
     }
 
@@ -113,16 +126,18 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       if (rawDiscountType === 'fixed' || rawDiscountType === 'fixed_amount' || rawDiscountType === 'amount') {
         maxAllowedDiscount = promoDiscountVal;
       } else if (rawDiscountType === 'percentage' || rawDiscountType === 'percent') {
-        if (orderRow && orderRow.id && orderBaseAmount > 0) {
+        if (hasOrderAmount && orderBaseAmount >= 0) {
           maxAllowedDiscount = Math.round((orderBaseAmount * promoDiscountVal) / 100);
         } else if (maxDiscountCap > 0) {
           maxAllowedDiscount = maxDiscountCap;
+        } else {
+          maxAllowedDiscount = 0;
         }
       }
       if (maxDiscountCap > 0 && maxDiscountCap < maxAllowedDiscount) {
         maxAllowedDiscount = maxDiscountCap;
       }
-      if (orderRow && orderRow.id && orderBaseAmount > 0 && orderBaseAmount < maxAllowedDiscount) {
+      if (hasOrderAmount && orderBaseAmount > 0 && orderBaseAmount < maxAllowedDiscount) {
         maxAllowedDiscount = orderBaseAmount;
       }
       if (Number.isFinite(maxAllowedDiscount) && Number(body.discountAmount) > maxAllowedDiscount) {
@@ -130,12 +145,25 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    // Check idempotency
+    // Check idempotency scoped to promotion_id
     if (body.idempotencyKey) {
-      const existing = await db.prepare(
-        'SELECT * FROM promotion_usages WHERE idempotency_key = ?'
-      ).bind(body.idempotencyKey).first();
-      if (existing) {
+      let existing: Record<string, unknown> | null = null;
+      try {
+        existing = await db
+          .prepare('SELECT * FROM promotion_usages WHERE idempotency_key = ? AND promotion_id = ?')
+          .bind(body.idempotencyKey, body.promotionId)
+          .first<Record<string, unknown>>();
+      } catch {
+        existing = await db
+          .prepare('SELECT * FROM promotion_usages WHERE idempotency_key = ?')
+          .bind(body.idempotencyKey)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+      }
+      if (
+        existing &&
+        (!existing.promotion_id || String(existing.promotion_id) === String(body.promotionId))
+      ) {
         return c.json({ success: false, error: 'Duplicate usage request' }, 409);
       }
     }
@@ -150,9 +178,22 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const usageId = crypto.randomUUID();
 
-    const usageUpdate = await db.prepare(
-      'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses)'
-    ).bind(now, body.promotionId).run();
+    let usageUpdate: any;
+    if (tenantId !== '*') {
+      try {
+        usageUpdate = await db.prepare(
+          "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses)"
+        ).bind(now, body.promotionId, tenantId).run();
+      } catch {
+        usageUpdate = await db.prepare(
+          'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses)'
+        ).bind(now, body.promotionId).run();
+      }
+    } else {
+      usageUpdate = await db.prepare(
+        'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses)'
+      ).bind(now, body.promotionId).run();
+    }
     if ((usageUpdate?.meta?.changes ?? 1) === 0) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 409);
     }
@@ -161,6 +202,9 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       `INSERT INTO promotion_usages (id, promotion_id, order_id, customer_id, discount_amount, idempotency_key, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(usageId, body.promotionId, body.orderId, user.customerId || user.id, body.discountAmount, body.idempotencyKey || null, now).run();
+    if (tenantId && tenantId !== '*') {
+      await db.prepare('UPDATE promotion_usages SET tenant_id = ? WHERE id = ?').bind(tenantId, usageId).run().catch(() => {});
+    }
 
     const auditMeta = JSON.stringify({ discountAmount: body.discountAmount, orderId: body.orderId });
     try {
@@ -206,7 +250,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions/summary - Get promotion summary
   app.openapi(PromotionRoutes.summary as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
 
     // Verify admin role

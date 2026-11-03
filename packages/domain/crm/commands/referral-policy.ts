@@ -33,10 +33,21 @@ export const DEFAULT_REFERRAL_POLICY: ReferralPolicy = {
  */
 export async function resolveReferralPolicy(
   kv?: import('@cloudflare/workers-types').KVNamespace,
+  tenantId?: string,
 ): Promise<ReferralPolicy> {
   if (!kv) return DEFAULT_REFERRAL_POLICY;
   try {
-    const raw = await kv.get('referral:policy');
+    const normTenant =
+      typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+        ? tenantId.trim()
+        : undefined;
+    let raw: string | null = null;
+    if (normTenant) {
+      raw = await kv.get(`referral:policy:${normTenant}`);
+    }
+    if (!raw) {
+      raw = await kv.get('referral:policy');
+    }
     if (!raw) return DEFAULT_REFERRAL_POLICY;
     const parsed = JSON.parse(raw) as Partial<ReferralPolicy>;
     return {

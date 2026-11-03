@@ -3,6 +3,7 @@
  * Routes each trigger through dedup, send, and log
  */
 import { createLogger } from '../../utils/logger';
+import { resolvePilotStore } from '../../middleware/tenant';
 import {
   deduplicate,
   logSend,
@@ -55,13 +56,15 @@ async function processTrigger(
   env: Record<string, unknown>,
   db: import('@cloudflare/workers-types').D1Database,
   trigger: CampaignTrigger,
-  customers: CampaignCustomer[]
+  customers: CampaignCustomer[],
+  tenantId: string
 ): Promise<TriggerResult> {
   let sent = 0;
 
   for (const customer of customers) {
     try {
-      const isDuplicate = await deduplicate(db, customer.id, trigger, 7);
+      const effectiveTenant = customer.tenant_id || tenantId;
+      const isDuplicate = await deduplicate(db, customer.id, trigger, 7, effectiveTenant);
       if (isDuplicate) {
         continue;
       }
@@ -87,7 +90,7 @@ async function processTrigger(
           to: recipient,
           subject: template.subject,
           body: channel === 'email' ? template.html : template.sms,
-          data: { customer_id: customer.id, name: customer.name, phone: customer.phone, email: customer.email, amount: customer.total_spent, days_left: 7 }
+          data: { customer_id: customer.id, name: customer.name, phone: customer.phone, email: customer.email, amount: customer.total_spent, days_left: 7, tenant_id: effectiveTenant }
         };
 
         let result: CampaignResult;
@@ -100,13 +103,13 @@ async function processTrigger(
           result = await sendCampaignEmail(env, message);
           break;
         case 'zalo':
-          result = await sendCampaignZalo(env, message);
+          result = await sendCampaignZalo(env, message, effectiveTenant);
           break;
         default:
           continue;
         }
 
-        await logSend(db, result);
+        await logSend(db, { ...result, tenant_id: effectiveTenant }, effectiveTenant);
         if (result.sent) {
           sent++;
           customerSent = true;
@@ -116,7 +119,7 @@ async function processTrigger(
 
       // For cashback expiry, also mark the customer
       if (trigger === 'cashback_expiry' && customerSent) {
-        await markExpiryNotified(db, [customer.id]);
+        await markExpiryNotified(db, [customer.id], effectiveTenant);
       }
     } catch (err) {
       log.error('processTrigger customer error', { customerId: customer.id, trigger, error: (err as Error).message });
@@ -135,14 +138,15 @@ export async function runCampaignTriggers(
     return { triggered: 0, sent: 0 };
   }
 
+  const tenantId = resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
   let totalTriggered = 0;
   let totalSent = 0;
 
   // Welcome — every 15 min
   try {
-    const welcome = await detectWelcomeCandidates(db);
+    const welcome = await detectWelcomeCandidates(db, tenantId);
     if (welcome.length > 0) {
-      const result = await processTrigger(env, db, 'welcome', welcome);
+      const result = await processTrigger(env, db, 'welcome', welcome, tenantId);
       totalTriggered += result.triggered;
       totalSent += result.sent;
     }
@@ -152,9 +156,9 @@ export async function runCampaignTriggers(
 
   // Birthday — daily
   try {
-    const birthday = await detectBirthdayCandidates(db);
+    const birthday = await detectBirthdayCandidates(db, tenantId);
     if (birthday.length > 0) {
-      const result = await processTrigger(env, db, 'birthday', birthday);
+      const result = await processTrigger(env, db, 'birthday', birthday, tenantId);
       totalTriggered += result.triggered;
       totalSent += result.sent;
     }
@@ -164,9 +168,9 @@ export async function runCampaignTriggers(
 
   // Winback — daily
   try {
-    const winback = await detectWinbackCandidates(db);
+    const winback = await detectWinbackCandidates(db, tenantId);
     if (winback.length > 0) {
-      const result = await processTrigger(env, db, 'winback', winback);
+      const result = await processTrigger(env, db, 'winback', winback, tenantId);
       totalTriggered += result.triggered;
       totalSent += result.sent;
     }
@@ -176,9 +180,9 @@ export async function runCampaignTriggers(
 
   // Post-visit — every 30 min
   try {
-    const postVisit = await detectPostVisitCandidates(db);
+    const postVisit = await detectPostVisitCandidates(db, tenantId);
     if (postVisit.length > 0) {
-      const result = await processTrigger(env, db, 'post_visit', postVisit);
+      const result = await processTrigger(env, db, 'post_visit', postVisit, tenantId);
       totalTriggered += result.triggered;
       totalSent += result.sent;
     }
@@ -188,9 +192,9 @@ export async function runCampaignTriggers(
 
   // Cashback expiry — daily
   try {
-    const cashback = await detectCashbackExpiry(db);
+    const cashback = await detectCashbackExpiry(db, tenantId);
     if (cashback.length > 0) {
-      const result = await processTrigger(env, db, 'cashback_expiry', cashback);
+      const result = await processTrigger(env, db, 'cashback_expiry', cashback, tenantId);
       totalTriggered += result.triggered;
       totalSent += result.sent;
     }

@@ -1,9 +1,10 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
-import { queryFirst } from '../../lib/db';
+import { getTenantId } from '../../lib/db';
 import {
   err,
   errorResponse,
+  readConfigRaw,
   writeConfig,
   type DindinContext,
 } from './types';
@@ -12,7 +13,8 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /config ──────────────────────────────────────────────────────────────
   router.get('/config', async (c) => {
     try {
-      const row = await queryFirst<{ config: string }>(c.env.AURA_DB, 'SELECT config FROM dindin_config LIMIT 1');
+      const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+      const row = await readConfigRaw(c.env, tenantId);
       if (!row?.config) {
         return c.json({ success: true, data: { menu: { sections: [] }, settings: {} } });
       }
@@ -44,6 +46,7 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
     try {
+      const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
       const body = await c.req.json<Record<string, unknown>>();
       const menuRaw = body.menu as Record<string, unknown> | undefined;
       if (!menuRaw || !Array.isArray(menuRaw.sections)) {
@@ -60,7 +63,7 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
           }
         }
       }
-      await writeConfig(c.env, JSON.stringify(body));
+      await writeConfig(c.env, JSON.stringify(body), tenantId);
       return c.json({ success: true } as const);
     } catch {
       return errorResponse(c as DindinContext, err('D06', 500, 'Lỗi ghi CSDL - vui lòng thử lại sau'));

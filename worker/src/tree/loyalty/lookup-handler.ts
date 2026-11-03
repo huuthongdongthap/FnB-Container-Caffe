@@ -117,24 +117,36 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   let lifetimeRow: { total: number } | null = null;
   try {
     lifetimeRow = await db.prepare(
-      'SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\')'
-    ).bind(customer.id).first<{ total: number }>();
+      "SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ? AND ct.type IN ('earn', 'bonus')"
+    ).bind(customer.id, tenantId).first<{ total: number }>();
   } catch {
-    lifetimeRow = await db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
-    ).bind(customer.id).first<{ total: number }>();
+    try {
+      lifetimeRow = await db.prepare(
+        'SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\')'
+      ).bind(customer.id).first<{ total: number }>();
+    } catch {
+      lifetimeRow = await db.prepare(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
+      ).bind(customer.id).first<{ total: number }>();
+    }
   }
 
   const sevenDays = new Date(Date.now() + 7 * 86400000).toISOString();
   let expiringRow: { total: number; cnt: number } | null = null;
   try {
     expiringRow = await db.prepare(
-      'SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime(\'now\')'
-    ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+      "SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ? AND ct.type IN ('earn', 'bonus') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime('now')"
+    ).bind(customer.id, tenantId, sevenDays).first<{ total: number; cnt: number }>();
   } catch {
-    expiringRow = await db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
-    ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+    try {
+      expiringRow = await db.prepare(
+        'SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime(\'now\')'
+      ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+    } catch {
+      expiringRow = await db.prepare(
+        'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
+      ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+    }
   }
 
   let nextTierRow: { tier_name: string; min_points: number } | null = null;

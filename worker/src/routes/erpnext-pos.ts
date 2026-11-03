@@ -3,13 +3,18 @@
  * Sales order creation, product availability, webhooks.
  */
 
-import { createErpnextClient, ErpnextClient } from '../clients/erpnext-client';
-import { createErpnextProductClient, type ProductEnv } from '../clients/erpnext-product-client';
+import { createErpnextClient, createErpnextClientWithKv, ErpnextClient } from '../clients/erpnext-client';
+import {
+  createErpnextProductClient,
+  createErpnextProductClientWithKv,
+  type ProductEnv,
+} from '../clients/erpnext-product-client';
 import { erpnextSalesOrderSchema, erpnextPosWebhookSchema, erpnextProductsBatchSyncSchema } from '../lib/validators';
 
 interface PosEnv {
   AURA_DB?: D1Database;
   AURA_KV?: KVNamespace;
+  AUTH_KV?: KVNamespace;
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;
   ERPNEXT_API_SECRET?: string;
@@ -43,8 +48,62 @@ interface _SalesOrderInput { // eslint-disable-line no-unused-vars
   notes?: string;
 }
 
-function getClient(env: PosEnv): ErpnextClient | null {
+async function getClient(env: PosEnv, tenantId?: string): Promise<ErpnextClient | null> {
+  if (env.AUTH_KV && typeof createErpnextClientWithKv === 'function') {
+    const kvClient = await createErpnextClientWithKv(
+      env as unknown as Parameters<typeof createErpnextClientWithKv>[0],
+      tenantId
+    );
+    if (kvClient) return kvClient;
+  }
   return createErpnextClient(env);
+}
+
+const PRODUCT_SYNC_ALLOWED_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor']);
+
+function extractRequestRole(request: Request): { hasAuthHeader: boolean; role: string | null } {
+  const roleHeader = (request.headers.get('x-user-role') || '').trim().toLowerCase();
+  if (roleHeader) {
+    return { hasAuthHeader: true, role: roleHeader };
+  }
+  const authHeader = (request.headers.get('Authorization') || request.headers.get('authorization') || '').trim();
+  let token = '';
+  if (authHeader.toLowerCase().startsWith('bearer ')) {
+    token = authHeader.slice(7).trim();
+  } else {
+    const cookieHeader = request.headers.get('Cookie') || request.headers.get('cookie') || '';
+    const match = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/);
+    if (match?.[1]) {
+      token = decodeURIComponent(match[1].trim());
+    }
+  }
+  if (!token) {
+    return { hasAuthHeader: false, role: null };
+  }
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) {
+      return { hasAuthHeader: true, role: null };
+    }
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(padded)) as { role?: unknown };
+    const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : null;
+    return { hasAuthHeader: true, role };
+  } catch {
+    return { hasAuthHeader: true, role: null };
+  }
+}
+
+async function getProductClient(env: PosEnv, tenantId?: string) {
+  if (env.AUTH_KV && typeof createErpnextProductClientWithKv === 'function') {
+    const kvProductClient = await createErpnextProductClientWithKv(
+      env as unknown as Parameters<typeof createErpnextProductClientWithKv>[0],
+      tenantId
+    );
+    if (kvProductClient) return kvProductClient;
+  }
+  return createErpnextProductClient(env as unknown as ProductEnv);
 }
 
 export async function handleErpnextPosRequest(
@@ -67,7 +126,7 @@ export async function handleErpnextPosRequest(
   try {
     // POST /api/erpnext-pos/sales-order — create sales order
     if (method === 'POST' && path === '/sales-order') {
-      const client = getClient(env);
+      const client = await getClient(env, tenantId);
       if (!client) {
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
@@ -105,7 +164,7 @@ export async function handleErpnextPosRequest(
     // GET /api/erpnext-pos/products/:code/availability
     if (method === 'GET' && path.startsWith('/products/') && path.endsWith('/availability')) {
       const itemCode = path.replace('/products/', '').replace('/availability', '');
-      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
+      const productClient = await getProductClient(env, tenantId);
       if (!productClient) {
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
@@ -116,7 +175,7 @@ export async function handleErpnextPosRequest(
 
     // GET /api/erpnext-pos/products/changed — delta sync
     if (method === 'GET' && path === '/products/changed') {
-      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
+      const productClient = await getProductClient(env, tenantId);
       if (!productClient) {
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
@@ -128,7 +187,16 @@ export async function handleErpnextPosRequest(
 
     // POST /api/erpnext-pos/products/sync — batch sync to local DB
     if (method === 'POST' && path === '/products/sync') {
-      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
+      const { hasAuthHeader, role } = extractRequestRole(request);
+      if (hasAuthHeader) {
+        if (!role || !PRODUCT_SYNC_ALLOWED_ROLES.has(role)) {
+          return json({ success: false, error: 'Forbidden' }, 403);
+        }
+      } else if ((env as Record<string, unknown>).JWT_SECRET) {
+        return json({ success: false, error: 'Unauthorized' }, 401);
+      }
+
+      const productClient = await getProductClient(env, tenantId);
       if (!productClient) {
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
@@ -138,7 +206,12 @@ export async function handleErpnextPosRequest(
       if (!parsed.success) {
         return json({ success: false, error: parsed.error.issues[0].message }, 400);
       }
-      const result = await productClient.syncProductsToLocal(env as unknown as ProductEnv, parsed.data.products);
+      const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
+      const result = await productClient.syncProductsToLocal(
+        env as unknown as ProductEnv,
+        parsed.data.products,
+        writeTenant
+      );
       return json({ success: true, data: result });
     }
 
@@ -166,12 +239,24 @@ export async function handleErpnextPosRequest(
         return json({ success: false, error: parsed.error.issues[0].message }, 400);
       }
       if (env.AURA_DB) {
-        await env.AURA_DB.prepare(
-          'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(
-          body.doctype || '', body.docname || '', body.action || '',
-          JSON.stringify(body), new Date().toISOString()
-        ).run();
+        const now = new Date().toISOString();
+        const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
+        const payloadStr = JSON.stringify(writeTenant !== 'default' ? { ...body, tenant_id: writeTenant } : body);
+        try {
+          await env.AURA_DB.prepare(
+            'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(
+            body.doctype || '', body.docname || '', body.action || '',
+            payloadStr, writeTenant, now
+          ).run();
+        } catch {
+          await env.AURA_DB.prepare(
+            'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, created_at) VALUES (?, ?, ?, ?, ?)'
+          ).bind(
+            body.doctype || '', body.docname || '', body.action || '',
+            payloadStr, now
+          ).run();
+        }
       }
       return json({ success: true, message: 'Webhook received' });
     }

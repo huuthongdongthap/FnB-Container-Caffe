@@ -6,21 +6,11 @@ import { sendZNS } from '../../tree/zalo/zns-sender';
 import { createLogger } from '../../utils/logger';
 import { broadcastSendSchema, zodErrorResponse } from '../../lib/validators';
 import { getTenantId } from '../../middleware/tenant';
+import { matchesTenantRow } from '../../lib/db';
 import { segmentSQL, type BroadcastCustomer } from './types';
 
 const log = createLogger({ route: 'broadcast' });
 const BROADCAST_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
-
-function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if (!row || typeof row !== 'object') return false;
-  const r = row as Record<string, unknown>;
-  if (r.tenant_id === undefined) {
-    return tenantId === 'default';
-  }
-  const rowTenant = typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default';
-  return rowTenant === tenantId;
-}
 
 function escapeHtml(raw: string): string {
   return raw
@@ -36,8 +26,12 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
   router.post('/send', async (c) => {
     const db = c.env.AURA_DB;
     const user = (c as unknown as { get?: (k: string) => { role?: string } | undefined }).get?.('user');
-    if (user?.role && !BROADCAST_ADMIN_ROLES.includes(user.role)) {
+    const role = user?.role ? String(user.role).toLowerCase() : '';
+    if (role && !BROADCAST_ADMIN_ROLES.includes(role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    if (!role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+      return c.json({ success: false, error: 'Authentication required' }, 401);
     }
     const tenantId = getTenantId(c);
 
@@ -63,20 +57,27 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
 
     // ── Lookup customers in segment ──
     const seg = segmentSQL(segment, tenantId);
-    const tenantAwareSql = seg.sql
-      .replace(/^SELECT DISTINCT c\./, 'SELECT DISTINCT c.tenant_id, c.')
-      .replace(/^SELECT id, name, phone, email/, 'SELECT id, name, phone, email, tenant_id');
+    const tenantCol = /FROM\s+customers\s+c\b/i.test(seg.sql) ? 'c.tenant_id' : 'tenant_id';
+    const hasWhere = /\bWHERE\b/i.test(seg.sql);
+    const needsTenantFilter = tenantId !== '*' && !/COALESCE\(NULLIF\(TRIM\(c\.tenant_id\),\s*''\),\s*'default'\)\s*=\s*\?/i.test(seg.sql);
+    const tenantClause = needsTenantFilter
+      ? `${hasWhere ? ' AND' : ' WHERE'} COALESCE(NULLIF(TRIM(${tenantCol}), ''), 'default') = ?`
+      : '';
+    const tenantAwareSql = `${seg.sql}${tenantClause}`;
+    const queryParams = [...(seg.params || []), ...(needsTenantFilter ? [tenantId] : [])];
     let customers: BroadcastCustomer[] = [];
     try {
-      const stmt = seg.params
-        ? db.prepare(tenantAwareSql).bind(...seg.params)
+      const stmt = queryParams.length > 0
+        ? db.prepare(tenantAwareSql).bind(...queryParams)
         : db.prepare(tenantAwareSql);
       const { results } = await stmt.all<BroadcastCustomer>();
       customers = results || [];
     } catch (err) {
       // Fallback for legacy test mocks without tenant_id, loyalty_tier, or date_of_birth
       const fallbackSeg = segmentSQL(segment);
-      let fallbackSql = fallbackSeg.sql;
+      let fallbackSql = fallbackSeg.sql
+        .replace(/,\s*c\.tenant_id\b/g, '')
+        .replace(/,\s*tenant_id\b/g, '');
       if (fallbackSql.includes('loyalty_tier')) {
         fallbackSql = fallbackSql.replace(/loyalty_tier/g, 'tier');
       } else if (fallbackSql.includes('date_of_birth')) {
@@ -150,7 +151,8 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
                         name: customer.name || '',
                         title: body.title ?? '',
                         message: body.message
-                      } as Record<string, string>
+                      } as Record<string, string>,
+                      tenantId: customer.tenant_id || tenantId
                     }
                   );
                   if (result.ok) {

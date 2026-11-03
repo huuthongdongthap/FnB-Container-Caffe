@@ -6,7 +6,7 @@ import { handleUpdateOrderStatus } from './orders-hono-handlers/kds-handlers';
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
-import { getTenantId, tenantMiddleware } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, tenantMiddleware } from '../middleware/tenant';
 import { getAdminOrders, getStats } from '@aura/domain-order';
 import { paymentRouter, nowPaymentsIPN } from '@aura/domain-payment';
 import { refundRouter } from './refunds';
@@ -87,9 +87,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   });
   app.get('/api/admin/orders', (c) => {
     const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
-    const isHQ = (user?.role === 'owner' || user?.role === 'admin') && (!user?.tenantId || user?.tenantId === 'default' || user?.tenantId === 'hq');
-    const requestedTenant = c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || undefined;
-    const effectiveTenant = isHQ ? requestedTenant : (user?.tenantId || getTenantId(c));
+    const isHQ = isHQSuperAdmin(user);
+    const requestedTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim() || undefined;
+    const effectiveTenant = isHQ ? (requestedTenant ? getTenantId(c) : undefined) : getTenantId(c);
     return getAdminOrders(c.req.raw, c.env, effectiveTenant);
   });
   // Every alias uses the same tenant-scoped state machine and compare-and-set.
@@ -108,9 +108,9 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   registerCronAdminRoutes(app);
 
   // Stats & Dashboard Overview
-  app.use('/api/stats', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/stats', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
   app.get('/api/stats', (c) => getStats(c.req.raw, c.env, getTenantId(c)));
-  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/dashboard/*', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
   app.get('/api/dashboard/overview', handleOverview);
 
   // Payment & Refunds
@@ -155,8 +155,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/chat', chatRouter);
 
   // Analytics & Observability
-  app.use('/api/analytics', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
-  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/analytics', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
+  app.use('/api/analytics/*', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
   app.route('/api/analytics', analyticsRouter);
   registerVitalsRoute(app);
 
@@ -180,8 +180,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/admin/loyalty', adminLoyaltyRouter);
   app.route('/api/admin-loyalty', adminLoyaltyRouter);
   app.get('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
-    const rawTenant = getTenantId(c);
-    const effectiveTenant = rawTenant === '*' ? 'default' : rawTenant;
+    const rawTenant = getTenantId(c).trim();
+    const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
     const tenantKey = `config:notification_settings:${effectiveTenant}`;
     const raw =
       (await c.env.AUTH_KV?.get(tenantKey)) ??
@@ -193,8 +193,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     });
   });
   app.patch('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
-    const rawTenant = getTenantId(c);
-    const effectiveTenant = rawTenant === '*' ? 'default' : rawTenant;
+    const rawTenant = getTenantId(c).trim();
+    const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
     const key = effectiveTenant === 'default' ? 'config:notification_settings' : `config:notification_settings:${effectiveTenant}`;
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
     const raw = await c.env.AUTH_KV?.get(key);
@@ -219,8 +219,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     await c.env.AUTH_KV?.put(key, JSON.stringify(next));
     return c.json({ success: true, ...next });
   });
-  app.use('/api/reports', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
-  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+  app.use('/api/reports', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
+  app.use('/api/reports/*', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
   app.route('/api/reports', reportsRouter);
 
   // Inventory Items (domain-inventory)

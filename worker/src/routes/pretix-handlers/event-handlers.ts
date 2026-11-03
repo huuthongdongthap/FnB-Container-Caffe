@@ -21,7 +21,8 @@ export function registerEventHandlers(router: Hono): void {
     if (queryOrg !== undefined && !isValidPretixId(queryOrg)) {
       return c.json({ success: false, error: 'Invalid organizer slug' }, 400);
     }
-    const isAuthenticated = Boolean(c.get?.('user' as never));
+    const user = c.get?.('user' as never) as { id?: string; role?: string } | undefined;
+    const isAuthenticated = Boolean(user && (user.id || user.role));
     const organizer = (env.PRETIX_ORGANIZER as string) || (isAuthenticated && queryOrg ? queryOrg : 'default');
 
     try {

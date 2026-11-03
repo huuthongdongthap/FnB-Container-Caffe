@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { verifyQRSignature } from 'worker/src/tree/qr/signer';
+import { matchesTenantRow } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { CafeTable } from '../model/table-types';
 
@@ -93,6 +94,18 @@ qrRouter.get('/:slug', async (c) => {
   }
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
+  }
+  const explicitTenant = (
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    ''
+  ).trim();
+  if (explicitTenant && explicitTenant !== '*' && 'tenant_id' in table && table.tenant_id !== undefined) {
+    if (!matchesTenantRow(table as unknown as Record<string, unknown>, explicitTenant)) {
+      return c.json({ success: false, error: 'Table not found' }, 404);
+    }
   }
 
   // Generate QR payload — deep link to ordering page with validated origin

@@ -44,8 +44,8 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
   const scope = staffTenant === undefined
     ? ''
     : staffTenant === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
   const values = staffTenant === undefined ? [orderId] : [orderId, staffTenant];
   const order = await db.prepare(`SELECT id, customer_id, status FROM orders WHERE id = ?${scope}`)
     .bind(...values).first<{ id: string; customer_id?: string | null; status: string }>();

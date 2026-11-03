@@ -1,4 +1,5 @@
-import { getTenantId } from '../../middleware/tenant';
+import { resolvePublicTenantId } from '../../middleware/tenant';
+import { matchesTenantRow } from '../../lib/db';
 
 export interface CategoryRow {
   id: string;
@@ -15,23 +16,14 @@ export interface CategoryRow {
 }
 
 export function resolveCatalogTenantId(c: any): string {
-  if (c.get?.('user')) {
-    return getTenantId(c);
-  }
-  const raw = (c.req.query?.('tenant_id') || c.req.header?.('X-Tenant-ID') || c.req.header?.('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') return 'default';
-  return raw;
+  return resolvePublicTenantId(c);
 }
 
 export function matchesCatalogTenant(row: unknown, tenantId: string): boolean {
   if (!row || typeof row !== 'object') return false;
-  if (!tenantId || tenantId === '*') return true;
-  const r = row as Record<string, unknown>;
-  if ('tenant_id' in r && r.tenant_id !== undefined) {
-    const rowTenant = r.tenant_id ? String(r.tenant_id) : 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
+  const clean = tenantId ? tenantId.trim() : '';
+  if (!clean || clean === '*') return true;
+  return matchesTenantRow(row as Record<string, unknown>, clean);
 }
 
 export function formatCategory(row: CategoryRow, locale: string = 'vi') {

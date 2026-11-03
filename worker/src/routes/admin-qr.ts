@@ -7,19 +7,11 @@ import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId } from '../middleware/tenant';
+import { matchesTenantRow } from '../lib/db';
 import { bulkGenerateSlugs } from '../tree/qr/generator';
 import { signQRUrl } from '../tree/qr/signer';
 import type { Env } from '../types/env';
 import type { CafeTable, QrCodeRow } from '@aura/domain-table';
-
-function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if (!row || typeof row !== 'object') return false;
-  const rec = row as Record<string, unknown>;
-  if (!('tenant_id' in rec) || rec.tenant_id === undefined) return tenantId === 'default';
-  const rowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() ? rec.tenant_id.trim() : 'default';
-  return rowTenant === tenantId;
-}
 
 function resolveSafeBaseUrl(c: { req: { header: (name: string) => string | undefined }; env: Env }): string {
   const configured = typeof (c.env as unknown as Record<string, unknown>).PUBLIC_URL === 'string'
@@ -72,26 +64,53 @@ adminQRRouter.get('/tables', async(c) => {
   let allTables: CafeTable[] = [];
   try {
     const res = await db
-      .prepare('SELECT * FROM cafe_tables ORDER BY zone, table_number')
+      .prepare("SELECT * FROM cafe_tables WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY zone, table_number")
+      .bind(tenantId, tenantId)
       .all<CafeTable>();
     allTables = res.results || [];
   } catch {
-    const res = await db
-      .prepare('SELECT * FROM cafe_tables ORDER BY table_number')
-      .all<CafeTable>();
-    allTables = res.results || [];
+    try {
+      const res = await db
+        .prepare('SELECT * FROM cafe_tables ORDER BY zone, table_number')
+        .all<CafeTable>();
+      allTables = res.results || [];
+    } catch {
+      const res = await db
+        .prepare('SELECT * FROM cafe_tables ORDER BY table_number')
+        .all<CafeTable>();
+      allTables = res.results || [];
+    }
   }
-  const tables = allTables.filter((t) => matchesTenantRow(t, tenantId));
+  const tables = allTables.filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
 
-  // Fetch existing QR codes
+  // Fetch existing QR codes scoped to current tenant's tables
   let qrRows: QrCodeRow[] = [];
-  try {
-    const res = await db
-      .prepare('SELECT table_id, slug FROM table_qr_codes')
-      .all<QrCodeRow>();
-    qrRows = res.results || [];
-  } catch {
-    qrRows = [];
+  if (tables.length > 0) {
+    try {
+      if (tenantId === '*') {
+        const res = await db
+          .prepare('SELECT table_id, slug FROM table_qr_codes')
+          .all<QrCodeRow>();
+        qrRows = res.results || [];
+      } else {
+        const placeholders = tables.map(() => '?').join(', ');
+        const tableIds = tables.map((t) => t.id);
+        const res = await db
+          .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+          .bind(...tableIds)
+          .all<QrCodeRow>();
+        qrRows = res.results || [];
+      }
+    } catch {
+      try {
+        const res = await db
+          .prepare('SELECT table_id, slug FROM table_qr_codes')
+          .all<QrCodeRow>();
+        qrRows = res.results || [];
+      } catch {
+        qrRows = [];
+      }
+    }
   }
 
   const slugMap = new Map<string | number, string>();
@@ -108,9 +127,14 @@ adminQRRouter.get('/tables', async(c) => {
     generated.forEach((v, k) => slugMap.set(k, v));
     // Re-fetch after upsert
     try {
-      const { results: updatedQR } = await db
-        .prepare('SELECT table_id, slug FROM table_qr_codes')
-        .all<QrCodeRow>();
+      const placeholders = tables.map(() => '?').join(', ');
+      const tableIds = tables.map((t) => t.id);
+      const { results: updatedQR } = tenantId === '*'
+        ? await db.prepare('SELECT table_id, slug FROM table_qr_codes').all<QrCodeRow>()
+        : await db
+            .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+            .bind(...tableIds)
+            .all<QrCodeRow>();
       (updatedQR || []).forEach((r) => {
         slugMap.set(r.table_id, r.slug);
         slugMap.set(String(r.table_id), r.slug);
@@ -139,19 +163,40 @@ adminQRRouter.get('/tables', async(c) => {
 });
 
 // ── POST /api/admin/qr/regenerate — clear + re-generate tenant slugs ──
-adminQRRouter.post('/regenerate', async(c) => {
+adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
+  const user = c.get('user' as never) as { role?: string } | undefined;
+  if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c);
-  const { results: allTables } = await db
-    .prepare('SELECT * FROM cafe_tables')
-    .all<CafeTable>();
-  const tables = (allTables || []).filter((t) => matchesTenantRow(t, tenantId));
+  let allTables: CafeTable[] = [];
+  try {
+    const res = await db
+      .prepare("SELECT * FROM cafe_tables WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+      .bind(tenantId, tenantId)
+      .all<CafeTable>();
+    allTables = res.results || [];
+  } catch {
+    const res = await db
+      .prepare('SELECT * FROM cafe_tables')
+      .all<CafeTable>();
+    allTables = res.results || [];
+  }
+  const tables = (allTables || []).filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
   try {
     if (tenantId === '*') {
       await db.prepare('DELETE FROM table_qr_codes').run();
-    } else {
-      for (const t of tables) {
-        await db.prepare('DELETE FROM table_qr_codes WHERE table_id = ?').bind(t.id).run();
+    } else if (tables.length > 0) {
+      const deleteStmts = tables.map((t) =>
+        db.prepare('DELETE FROM table_qr_codes WHERE table_id = ?').bind(t.id)
+      );
+      if (typeof db.batch === 'function') {
+        await db.batch(deleteStmts);
+      } else {
+        for (const stmt of deleteStmts) {
+          await stmt.run();
+        }
       }
     }
   } catch {
@@ -173,27 +218,53 @@ adminQRRouter.get('/:slug/download', async(c) => {
   const slug = c.req.param('slug');
   const safeSlug = String(slug || '').replace(/[^A-Za-z0-9._-]/g, '_');
 
-  // Verify slug exists
-  let qrRowRaw: unknown = null;
+  // Verify slug exists and belongs to a table in the current tenant
+  let resolvedTableId: number | string | null = null;
+  let joinedLookupResolved = false;
   try {
-    qrRowRaw = await db
-      .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
-      .bind(slug)
-      .first();
-  } catch {
-    qrRowRaw = null;
-  }
-  const qrRow = qrRowRaw as { table_id: number | string } | null;
-  if (!qrRow) {
-    return c.json({ success: false, error: 'Not found' }, 404);
-  }
-  try {
-    const tbl = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(qrRow.table_id).first();
-    if (!tbl || !matchesTenantRow(tbl, tenantId)) {
-      return c.json({ success: false, error: 'Not found' }, 404);
+    const joined = await db
+      .prepare(
+        `SELECT q.table_id, q.slug, t.*
+         FROM table_qr_codes q
+         JOIN cafe_tables t ON t.id = q.table_id
+         WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+      )
+      .bind(slug, tenantId, tenantId)
+      .first<Record<string, unknown>>();
+    if (joined && joined.table_id !== undefined && 'table_number' in joined) {
+      if (!matchesTenantRow(joined, tenantId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      resolvedTableId = joined.table_id as number | string;
+      joinedLookupResolved = true;
     }
   } catch {
-    return c.json({ success: false, error: 'Not found' }, 404);
+    // Fall back to two-step lookup when join or tenant_id column is unsupported
+  }
+
+  if (!joinedLookupResolved) {
+    let qrRowRaw: unknown = null;
+    try {
+      qrRowRaw = await db
+        .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
+        .bind(slug)
+        .first();
+    } catch {
+      qrRowRaw = null;
+    }
+    const qrRow = qrRowRaw as { table_id: number | string } | null;
+    if (!qrRow) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    try {
+      const tbl = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(qrRow.table_id).first();
+      if (!tbl || !matchesTenantRow(tbl as Record<string, unknown>, tenantId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      resolvedTableId = qrRow.table_id;
+    } catch {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
   }
 
   const baseUrl = resolveSafeBaseUrl(c);
@@ -207,7 +278,7 @@ adminQRRouter.get('/:slug/download', async(c) => {
       'Content-Type': 'image/png',
       'Content-Disposition': `attachment; filename="qr-${safeSlug}.png"`,
       'X-Slug': safeSlug,
-      'X-Table-ID': String(qrRow.table_id)
+      'X-Table-ID': String(resolvedTableId)
     }
   });
 });
@@ -221,32 +292,54 @@ adminQRRouter.get('/:slug/png', async(c) => {
   }
 
   const slug = c.req.param('slug');
-
-  // Verify slug exists
-  let qrRow: { table_id: number | string } | null = null;
-  try {
-    qrRow = await db
-      .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
-      .bind(slug)
-      .first<{ table_id: number | string }>();
-  } catch {
-    qrRow = null;
-  }
-  if (!qrRow) {
-    return c.json({ success: false, error: 'Not found' }, 404);
-  }
-
-  // Verify table still exists and belongs to current tenant
+  const safeSlug = String(slug || '').replace(/[^A-Za-z0-9._-]/g, '_');
   const tenantId = getTenantId(c);
-  const tableRow = await db
-    .prepare(
-      'SELECT * FROM cafe_tables WHERE id = ?'
-    )
-    .bind(qrRow.table_id)
-    .first<CafeTable>();
-  const table = (tableRow ?? null);
-  if (!table || !matchesTenantRow(table, tenantId)) {
-    return c.json({ success: false, error: 'Table not found' }, 404);
+
+  let table: CafeTable | null = null;
+  let joinedPngResolved = false;
+  try {
+    const joined = await db
+      .prepare(
+        `SELECT q.table_id, q.slug, t.*
+         FROM table_qr_codes q
+         JOIN cafe_tables t ON t.id = q.table_id
+         WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+      )
+      .bind(slug, tenantId, tenantId)
+      .first<Record<string, unknown>>();
+    if (joined && joined.id !== undefined && 'table_number' in joined) {
+      if (!matchesTenantRow(joined, tenantId)) {
+        return c.json({ success: false, error: 'Table not found' }, 404);
+      }
+      table = joined as unknown as CafeTable;
+      joinedPngResolved = true;
+    }
+  } catch {
+    // Fall back to two-step lookup when join or tenant_id column is unsupported
+  }
+
+  if (!joinedPngResolved) {
+    let qrRow: { table_id: number | string } | null = null;
+    try {
+      qrRow = await db
+        .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
+        .bind(slug)
+        .first<{ table_id: number | string }>();
+    } catch {
+      qrRow = null;
+    }
+    if (!qrRow) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+
+    const tableRow = await db
+      .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+      .bind(qrRow.table_id)
+      .first<CafeTable>();
+    table = tableRow ?? null;
+    if (!table || !matchesTenantRow(table as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Table not found' }, 404);
+    }
   }
 
   // QR payload: deep link to public ordering page for that table/slug.
@@ -264,9 +357,9 @@ adminQRRouter.get('/:slug/png', async(c) => {
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(
         db.prepare(
-          'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
+          'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ? AND table_id = ?'
         )
-          .bind(slug)
+          .bind(slug, table!.id)
           .run()
           .catch(() => {})
       );
@@ -280,8 +373,8 @@ adminQRRouter.get('/:slug/png', async(c) => {
     headers: {
       'Content-Type': 'image/png',
       'Cache-Control': 'no-store',
-      'X-Table-ID': String(table.id),
-      'X-Slug': slug
+      'X-Table-ID': String(table!.id),
+      'X-Slug': safeSlug
     }
   });
 });

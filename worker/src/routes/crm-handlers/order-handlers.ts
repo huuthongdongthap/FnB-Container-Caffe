@@ -43,17 +43,23 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return c.json({ success: false, error: 'items array is required' }, 400);
     }
-    if (!body.customerPhone) {
-      return c.json({ success: false, error: 'customerPhone is required' }, 400);
+    if (!body.customerPhone || typeof body.customerPhone !== 'string' || !body.customerPhone.trim() || body.customerPhone.trim().length > 20) {
+      return c.json({ success: false, error: 'customerPhone is required and must be at most 20 characters' }, 400);
     }
 
     // Customer role: use own id. Staff/owner: must pass customerId in body.
-    const customerId = user.role === 'customer' ? user.id : (body.customerId ?? user.id);
-    const tenantId = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
-    if (user.role !== 'customer' && body.customerId) {
+    const isSelfCustomer = user.role === 'customer';
+    const rawCustomerId = isSelfCustomer ? user.id : (typeof body.customerId === 'string' ? body.customerId.trim() : '');
+    if (!rawCustomerId) {
+      return c.json({ success: false, error: 'customerId is required for staff-placed CRM orders' }, 400);
+    }
+    const customerId = rawCustomerId;
+    const rawTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
+    const tenantId = (rawTenant || '').trim() || 'default';
+    if (!isSelfCustomer && customerId) {
       if (tenantId !== '*') {
         try {
-          const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(body.customerId).first<{ tenant_id?: string | null }>();
+          const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(customerId).first<{ tenant_id?: string | null }>();
           if (custRow) {
             const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
             if (custTenant !== tenantId) {
@@ -69,7 +75,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
         }
       }
     }
-    const customerPhone = body.customerPhone;
+    const customerPhone = body.customerPhone.trim();
 
     const result = await placeOrder(db, {
       customerId,
@@ -82,15 +88,16 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     });
 
     if (!result.ok) {
-      const err = result as { ok: false; error: string; code: string };
+      const err = result as { ok: false; error: string; code: string; status?: number };
       const statusByCode: Record<string, number> = {
         empty_items: 400,
         invalid_item: 400,
+        invalid_items: 400,
         invalid_quantity: 400,
         invalid_channel: 400,
         d1_error: 500,
       };
-      return c.json({ success: false, error: err.error }, (statusByCode[err.code] ?? 400) as any);
+      return c.json({ success: false, error: err.error }, (err.status ?? statusByCode[err.code] ?? 400) as any);
     }
 
     if (c.env?.AUTH_KV) {
@@ -138,7 +145,8 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'order id is required' }, 400);
     }
 
-    const tenantId = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
+    const rawOrderTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
+    const tenantId = (rawOrderTenant || '').trim() || 'default';
     if (user.role !== 'customer') {
       if (tenantId !== '*') {
         try {

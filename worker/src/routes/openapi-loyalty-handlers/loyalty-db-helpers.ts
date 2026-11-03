@@ -1,3 +1,5 @@
+import { matchesTenantRow } from '../../lib/db';
+
 export async function writeLoyaltyAuditLog(
   db: any,
   userId: string,
@@ -33,13 +35,9 @@ export async function writeLoyaltyAuditLog(
 
 export function matchesLoyaltyTenant(row: unknown, tenantId: string = '*'): boolean {
   if (!row || typeof row !== 'object') return false;
-  if (!tenantId || tenantId === '*') return true;
-  const r = row as Record<string, unknown>;
-  if ('tenant_id' in r && r.tenant_id !== undefined) {
-    const rowTenant = r.tenant_id ? String(r.tenant_id).trim() || 'default' : 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
+  const clean = tenantId ? tenantId.trim() : '';
+  if (!clean || clean === '*') return true;
+  return matchesTenantRow(row as Record<string, unknown>, clean);
 }
 
 export async function checkRewardTenant(
@@ -48,10 +46,10 @@ export async function checkRewardTenant(
   tenantId: string = '*'
 ): Promise<boolean> {
   if (!reward || typeof reward !== 'object') return false;
-  if (!tenantId || tenantId === '*') return true;
+  const cleanTenant = tenantId ? tenantId.trim() : '';
+  if (!cleanTenant || cleanTenant === '*') return true;
   if ('tenant_id' in reward && reward.tenant_id !== undefined) {
-    const rowTenant = reward.tenant_id ? String(reward.tenant_id).trim() || 'default' : 'default';
-    return rowTenant === tenantId;
+    return matchesTenantRow(reward, cleanTenant);
   }
   const rewardId = reward.id ? String(reward.id) : '';
   if (rewardId) {
@@ -71,7 +69,7 @@ export async function checkRewardTenant(
             const parsed = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : rawMeta;
             const metaTenant = parsed?.tenant_id ?? parsed?.tenantId;
             if (metaTenant && String(metaTenant).trim() !== '') {
-              return String(metaTenant).trim() === tenantId;
+              return String(metaTenant).trim() === cleanTenant;
             }
           } catch {
             // Ignore malformed audit metadata
@@ -86,7 +84,7 @@ export async function checkRewardTenant(
             .catch(() => null);
           if (creator && creator.tenant_id !== undefined) {
             const creatorTenant = creator.tenant_id ? String(creator.tenant_id).trim() || 'default' : 'default';
-            return creatorTenant === tenantId;
+            return creatorTenant === cleanTenant;
           }
         }
       }
@@ -94,15 +92,20 @@ export async function checkRewardTenant(
       // Optional audit_logs table
     }
   }
-  return tenantId === 'default';
+  return cleanTenant === 'default';
 }
 
 export async function getLoyaltyAccountWithFallback(
   db: any,
   customerId: string,
-  now = new Date().toISOString(),
-  tenantId: string = '*'
-): Promise<{ account: any | null; usingCustomersFallback: boolean }> {
+  nowOrTenantId = new Date().toISOString(),
+  tenantIdArg: string = '*'
+): Promise<{ account: any | null; usingCustomersFallback: boolean; [key: string]: any }> {
+  const isIsoDate = typeof nowOrTenantId === 'string' && /^\d{4}-\d{2}-\d{2}/.test(nowOrTenantId);
+  const now = isIsoDate ? nowOrTenantId : new Date().toISOString();
+  const tenantId = !isIsoDate && tenantIdArg === '*' && typeof nowOrTenantId === 'string' && nowOrTenantId.trim()
+    ? nowOrTenantId.trim()
+    : tenantIdArg;
   let account: any = null;
   let usingCustomersFallback = false;
   let loyaltyAccountsTableExists = true;
@@ -153,6 +156,10 @@ export async function getLoyaltyAccountWithFallback(
         }
         if (loyaltyAccountsTableExists) {
           const accountId = `la_${cust.id}`;
+          const effectiveAccountTenant =
+            tenantId && tenantId !== '*'
+              ? tenantId
+              : (cust.tenant_id && String(cust.tenant_id).trim()) || 'default';
           await db.prepare(
             `INSERT OR IGNORE INTO loyalty_accounts (
               id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
@@ -169,8 +176,8 @@ export async function getLoyaltyAccountWithFallback(
             cust.created_at ?? now,
             cust.updated_at ?? now
           ).run().catch(() => {});
-          if (tenantId !== '*' && tenantId !== 'default') {
-            await db.prepare('UPDATE loyalty_accounts SET tenant_id = ? WHERE id = ?').bind(tenantId, accountId).run().catch(() => {});
+          if (effectiveAccountTenant && effectiveAccountTenant !== '*') {
+            await db.prepare('UPDATE loyalty_accounts SET tenant_id = ? WHERE id = ?').bind(effectiveAccountTenant, accountId).run().catch(() => {});
           }
           account = await db.prepare('SELECT * FROM loyalty_accounts WHERE customer_id = ?').bind(customerId).first().catch(() => null);
         }
@@ -184,54 +191,289 @@ export async function getLoyaltyAccountWithFallback(
     }
   }
 
-  return { account, usingCustomersFallback };
+  return account
+    ? Object.assign({ account, usingCustomersFallback }, account)
+    : { account: null, usingCustomersFallback };
+}
+
+const accountSyncLocks = new Map<string, Promise<void>>();
+
+export async function resolveTierForPoints(db: any, points: number): Promise<string> {
+  try {
+    const res = (await db
+      .prepare('SELECT tier_name, min_points FROM loyalty_tiers ORDER BY min_points DESC')
+      .all()) as { results?: Array<{ tier_name: string; min_points: number }> } | null;
+    if (res?.results && res.results.length > 0) {
+      const validTiers = res.results.filter(
+        (r) => typeof r?.tier_name === 'string' && typeof r?.min_points === 'number'
+      );
+      if (validTiers.length > 0) {
+        for (const row of validTiers) {
+          if (points >= row.min_points) {
+            return row.tier_name;
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback when loyalty_tiers is absent
+  }
+
+  try {
+    const res = (await db
+      .prepare('SELECT tier, min_points FROM loyalty_tier_configs ORDER BY min_points DESC')
+      .all()) as { results?: Array<{ tier: string; min_points: number }> } | null;
+    if (res?.results && res.results.length > 0) {
+      const validTiers = res.results.filter(
+        (r) => typeof r?.tier === 'string' && typeof r?.min_points === 'number'
+      );
+      if (validTiers.length > 0) {
+        for (const row of validTiers) {
+          if (points >= row.min_points) {
+            return row.tier;
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback to static thresholds
+  }
+
+  if (points >= 5000) return 'platinum';
+  if (points >= 2000) return 'gold';
+  if (points >= 500) return 'silver';
+  return 'bronze';
 }
 
 export async function syncLoyaltyAccountAndCustomerBalance(
   db: any,
-  params: {
-    accountId: string;
-    customerId: string;
-    newBalance: number;
-    lifetimeDelta?: number;
-    now: string;
-  }
-): Promise<void> {
-  const { accountId, customerId, newBalance, lifetimeDelta = 0, now } = params;
-  try {
-    if (lifetimeDelta > 0) {
-      await db.prepare(
-        `UPDATE loyalty_accounts
-         SET current_points = ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, last_activity_at = ?, updated_at = ?
-         WHERE id = ? OR customer_id = ?`
-      ).bind(newBalance, lifetimeDelta, now, now, accountId, customerId).run();
-    } else {
-      await db.prepare(
-        `UPDATE loyalty_accounts
-         SET current_points = ?, last_activity_at = ?, updated_at = ?
-         WHERE id = ? OR customer_id = ?`
-      ).bind(newBalance, now, now, accountId, customerId).run();
-    }
-  } catch {
-    // Fallback when loyalty_accounts table is absent
-  }
+  paramsOrCustomerId:
+    | {
+        accountId: string;
+        customerId: string;
+        newBalance: number;
+        pointsDelta?: number;
+        lifetimeDelta?: number;
+        tenantId?: string;
+        now: string;
+      }
+    | string,
+  positionalBalance?: number,
+  positionalLifetime?: number,
+  _positionalTier?: string,
+  positionalTenantId?: string
+): Promise<number> {
+  const params =
+    typeof paramsOrCustomerId === 'string'
+      ? {
+          accountId: `la_${paramsOrCustomerId}`,
+          customerId: paramsOrCustomerId,
+          newBalance: Number(positionalBalance ?? 0),
+          lifetimeDelta: Number(positionalLifetime ?? 0),
+          tenantId: positionalTenantId ?? '*',
+          now: new Date().toISOString(),
+        }
+      : paramsOrCustomerId;
+  const { accountId, customerId, newBalance, pointsDelta, lifetimeDelta = 0, tenantId = '*', now } = params;
+  const hasRelativeDelta = typeof pointsDelta === 'number' && Number.isFinite(pointsDelta);
+  const preDeltaBalance = hasRelativeDelta ? newBalance - Number(pointsDelta) : newBalance;
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
+  const lockKey = `${accountId}:${customerId}`;
+  const prevLock = accountSyncLocks.get(lockKey) ?? Promise.resolve();
 
-  try {
-    if (lifetimeDelta > 0) {
-      await db.prepare(
-        `UPDATE customers
-         SET loyalty_points = ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
-         WHERE id = ?`
-      ).bind(newBalance, lifetimeDelta, now, customerId).run();
-    } else {
-      await db.prepare(
-        `UPDATE customers
-         SET loyalty_points = ?, updated_at = ?
-         WHERE id = ?`
-      ).bind(newBalance, now, customerId).run();
+  const runSync = prevLock.then(async () => {
+    let resolvedBalance = newBalance;
+    let effectiveLifetime = Math.max(0, newBalance);
+    const acctPointsExpr = hasRelativeDelta ? 'MAX(0, COALESCE(current_points, 0) + ?)' : '?';
+    const acctPointsBind = hasRelativeDelta ? Number(pointsDelta) : newBalance;
+    try {
+      if (lifetimeDelta > 0) {
+        if (effectiveTenant) {
+          try {
+            await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = ${acctPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, last_activity_at = ?, updated_at = ?
+               WHERE (id = ? OR customer_id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(acctPointsBind, lifetimeDelta, now, now, accountId, customerId, effectiveTenant).run();
+          } catch {
+            await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = ${acctPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, last_activity_at = ?, updated_at = ?
+               WHERE id = ? OR customer_id = ?`
+            ).bind(acctPointsBind, lifetimeDelta, now, now, accountId, customerId).run();
+          }
+        } else {
+          await db.prepare(
+            `UPDATE loyalty_accounts
+             SET current_points = ${acctPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, last_activity_at = ?, updated_at = ?
+             WHERE id = ? OR customer_id = ?`
+          ).bind(acctPointsBind, lifetimeDelta, now, now, accountId, customerId).run();
+        }
+      } else {
+        if (effectiveTenant) {
+          try {
+            await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = ${acctPointsExpr}, last_activity_at = ?, updated_at = ?
+               WHERE (id = ? OR customer_id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(acctPointsBind, now, now, accountId, customerId, effectiveTenant).run();
+          } catch {
+            await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = ${acctPointsExpr}, last_activity_at = ?, updated_at = ?
+               WHERE id = ? OR customer_id = ?`
+            ).bind(acctPointsBind, now, now, accountId, customerId).run();
+          }
+        } else {
+          await db.prepare(
+            `UPDATE loyalty_accounts
+             SET current_points = ${acctPointsExpr}, last_activity_at = ?, updated_at = ?
+             WHERE id = ? OR customer_id = ?`
+          ).bind(acctPointsBind, now, now, accountId, customerId).run();
+        }
+      }
+      const accRow = (await db
+        .prepare('SELECT current_points, lifetime_points FROM loyalty_accounts WHERE customer_id = ?')
+        .bind(customerId)
+        .first()
+        .catch(() => null)) as { current_points?: number; lifetime_points?: number } | null;
+      if (accRow) {
+        if (hasRelativeDelta && typeof accRow.current_points === 'number' && Number(accRow.current_points) !== preDeltaBalance) {
+          resolvedBalance = Number(accRow.current_points);
+        }
+        effectiveLifetime = Math.max(
+          effectiveLifetime,
+          resolvedBalance,
+          Number(accRow.lifetime_points ?? accRow.current_points ?? resolvedBalance)
+        );
+      }
+    } catch {
+      // Fallback when loyalty_accounts table is absent
     }
-  } catch {
-    // Ignore when customers table lacks columns in minimal test fixtures
+
+    const custPointsExpr = hasRelativeDelta ? 'MAX(0, COALESCE(loyalty_points, 0) + ?)' : '?';
+    const custPointsBind = hasRelativeDelta ? Number(pointsDelta) : newBalance;
+    try {
+      if (lifetimeDelta > 0) {
+        if (effectiveTenant) {
+          try {
+            await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = ${custPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(custPointsBind, lifetimeDelta, now, customerId, effectiveTenant).run();
+          } catch {
+            await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = ${custPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
+               WHERE id = ?`
+            ).bind(custPointsBind, lifetimeDelta, now, customerId).run();
+          }
+        } else {
+          await db.prepare(
+            `UPDATE customers
+             SET loyalty_points = ${custPointsExpr}, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
+             WHERE id = ?`
+          ).bind(custPointsBind, lifetimeDelta, now, customerId).run();
+        }
+      } else {
+        if (effectiveTenant) {
+          try {
+            await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = ${custPointsExpr}, updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(custPointsBind, now, customerId, effectiveTenant).run();
+          } catch {
+            await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = ${custPointsExpr}, updated_at = ?
+               WHERE id = ?`
+            ).bind(custPointsBind, now, customerId).run();
+          }
+        } else {
+          await db.prepare(
+            `UPDATE customers
+             SET loyalty_points = ${custPointsExpr}, updated_at = ?
+             WHERE id = ?`
+          ).bind(custPointsBind, now, customerId).run();
+        }
+      }
+      const custRow = (await db
+        .prepare('SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?')
+        .bind(customerId)
+        .first()
+        .catch(() => null)) as { loyalty_points?: number; lifetime_points?: number } | null;
+      if (custRow) {
+        if (hasRelativeDelta && resolvedBalance === newBalance && typeof custRow.loyalty_points === 'number' && Number(custRow.loyalty_points) !== preDeltaBalance) {
+          resolvedBalance = Number(custRow.loyalty_points);
+        }
+        effectiveLifetime = Math.max(
+          effectiveLifetime,
+          resolvedBalance,
+          Number(custRow.lifetime_points ?? custRow.loyalty_points ?? resolvedBalance)
+        );
+      }
+    } catch {
+      // Ignore when customers table lacks columns in minimal test fixtures
+    }
+
+    const newTier = await resolveTierForPoints(db, effectiveLifetime);
+    try {
+      if (effectiveTenant) {
+        try {
+          await db
+            .prepare("UPDATE loyalty_accounts SET tier = ?, updated_at = ? WHERE (id = ? OR customer_id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(newTier, now, accountId, customerId, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare('UPDATE loyalty_accounts SET tier = ?, updated_at = ? WHERE id = ? OR customer_id = ?')
+            .bind(newTier, now, accountId, customerId)
+            .run();
+        }
+      } else {
+        await db
+          .prepare('UPDATE loyalty_accounts SET tier = ?, updated_at = ? WHERE id = ? OR customer_id = ?')
+          .bind(newTier, now, accountId, customerId)
+          .run();
+      }
+    } catch {
+      // Ignore when loyalty_accounts table is absent
+    }
+    try {
+      if (effectiveTenant) {
+        try {
+          await db
+            .prepare("UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(newTier, now, customerId, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+            .bind(newTier, now, customerId)
+            .run();
+        }
+      } else {
+        await db
+          .prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+          .bind(newTier, now, customerId)
+          .run();
+      }
+    } catch {
+      // Ignore when customers table lacks loyalty_tier in minimal test fixtures
+    }
+    return resolvedBalance;
+  });
+
+  const lockPromise = runSync.then(() => {}).catch(() => {});
+  accountSyncLocks.set(lockKey, lockPromise);
+  try {
+    return await runSync;
+  } finally {
+    if (accountSyncLocks.get(lockKey) === lockPromise) {
+      accountSyncLocks.delete(lockKey);
+    }
   }
 }
 
@@ -241,8 +483,10 @@ export async function recordLoyaltyTransactionDualWrite(
     txId: string;
     accountId: string;
     customerId: string;
-    type: string;
-    points: number;
+    type?: string;
+    txType?: string;
+    points?: number;
+    pointsDelta?: number;
     balanceAfter: number;
     orderId?: string | null;
     rewardId?: string | null;
@@ -250,15 +494,18 @@ export async function recordLoyaltyTransactionDualWrite(
     reason?: string | null;
     idempotencyKey?: string | null;
     createdBy?: string | null;
-    now: string;
+    tenantId?: string;
+    now?: string;
   }
 ): Promise<void> {
   const {
     txId,
     accountId,
     customerId,
-    type,
-    points,
+    type: rawType,
+    txType,
+    points: rawPoints,
+    pointsDelta,
     balanceAfter,
     orderId = null,
     rewardId = null,
@@ -266,8 +513,12 @@ export async function recordLoyaltyTransactionDualWrite(
     reason = null,
     idempotencyKey = null,
     createdBy = null,
-    now,
+    tenantId = '*',
+    now = new Date().toISOString(),
   } = params;
+  const type = rawType ?? txType ?? 'earn';
+  const points = rawPoints ?? pointsDelta ?? 0;
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
 
   await db.prepare(
     `INSERT INTO loyalty_transactions (
@@ -289,6 +540,9 @@ export async function recordLoyaltyTransactionDualWrite(
     createdBy,
     now
   ).run();
+  if (effectiveTenant) {
+    await db.prepare('UPDATE loyalty_transactions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, txId).run().catch(() => {});
+  }
 
   try {
     await db.prepare(
@@ -308,6 +562,9 @@ export async function recordLoyaltyTransactionDualWrite(
       now,
       customerId
     ).run();
+    if (effectiveTenant) {
+      await db.prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, txId).run().catch(() => {});
+    }
   } catch {
     // Ignore when loyalty_point_logs is absent in older migration snapshots
   }

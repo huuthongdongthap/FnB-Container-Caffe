@@ -4,6 +4,8 @@
  * GET /api/analytics/top-products?limit=10
  */
 
+import { buildTenantFilter } from './summary';
+
 export interface TopProductRow {
   product_name: string;
   total_qty: number;
@@ -19,32 +21,44 @@ export async function getTopProducts(
   limit: number,
   tenantId?: string
 ): Promise<TopProductRow[]> {
-  const hasTenant = Boolean(tenantId && tenantId !== '*');
-  const orderAliasClause = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
-  const orderClause = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
-  const tenantBinds = hasTenant && tenantId ? [tenantId] : [];
+  const { clause: orderAliasClause, binds: tenantBinds } = buildTenantFilter(tenantId, 'o');
+  const { clause: orderClause } = buildTenantFilter(tenantId);
   try {
-    const { results } = await db.prepare(`
-    SELECT
-      p.name AS product_name,
-      SUM(oi.quantity) AS total_qty,
-      SUM(oi.subtotal) AS revenue
-    FROM order_items oi
-    JOIN products p ON p.id = oi.product_id
-    JOIN orders o ON o.id = oi.order_id
-    WHERE o.status != 'cancelled'${orderAliasClause}
-    GROUP BY oi.product_id, p.name
-    ORDER BY total_qty DESC
-    LIMIT ?
-  `).bind(...tenantBinds, limit).all<TopProductRow>();
+    const productTenantJoin = tenantId && tenantId !== '*'
+      ? " AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
+      : '';
+    let results: TopProductRow[] | undefined;
+    try {
+      const res = await db.prepare(`
+      SELECT
+        p.name AS product_name,
+        SUM(oi.quantity) AS total_qty,
+        SUM(oi.subtotal) AS revenue
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      JOIN products p ON p.id = oi.product_id${productTenantJoin}
+      WHERE o.status != 'cancelled'${orderAliasClause}
+      GROUP BY oi.product_id, p.name
+      ORDER BY total_qty DESC
+      LIMIT ?
+    `).bind(...tenantBinds, limit).all<TopProductRow>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(`
+      SELECT
+        p.name AS product_name,
+        SUM(oi.quantity) AS total_qty,
+        SUM(oi.subtotal) AS revenue
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.status != 'cancelled'${orderAliasClause}
+      GROUP BY oi.product_id, p.name
+      ORDER BY total_qty DESC
+      LIMIT ?
+    `).bind(...tenantBinds, limit).all<TopProductRow>();
+      results = res.results;
+    }
 
     return results || [];
   } catch {

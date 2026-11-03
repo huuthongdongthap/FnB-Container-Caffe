@@ -1,23 +1,20 @@
 import type { Hono } from 'hono';
 import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
-import { queryFirst, execute, getTenantId, matchesTenantRow as dbMatchesTenantRow } from '../../lib/db';
+import { queryFirst, execute, getTenantId, matchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
 import {
   dindinCheckoutSchema,
   err,
   errorResponse,
   readCartRD,
+  readConfigRaw,
   writeCart,
   emptyCart,
+  configKVKey,
   idempotencyKVKey,
   type DindinContext,
 } from './types';
-
-function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (!row || typeof row !== 'object') return false;
-  return dbMatchesTenantRow(row as Record<string, unknown>, tenantId);
-}
 
 export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /checkouts ──────────────────────────────────────────────────────────
@@ -37,16 +34,24 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         created_at: string | null;
         tenant_id?: string | null;
       }> = [];
+      const effectiveTenant = tenantId?.trim() || 'default';
       try {
         const res = await c.env.AURA_DB.prepare(
-          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
-        ).all<typeof rows[number]>();
+          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) OR (id LIKE 'DIN%' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)) ORDER BY created_at DESC LIMIT 50"
+        ).bind(effectiveTenant, effectiveTenant, effectiveTenant, effectiveTenant).all<typeof rows[number]>();
         rows = res.results || [];
       } catch {
-        const res = await c.env.AURA_DB.prepare(
-          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
-        ).all<typeof rows[number]>();
-        rows = res.results || [];
+        try {
+          const res = await c.env.AURA_DB.prepare(
+            "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+          ).all<typeof rows[number]>();
+          rows = res.results || [];
+        } catch {
+          const res = await c.env.AURA_DB.prepare(
+            "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+          ).all<typeof rows[number]>();
+          rows = res.results || [];
+        }
       }
 
       for (const row of rows) {
@@ -76,8 +81,10 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         } catch {
           parsedItems = [];
         }
-        const printedState = await kvGet<{ printed?: boolean }>(c.env.AUTH_KV, `dindin:print:${row.id}`);
-        const qcState = await kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, `dindin:qc:${row.id}`);
+        const printKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:print:${tenantId}:${row.id}` : `dindin:print:${row.id}`;
+        const qcKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:qc:${tenantId}:${row.id}` : `dindin:qc:${row.id}`;
+        const printedState = await kvGet<{ printed?: boolean }>(c.env.AUTH_KV, printKey);
+        const qcState = await kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, qcKey);
         checkouts.push({
           id: row.id,
           orderId: row.id,
@@ -113,7 +120,8 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
     const printedAt = new Date().toISOString();
-    await kvSet(c.env.AUTH_KV, `dindin:print:${orderId}`, JSON.stringify({ printed: true, printedAt }), 86400);
+    const printKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:print:${tenantId}:${orderId}` : `dindin:print:${orderId}`;
+    await kvSet(c.env.AUTH_KV, printKey, JSON.stringify({ printed: true, printedAt }), 86400);
     return c.json({ success: true, orderId, printed: true, printedAt });
   });
 
@@ -121,19 +129,81 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
   router.post('/checkout/:orderId/qc', async (c) => {
     const { orderId } = c.req.param();
     const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
-    let ordRow: { id: string; tenant_id?: string | null } | null = null;
+    type QcOrderRow = {
+      id: string;
+      status?: string | null;
+      customer_name?: string | null;
+      payment_method?: string | null;
+      payment_status?: string | null;
+      tenant_id?: string | null;
+    };
+    let ordRow: QcOrderRow | null = null;
     try {
-      ordRow = await c.env.AURA_DB.prepare('SELECT id, tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; tenant_id?: string | null }>();
+      ordRow = await c.env.AURA_DB.prepare(
+        'SELECT id, status, customer_name, payment_method, payment_status, tenant_id FROM orders WHERE id = ?'
+      ).bind(orderId).first<QcOrderRow>();
     } catch {
-      ordRow = await c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>().catch(() => null);
+      ordRow = await c.env.AURA_DB.prepare(
+        'SELECT id, status, customer_name, payment_method, tenant_id FROM orders WHERE id = ?'
+      ).bind(orderId).first<QcOrderRow>().catch(async () =>
+        c.env.AURA_DB.prepare('SELECT id, status, customer_name, payment_method FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
+          c.env.AURA_DB.prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
+            c.env.AURA_DB.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
+              c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(() => null)
+            )
+          )
+        )
+      );
     }
     if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
+    const isDindinOrder =
+      String(ordRow.id || '').startsWith('DIN') ||
+      String(ordRow.customer_name || '').toUpperCase() === 'DIN';
+    if (!isDindinOrder) {
+      return c.json({ success: false, error: 'Order is not a DinDin order' }, 400);
+    }
+    if (ordRow.status && ['cancelled', 'failed', 'refunded', 'expired'].includes(String(ordRow.status).toLowerCase())) {
+      return c.json({ success: false, error: 'Cannot complete QC for a cancelled or failed order' }, 409);
+    }
+    const paymentMethod = String(ordRow.payment_method || '').trim().toLowerCase();
+    const paymentStatus = ordRow.payment_status != null ? String(ordRow.payment_status).trim().toLowerCase() : '';
+    if (paymentStatus && !['cash', 'cod', ''].includes(paymentMethod) && paymentStatus !== 'paid') {
+      return c.json({ success: false, error: 'Order payment has not been completed' }, 409);
+    }
     const checkedAt = new Date().toISOString();
-    await kvSet(c.env.AUTH_KV, `dindin:qc:${orderId}`, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
+    const qcKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:qc:${tenantId}:${orderId}` : `dindin:qc:${orderId}`;
+    await kvSet(c.env.AUTH_KV, qcKey, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
     try {
-      await execute(c.env.AURA_DB, 'UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'completed', checkedAt, orderId);
+      if (tenantId !== '*') {
+        try {
+          await execute(
+            c.env.AURA_DB,
+            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            'completed',
+            checkedAt,
+            orderId,
+            tenantId || 'default'
+          );
+        } catch {
+          await execute(
+            c.env.AURA_DB,
+            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired')",
+            'completed',
+            checkedAt,
+            orderId
+          );
+        }
+      } else {
+        await execute(
+          c.env.AURA_DB,
+          "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired')",
+          'completed',
+          checkedAt,
+          orderId
+        );
+      }
     } catch {
       // Best-effort DB status update
     }
@@ -160,27 +230,51 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         return errorResponse(c as DindinContext, err('D03', 400, 'Phương thức thanh toán không hợp lệ - chỉ hỗ trợ cod | payos'));
       }
 
+      const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
       const idempotencyKey = c.req.header('Idempotency-Key');
       if (idempotencyKey) {
-        const cached = await kvGet<{ ok?: boolean; orderId?: string; status?: string; at?: string }>(
+        const cached = await kvGet<{ ok?: boolean; queued?: boolean; orderId?: string; status?: string; at?: string }>(
           c.env.AUTH_KV,
-          idempotencyKVKey(idempotencyKey)
+          idempotencyKVKey(idempotencyKey, tenantId)
         );
         if (cached && cached.orderId) {
           return c.json({ success: true, orderId: cached.orderId, status: cached.status || 'pending', cached: true });
         }
+        if (cached && cached.queued && !cached.orderId) {
+          return c.json({ success: false, error: 'Checkout with this Idempotency-Key is already in progress' }, 409);
+        }
       }
 
-      const cart = await readCartRD(c.env, sessionId);
+      const cart = await readCartRD(c.env, sessionId, tenantId);
       if (!cart || cart.items.length === 0) {
         return errorResponse(c as DindinContext, err('D01', 400, 'Giỏ hàng trống hoặc phiên đã hết hạn'));
       }
 
       let configRow: { config: string } | null = null;
       try {
-        configRow = await queryFirst<{ config: string }>(c.env.AURA_DB, 'SELECT config FROM dindin_config LIMIT 1');
+        if (tenantId && tenantId !== 'default' && tenantId !== '*') {
+          configRow = await readConfigRaw(c.env, tenantId);
+        } else {
+          try {
+            const candidate = await queryFirst<{ config: string; tenant_id?: string | null }>(
+              c.env.AURA_DB,
+              "SELECT config FROM dindin_config WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' LIMIT 1"
+            );
+            if (candidate && matchesTenantRow(candidate, tenantId || 'default')) {
+              configRow = candidate;
+            }
+          } catch {
+            const fallbackRow = await queryFirst<{ config: string; tenant_id?: string | null }>(
+              c.env.AURA_DB,
+              'SELECT config FROM dindin_config LIMIT 1'
+            );
+            if (fallbackRow && matchesTenantRow(fallbackRow, tenantId || 'default')) {
+              configRow = fallbackRow;
+            }
+          }
+        }
       } catch {
-        const kvConfig = await kvGet<Record<string, unknown> | string>(c.env.AUTH_KV, 'dindin:config');
+        const kvConfig = await kvGet<Record<string, unknown> | string>(c.env.AUTH_KV, configKVKey(tenantId));
         if (kvConfig) {
           configRow = { config: typeof kvConfig === 'string' ? kvConfig : JSON.stringify(kvConfig) };
         }
@@ -215,10 +309,34 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       }
 
       let totalFromMenu = 0;
+      const validatedOrderItems: Array<{ product_id: string; name: string; quantity: number; price: number }> = [];
       for (const it of cart.items) {
-        const cast = it as { id?: string; name?: string; price?: number; qty?: number };
-        const qty = Math.max(1, Number(cast.qty ?? 1));
-        const entry = lookup.get((cast.name ?? '').toLowerCase()) ?? lookup.get(cast.id ?? '');
+        const cast = it as { product_id?: string; id?: string; name?: string; price?: number; qty?: number; quantity?: number };
+        if (
+          cast.qty !== undefined &&
+          cast.quantity !== undefined &&
+          Math.floor(Number(cast.qty)) !== Math.floor(Number(cast.quantity))
+        ) {
+          return errorResponse(c as DindinContext, err('D07', 400, 'Số lượng sản phẩm không hợp lệ'));
+        }
+        const rawQty = Number(cast.qty ?? cast.quantity ?? 1);
+        const qty = Math.floor(rawQty);
+        if (!Number.isFinite(rawQty) || !Number.isFinite(qty) || qty < 1 || qty > 100) {
+          return errorResponse(c as DindinContext, err('D07', 400, 'Số lượng sản phẩm không hợp lệ'));
+        }
+        const itemIdKey = String(cast.product_id || cast.id || '').trim();
+        const itemNameKey = String(cast.name || '').trim().toLowerCase();
+        const byId = itemIdKey ? (lookup.get(itemIdKey) ?? lookup.get(itemIdKey.toLowerCase())) : undefined;
+        const byName = itemNameKey ? lookup.get(itemNameKey) : undefined;
+        if (
+          byId &&
+          byName &&
+          ((byId.id && byName.id && String(byId.id) !== String(byName.id)) ||
+            byId.name.toLowerCase() !== byName.name.toLowerCase())
+        ) {
+          return errorResponse(c as DindinContext, err('D07', 400, 'Cart item id and name mismatch'));
+        }
+        const entry = byId ?? byName;
         if (!entry) {
           return errorResponse(c as DindinContext, err('D02', 422, 'Sản phẩm không tồn tại trên menu hoặc giá thay đổi >10%'));
         }
@@ -233,12 +351,18 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           return errorResponse(c as DindinContext, err('D04', 409, 'Món đã hết hàng hoặc xung đột nguyên liệu'));
         }
         totalFromMenu += entry.price * qty;
+        validatedOrderItems.push({
+          product_id: entry.id || itemIdKey || `dindin_${entry.name.replace(/\s+/g, '_').toLowerCase()}`,
+          name: entry.name,
+          quantity: qty,
+          price: Number(entry.price ?? 0),
+        });
       }
 
       if (idempotencyKey) {
         await kvSet(
           c.env.AUTH_KV,
-          idempotencyKVKey(idempotencyKey),
+          idempotencyKVKey(idempotencyKey, tenantId),
           JSON.stringify({ queued: true, at: new Date().toISOString() }),
           86400
         );
@@ -248,35 +372,45 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       crypto.getRandomValues(randBytes);
       const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
       const orderId = `DIN${Date.now().toString(36).toUpperCase()}${randHex}`;
-      const itemsJson = JSON.stringify(
-        cart.items.map((i) => ({
-          product_id: i.id ?? `dindin_${(i.name ?? '').replace(/\s+/g, '_').toLowerCase()}`,
-          name: i.name ?? '',
-          quantity: Math.max(1, Number(i.qty ?? 1)),
-          price: Number(i.price ?? 0),
-        }))
-      );
+      const itemsJson = JSON.stringify(validatedOrderItems);
+      const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
       try {
-        await execute(
-          c.env.AURA_DB,
-          'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          orderId,
-          'DIN',
-          sessionId,
-          null,
-          payment_method,
-          itemsJson,
-          Math.max(0, totalFromMenu),
-          'pending'
-        );
+        try {
+          await execute(
+            c.env.AURA_DB,
+            'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            orderId,
+            'DIN',
+            sessionId,
+            null,
+            payment_method,
+            itemsJson,
+            Math.max(0, totalFromMenu),
+            'pending',
+            writeTenant
+          );
+        } catch {
+          await execute(
+            c.env.AURA_DB,
+            'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            orderId,
+            'DIN',
+            sessionId,
+            null,
+            payment_method,
+            itemsJson,
+            Math.max(0, totalFromMenu),
+            'pending'
+          );
+        }
       } catch {
         if (idempotencyKey && c.env.AUTH_KV) {
-          await c.env.AUTH_KV.delete(idempotencyKVKey(idempotencyKey)).catch(() => {});
+          await c.env.AUTH_KV.delete(idempotencyKVKey(idempotencyKey, tenantId)).catch(() => {});
         }
         return errorResponse(c as DindinContext, err('D06', 500, 'Lỗi ghi CSDL - vui lòng thử lại sau'));
       }
 
-      await writeCart(c.env, sessionId, emptyCart());
+      await writeCart(c.env, sessionId, emptyCart(), tenantId);
 
       if (c.env.AUTH_KV) {
         const ts = new Date().toISOString();
@@ -291,7 +425,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       if (idempotencyKey) {
         await kvSet(
           c.env.AUTH_KV,
-          idempotencyKVKey(idempotencyKey),
+          idempotencyKVKey(idempotencyKey, tenantId),
           JSON.stringify({ ok: true, orderId, status: 'pending', at: new Date().toISOString() })
         );
       }

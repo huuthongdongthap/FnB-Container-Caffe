@@ -64,18 +64,35 @@ export function isSafePublicHttpsUrl(rawUrl: string): boolean {
     }
     const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
     if (
+      !host ||
+      host.includes(':') ||
       host === 'localhost' ||
       host === '0.0.0.0' ||
-      host === '::1' ||
+      host.endsWith('.localhost') ||
       host.endsWith('.local') ||
-      host.endsWith('.internal') ||
-      /^127\./.test(host) ||
-      /^10\./.test(host) ||
-      /^192\.168\./.test(host) ||
-      /^169\.254\./.test(host) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+      host.endsWith('.internal')
     ) {
       return false;
+    }
+    const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    if (ipv4Match) {
+      const a = Number(ipv4Match[1]);
+      const b = Number(ipv4Match[2]);
+      const c = Number(ipv4Match[3]);
+      const d = Number(ipv4Match[4]);
+      if (
+        a > 255 || b > 255 || c > 255 || d > 255 ||
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        a >= 224
+      ) {
+        return false;
+      }
     }
     return true;
   } catch {

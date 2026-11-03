@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, resolvePublicTenantId as resolvePricingTenantId } from '../middleware/tenant';
 import { matchesTenantRow } from '../lib/db';
 import type { DynamicPricingRule as DynamicPricingRuleRow } from '../types/api';
 
@@ -19,15 +19,6 @@ dynamicPricingRouter.use('/*', async (c, next) => {
   }
   return next();
 });
-
-function resolvePricingTenantId(c: Parameters<typeof getTenantId>[0]): string {
-  if (c.get?.('user')) {
-    return getTenantId(c);
-  }
-  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') return 'default';
-  return raw;
-}
 
 export function getVietnamTime(date: Date): { day: number; minutes: number } {
   const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -51,9 +42,12 @@ export function isRuleActiveAt(rule: DynamicPricingRuleRow, date: Date = new Dat
   const days = rule.days_of_week.split(',').map((d) => parseInt(d.trim(), 10));
   if (!days.includes(day)) return false;
 
-  const [sH, sM] = rule.start_time.split(':').map(Number);
-  const [eH, eM] = rule.end_time.split(':').map(Number);
-  return minutes >= (sH || 0) * 60 + (sM || 0) && minutes <= (eH || 0) * 60 + (eM || 0);
+  const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
+  const timeStr = `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+  if (rule.start_time <= rule.end_time) {
+    return timeStr >= rule.start_time && timeStr <= rule.end_time;
+  }
+  return timeStr >= rule.start_time || timeStr <= rule.end_time;
 }
 
 const calculateSchema = z.object({
@@ -124,19 +118,79 @@ dynamicPricingRouter.post('/calculate', async (c) => {
     .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
     .filter((r) => isRuleActiveAt(r, evalDate));
 
+  const user = c.get('user' as never) as { id?: string; role?: string } | undefined;
+  const isPrivilegedCaller = Boolean(user?.role && user.role !== 'customer');
+
   const serverCostByProduct = new Map<string, number>();
-  for (const item of items) {
-    if ((item.unit_cost === undefined || item.unit_cost <= 0) && !serverCostByProduct.has(item.product_id)) {
-      try {
-        const stmt = db.prepare('SELECT id, cost_price, tenant_id FROM products WHERE id = ?').bind(item.product_id);
-        if (typeof (stmt as { first?: unknown }).first === 'function') {
-          const row = await stmt.first<{ id: string; cost_price?: number | null; tenant_id?: string | null }>();
-          if (row && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId) && Number(row.cost_price) > 0) {
-            serverCostByProduct.set(item.product_id, Number(row.cost_price));
+  const serverPriceByProduct = new Map<string, number>();
+  const lookupProductIds = Array.from(
+    new Set(
+      items
+        .filter((it) => !isPrivilegedCaller || it.unit_cost === undefined || it.unit_cost <= 0)
+        .map((it) => it.product_id)
+    )
+  );
+
+  if (lookupProductIds.length > 0) {
+    const placeholders = lookupProductIds.map(() => '?').join(', ');
+    let batchMatchedAny = false;
+    try {
+      const batchStmt = db
+        .prepare(`SELECT id, price, cost_price, tenant_id FROM products WHERE id IN (${placeholders})`)
+        .bind(...lookupProductIds);
+      if (typeof (batchStmt as { all?: unknown }).all === 'function') {
+        const { results: prodRows } = await batchStmt.all<{
+          id: string;
+          price?: number | null;
+          cost_price?: number | null;
+          tenant_id?: string | null;
+        }>();
+        for (const row of prodRows || []) {
+          if (row && lookupProductIds.includes(row.id) && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
+            batchMatchedAny = true;
+            if (Number(row.cost_price) > 0) {
+              serverCostByProduct.set(row.id, Number(row.cost_price));
+            }
+            if (Number(row.price) > 0) {
+              serverPriceByProduct.set(row.id, Number(row.price));
+            }
           }
         }
-      } catch {
-        // Fallback if products table or cost_price column is unavailable
+      }
+    } catch {
+      // Fallback to per-id query below when batch query is unsupported by schema or mock
+    }
+
+    if (!batchMatchedAny) {
+      for (const productId of lookupProductIds) {
+        if (!serverCostByProduct.has(productId)) {
+          try {
+            const stmt = db.prepare('SELECT id, price, cost_price, tenant_id FROM products WHERE id = ?').bind(productId);
+            if (typeof (stmt as { first?: unknown }).first === 'function') {
+              const row = await stmt.first<{ id: string; price?: number | null; cost_price?: number | null; tenant_id?: string | null }>();
+              if (row && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
+                if (Number(row.cost_price) > 0) {
+                  serverCostByProduct.set(productId, Number(row.cost_price));
+                }
+                if (Number(row.price) > 0) {
+                  serverPriceByProduct.set(productId, Number(row.price));
+                }
+              }
+            }
+          } catch {
+            try {
+              const fallbackStmt = db.prepare('SELECT id, cost_price, tenant_id FROM products WHERE id = ?').bind(productId);
+              if (typeof (fallbackStmt as { first?: unknown }).first === 'function') {
+                const row = await fallbackStmt.first<{ id: string; cost_price?: number | null; tenant_id?: string | null }>();
+                if (row && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId) && Number(row.cost_price) > 0) {
+                  serverCostByProduct.set(productId, Number(row.cost_price));
+                }
+              }
+            } catch {
+              // Fallback if products table or cost_price column is unavailable
+            }
+          }
+        }
       }
     }
   }
@@ -145,7 +199,11 @@ dynamicPricingRouter.post('/calculate', async (c) => {
   let discountedTotal = 0;
 
   const calculatedItems = items.map((item) => {
-    const itemSubtotal = item.price * item.quantity;
+    const serverPrice = serverPriceByProduct.get(item.product_id);
+    const effectivePrice = !isPrivilegedCaller && serverPrice !== undefined && serverPrice > 0
+      ? Math.max(serverPrice, item.price)
+      : item.price;
+    const itemSubtotal = effectivePrice * item.quantity;
     originalTotal += itemSubtotal;
 
     // Find first matching active rule (specific product takes priority over category)
@@ -155,33 +213,38 @@ dynamicPricingRouter.post('/calculate', async (c) => {
 
     if (!matchedRule) {
       discountedTotal += itemSubtotal;
-      return { ...item, original_price: item.price, final_price: item.price, discount_applied: 0, rule_name: null };
+      return { ...item, price: effectivePrice, original_price: effectivePrice, final_price: effectivePrice, discount_applied: 0, rule_name: null };
     }
 
     let discountPercent = matchedRule.discount_percent;
-    const effectiveUnitCost = item.unit_cost !== undefined && item.unit_cost > 0
-      ? item.unit_cost
-      : serverCostByProduct.get(item.product_id);
+    const serverCost = serverCostByProduct.get(item.product_id);
+    const effectiveUnitCost = !isPrivilegedCaller
+      ? (serverCost !== undefined && serverCost > 0
+          ? Math.max(serverCost, item.unit_cost || 0)
+          : (item.unit_cost !== undefined && item.unit_cost > 0 ? item.unit_cost : undefined))
+      : (item.unit_cost !== undefined && item.unit_cost > 0
+          ? item.unit_cost
+          : serverCost);
 
     // Margin Floor Protection: Final price cannot be below unit_cost * (1 + min_margin / 100)
     if (effectiveUnitCost !== undefined && effectiveUnitCost > 0) {
       const minAllowablePrice = effectiveUnitCost * (1 + (matchedRule.min_margin_percent / 100));
-      const requestedPrice = item.price * (1 - discountPercent / 100);
+      const requestedPrice = effectivePrice * (1 - discountPercent / 100);
       if (requestedPrice < minAllowablePrice) {
-        const cappedDiscount = Math.max(0, ((item.price - minAllowablePrice) / item.price) * 100);
+        const cappedDiscount = Math.max(0, ((effectivePrice - minAllowablePrice) / effectivePrice) * 100);
         discountPercent = Math.floor(cappedDiscount);
       }
     }
 
-    const unitDiscount = Math.round(item.price * (discountPercent / 100));
-    const finalPrice = Math.max(0, item.price - unitDiscount);
+    const unitDiscount = Math.round(effectivePrice * (discountPercent / 100));
+    const finalPrice = Math.max(0, effectivePrice - unitDiscount);
     const itemFinalTotal = finalPrice * item.quantity;
     discountedTotal += itemFinalTotal;
 
     return {
       product_id: item.product_id,
       quantity: item.quantity,
-      original_price: item.price,
+      original_price: effectivePrice,
       final_price: finalPrice,
       discount_applied: unitDiscount * item.quantity,
       discount_percent: discountPercent,

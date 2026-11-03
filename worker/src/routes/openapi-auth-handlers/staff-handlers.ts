@@ -5,6 +5,27 @@ import { hashPassword, generateToken } from './helpers';
 import { getTenantId } from '../../middleware/tenant';
 
 const STAFF_LIST_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
+const ALLOWED_STAFF_SORTS: Record<string, string> = {
+  name: 'name', email: 'email', role: 'role', created_at: 'created_at', updated_at: 'updated_at',
+};
+
+async function writeStaffAuthAudit(db: any, actorId: string, action: string, targetId: string, metaStr: string, now: string) {
+  try {
+    await db.prepare(
+      'INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(`audit_${crypto.randomUUID()}`, actorId, action, 'user', targetId, metaStr, now).run();
+  } catch {
+    try {
+      await db.prepare(
+        'INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(actorId, actorId, actorId, action, 'user', targetId, 'user', targetId, metaStr, metaStr, now).run();
+    } catch {
+      await db.prepare(
+        'INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(actorId, actorId, action, 'user', targetId, metaStr, now).run().catch(() => {});
+    }
+  }
+}
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/auth/register-staff - Register staff (owner only)
@@ -14,43 +35,31 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    if (user.role !== 'owner' && user.role !== 'admin') {
-      return c.json({ success: false, error: 'Only owners can register staff' }, 403);
-    }
-    if (body.role === 'admin' && user.role !== 'admin') {
-      return c.json({ success: false, error: 'Only admins can register admin accounts' }, 403);
-    }
+    if (user.role !== 'owner' && user.role !== 'admin') return c.json({ success: false, error: 'Only owners can register staff' }, 403);
+    if (body.role === 'admin' && user.role !== 'admin') return c.json({ success: false, error: 'Only admins can register admin accounts' }, 403);
 
     let existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first().catch(() => null);
     if (!existing) {
       existing = await db.prepare('SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)').bind(body.email).first().catch(() => null);
     }
-    if (existing) {
-      return c.json({ success: false, error: 'Email already exists' }, 409);
-    }
+    if (existing) return c.json({ success: false, error: 'Email already exists' }, 409);
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
-    const rawTenantId = getTenantId(c);
-    const tenantId = rawTenantId === '*' ? (user.tenantId || user.tenant_id || 'default') : rawTenantId;
+    const rawTenantId = getTenantId(c).trim() || 'default';
+    const tenantId = rawTenantId === '*' ? (String(user.tenantId || user.tenant_id || '').trim() || 'default') : rawTenantId;
 
     try {
       await db.prepare(
         `INSERT INTO users (id, name, email, phone, password_hash, role, tenant_id, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id, body.name, body.email, body.phone || null, passwordHash,
-        body.role, tenantId, body.locale || 'vi', 'bronze', 0, 1, null, now, now
-      ).run();
+      ).bind(id, body.name, body.email, body.phone || null, passwordHash, body.role, tenantId, body.locale || 'vi', 'bronze', 0, 1, null, now, now).run();
     } catch {
       try {
         await db.prepare(
           `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id, body.name, body.email, body.phone || null, passwordHash,
-          body.role, body.locale || 'vi', 'bronze', 0, 1, null, now, now
-        ).run();
+        ).bind(id, body.name, body.email, body.phone || null, passwordHash, body.role, body.locale || 'vi', 'bronze', 0, 1, null, now, now).run();
       } catch {
         await db.prepare(
           `INSERT INTO users (id, name, phone, password_hash, role, tenant_id, is_active, auth_version, created_at, updated_at)
@@ -64,49 +73,22 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`
     ).bind(body.email, id).run().catch(() => {});
 
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${crypto.randomUUID()}`, user.id, 'register_staff', 'user', id, JSON.stringify({ role: body.role }), now).run();
-    } catch {
-      const metaStr = JSON.stringify({ role: body.role });
-      try {
-        await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(user.id, user.id, user.id, 'register_staff', 'user', id, 'user', id, metaStr, metaStr, now).run();
-      } catch {
-        try {
-          await db.prepare(
-            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(user.id, user.id, 'register_staff', 'user', id, metaStr, now).run().catch(() => {});
-        } catch {
-          // Ignore audit log error
-        }
-      }
-    }
+    await writeStaffAuthAudit(db, user.id, 'register_staff', id, JSON.stringify({ role: body.role }), now);
 
     let staff = await db.prepare(
       'SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at FROM users WHERE id = ?'
     ).bind(id).first().catch(() => null);
     if (!staff) {
-      const minimal = await db.prepare(
-        'SELECT id, name, phone, role, is_active, created_at, updated_at FROM users WHERE id = ?'
-      ).bind(id).first();
+      const minimal = await db.prepare('SELECT id, name, phone, role, is_active, created_at, updated_at FROM users WHERE id = ?').bind(id).first();
       staff = minimal ? { ...minimal, email: body.email, locale: body.locale || 'vi', avatar_url: null } : null;
     }
 
     return c.json({
       success: true,
       data: {
-        ...staff!,
-        email: staff!.email || body.email,
-        role: staff!.role,
-        locale: staff!.locale || body.locale || 'vi',
-        isActive: staff!.is_active === 1,
-        createdAt: staff!.created_at,
-        updatedAt: staff!.updated_at,
+        ...staff!, email: staff!.email || body.email, role: staff!.role,
+        locale: staff!.locale || body.locale || 'vi', isActive: staff!.is_active === 1,
+        createdAt: staff!.created_at, updatedAt: staff!.updated_at,
       },
     }, 201);
   });
@@ -118,50 +100,30 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive } = query;
 
-    if (!STAFF_LIST_ROLES.includes(user.role)) {
-      return c.json({ success: false, error: 'Only owners can list staff' }, 403);
-    }
+    if (!STAFF_LIST_ROLES.includes(user.role)) return c.json({ success: false, error: 'Only owners can list staff' }, 403);
 
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     let whereClause = 'WHERE role != \'customer\'';
     const params: (string | number)[] = [];
     if (tenantId !== '*') {
-      whereClause += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      whereClause += ' AND COALESCE(NULLIF(tenant_id, \'\'), \'default\') = ?';
       params.push(tenantId);
     }
+    if (role) { whereClause += ' AND role = ?'; params.push(role); }
+    if (isActive !== undefined) { whereClause += ' AND is_active = ?'; params.push(isActive ? 1 : 0); }
 
-    if (role) {
-      whereClause += ' AND role = ?';
-      params.push(role);
-    }
-    if (isActive !== undefined) {
-      whereClause += ' AND is_active = ?';
-      params.push(isActive ? 1 : 0);
-    }
-
-    const countResult = await db.prepare(
-      `SELECT COUNT(*) as total FROM users ${whereClause}`
-    ).bind(...params).first();
+    const countResult = await db.prepare(`SELECT COUNT(*) as total FROM users ${whereClause}`).bind(...params).first();
     const total = (countResult as { total?: number })?.total || 0;
 
     const offset = (Number(page) - 1) * Number(limit);
-    const allowedSorts: Record<string, string> = {
-      name: 'name',
-      email: 'email',
-      role: 'role',
-      created_at: 'created_at',
-      updated_at: 'updated_at',
-    };
-    const safeSort = allowedSorts[sort] || 'name';
+    const safeSort = ALLOWED_STAFF_SORTS[sort] || 'name';
     const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
     const orderClause = `${safeSort} ${safeDirection}`;
     let rows: { results: Array<Record<string, unknown>> };
     try {
       rows = await db.prepare(
         `SELECT id, name, email, phone, role, locale, is_active, avatar_url, created_at, updated_at
-         FROM users ${whereClause}
-         ORDER BY ${orderClause}
-         LIMIT ? OFFSET ?`
+         FROM users ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
       ).bind(...params, limit, offset).all();
     } catch {
       const canonicalWhere = whereClause
@@ -172,21 +134,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       rows = await db.prepare(
         `SELECT u.id, u.name, s.email AS email, u.phone, u.role, u.is_active, u.created_at, u.updated_at
          FROM users u LEFT JOIN staff_login_identities s ON s.staff_id = u.id
-         ${canonicalWhere}
-         ORDER BY ${canonicalOrder}
-         LIMIT ? OFFSET ?`
+         ${canonicalWhere} ORDER BY ${canonicalOrder} LIMIT ? OFFSET ?`
       ).bind(...params, limit, offset).all();
     }
 
     const staff = rows.results.map((row: Record<string, unknown>) => ({
-      ...row,
-      email: row.email || '',
-      role: row.role,
-      locale: row.locale || 'vi',
-      avatar_url: row.avatar_url ?? null,
-      isActive: row.is_active === 1,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      ...row, email: row.email || '', role: row.role, locale: row.locale || 'vi',
+      avatar_url: row.avatar_url ?? null, isActive: row.is_active === 1,
+      createdAt: row.created_at, updatedAt: row.updated_at,
     }));
 
     return c.json({
@@ -202,9 +157,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
 
     const existingOwner = await db.prepare('SELECT id FROM users WHERE role = \'owner\'').first();
-    if (existingOwner) {
-      return c.json({ success: false, error: 'Owner already exists' }, 409);
-    }
+    if (existingOwner) return c.json({ success: false, error: 'Owner already exists' }, 409);
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
@@ -217,10 +170,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       await db.prepare(
         `INSERT INTO users (id, name, email, phone, password_hash, role, locale, loyalty_tier, loyalty_points, email_verified, avatar_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id, body.name, body.email, body.phone || null, passwordHash,
-        'owner', body.locale || 'vi', 'diamond', 0, 1, null, now, now
-      ).run();
+      ).bind(id, body.name, body.email, body.phone || null, passwordHash, 'owner', body.locale || 'vi', 'diamond', 0, 1, null, now, now).run();
     } catch {
       await db.prepare(
         `INSERT INTO users (id, name, phone, password_hash, role, tenant_id, is_active, auth_version, created_at, updated_at)
@@ -238,54 +188,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(sessionId, id, accessToken, refreshToken, expiresAt, 1, null, 'Bootstrap Device', now, now).run().catch(() => {});
 
-    try {
-      await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${crypto.randomUUID()}`, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run();
-    } catch {
-      try {
-        await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(id, id, id, 'bootstrap_owner', 'user', id, 'user', id, '{}', '{}', now).run();
-      } catch {
-        try {
-          await db.prepare(
-            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(id, id, 'bootstrap_owner', 'user', id, JSON.stringify({}), now).run().catch(() => {});
-        } catch {
-          // Ignore audit log error
-        }
-      }
-    }
+    await writeStaffAuthAudit(db, id, 'bootstrap_owner', id, '{}', now);
 
     const owner = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
-
     return c.json({
       success: true,
       data: {
         user: {
-          id: owner!.id,
-          name: owner!.name,
-          email: owner!.email || body.email,
-          phone: owner!.phone,
-          role: owner!.role,
-          locale: owner!.locale || body.locale || 'vi',
+          id: owner!.id, name: owner!.name, email: owner!.email || body.email, phone: owner!.phone,
+          role: owner!.role, locale: owner!.locale || body.locale || 'vi',
           loyaltyTier: owner!.loyalty_tier || owner!.tier || 'diamond',
           loyaltyPoints: owner!.loyalty_points ?? owner!.total_points ?? 0,
           emailVerified: owner!.email_verified !== undefined ? owner!.email_verified === 1 : true,
-          avatarUrl: owner!.avatar_url ?? null,
-          createdAt: owner!.created_at,
-          updatedAt: owner!.updated_at,
+          avatarUrl: owner!.avatar_url ?? null, createdAt: owner!.created_at, updatedAt: owner!.updated_at,
         },
-        session: {
-          id: sessionId,
-          accessToken,
-          refreshToken,
-          expiresAt,
-          isTrustedDevice: true,
-        },
+        session: { id: sessionId, accessToken, refreshToken, expiresAt, isTrustedDevice: true },
       },
     }, 201);
   });

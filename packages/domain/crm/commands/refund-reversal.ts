@@ -61,7 +61,7 @@ export async function reverseAccrual(
     const existing = await db
       .prepare(
         `SELECT id FROM loyalty_point_logs
-         WHERE order_id = ? AND reason = 'refund' AND points_change < 0 LIMIT 1`,
+         WHERE order_id = ? AND reason = 'refund' AND points_change <= 0 LIMIT 1`,
       )
       .bind(orderId)
       .first<{ id: string }>();
@@ -112,14 +112,15 @@ export async function reverseAccrual(
   }
 
   const pointsEarned = order.points_earned ?? 0;
-  if (pointsEarned <= 0) {
+  const cashbackEarnedOnOrder = Number(order.cashback_earned ?? 0);
+  if (pointsEarned <= 0 && cashbackEarnedOnOrder <= 0) {
     return { ok: false, reason: 'no_points_to_reverse' };
   }
 
   // ── Proportional deduction ──
   const total = order.total ?? 0;
   const ratio = total > 0 ? Math.min(Math.max(0, refundAmountVnd) / total, 1) : 1;
-  const pointsToDeduct = Math.max(1, Math.round(pointsEarned * ratio));
+  const pointsToDeduct = pointsEarned > 0 ? Math.max(1, Math.round(pointsEarned * ratio)) : 0;
 
   // ── Load the customer ──
   interface CustomerRow {
@@ -186,10 +187,12 @@ export async function reverseAccrual(
       db
         .prepare(
           `UPDATE customers
-           SET loyalty_points = ?, lifetime_points = ?, updated_at = ?
+           SET loyalty_points = MAX(0, COALESCE(loyalty_points, 0) - ?),
+               lifetime_points = MAX(0, COALESCE(lifetime_points, 0) - ?),
+               updated_at = ?
            WHERE id = ?`,
         )
-        .bind(newPoints, newLifetimePoints, now, customer.id),
+        .bind(pointsToDeduct, pointsToDeduct, now, customer.id),
       db
         .prepare(
           `INSERT INTO loyalty_point_logs
@@ -234,6 +237,25 @@ export async function reverseAccrual(
     const cashbackEarned = Number(order.cashback_earned ?? 0);
     if (cashbackEarned > 0) {
       const cashbackToReverse = Math.max(1, Math.round(cashbackEarned * ratio));
+      const walletRow = effectiveTenant
+        ? await db
+            .prepare(
+              "SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(customer.id, effectiveTenant)
+            .first<{ id: string; balance: number }>()
+            .catch(() =>
+              db
+                .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+                .bind(customer.id)
+                .first<{ id: string; balance: number }>(),
+            )
+            .catch(() => null)
+        : await db
+            .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
+            .bind(customer.id)
+            .first<{ id: string; balance: number }>()
+            .catch(() => null);
       if (effectiveTenant) {
         try {
           await db
@@ -264,6 +286,27 @@ export async function reverseAccrual(
           .bind(cashbackToReverse, now, customer.id)
           .run();
       }
+      const revWalletId = walletRow?.id || `cbw_${customer.id}`;
+      const revBalanceAfter = Math.max(0, Number(walletRow?.balance ?? 0) - cashbackToReverse);
+      const revTxId = `cbt_rev_${orderId}`;
+      await db
+        .prepare(
+          `INSERT INTO cashback_transactions
+           (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, 'debit', ?, ?, ?, ?)`,
+        )
+        .bind(
+          revTxId,
+          revWalletId,
+          customer.id,
+          orderId,
+          cashbackToReverse,
+          revBalanceAfter,
+          `Hoan tien cashback don #${orderId.slice(0, 8)}`,
+          now,
+        )
+        .run()
+        .catch(() => {});
       await db
         .prepare(
           `UPDATE orders
@@ -334,12 +377,24 @@ export async function reverseAccrual(
     }
   }
 
+  const finalTier = tierDowngraded ? computed.tierName : (customer.loyalty_tier ?? policy.defaultTier.tierName);
+  try {
+    await db
+      .prepare(
+        'UPDATE loyalty_accounts SET current_points = MAX(0, COALESCE(current_points, 0) - ?), lifetime_points = MAX(0, COALESCE(lifetime_points, 0) - ?), tier = ?, updated_at = ? WHERE customer_id = ?',
+      )
+      .bind(pointsToDeduct, pointsToDeduct, finalTier, now, customer.id)
+      .run();
+  } catch {
+    // loyalty_accounts is optional in minimal schemas
+  }
+
   return {
     ok: true,
     pointsDeducted: pointsToDeduct,
     newLifetimePoints,
     tierDowngraded,
-    newTier: tierDowngraded ? computed.tierName : (customer.loyalty_tier ?? policy.defaultTier.tierName),
+    newTier: finalTier,
   };
 }
 

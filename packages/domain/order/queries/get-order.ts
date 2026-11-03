@@ -16,13 +16,14 @@ export async function getOrder(
 ) {
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const hasTenantScope = Boolean(tenantId && tenantId !== '*');
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const hasTenantScope = Boolean(cleanTenant && cleanTenant !== '*');
     const tenantClause = hasTenantScope
-      ? tenantId === 'default'
-        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-        : ' AND tenant_id = ?'
+      ? cleanTenant === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+        : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)'
       : '';
-    const binds = hasTenantScope ? [id, tenantId!] : [id];
+    const binds = hasTenantScope ? [id, cleanTenant] : [id];
     let results: Record<string, unknown>[] = [];
     try {
       const res = await db.prepare(
@@ -36,7 +37,7 @@ export async function getOrder(
         ).bind(...binds).all<Record<string, unknown>>();
         results = res.results ?? [];
       } catch {
-        if (!hasTenantScope || tenantId === 'default') {
+        if (!hasTenantScope || cleanTenant === 'default') {
           try {
             const res = await db.prepare(
               'SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?'
@@ -52,7 +53,7 @@ export async function getOrder(
 
     if (hasTenantScope && results.length > 0 && 'tenant_id' in results[0] && results[0].tenant_id !== undefined) {
       const rowTenant = (results[0].tenant_id && String(results[0].tenant_id).trim()) || 'default';
-      if (rowTenant !== tenantId) {
+      if (rowTenant !== cleanTenant) {
         results = [];
       }
     }

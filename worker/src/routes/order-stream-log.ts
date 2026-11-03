@@ -59,13 +59,13 @@ export async function fetchOrderRecord(
   const joinScope = effectiveTenant === undefined
     ? ''
     : effectiveTenant === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      : ' AND (o.tenant_id = ? OR TRIM(o.tenant_id) = ?2)';
   const bareScope = effectiveTenant === undefined
     ? ''
     : effectiveTenant === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
   const values = effectiveTenant === undefined ? [orderId] : [orderId, effectiveTenant];
   const withTable = (await db.prepare(
     `SELECT o.*, COALESCE(t.table_number, t.id) as table_name

@@ -1,18 +1,19 @@
 import type { Hono } from 'hono';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, matchesTenantRow, resolvePublicTenantId } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import type { CreatePromotionInput } from './types';
 
 const PROMO_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
+function resolvePromoReadTenantId(c: Parameters<typeof resolvePublicTenantId>[0]): string {
+  const raw = resolvePublicTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c as Parameters<typeof isHQSuperAdmin>[0]) ? 'default' : raw;
+}
+
+function resolvePromoWriteTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  const raw = getTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c as Parameters<typeof isHQSuperAdmin>[0]) ? 'default' : raw;
 }
 
 async function findPromoForTenant(
@@ -20,12 +21,15 @@ async function findPromoForTenant(
   code: string,
   tenantId: string,
 ): Promise<Record<string, unknown> | null> {
+  const normTenant = (tenantId || '').trim() || 'default';
   const row = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first<Record<string, unknown>>();
-  if (row && matchesTenantRow(row, tenantId)) return row;
-  if (row && tenantId !== '*') {
-    const scoped = await db.prepare("SELECT * FROM promotions WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
-      .bind(code, tenantId).first<Record<string, unknown>>().catch(() => null);
-    if (scoped && matchesTenantRow(scoped, tenantId)) return scoped;
+  if (row && matchesTenantRow(row, normTenant)) return row;
+  if (row && normTenant !== '*') {
+    const scoped = await db.prepare(
+      "SELECT * FROM promotions WHERE code = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+    )
+      .bind(code, normTenant).first<Record<string, unknown>>().catch(() => null);
+    if (scoped && matchesTenantRow(scoped, normTenant)) return scoped;
   }
   return null;
 }
@@ -34,7 +38,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/promotions — list all promotions
   router.get('/', optionalAuth(), async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = resolvePromoReadTenantId(c);
     let results: unknown[] = [];
     try {
       const res = await db.prepare(
@@ -56,7 +60,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/promotions/:code — get single promotion
   router.get('/:code', optionalAuth(), async (c, next) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = resolvePromoReadTenantId(c);
     const code = c.req.param('code').toUpperCase();
     if (code === 'SUMMARY') {
       await next();
@@ -86,7 +90,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // POST /api/promotions — create new promotion
   router.post('/', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
-    const rawTenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c).trim() || 'default';
     const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const body = await c.req.json() as CreatePromotionInput;
     const code = body.code.trim().toUpperCase();
@@ -130,7 +134,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // PATCH /api/promotions/:code — update promotion
   router.patch('/:code', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = resolvePromoWriteTenantId(c);
     const code = c.req.param('code').toUpperCase();
     const body = await c.req.json() as Partial<CreatePromotionInput>;
 
@@ -144,7 +148,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     }
 
     const whereClause = tenantId !== '*'
-      ? "WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+      ? "WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR (code = ?8 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?9)"
       : 'WHERE code = ?';
     const whereArgs = tenantId !== '*' ? [code, tenantId] : [code];
     const baseFields = [body.percent ?? null, body.max_discount ?? null, body.min_order ?? null, body.usage_limit ?? null];
@@ -154,14 +158,16 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
         `UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
       ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
     } catch {
-      try {
-        await db.prepare(
-          'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
-        ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, code).run();
-      } catch {
-        await db.prepare(
-          'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
-        ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, code).run();
+      if (tenantId === 'default' || tenantId === '*') {
+        try {
+          await db.prepare(
+            'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
+          ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, code).run();
+        } catch {
+          await db.prepare(
+            'UPDATE promotions SET percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE code = ?'
+          ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, code).run();
+        }
       }
     }
 
@@ -172,7 +178,7 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
   // DELETE /api/promotions/:code — delete promotion
   router.delete('/:code', requireAuth(PROMO_ADMIN_ROLES), async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
+    const tenantId = resolvePromoWriteTenantId(c);
     const code = c.req.param('code').toUpperCase();
     const existing = await findPromoForTenant(db, code, tenantId);
     if (!existing) {
@@ -180,10 +186,17 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     }
 
     if (tenantId !== '*') {
-      await db.prepare("DELETE FROM promotions WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+      await db.prepare(
+        "DELETE FROM promotions WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR (code = ?1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+      )
         .bind(code, tenantId)
         .run()
-        .catch(() => db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run());
+        .catch(() => {
+          if (tenantId === 'default') {
+            return db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run();
+          }
+          return null;
+        });
     } else {
       await db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run();
     }

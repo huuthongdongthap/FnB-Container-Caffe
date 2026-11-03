@@ -22,14 +22,35 @@ interface Env {
  */
 export async function getRecipeForProduct(
   db: D1Database,
-  productId: string
+  productId: string,
+  tenantId?: string
 ): Promise<RecipeComponent[]> {
-  const recipe = await db
-    .prepare('SELECT id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1')
-    .bind(productId)
-    .first<{ id: string }>();
+  const normTenant = tenantId ? tenantId.trim() : undefined;
+  let recipe: { id: string; tenant_id?: string | null } | null = null;
+  if (normTenant && normTenant !== '*') {
+    try {
+      recipe = await db
+        .prepare("SELECT id, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(productId, normTenant)
+        .first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      recipe = await db
+        .prepare('SELECT id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1')
+        .bind(productId)
+        .first<{ id: string; tenant_id?: string | null }>();
+    }
+  } else {
+    recipe = await db
+      .prepare('SELECT id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1')
+      .bind(productId)
+      .first<{ id: string; tenant_id?: string | null }>();
+  }
 
   if (!recipe) return [];
+  if (normTenant && normTenant !== '*' && 'tenant_id' in recipe && recipe.tenant_id !== undefined) {
+    const rowTenant = typeof recipe.tenant_id === 'string' && recipe.tenant_id.trim() ? recipe.tenant_id.trim() : 'default';
+    if (rowTenant !== normTenant) return [];
+  }
 
   const { results } = await db
     .prepare(
@@ -74,14 +95,16 @@ export function calculateBomDepletion(
 export async function deductIngredientsForOrder(
   env: Env,
   orderId: string,
-  orderItems: Array<{ product_id: string; quantity: number }>
+  orderItems: Array<{ product_id: string; quantity: number }>,
+  tenantId?: string
 ): Promise<void> {
   const db = env.AURA_DB;
+  const normTenant = tenantId ? tenantId.trim() : undefined;
 
   const recipeMap = new Map<string, RecipeComponent[]>();
   for (const item of orderItems) {
     if (!recipeMap.has(item.product_id)) {
-      const components = await getRecipeForProduct(db, item.product_id);
+      const components = await getRecipeForProduct(db, item.product_id, normTenant);
       if (components.length > 0) {
         recipeMap.set(item.product_id, components);
       }
@@ -118,6 +141,13 @@ export async function deductIngredientsForOrder(
 
   try {
     await db.batch(ops);
+    if (normTenant && normTenant !== '*') {
+      await db
+        .prepare("UPDATE inventory_transactions SET tenant_id = ? WHERE reference_id = ? AND reference_type = 'order'")
+        .bind(normTenant, orderId)
+        .run()
+        .catch(() => {});
+    }
   } catch {
     const fallbackOps = [];
     for (const [ingredientId, qty] of depletion) {

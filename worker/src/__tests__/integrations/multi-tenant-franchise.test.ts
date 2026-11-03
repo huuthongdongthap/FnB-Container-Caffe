@@ -2228,7 +2228,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
     it('enforces Customers Admin/Profile visit_count tenant scoping, HQ wildcard (?tenant_id=*), and Demand Forecast & Franchise Locations parity (I2–I3)', async () => {
       // Verify PROFILE_SQL correlates orders.tenant_id with customers.tenant_id
-      expect(PROFILE_SQL).toContain("COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')");
+      expect(PROFILE_SQL).toContain("COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')");
 
       const todayIso = new Date().toISOString();
       const custDef = {
@@ -2529,7 +2529,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         all: vi.fn(async () => {
           if (/FROM customers c LEFT JOIN cashback_wallets/i.test(sql)) {
             // Verify visit_count subquery correlates o.tenant_id with c.tenant_id
-            expect(sql).toContain("COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')");
+            expect(sql).toContain("COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')");
             if (args[0] === '*') return { results: [custDef, custSad] };
             if (args[0] === 'tenant_sadec_02') return { results: [custSad] };
             return { results: [custDef] };
@@ -5843,7 +5843,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           return null;
         }),
         all: vi.fn(async () => {
-          if (/SELECT \* FROM cashback_transactions WHERE wallet_id = \?/i.test(sql)) {
+          if (/FROM cashback_transactions WHERE wallet_id = \?/i.test(sql)) {
             return { results: cashbackTxs.filter((tx) => tx.wallet_id === args[0]) };
           }
           if (/SELECT \* FROM rewards ORDER BY point_cost ASC/i.test(sql)) {
@@ -5901,7 +5901,17 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
           for (const s of stmts) {
             batchExecuted.push({ sql: s.sql, args: s.args });
-            if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+            if (/UPDATE cashback_wallets\s+SET balance = COALESCE\(balance, 0\) \+ \?, total_earned = COALESCE\(total_earned, 0\) \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+              const delta = Number(s.args[0]);
+              const earned = Number(s.args[1]);
+              const cid = String(s.args[3]);
+              const t = String(s.args[4]);
+              const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+              if (w) {
+                w.balance = Number(w.balance ?? 0) + delta;
+                w.total_earned = Number(w.total_earned ?? 0) + earned;
+              }
+            } else if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
               const nextBal = Number(s.args[0]);
               const earned = Number(s.args[1]);
               const cid = String(s.args[3]);
@@ -6279,6 +6289,27 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (w) w.balance = Math.max(0, Number(w.balance) - rev);
             return { success: true, meta: { changes: w ? 1 : 0 } };
           }
+          if (/UPDATE customers SET loyalty_points = COALESCE\(loyalty_points,\s*0\)\s*\+\s*\?, lifetime_points = COALESCE\(lifetime_points,\s*0\)\s*\+\s*\?, updated_at = \? WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const delta = Number(args[0]);
+            const cid = String(args[3]);
+            const t = String(args[4]);
+            const c = customers.find((x) => x.id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+            if (c) {
+              c.loyalty_points = Number(c.loyalty_points || 0) + delta;
+              c.lifetime_points = Number(c.lifetime_points || 0) + Number(args[1]);
+            }
+            return { success: true, meta: { changes: c ? 1 : 0 } };
+          }
+          if (/UPDATE customers SET loyalty_points = COALESCE\(loyalty_points,\s*0\)\s*\+\s*\?, lifetime_points = COALESCE\(lifetime_points,\s*0\)\s*\+\s*\?, updated_at = \? WHERE id = \?/i.test(sql)) {
+            const delta = Number(args[0]);
+            const cid = String(args[3]);
+            const c = customers.find((x) => x.id === cid);
+            if (c) {
+              c.loyalty_points = Number(c.loyalty_points || 0) + delta;
+              c.lifetime_points = Number(c.lifetime_points || 0) + Number(args[1]);
+            }
+            return { success: true, meta: { changes: c ? 1 : 0 } };
+          }
           if (/UPDATE customers SET loyalty_points = \?, lifetime_points = \?, updated_at = \? WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
             const pts = Number(args[0]);
             const lpts = Number(args[1]);
@@ -6306,7 +6337,17 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
           for (const s of stmts) {
             executedSqls.push(s.sql);
-            if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+            if (/UPDATE cashback_wallets\s+SET balance = COALESCE\(balance, 0\) \+ \?, total_earned = COALESCE\(total_earned, 0\) \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+              const delta = Number(s.args[0]);
+              const earned = Number(s.args[1]);
+              const cid = String(s.args[3]);
+              const t = String(s.args[4]);
+              const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+              if (w) {
+                w.balance = Number(w.balance ?? 0) + delta;
+                w.total_earned = Number(w.total_earned ?? 0) + earned;
+              }
+            } else if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
               const nextBal = Number(s.args[0]);
               const earned = Number(s.args[1]);
               const cid = String(s.args[3]);
@@ -6440,6 +6481,5969 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(executedSqls.some((s) => s.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"))).toBe(true);
     });
   });
+
+  // =========================================================================
+  // Suite 25: Phase U1–U3 — OpenAPI Order Update/Cancel Reversal & Accrual Parity,
+  //           Inventory Restore & BOM Recipe/Ingredient Tenant Scoping, and
+  //           Check-in / Birthday / Promotion Code-Keyed Multi-Tenant Isolation
+  // =========================================================================
+  describe('Suite 25: OpenAPI Order Update/Cancel Reversal & Accrual Parity, Inventory Restore & BOM Recipe/Ingredient Tenant Scoping, and Check-in/Birthday/Promotion Multi-Tenant Isolation (U1–U3)', () => {
+    it('enforces tenant-scoped reversal/accrual in handleOpenApiUpdateOrder & handleCancelOrder, scopes restoreInventoryForOrder/getCanonicalRecipe/deductOrderStock by tenant, and isolates same-day checkins, birthday redemptions & code-keyed promotion usage by tenant (U1–U3)', async () => {
+      const { handleOpenApiUpdateOrder, handleCancelOrder } = await import('../../routes/openapi-orders-handlers/order-write-handlers');
+      const { restoreInventoryForOrder } = await import('../../../../packages/domain/inventory/src/routes/order-deduction');
+      const { getCanonicalRecipe, deductOrderStock } = await import('../../../../packages/domain/inventory/src/policies/inventory-recipe-policy');
+      const { checkinRouter } = await import('../../routes/checkin');
+      const { birthdayRouter } = await import('../../routes/birthday');
+      const { promotionsRouter } = await import('../../routes/promotions');
+      const { Hono } = await import('hono');
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayMonthDay = todayStr.slice(5); // MM-DD
+
+      const customers: Array<Record<string, unknown>> = [
+        {
+          id: 'cust_fran_u1',
+          name: 'SaDec Customer U1',
+          phone: '0906661111',
+          email: 'fran_u1@aura.vn',
+          birthday: `1995-${todayMonthDay}`,
+          date_of_birth: `1995-${todayMonthDay}`,
+          loyalty_points: 250,
+          lifetime_points: 250,
+          loyalty_tier: 'gold',
+          tenant_id: 'tenant_sadec_02',
+        },
+        {
+          id: 'cust_def_u1',
+          name: 'Default Customer U1',
+          phone: '0906660000',
+          email: 'def_u1@aura.vn',
+          birthday: `1995-${todayMonthDay}`,
+          date_of_birth: `1995-${todayMonthDay}`,
+          loyalty_points: 100,
+          lifetime_points: 100,
+          loyalty_tier: 'silver',
+          tenant_id: '   ',
+        },
+      ];
+
+      const wallets: Array<Record<string, unknown>> = [
+        {
+          id: 'wal_def_u1',
+          customer_id: 'cust_fran_u1',
+          balance: 700000,
+          total_earned: 700000,
+          total_spent: 0,
+          tenant_id: 'default',
+        },
+        {
+          id: 'wal_fran_u1',
+          customer_id: 'cust_fran_u1',
+          balance: 20000,
+          total_earned: 20000,
+          total_spent: 0,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const orders: Array<Record<string, unknown>> = [
+        {
+          id: 'ord_fran_u1',
+          customer_id: 'cust_fran_u1',
+          customer_phone: '0906661111',
+          total: 100000,
+          total_amount: 100000,
+          status: 'served',
+          payment_status: 'paid',
+          tenant_id: 'tenant_sadec_02',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'ord_fran_cancel_u1',
+          customer_id: 'cust_fran_u1',
+          customer_phone: '0906661111',
+          total: 100000,
+          total_amount: 100000,
+          points_earned: 100,
+          cashback_earned: 5000,
+          status: 'confirmed',
+          payment_status: 'paid',
+          tenant_id: 'tenant_sadec_02',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'ord_def_ws_u1',
+          customer_id: 'cust_def_u1',
+          total: 50000,
+          status: 'pending',
+          payment_status: 'unpaid',
+          tenant_id: '   ',
+          created_at: new Date().toISOString(),
+        },
+      ];
+
+      const inventoryItems: Array<Record<string, unknown>> = [
+        { id: 'inv_def_1', sku: 'SKU_DEF', name: 'Default Beans', current_stock: 50, unit: 'kg', tenant_id: 'default' },
+        { id: 'inv_fran_1', sku: 'SKU_FRAN', name: 'SaDec Beans', current_stock: 30, unit: 'kg', tenant_id: 'tenant_sadec_02' },
+      ];
+
+      const inventoryTxs: Array<Record<string, unknown>> = [
+        { id: 'itx_cross_1', item_id: 'inv_def_1', type: 'reserve', quantity: -5, reference_id: 'ord_fran_cancel_u1', reference_type: 'order' },
+        { id: 'itx_same_1', item_id: 'inv_fran_1', type: 'reserve', quantity: -3, reference_id: 'ord_fran_cancel_u1', reference_type: 'order' },
+      ];
+
+      const recipes: Array<Record<string, unknown>> = [
+        { id: 'rec_def_only', product_id: 'prod_def_only', name: 'Default Recipe', is_active: 1, tenant_id: '   ' },
+        { id: 'rec_fran_u2', product_id: 'prod_fran_u2', name: 'SaDec Recipe', is_active: 1, tenant_id: 'tenant_sadec_02' },
+      ];
+
+      const recipeItems: Array<Record<string, unknown>> = [
+        { recipe_id: 'rec_def_only', ingredient_id: 'ing_def_u2', quantity: 20, unit: 'g' },
+        { recipe_id: 'rec_fran_u2', ingredient_id: 'ing_def_u2', quantity: 15, unit: 'g' },
+      ];
+
+      const ingredients: Array<Record<string, unknown>> = [
+        { id: 'ing_def_u2', name: 'Default Arabica', current_stock: 500, unit: 'g', cost_per_unit: 500, tenant_id: 'default' },
+      ];
+
+      const stockMovements: Array<Record<string, unknown>> = [];
+
+      const promotions: Array<Record<string, unknown>> = [
+        { code: 'SHAREDCODE', percent: 10, max_discount: 20000, min_order: 0, usage_limit: 10, usage_count: 5, current_uses: 5, used_count: 5, is_active: 1, tenant_id: 'default' },
+        { code: 'SHAREDCODE', percent: 15, max_discount: 30000, min_order: 0, usage_limit: 10, usage_count: 2, current_uses: 2, used_count: 2, is_active: 1, tenant_id: 'tenant_sadec_02' },
+      ];
+
+      const promoRedemptions: Array<Record<string, unknown>> = [
+        { order_id: 'ord_fran_cancel_u1', code: 'SHAREDCODE', discount_amount: 15000 },
+      ];
+
+      const checkins: Array<Record<string, unknown>> = [
+        {
+          id: 'ci_def_today',
+          customer_id: 'cust_fran_u1',
+          customer_name: 'Checked In At Default',
+          checkin_date: todayStr,
+          checkin_time: new Date().toISOString(),
+          reward_amount: 5000,
+          status: 'pending',
+          tenant_id: 'default',
+        },
+      ];
+
+      const birthdayRedemptions: Array<Record<string, unknown>> = [
+        {
+          id: 'bday_def_year',
+          customer_id: 'cust_fran_u1',
+          discount_percent: 15,
+          redeemed_at: new Date().toISOString(),
+          tenant_id: 'default',
+        },
+      ];
+
+      const cashbackTxs: Array<Record<string, unknown>> = [
+        {
+          id: 'ctx_earn_cancel_u1',
+          wallet_id: 'wal_fran_u1',
+          customer_id: 'cust_fran_u1',
+          order_id: 'ord_fran_cancel_u1',
+          type: 'earn',
+          amount: 7000,
+        },
+      ];
+
+      const executedSqls: string[] = [];
+
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        first: vi.fn(async () => {
+          executedSqls.push(sql);
+          if (isAccountLookup(sql)) {
+            if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
+            if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
+          }
+          if (/FROM orders WHERE id = \?/i.test(sql) || /FROM orders o\s+LEFT JOIN cafe_tables/i.test(sql)) {
+            return orders.find((o) => o.id === args[0]) ?? null;
+          }
+          if (/SELECT customer_id FROM cashback_transactions WHERE order_id = \? AND type = 'earn'/i.test(sql)) {
+            return cashbackTxs.find((tx) => tx.order_id === args[0] && tx.type === 'earn') ?? null;
+          }
+          if (/SELECT id FROM cashback_transactions WHERE order_id = \? AND type = 'earn'/i.test(sql)) {
+            return cashbackTxs.find((tx) => tx.order_id === args[0] && tx.type === 'earn') ?? null;
+          }
+          if (/SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = \?/i.test(sql)) {
+            return promoRedemptions.find((pr) => pr.order_id === args[0]) ?? null;
+          }
+          if (/SELECT order_id, discount_amount FROM promotion_redemptions WHERE order_id = \?/i.test(sql)) {
+            return promoRedemptions.find((pr) => pr.order_id === args[0]) ?? null;
+          }
+          if (/SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id\s+FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql) ||
+              /SELECT id, tenant_id FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return customers.find((c) => c.id === cid && ((String(c.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            return customers.find((c) => c.id === args[0]) ?? null;
+          }
+          if (/FROM cashback_wallets WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return wallets.find((w) => w.customer_id === cid && ((String(w.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT id, tenant_id FROM inventory_items WHERE id = \?/i.test(sql)) {
+            return inventoryItems.find((i) => i.id === args[0]) ?? null;
+          }
+          if (/SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = \? AND is_active = 1 AND/i.test(sql)) {
+            const pid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return recipes.find((r) => r.product_id === pid && ((String(r.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = \?/i.test(sql)) {
+            return recipes.find((r) => r.product_id === args[0]) ?? null;
+          }
+          if (/SELECT id, current_stock, tenant_id FROM ingredients WHERE id = \?/i.test(sql) || /SELECT id, tenant_id FROM ingredients WHERE id = \?/i.test(sql)) {
+            return ingredients.find((i) => i.id === args[0]) ?? null;
+          }
+          if (/SELECT id FROM stock_movements WHERE reference_id = \?/i.test(sql)) {
+            return stockMovements.find((m) => m.reference_id === args[0]) ?? null;
+          }
+          if (/SELECT id FROM checkins WHERE customer_id = \? AND checkin_date = \?$/i.test(sql.trim())) {
+            return checkins.find((ci) => ci.customer_id === args[0] && ci.checkin_date === args[1]) ?? null;
+          }
+          if (/SELECT id, tenant_id FROM checkins WHERE customer_id = \? AND checkin_date = \? AND/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const dt = String(args[1] ?? '');
+            const t = String(args[2] ?? 'default');
+            return checkins.find((ci) => ci.customer_id === cid && ci.checkin_date === dt && ((String(ci.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT \* FROM checkins WHERE id = \?/i.test(sql)) {
+            return checkins.find((ci) => ci.id === args[0]) ?? null;
+          }
+          if (/SELECT id FROM birthday_redemptions WHERE customer_id = \? AND redeemed_at >= \?$/i.test(sql.trim())) {
+            return birthdayRedemptions.find((b) => b.customer_id === args[0]) ?? null;
+          }
+          if (/SELECT id, tenant_id FROM birthday_redemptions WHERE customer_id = \? AND redeemed_at >= \? AND/i.test(sql)) {
+            const cid = String(args[0] ?? '');
+            const t = String(args[2] ?? 'default');
+            return birthdayRedemptions.find((b) => b.customer_id === cid && ((String(b.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT \* FROM birthday_redemptions WHERE id = \?/i.test(sql)) {
+            return birthdayRedemptions.find((b) => b.id === args[0]) ?? null;
+          }
+          if (/SELECT \* FROM promotions WHERE UPPER\(code\) = \? AND/i.test(sql)) {
+            const c = String(args[0] ?? '').toUpperCase();
+            const t = String(args[1] ?? 'default');
+            return promotions.find((p) => String(p.code).toUpperCase() === c && ((String(p.tenant_id ?? '').trim()) || 'default') === t) ?? null;
+          }
+          if (/SELECT \* FROM promotions WHERE UPPER\(code\) = \?$/i.test(sql.trim())) {
+            const c = String(args[0] ?? '').toUpperCase();
+            return promotions.find((p) => String(p.code).toUpperCase() === c) ?? null;
+          }
+          return null;
+        }),
+        all: vi.fn(async () => {
+          executedSqls.push(sql);
+          if (/FROM inventory_transactions\s+WHERE reference_id = \? AND reference_type = 'order' AND type = 'reserve'/i.test(sql)) {
+            return { results: inventoryTxs.filter((tx) => tx.reference_id === args[0] && tx.type === 'reserve') };
+          }
+          if (/FROM recipe_items ri/i.test(sql)) {
+            const rid = String(args[0] ?? '');
+            const items = recipeItems
+              .filter((ri) => ri.recipe_id === rid)
+              .map((ri) => {
+                const ing = ingredients.find((i) => i.id === ri.ingredient_id);
+                return {
+                  ingredient_id: ri.ingredient_id,
+                  quantity: ri.quantity,
+                  unit: ri.unit,
+                  ing_name: ing?.name,
+                  cost_per_unit: ing?.cost_per_unit ?? 0,
+                };
+              });
+            return { results: items };
+          }
+          return { results: [] };
+        }),
+        run: vi.fn(async () => {
+          executedSqls.push(sql);
+          if (/UPDATE orders SET status = \?/i.test(sql)) {
+            const nextStatus = String(args[0]);
+            const oid = String(args[args.length - 1] ?? args[1]);
+            const ord = orders.find((o) => o.id === oid || args.includes(o.id));
+            if (ord) ord.status = nextStatus;
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE cashback_wallets\s+SET balance = MAX\(0, balance - \?\), updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const rev = Number(args[0]);
+            const cid = String(args[2]);
+            const t = String(args[3]);
+            const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+            if (w) w.balance = Math.max(0, Number(w.balance) - rev);
+            return { success: true, meta: { changes: w ? 1 : 0 } };
+          }
+          if (/UPDATE promotions[\s\S]*WHERE UPPER\(code\) = UPPER\(\?\) AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const code = String(args[0]).toUpperCase();
+            const t = String(args[1]);
+            const p = promotions.find((x) => String(x.code).toUpperCase() === code && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+            if (p) {
+              p.usage_count = Math.max(0, Number(p.usage_count) - 1);
+              p.current_uses = Math.max(0, Number(p.current_uses) - 1);
+              p.used_count = Math.max(0, Number(p.used_count) - 1);
+            }
+            return { success: true, meta: { changes: p ? 1 : 0 } };
+          }
+          if (/UPDATE promotions SET usage_count = COALESCE\(usage_count, 0\) \+ 1 WHERE code = \? AND \(COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = \? OR COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?2\)/i.test(sql)) {
+            const code = String(args[0]).toUpperCase();
+            const t = String(args[1]);
+            const p = promotions.find((x) => String(x.code).toUpperCase() === code && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+            if (p) p.usage_count = Number(p.usage_count) + 1;
+            return { success: true, meta: { changes: p ? 1 : 0 } };
+          }
+          if (/INSERT INTO stock_movements/i.test(sql)) {
+            stockMovements.push({ id: args[0], ingredient_id: args[1], quantity: args[2], reference_id: args[3] });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO checkins/i.test(sql)) {
+            checkins.push({
+              id: args[0],
+              customer_id: args[1],
+              customer_name: args[2],
+              checkin_date: args[3],
+              checkin_time: args[4],
+              reward_amount: args[5],
+              status: args[6],
+              created_at: args[7],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE checkins SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const ci = checkins.find((x) => x.id === args[1]);
+            if (ci) ci.tenant_id = args[0];
+            return { success: true, meta: { changes: ci ? 1 : 0 } };
+          }
+          if (/INSERT INTO birthday_redemptions/i.test(sql)) {
+            birthdayRedemptions.push({
+              id: args[0],
+              customer_id: args[1],
+              discount_percent: args[2],
+              order_id: args[3],
+              redeemed_at: args[4],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE birthday_redemptions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const br = birthdayRedemptions.find((x) => x.id === args[1]);
+            if (br) br.tenant_id = args[0];
+            return { success: true, meta: { changes: br ? 1 : 0 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        }),
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => {
+          const base = makeStmt(sql, []);
+          return {
+            ...base,
+            bind: vi.fn((...args: unknown[]) => makeStmt(sql, args)),
+          };
+        }),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
+          for (const s of stmts) {
+            executedSqls.push(s.sql);
+            if (/UPDATE cashback_wallets\s+SET balance = COALESCE\(balance, 0\) \+ \?, total_earned = COALESCE\(total_earned, 0\) \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+              const delta = Number(s.args[0]);
+              const earned = Number(s.args[1]);
+              const cid = String(s.args[3]);
+              const t = String(s.args[4]);
+              const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+              if (w) {
+                w.balance = Number(w.balance ?? 0) + delta;
+                w.total_earned = Number(w.total_earned ?? 0) + earned;
+              }
+            } else if (/UPDATE cashback_wallets\s+SET balance = \?, total_earned = total_earned \+ \?, updated_at = \?\s+WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(s.sql)) {
+              const nextBal = Number(s.args[0]);
+              const earned = Number(s.args[1]);
+              const cid = String(s.args[3]);
+              const t = String(s.args[4]);
+              const w = wallets.find((x) => x.customer_id === cid && ((String(x.tenant_id ?? '').trim()) || 'default') === t);
+              if (w) {
+                w.balance = nextBal;
+                w.total_earned = Number(w.total_earned) + earned;
+              }
+            }
+            if (/UPDATE inventory_items SET current_stock = current_stock \+ \?/i.test(s.sql)) {
+              const qty = Number(s.args[0]);
+              const iid = String(s.args[1]);
+              const item = inventoryItems.find((i) => i.id === iid);
+              if (item) item.current_stock = Number(item.current_stock) + qty;
+            }
+          }
+          return [];
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+      });
+
+      // 1. U1: OpenAPI handleOpenApiUpdateOrder transitions 'ord_fran_u1' -> 'completed' and credits ONLY 'wal_fran_u1'
+      const orderApiApp = new Hono<{ Bindings: Env }>();
+      orderApiApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      orderApiApp.patch('/api/orders/:id', (c) => handleOpenApiUpdateOrder(c as any));
+      orderApiApp.post('/api/orders/:id/cancel', (c) => handleCancelOrder(c as any));
+
+      const completeRes = await orderApiApp.fetch(
+        new Request('https://api.test/api/orders/ord_fran_u1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        }),
+        franEnv
+      );
+      expect(completeRes.status).toBe(200);
+      expect(Number(wallets.find((w) => w.id === 'wal_fran_u1')?.balance)).toBeGreaterThan(20000);
+      expect(wallets.find((w) => w.id === 'wal_def_u1')?.balance).toBe(700000);
+
+      // Transition 'ord_fran_cancel_u1' -> 'cancelled' via handleOpenApiUpdateOrder:
+      // - Restores ONLY 'inv_fran_1' (30 -> 33), NOT cross-tenant 'inv_def_1' (remains 50)
+      // - Reverses cashback on 'wal_fran_u1', NOT 'wal_def_u1'
+      // - Decrements 'SHAREDCODE' usage ONLY for 'tenant_sadec_02' (2 -> 1), leaving 'default' at 5
+      const walletBeforeCancel = Number(wallets.find((w) => w.id === 'wal_fran_u1')?.balance);
+      const cancelViaPatchRes = await orderApiApp.fetch(
+        new Request('https://api.test/api/orders/ord_fran_cancel_u1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled', reason: 'Customer changed mind' }),
+        }),
+        franEnv
+      );
+      expect(cancelViaPatchRes.status).toBe(200);
+      expect(inventoryItems.find((i) => i.id === 'inv_fran_1')?.current_stock).toBe(33);
+      expect(inventoryItems.find((i) => i.id === 'inv_def_1')?.current_stock).toBe(50);
+      expect(Number(wallets.find((w) => w.id === 'wal_fran_u1')?.balance)).toBeLessThan(walletBeforeCancel);
+      expect(wallets.find((w) => w.id === 'wal_def_u1')?.balance).toBe(700000);
+      expect(promotions.find((p) => p.tenant_id === 'tenant_sadec_02')?.usage_count).toBe(1);
+      expect(promotions.find((p) => p.tenant_id === 'default')?.usage_count).toBe(5);
+
+      // 2. U2: restoreInventoryForOrder aborts when caller tenantId mismatches order.tenant_id
+      await restoreInventoryForOrder({ AURA_DB: mockDb as any }, 'ord_fran_u1', 'default');
+      expect(inventoryItems.find((i) => i.id === 'inv_fran_1')?.current_stock).toBe(33);
+
+      // U2: getCanonicalRecipe normalizes whitespace-only tenant_id ('   ') to 'default' and blocks cross-tenant fallback
+      const crossRecipe = await getCanonicalRecipe(mockDb as any, 'prod_def_only', 'tenant_sadec_02');
+      expect(crossRecipe).toBeNull();
+      const wsDefaultRecipe = await getCanonicalRecipe(mockDb as any, 'prod_def_only', 'default');
+      expect(wsDefaultRecipe).not.toBeNull();
+      expect(wsDefaultRecipe?.id).toBe('rec_def_only');
+
+      // U2: deductOrderStock rejects cross-tenant ingredient in allowNegative: false and skips cross-tenant stock_movements in allowNegative: true
+      const strictDeduct = await deductOrderStock(
+        mockDb as any,
+        'ord_fran_u2_strict',
+        [{ productId: 'prod_fran_u2', quantity: 1 }],
+        { allowNegative: false, tenantId: 'tenant_sadec_02' }
+      );
+      expect(strictDeduct.ok).toBe(false);
+      expect(strictDeduct.error).toBe('insufficient_stock');
+
+      const lenientDeduct = await deductOrderStock(
+        mockDb as any,
+        'ord_fran_u2_lenient',
+        [{ productId: 'prod_fran_u2', quantity: 1 }],
+        { allowNegative: true, tenantId: 'tenant_sadec_02' }
+      );
+      expect(lenientDeduct.ok).toBe(true);
+      expect(stockMovements.some((m) => m.reference_id === 'ord_fran_u2_lenient')).toBe(false);
+
+      // 3. U3: Check-in same-day duplicate guard isolates by tenant and persists tenant_id on checkins
+      const checkinApp = new Hono<{ Bindings: Env }>();
+      checkinApp.route('/api/checkin', checkinRouter);
+      const franCheckinRes = await checkinApp.fetch(
+        new Request('https://api.test/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'tenant_sadec_02' },
+          body: JSON.stringify({ customer_id: 'cust_fran_u1', customer_name: 'SaDec Customer U1' }),
+        }),
+        franEnv
+      );
+      expect(franCheckinRes.status).toBe(201);
+      const newCheckin = checkins.find((ci) => ci.id !== 'ci_def_today');
+      expect(newCheckin?.tenant_id).toBe('tenant_sadec_02');
+
+      // Second check-in on the same day at the SAME tenant ('tenant_sadec_02') is blocked with 400
+      const dupFranCheckinRes = await checkinApp.fetch(
+        new Request('https://api.test/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'tenant_sadec_02' },
+          body: JSON.stringify({ customer_id: 'cust_fran_u1', customer_name: 'SaDec Customer U1' }),
+        }),
+        franEnv
+      );
+      expect(dupFranCheckinRes.status).toBe(400);
+
+      // 4. U3: Birthday annual redemption check & redeem isolate by tenant and persist tenant_id on birthday_redemptions
+      const bdayApp = new Hono<{ Bindings: Env }>();
+      bdayApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      bdayApp.route('/api/birthday', birthdayRouter);
+      const bdayCheckRes = await bdayApp.fetch(
+        new Request('https://api.test/api/birthday/check?customer_id=cust_fran_u1', {
+          headers: { 'X-Tenant-ID': 'tenant_sadec_02' },
+        }),
+        franEnv
+      );
+      expect(bdayCheckRes.status).toBe(200);
+      const bdayCheckBody = (await bdayCheckRes.json()) as { data: { eligible: boolean } };
+      expect(bdayCheckBody.data.eligible).toBe(true);
+
+      const bdayRedeemRes = await bdayApp.fetch(
+        new Request('https://api.test/api/birthday/redeem', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: JSON.stringify({ customer_id: 'cust_fran_u1', order_id: 'ord_fran_u1' }),
+        }),
+        franEnv
+      );
+      expect(bdayRedeemRes.status).toBe(201);
+      const newBday = birthdayRedemptions.find((b) => b.id !== 'bday_def_year');
+      expect(newBday?.tenant_id).toBe('tenant_sadec_02');
+
+      // 5. U3: Promotion code-keyed /redeem increments ONLY the 'tenant_sadec_02' promotion row (1 -> 2), leaving 'default' at 5
+      const promoApp = new Hono<{ Bindings: Env }>();
+      promoApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      promoApp.route('/api/promotions', promotionsRouter);
+      const promoRedeemRes = await promoApp.fetch(
+        new Request('https://api.test/api/promotions/redeem', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: JSON.stringify({ code: 'SHAREDCODE', order_id: 'ord_fran_u1', order_total: 100000 }),
+        }),
+        franEnv
+      );
+      expect(promoRedeemRes.status).toBe(200);
+      expect(promotions.find((p) => p.tenant_id === 'tenant_sadec_02')?.usage_count).toBe(2);
+      expect(promotions.find((p) => p.tenant_id === 'default')?.usage_count).toBe(5);
+    });
+  });
+
+  // =========================================================================
+  // Suite 26: Phase V1-V3 — Loyalty Rewards/Redeem/My-Rewards/Points/Summary,
+  //           Referral Code/Apply/Stats, OpenAPI Promotion Usage & PO Receive
+  //           Multi-Tenant Isolation
+  // =========================================================================
+  describe('Suite 26: Phase V1-V3 — Loyalty Rewards, Referrals, Promotion Usage & PO Receive Multi-Tenant Isolation', () => {
+    it('isolates loyalty_rewards catalog/redeem/my-rewards/points/summary, referral code/apply/stats, promotion_usages, and PO receive across tenants', async () => {
+      const { loyaltyRouter } = await import('../../routes/loyalty');
+      const { referralRouter } = await import('../../routes/referrals');
+      const { registerUsageHandlers } = await import('../../routes/openapi-promotions-handlers/usage-handlers');
+      const { registerPurchaseOrderHandlers } = await import('../../routes/openapi-inventory-handlers/purchase-order-handlers');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { Hono } = await import('hono');
+
+      const custSadecToken = await generateJWT(
+        { id: 'cust_fran_v1', role: 'customer', tenantId: 'tenant_sadec_02' },
+        TEST_JWT_SECRET,
+        3600
+      );
+
+      const customers: Array<Record<string, unknown>> = [
+        {
+          id: 'cust_fran_v1',
+          name: 'SaDec Customer V1',
+          phone: '0977111222',
+          email: 'v1@sadec.vn',
+          loyalty_points: 500,
+          lifetime_points: 500,
+          loyalty_tier: 'silver',
+          tenant_id: 'tenant_sadec_02',
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'cust_ref_owner_fran',
+          name: 'SaDec Referrer',
+          phone: '0977333444',
+          loyalty_points: 200,
+          tenant_id: 'tenant_sadec_02',
+        },
+        {
+          id: 'cust_ref_owner_def',
+          name: 'Default Referrer',
+          phone: '0977555666',
+          loyalty_points: 200,
+          tenant_id: 'default',
+        },
+      ];
+
+      const loyaltyRewards: Array<Record<string, unknown>> = [
+        {
+          id: 'lr_def_v1',
+          name: 'Default Free Latte',
+          points_cost: 100,
+          description: 'Default store reward',
+          type: 'free_item',
+          value: 45000,
+          is_active: 1,
+          tenant_id: 'default',
+        },
+        {
+          id: 'lr_fran_v1',
+          name: 'SaDec Free Matcha',
+          points_cost: 150,
+          description: 'SaDec store reward',
+          type: 'free_item',
+          value: 50000,
+          is_active: 1,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const userRewards: Array<Record<string, unknown>> = [
+        {
+          id: 'uwr_def_existing',
+          customer_id: 'cust_fran_v1',
+          reward_id: 'lr_def_v1',
+          code: 'DEF-CODE-1',
+          status: 'active',
+          tenant_id: 'default',
+          created_at: '2026-11-01T00:00:00.000Z',
+        },
+      ];
+
+      const loyaltyRedemptions: Array<Record<string, unknown>> = [];
+      const loyaltyPointLogs: Array<Record<string, unknown>> = [
+        {
+          id: 'ptl_def_existing',
+          customer_id: 'cust_fran_v1',
+          points_change: 50,
+          reason: 'earn',
+          tenant_id: 'default',
+          created_at: '2026-11-01T00:00:00.000Z',
+        },
+      ];
+      const loyaltyTransactions: Array<Record<string, unknown>> = [];
+
+      const referralCodes: Array<Record<string, unknown>> = [
+        {
+          id: 'refc_def_existing',
+          customer_id: 'cust_fran_v1',
+          code: 'FNB-DEF001',
+          times_used: 3,
+          total_points_earned: 300,
+          tenant_id: 'default',
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'refc_owner_fran',
+          customer_id: 'cust_ref_owner_fran',
+          code: 'FNB-SADEC1',
+          times_used: 1,
+          total_points_earned: 0,
+          tenant_id: 'tenant_sadec_02',
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'refc_owner_def',
+          customer_id: 'cust_ref_owner_def',
+          code: 'FNB-ONLYDF',
+          times_used: 1,
+          total_points_earned: 0,
+          tenant_id: 'default',
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ];
+
+      const referrals: Array<Record<string, unknown>> = [
+        {
+          id: 'ref_def_prev',
+          referrer_id: 'cust_fran_v1',
+          referred_customer_id: 'cust_fran_v1',
+          referral_code: 'FNB-DEF001',
+          status: 'completed',
+          cashback_awarded_vnd: 10000,
+          tenant_id: 'default',
+          created_at: '2026-10-01T00:00:00.000Z',
+        },
+      ];
+
+      const promotions: Array<Record<string, unknown>> = [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          code: 'SADECVIP',
+          name: 'SaDec VIP Promo',
+          discount_type: 'fixed',
+          discount_value: 15000,
+          is_active: 1,
+          max_uses: 10,
+          current_uses: 1,
+          usage_count: 1,
+          usage_limit_per_customer: 1,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const promotionUsages: Array<Record<string, unknown>> = [
+        {
+          id: 'pu_def_existing',
+          promotion_id: '11111111-1111-4111-8111-111111111111',
+          customer_id: 'cust_fran_v1',
+          order_id: '33333333-3333-4333-8333-333333333333',
+          discount_amount: 15000,
+          tenant_id: 'default',
+        },
+      ];
+
+      const orders: Array<Record<string, unknown>> = [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          customer_id: 'cust_fran_v1',
+          status: 'pending',
+          total: 100000,
+          subtotal: 100000,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const purchaseOrders: Array<Record<string, unknown>> = [
+        {
+          id: 'po_fran_v3',
+          po_number: 'PO-SADEC-V3',
+          supplier_id: 'sup_fran_1',
+          status: 'ordered',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const ingredients: Array<Record<string, unknown>> = [
+        {
+          id: 'ing_def_v3',
+          name: 'Default Coffee Beans',
+          current_stock: 100,
+          tenant_id: 'default',
+        },
+        {
+          id: 'ing_fran_v3',
+          name: 'SaDec Coffee Beans',
+          current_stock: 40,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const stockMovements: Array<Record<string, unknown>> = [];
+      const inventoryTransactions: Array<Record<string, unknown>> = [];
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => {
+          const makeStmt = (args: unknown[]) => ({
+            bind: (...b: unknown[]) => makeStmt(b),
+            first: async () => {
+              if (/FROM customers WHERE id = \?/i.test(sql)) {
+                const cid = String(args[0]);
+                const cust = customers.find((c) => c.id === cid) || null;
+                if (cust && /TRIM\(tenant_id\)/i.test(sql) && args[1]) {
+                  if (String(cust.tenant_id || 'default').trim() !== String(args[1])) return null;
+                }
+                return cust;
+              }
+              if (/FROM rewards WHERE id = \?/i.test(sql)) {
+                return null;
+              }
+              if (/FROM loyalty_rewards WHERE id = \?/i.test(sql)) {
+                const rid = String(args[0]);
+                const r = loyaltyRewards.find((rw) => rw.id === rid) || null;
+                if (!r) return null;
+                return {
+                  id: r.id,
+                  title: r.name,
+                  point_cost: r.points_cost,
+                  ...(sql.includes('tenant_id') ? { tenant_id: r.tenant_id } : {}),
+                };
+              }
+              if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
+                return { id: 'wal_fran_v1', customer_id: args[0], balance: 25000, total_earned: 25000, total_spent: 0, tenant_id: 'tenant_sadec_02' };
+              }
+              if (/FROM referral_codes WHERE customer_id = \?/i.test(sql)) {
+                const cid = String(args[0]);
+                return referralCodes.find((rc) => rc.customer_id === cid) || null;
+              }
+              if (/FROM referral_codes WHERE code = \?/i.test(sql)) {
+                const code = String(args[0]);
+                return referralCodes.find((rc) => rc.code === code) || null;
+              }
+              if (/FROM referrals WHERE referred_customer_id = \?/i.test(sql)) {
+                const cid = String(args[0]);
+                return referrals.find((r) => r.referred_customer_id === cid) || null;
+              }
+              if (/FROM promotions WHERE id = \?/i.test(sql)) {
+                const pid = String(args[0]);
+                return promotions.find((p) => p.id === pid) || null;
+              }
+              if (/SELECT COUNT\(\*\) as cnt FROM promotion_usages WHERE promotion_id = \? AND customer_id = \?/i.test(sql)) {
+                const pid = String(args[0]);
+                const cid = String(args[1]);
+                const tid = args[2] ? String(args[2]) : undefined;
+                const cnt = promotionUsages.filter(
+                  (u) => u.promotion_id === pid && u.customer_id === cid && (!tid || String(u.tenant_id || 'default').trim() === tid)
+                ).length;
+                return { cnt };
+              }
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return orders.find((o) => o.id === String(args[0])) || null;
+              }
+              if (/FROM promotion_usages WHERE order_id = \?/i.test(sql)) {
+                return null;
+              }
+              if (/FROM purchase_orders WHERE id = \?/i.test(sql)) {
+                return purchaseOrders.find((po) => po.id === String(args[0])) || null;
+              }
+              if (/FROM ingredients WHERE id = \?/i.test(sql)) {
+                return ingredients.find((i) => i.id === String(args[0])) || null;
+              }
+              return null;
+            },
+            all: async () => {
+              if (/FROM rewards ORDER BY/i.test(sql)) {
+                return { results: [] };
+              }
+              if (/FROM loyalty_rewards WHERE is_active = 1/i.test(sql)) {
+                return {
+                  results: loyaltyRewards.map((r) => ({
+                    id: r.id,
+                    title: r.name,
+                    point_cost: r.points_cost,
+                    description: r.description,
+                    discount_type: r.type,
+                    discount_value: r.value,
+                    is_active: r.is_active,
+                    ...(sql.includes('tenant_id') ? { tenant_id: r.tenant_id } : {}),
+                  })),
+                };
+              }
+              if (/SELECT COUNT\(\*\) as cnt FROM user_rewards/i.test(sql)) {
+                const cid = String(args[0]);
+                const tid = args[1] ? String(args[1]) : undefined;
+                const cnt = userRewards.filter(
+                  (ur) => ur.customer_id === cid && ur.status === 'active' && (!tid || String(ur.tenant_id || 'default').trim() === tid)
+                ).length;
+                return { results: [{ cnt }] };
+              }
+              if (/FROM user_rewards ur LEFT JOIN rewards r/i.test(sql)) {
+                const cid = String(args[0]);
+                return {
+                  results: userRewards
+                    .filter((ur) => ur.customer_id === cid)
+                    .map((ur) => {
+                      const lr = loyaltyRewards.find((rw) => rw.id === ur.reward_id);
+                      return {
+                        ...ur,
+                        title: lr?.name || 'Reward',
+                        discount_type: lr?.type || 'free_item',
+                        discount_value: lr?.value || 0,
+                        r_tenant_id: null,
+                        lr_tenant_id: lr?.tenant_id ?? null,
+                      };
+                    }),
+                };
+              }
+              if (/FROM loyalty_point_logs WHERE customer_id = \?/i.test(sql)) {
+                const cid = String(args[0]);
+                return { results: loyaltyPointLogs.filter((l) => l.customer_id === cid) };
+              }
+              if (/SELECT COUNT\(\*\) as cnt FROM referrals WHERE referrer_id = \?/i.test(sql)) {
+                const cid = String(args[0]);
+                const tid = args[1] ? String(args[1]) : undefined;
+                const cnt = referrals.filter(
+                  (r) => r.referrer_id === cid && (!tid || String(r.tenant_id || 'default').trim() === tid)
+                ).length;
+                return { results: [{ cnt }] };
+              }
+              if (/SELECT COALESCE\(SUM\(cashback_awarded_vnd\), 0\) as total FROM referrals/i.test(sql)) {
+                const cid = String(args[0]);
+                const st = String(args[1]);
+                const tid = args[2] ? String(args[2]) : undefined;
+                const total = referrals
+                  .filter((r) => r.referrer_id === cid && r.status === st && (!tid || String(r.tenant_id || 'default').trim() === tid))
+                  .reduce((sum, r) => sum + Number(r.cashback_awarded_vnd || 0), 0);
+                return { results: [{ total }] };
+              }
+              if (/FROM referrals r LEFT JOIN customers c/i.test(sql)) {
+                const cid = String(args[0]);
+                return {
+                  results: referrals
+                    .filter((r) => r.referrer_id === cid)
+                    .map((r) => ({ ...r, referred_name: 'Friend', referred_phone: '0988777666' })),
+                };
+              }
+              if (/FROM purchase_order_items WHERE purchase_order_id = \?/i.test(sql)) {
+                return { results: [] };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              if (/UPDATE customers SET loyalty_points = loyalty_points - \?/i.test(sql)) {
+                const cost = Number(args[0]);
+                const cid = String(args[2]);
+                const tid = args.length >= 5 ? String(args[3]) : undefined;
+                const cust = customers.find((c) => c.id === cid && (!tid || String(c.tenant_id || 'default').trim() === tid));
+                if (!cust || Number(cust.loyalty_points || 0) < cost) {
+                  return { success: true, meta: { changes: 0 } };
+                }
+                cust.loyalty_points = Number(cust.loyalty_points) - cost;
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO loyalty_point_logs/i.test(sql)) {
+                loyaltyPointLogs.push({ id: args[0], customer_id: args[1], points_change: args[2], reason: args[3], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE loyalty_point_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = loyaltyPointLogs.find((l) => l.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT OR IGNORE INTO loyalty_transactions/i.test(sql)) {
+                loyaltyTransactions.push({ id: args[0], customer_id: args[2], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE loyalty_transactions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = loyaltyTransactions.find((t) => t.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO user_rewards/i.test(sql)) {
+                userRewards.push({ id: args[0], customer_id: args[1], reward_id: args[2], code: args[3], status: 'active', tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE user_rewards SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = userRewards.find((u) => u.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT OR IGNORE INTO loyalty_redemptions/i.test(sql)) {
+                loyaltyRedemptions.push({ id: args[0], customer_id: args[1], reward_id: args[2], code: args[3], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE loyalty_redemptions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = loyaltyRedemptions.find((r) => r.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO referral_codes/i.test(sql)) {
+                referralCodes.push({ id: args[0], customer_id: args[1], code: args[2], times_used: 0, total_points_earned: 0, tenant_id: 'default', created_at: args[3] });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE referral_codes SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = referralCodes.find((r) => r.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO referrals/i.test(sql)) {
+                referrals.push({ id: args[0], referrer_id: args[1], referred_customer_id: args[2], referral_code: args[3], status: 'pending', cashback_awarded_vnd: args[4], tenant_id: 'default', created_at: args[6] });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE referrals SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = referrals.find((r) => r.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE promotions SET current_uses = COALESCE\(current_uses, 0\) \+ 1/i.test(sql)) {
+                const pid = String(args[1]);
+                const tid = args[2] ? String(args[2]) : undefined;
+                const promo = promotions.find((p) => p.id === pid && (!tid || String(p.tenant_id || 'default').trim() === tid));
+                if (!promo) return { success: true, meta: { changes: 0 } };
+                promo.current_uses = Number(promo.current_uses || 0) + 1;
+                promo.usage_count = Number(promo.usage_count || 0) + 1;
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO promotion_usages/i.test(sql)) {
+                promotionUsages.push({ id: args[0], promotion_id: args[1], order_id: args[2], customer_id: args[3], discount_amount: args[4], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE promotion_usages SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = promotionUsages.find((u) => u.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE purchase_orders SET status = 'received'/i.test(sql)) {
+                const po = purchaseOrders.find((p) => p.id === args[1]);
+                if (po) po.status = 'received';
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE ingredients SET current_stock = COALESCE\(current_stock,\s*0\)\s*\+\s*\?/i.test(sql)) {
+                const ing = ingredients.find((i) => i.id === args[2]);
+                if (ing) ing.current_stock = Number(ing.current_stock || 0) + Number(args[0]);
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE ingredients SET current_stock = \?/i.test(sql)) {
+                const ing = ingredients.find((i) => i.id === args[2]);
+                if (ing) ing.current_stock = Number(args[0]);
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO stock_movements/i.test(sql)) {
+                stockMovements.push({ id: args[0], ingredient_id: args[1], quantity: args[3], reference_id: args[4], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE stock_movements SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = stockMovements.find((m) => m.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT OR IGNORE INTO inventory_transactions|INSERT INTO inventory_transactions/i.test(sql)) {
+                inventoryTransactions.push({ id: args[0], item_id: args[1], quantity: args[2], reference_id: args[3], tenant_id: 'default' });
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/UPDATE inventory_transactions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+                const row = inventoryTransactions.find((t) => t.id === args[1]);
+                if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return makeStmt([]);
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+      });
+
+      const loyaltyApp = new Hono<{ Bindings: Env }>();
+      loyaltyApp.route('/api/loyalty', loyaltyRouter);
+
+      // 1. V1: GET /api/loyalty/rewards returns ONLY 'lr_fran_v1' (filters out 'lr_def_v1' from loyalty_rewards fallback)
+      const rewardsRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/rewards', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(rewardsRes.status).toBe(200);
+      const rewardsBody = (await rewardsRes.json()) as { data: Array<{ id: string }> };
+      expect(rewardsBody.data.map((r) => r.id)).toEqual(['lr_fran_v1']);
+
+      // V1: POST /api/loyalty/redeem blocks cross-tenant 'lr_def_v1' with 404
+      const crossRedeemRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custSadecToken}` },
+          body: JSON.stringify({ reward_id: 'lr_def_v1' }),
+        }),
+        franEnv
+      );
+      expect(crossRedeemRes.status).toBe(404);
+
+      // V1: POST /api/loyalty/redeem succeeds on 'lr_fran_v1' and persists tenant_id = 'tenant_sadec_02'
+      const validRedeemRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custSadecToken}` },
+          body: JSON.stringify({ reward_id: 'lr_fran_v1' }),
+        }),
+        franEnv
+      );
+      expect(validRedeemRes.status).toBe(200);
+      expect(customers.find((c) => c.id === 'cust_fran_v1')?.loyalty_points).toBe(350);
+      expect(userRewards.find((u) => u.reward_id === 'lr_fran_v1')?.tenant_id).toBe('tenant_sadec_02');
+      expect(loyaltyRedemptions.find((r) => r.reward_id === 'lr_fran_v1')?.tenant_id).toBe('tenant_sadec_02');
+      expect(loyaltyPointLogs.find((l) => l.reason === 'redeem')?.tenant_id).toBe('tenant_sadec_02');
+
+      // V1: GET /api/loyalty/my-rewards & GET /api/loyalty/points return ONLY 'tenant_sadec_02' rows
+      const myRewardsRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/my-rewards', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(myRewardsRes.status).toBe(200);
+      const myRewardsBody = (await myRewardsRes.json()) as { data: Array<{ reward_id: string }> };
+      expect(myRewardsBody.data.map((r) => r.reward_id)).toEqual(['lr_fran_v1']);
+
+      const pointsRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/points', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(pointsRes.status).toBe(200);
+      const pointsBody = (await pointsRes.json()) as { data: Array<{ reason: string }> };
+      expect(pointsBody.data.map((p) => p.reason)).toEqual(['redeem']);
+
+      // V1: GET /api/loyalty/summary counts active_rewards ONLY for 'tenant_sadec_02' (1, not 2)
+      const summaryRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/summary', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(summaryRes.status).toBe(200);
+      const summaryBody = (await summaryRes.json()) as { data: { active_rewards: number } };
+      expect(summaryBody.data.active_rewards).toBe(1);
+
+      // 2. V2: Referral code, apply & stats isolate by tenant and persist tenant_id
+      const refApp = new Hono<{ Bindings: Env }>();
+      refApp.route('/api/referrals', referralRouter);
+
+      const getCodeRes = await refApp.fetch(
+        new Request('https://api.test/api/referrals/code', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(getCodeRes.status).toBe(200);
+      const getCodeBody = (await getCodeRes.json()) as { data: { code: string } };
+      expect(getCodeBody.data.code).not.toBe('FNB-DEF001');
+      expect(referralCodes.find((rc) => rc.code === getCodeBody.data.code)?.tenant_id).toBe('tenant_sadec_02');
+
+      // Cross-tenant referral code 'FNB-ONLYDF' is rejected with 404
+      const applyCrossRefRes = await refApp.fetch(
+        new Request('https://api.test/api/referrals/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custSadecToken}` },
+          body: JSON.stringify({ code: 'FNB-ONLYDF' }),
+        }),
+        franEnv
+      );
+      expect(applyCrossRefRes.status).toBe(404);
+
+      // Same-tenant referral code 'FNB-SADEC1' succeeds even though 'cust_fran_v1' had a 'default' referral ('ref_def_prev')
+      const applyValidRefRes = await refApp.fetch(
+        new Request('https://api.test/api/referrals/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custSadecToken}` },
+          body: JSON.stringify({ code: 'FNB-SADEC1' }),
+        }),
+        franEnv
+      );
+      expect(applyValidRefRes.status).toBe(200);
+      const newRefRow = referrals.find((r) => r.referral_code === 'FNB-SADEC1');
+      expect(newRefRow?.tenant_id).toBe('tenant_sadec_02');
+
+      // GET /api/referrals/stats excludes 'default' referrals ('ref_def_prev') for 'cust_fran_v1' in 'tenant_sadec_02'
+      const statsRes = await refApp.fetch(
+        new Request('https://api.test/api/referrals/stats', {
+          headers: { Authorization: `Bearer ${custSadecToken}` },
+        }),
+        franEnv
+      );
+      expect(statsRes.status).toBe(200);
+      const statsBody = (await statsRes.json()) as {
+        data: { total_referrals: number; total_cashback_earned_vnd: number; recent_referrals: unknown[] };
+      };
+      expect(statsBody.data.total_referrals).toBe(0);
+      expect(statsBody.data.total_cashback_earned_vnd).toBe(0);
+      expect(statsBody.data.recent_referrals).toHaveLength(0);
+
+      // 3. V3: OpenAPI POST /api/promotions/use scopes per-customer usage count by tenant and persists tenant_id
+      const promoUseApp = new OpenAPIHono<{ Bindings: Env }>();
+      promoUseApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'cust_fran_v1', customerId: 'cust_fran_v1', role: 'customer', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      registerUsageHandlers(promoUseApp);
+
+      const promoUseRes = await promoUseApp.fetch(
+        new Request('https://api.test/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            promotionId: '11111111-1111-4111-8111-111111111111',
+            orderId: '22222222-2222-4222-8222-222222222222',
+            discountAmount: 15000,
+          }),
+        }),
+        franEnv
+      );
+      expect(promoUseRes.status).toBe(200);
+      const newPromoUsage = promotionUsages.find((u) => u.order_id === '22222222-2222-4222-8222-222222222222');
+      expect(newPromoUsage?.tenant_id).toBe('tenant_sadec_02');
+
+      // 4. V3: OpenAPI POST /api/inventory/purchase-orders/{id}/receive enforces PO's effectiveTenant on ingredients even under wildcard admin ('*')
+      const poReceiveApp = new OpenAPIHono<{ Bindings: Env }>();
+      poReceiveApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'hq-owner', role: 'owner', tenantId: '*' });
+        c.set('tenantId' as any, '*');
+        await next();
+      });
+      registerPurchaseOrderHandlers(poReceiveApp);
+
+      const crossIngReceiveRes = await poReceiveApp.fetch(
+        new Request('https://api.test/api/inventory/purchase-orders/po_fran_v3/receive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ ingredientId: 'ing_def_v3', receivedQuantity: 10 }],
+          }),
+        }),
+        franEnv
+      );
+      expect(crossIngReceiveRes.status).toBe(400);
+      expect(ingredients.find((i) => i.id === 'ing_def_v3')?.current_stock).toBe(100);
+
+      const validPoReceiveRes = await poReceiveApp.fetch(
+        new Request('https://api.test/api/inventory/purchase-orders/po_fran_v3/receive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ ingredientId: 'ing_fran_v3', receivedQuantity: 15 }],
+          }),
+        }),
+        franEnv
+      );
+      expect(validPoReceiveRes.status).toBe(200);
+      expect(ingredients.find((i) => i.id === 'ing_fran_v3')?.current_stock).toBe(55);
+      expect(stockMovements[0]?.tenant_id).toBe('tenant_sadec_02');
+      expect(inventoryTransactions[0]?.tenant_id).toBe('tenant_sadec_02');
+    });
+  });
+
+  // =========================================================================
+  // Suite 27: Phase W1–W3 — Push Subscriptions & Notifier, Campaign Engine &
+  //           Triggers, Cron Order-Checks & Cashback Warnings, Mautic Sync /
+  //           Enrollment & Loyalty Bonus Campaigns Multi-Tenant Isolation
+  // =========================================================================
+  describe('Suite 27: Phase W1–W3 — Push Subscriptions/Notifier, Campaign Engine/Triggers, Cron Handlers, Mautic & Bonus Campaigns Multi-Tenant Isolation', () => {
+    it('isolates push_subscriptions & WebPush notifier, campaign_logs & trigger detectors, cron checkOverdueOrders & sendCashbackExpiryWarnings, Mautic enrollment/sync cursor, and bonus_campaigns across tenants (W1–W3)', async () => {
+      const { pushRouter } = await import('../../routes/push');
+      const { sendPushToCustomer, sendPushToStaff } = await import('../../tree/push/notifier');
+      const { deduplicate, logSend } = await import('../../tree/campaigns/campaign-engine');
+      const { detectWelcomeCandidates } = await import('../../tree/campaigns/triggers/welcome');
+      const { detectBirthdayCandidates: detectTreeBirthday } = await import('../../tree/campaigns/triggers/birthday');
+      const { detectWinbackCandidates: detectTreeWinback } = await import('../../tree/campaigns/triggers/winback');
+      const { detectPostVisitCandidates } = await import('../../tree/campaigns/triggers/post-visit');
+      const { detectCashbackExpiry, markExpiryNotified } = await import('../../tree/campaigns/triggers/cashback-expiry');
+      const { runCampaignTriggers } = await import('../../tree/campaigns/cron-handler');
+      const { checkOverdueOrders } = await import('../../routes/cron-handlers/order-checks');
+      const { sendCashbackExpiryWarnings } = await import('../../routes/cron-handlers/cashback-warnings');
+      const { trackEnrollment, isAlreadyEnrolled } = await import('../../tree/mautic/enrollment-tracker');
+      const { syncMauticContacts } = await import('../../tree/mautic/contact-sync-cron');
+      const { getActiveCampaign } = await import('../../tree/loyalty/campaign');
+      const { loyaltyRouter } = await import('../../routes/loyalty');
+      const { Hono } = await import('hono');
+
+      const pushSubs: Array<Record<string, unknown>> = [
+        {
+          id: 'ps_def_1',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/def-sub-1',
+          p256dh: 'p256_def',
+          auth: 'auth_def',
+          customer_id: 'cust_def_w1',
+          staff_role: 'barista',
+          tenant_id: 'default',
+          created_at: '2026-11-01T00:00:00.000Z',
+        },
+        {
+          id: 'ps_fran_1',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/fran-sub-1',
+          p256dh: 'p256_fran',
+          auth: 'auth_fran',
+          customer_id: 'cust_fran_w1',
+          staff_role: 'barista',
+          tenant_id: 'tenant_sadec_02',
+          created_at: '2026-11-01T00:00:00.000Z',
+        },
+      ];
+
+      const customers: Array<Record<string, unknown>> = [
+        {
+          id: 'cust_def_w1',
+          name: 'Default Customer W1',
+          phone: '0908880001',
+          email: 'def_w1@aura.vn',
+          zalo: '0908880001',
+          loyalty_tier: 'silver',
+          loyalty_points: 120,
+          tenant_id: 'default',
+          last_expiry_warning_at: null,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 'cust_fran_w1',
+          name: 'SaDec Customer W1',
+          phone: '0908880002',
+          email: 'fran_w1@aura.vn',
+          zalo: '0908880002',
+          loyalty_tier: 'gold',
+          loyalty_points: 300,
+          tenant_id: 'tenant_sadec_02',
+          last_expiry_warning_at: null,
+          updated_at: new Date().toISOString(),
+        },
+      ];
+
+      const campaignLogs: Array<Record<string, unknown>> = [
+        {
+          id: 'cl_def_existing',
+          trigger: 'welcome_series',
+          campaign_type: 'welcome_series',
+          customer_id: 'cust_fran_w1',
+          channel: 'zalo',
+          template_key: 'welcome_bonus',
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          tenant_id: 'default',
+        },
+      ];
+
+      const campaignEnrollments: Array<Record<string, unknown>> = [
+        {
+          id: 'ce_def_existing',
+          customer_id: 'cust_fran_w1',
+          campaign_type: 'winback',
+          campaign_id: '10',
+          created_at: new Date().toISOString(),
+          mautic_contact_id: '101',
+          status: 'enrolled',
+          tenant_id: 'default',
+        },
+      ];
+
+      const overdueOrders: Array<Record<string, unknown>> = [
+        {
+          id: 'ord_overdue_def',
+          customer_name: 'Default Overdue',
+          status: 'pending',
+          notes: null,
+          tenant_id: 'default',
+          created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+        },
+        {
+          id: 'ord_overdue_fran',
+          customer_name: 'SaDec Overdue',
+          status: 'pending',
+          notes: null,
+          tenant_id: 'tenant_sadec_02',
+          created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+        },
+      ];
+
+      const bonusCampaigns: Array<Record<string, unknown>> = [
+        {
+          id: 1,
+          code: 'DEF_OPENING',
+          name: 'Default Store Bonus',
+          description: 'Default only',
+          cashback_multiplier: 2,
+          signup_bonus_vnd: 20000,
+          signup_bonus_cap: 100,
+          refer_bonus_vnd: 10000,
+          active: 1,
+          start_date: '2026-01-01 00:00:00',
+          end_date: '2027-12-31 23:59:59',
+          tenant_id: 'default',
+        },
+        {
+          id: 2,
+          code: 'SADEC_OPENING',
+          name: 'SaDec Grand Opening',
+          description: 'SaDec only',
+          cashback_multiplier: 3,
+          signup_bonus_vnd: 30000,
+          signup_bonus_cap: 100,
+          refer_bonus_vnd: 15000,
+          active: 1,
+          start_date: '2026-01-01 00:00:00',
+          end_date: '2027-12-31 23:59:59',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const kvStore = new Map<string, string>();
+
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          executedSqls.push({ sql, args });
+          if (isAccountLookup(sql)) {
+            if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const cust = customers.find((c) => c.id === cid) || null;
+            if (cust && /TRIM\(tenant_id\)/i.test(sql) && args[1]) {
+              if (String(cust.tenant_id || 'default').trim() !== String(args[1])) return null;
+            }
+            return cust;
+          }
+          if (/FROM campaign_logs/i.test(sql)) {
+            const cid = String(args[0]);
+            const trig = String(args[1]);
+            const tid = args[3] ? String(args[3]) : undefined;
+            const hit = campaignLogs.find(
+              (l) =>
+                l.customer_id === cid &&
+                (l.trigger === trig || l.campaign_type === trig) &&
+                (!tid || String(l.tenant_id || 'default').trim() === tid)
+            );
+            return hit ? { id: hit.id, sent_at: hit.sent_at } : null;
+          }
+          if (/SELECT 1 FROM campaign_enrollments WHERE customer_id = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const ctype = String(args[1]);
+            const tid = args[3] ? String(args[3]) : undefined;
+            const hit = campaignEnrollments.find(
+              (e) =>
+                e.customer_id === cid &&
+                e.campaign_type === ctype &&
+                (!tid || String(e.tenant_id || 'default').trim() === tid)
+            );
+            return hit ? { 1: 1 } : null;
+          }
+          if (/FROM bonus_campaigns WHERE active = 1/i.test(sql)) {
+            const tid = args[2] ? String(args[2]) : undefined;
+            if (tid) {
+              return bonusCampaigns.find((b) => String(b.tenant_id || 'default').trim() === tid) || null;
+            }
+            return bonusCampaigns[bonusCampaigns.length - 1] || null;
+          }
+          if (/SELECT COUNT\(\*\) as count FROM signup_bonus_log/i.test(sql)) {
+            return { count: 5 };
+          }
+          return null;
+        },
+        all: async () => {
+          executedSqls.push({ sql, args });
+          if (/FROM push_subscriptions/i.test(sql)) {
+            if (/WHERE customer_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const cid = String(args[0]);
+              const tid = String(args[1]);
+              return {
+                results: pushSubs.filter(
+                  (s) => s.customer_id === cid && String(s.tenant_id || 'default').trim() === tid
+                ),
+              };
+            }
+            if (/WHERE staff_role IS NOT NULL AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[0]);
+              return {
+                results: pushSubs.filter(
+                  (s) => s.staff_role && String(s.tenant_id || 'default').trim() === tid
+                ),
+              };
+            }
+            return { results: [...pushSubs] };
+          }
+          if (/SELECT DISTINCT customer_id FROM campaign_logs/i.test(sql)) {
+            const ctype = String(args[0]);
+            const tid = /TRIM\(tenant_id\) = \?/i.test(sql) ? String(args[args.length - 1]) : undefined;
+            const rows = campaignLogs
+              .filter(
+                (l) =>
+                  l.campaign_type === ctype &&
+                  (!tid || String(l.tenant_id || 'default').trim() === tid)
+              )
+              .map((l) => ({ customer_id: l.customer_id }));
+            return { results: rows };
+          }
+          if (/FROM orders/i.test(sql) && /status IN \('pending', 'confirmed'/i.test(sql)) {
+            const tid = args[1] ? String(args[1]) : undefined;
+            return {
+              results: overdueOrders.filter(
+                (o) => !tid || String(o.tenant_id || 'default').trim() === tid
+              ),
+            };
+          }
+          if (/FROM cashback_transactions ct\s+JOIN cashback_wallets cw/i.test(sql)) {
+            const tid = args[1] && /TRIM\(cw\.tenant_id\)/i.test(sql) ? String(args[1]) : undefined;
+            const matchingCustomers = customers.filter(
+              (c) => !tid || String(c.tenant_id || 'default').trim() === tid
+            );
+            return {
+              results: matchingCustomers.map((c) => ({
+                id: c.id,
+                customer_id: c.id,
+                name: c.name,
+                phone: c.phone,
+                email: c.email,
+                zalo: c.zalo,
+                loyalty_tier: c.loyalty_tier,
+                loyalty_points: c.loyalty_points,
+                expiring_amount: 15000,
+                total_expiring: 15000,
+                earliest_expiry: new Date(Date.now() + 3 * 86400000).toISOString(),
+              })),
+            };
+          }
+          if (/FROM customers c/i.test(sql)) {
+            const tid = /TRIM\(c\.tenant_id\)/i.test(sql)
+              ? (args.find((a) => a === 'tenant_sadec_02' || a === 'default') as string | undefined)
+              : undefined;
+            return {
+              results: customers.filter(
+                (c) => !tid || String(c.tenant_id || 'default').trim() === tid
+              ),
+            };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          executedSqls.push({ sql, args });
+          if (/INSERT INTO push_subscriptions/i.test(sql)) {
+            pushSubs.push({
+              id: args[0],
+              customer_id: args[1],
+              endpoint: args[2],
+              auth_key: args[3],
+              p256dh_key: args[4],
+              user_agent: args[5],
+              role: args[6],
+              created_at: args[7],
+              tenant_id: 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE push_subscriptions SET tenant_id = \? WHERE endpoint = \?/i.test(sql)) {
+            const sub = pushSubs.find((s) => s.endpoint === args[1]);
+            if (sub) sub.tenant_id = args[0];
+            return { success: true, meta: { changes: sub ? 1 : 0 } };
+          }
+          if (/DELETE FROM push_subscriptions WHERE endpoint = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const ep = String(args[0]);
+            const tid = String(args[1]);
+            const idx = pushSubs.findIndex(
+              (s) => s.endpoint === ep && String(s.tenant_id || 'default').trim() === tid
+            );
+            if (idx >= 0) pushSubs.splice(idx, 1);
+            return { success: true, meta: { changes: idx >= 0 ? 1 : 0 } };
+          }
+          if (/INSERT INTO campaign_logs/i.test(sql)) {
+            campaignLogs.push({
+              id: args[0],
+              customer_id: args[1],
+              trigger: args[2],
+              campaign_type: args[2],
+              channel: args[3],
+              sent_at: args[4],
+              status: args[5],
+              error: args[6],
+              tenant_id: 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE campaign_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = campaignLogs.find((l) => l.id === args[1]);
+            if (row) row.tenant_id = args[0];
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/INSERT INTO campaign_enrollments/i.test(sql)) {
+            campaignEnrollments.push({
+              id: args[0],
+              customer_id: args[1],
+              campaign_type: args[2],
+              campaign_id: args[3],
+              created_at: args[4],
+              mautic_contact_id: args[5],
+              status: args[6],
+              tenant_id: 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE campaign_enrollments SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = campaignEnrollments.find((e) => e.id === args[1]);
+            if (row) row.tenant_id = args[0];
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/UPDATE customers SET last_expiry_warning_at = \? WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const ts = String(args[0]);
+            const cid = String(args[1]);
+            const tid = String(args[2]);
+            const cust = customers.find((c) => c.id === cid && String(c.tenant_id || 'default').trim() === tid);
+            if (cust) cust.last_expiry_warning_at = ts;
+            return { success: true, meta: { changes: cust ? 1 : 0 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[]; run: () => Promise<unknown> }>) => {
+          for (const s of stmts) {
+            if (/UPDATE orders SET notes =/i.test(s.sql)) {
+              executedSqls.push({ sql: s.sql, args: s.args });
+              const oid = String(s.args[3]);
+              const tid = s.args[4] ? String(s.args[4]) : undefined;
+              const ord = overdueOrders.find(
+                (o) => o.id === oid && (!tid || String(o.tenant_id || 'default').trim() === tid)
+              );
+              if (ord) ord.notes = '[OVERDUE]';
+            } else if (typeof s.run === 'function') {
+              await s.run();
+            } else {
+              executedSqls.push({ sql: s.sql, args: s.args });
+            }
+          }
+          return [];
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+        AUTH_KV: {
+          get: vi.fn(async (k: string) => kvStore.get(k) ?? null),
+          put: vi.fn(async (k: string, v: string) => {
+            kvStore.set(k, v);
+          }),
+        } as any,
+      });
+
+      // 1. W1: Push routes & WebPush notifier multi-tenant isolation
+      const pushApp = new Hono<{ Bindings: Env }>();
+      pushApp.route('/api/push', pushRouter);
+
+      const listSubsRes = await pushApp.fetch(
+        await authRequest('GET', '/api/push/list-subscriptions', 'supervisor', 'tenant_sadec_02'),
+        franEnv
+      );
+      expect(listSubsRes.status).toBe(200);
+      const listSubsBody = (await listSubsRes.json()) as { subscriptions: Array<{ endpoint: string }> };
+      expect(listSubsBody.subscriptions.map((s) => s.endpoint)).toEqual([
+        'https://fcm.googleapis.com/fcm/send/fran-sub-1',
+      ]);
+
+      // Unauthenticated POST /subscribe with cross-tenant customer_id ('cust_def_w1') is rejected with 400 and never inserted
+      const crossSubRes = await pushApp.fetch(
+        new Request('https://api.test/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'tenant_sadec_02' },
+          body: JSON.stringify({
+            endpoint: 'https://fcm.googleapis.com/fcm/send/cross-attempt',
+            p256dh_key: 'k1_p256dh_valid_key',
+            auth_key: 'a1_auth_valid_key',
+            customer_id: 'cust_def_w1',
+          }),
+        }),
+        franEnv
+      );
+      expect(crossSubRes.status).toBe(400);
+      expect(pushSubs.some((s) => String(s.endpoint).endsWith('cross-attempt'))).toBe(false);
+
+      // Valid POST /subscribe for 'cust_fran_w1' persists tenant_id = 'tenant_sadec_02'
+      const validSubRes = await pushApp.fetch(
+        new Request('https://api.test/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'tenant_sadec_02' },
+          body: JSON.stringify({
+            endpoint: 'https://fcm.googleapis.com/fcm/send/fran-sub-2',
+            p256dh_key: 'k2_p256dh_valid_key',
+            auth_key: 'a2_auth_valid_key',
+            customer_id: 'cust_fran_w1',
+          }),
+        }),
+        franEnv
+      );
+      expect([200, 201]).toContain(validSubRes.status);
+      expect(pushSubs.find((s) => String(s.endpoint).endsWith('fran-sub-2'))?.tenant_id).toBe('tenant_sadec_02');
+
+      // DELETE /subscribe from 'tenant_sadec_02' cannot delete 'default' endpoint
+      await pushApp.fetch(
+        new Request('https://api.test/api/push/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'tenant_sadec_02' },
+          body: JSON.stringify({ endpoint: 'https://fcm.googleapis.com/fcm/send/def-sub-1' }),
+        }),
+        franEnv
+      );
+      expect(pushSubs.some((s) => s.id === 'ps_def_1')).toBe(true);
+
+      // Notifier sendPushToCustomer & sendPushToStaff scope queries by tenant_id
+      executedSqls.length = 0;
+      await sendPushToCustomer(
+        { ...franEnv, VAPID_PUBLIC_KEY: undefined } as any,
+        'cust_fran_w1',
+        { title: 'Test', body: 'Hello' },
+        'tenant_sadec_02'
+      );
+      await sendPushToStaff(
+        { ...franEnv, VAPID_PUBLIC_KEY: undefined } as any,
+        { title: 'Staff', body: 'Order' },
+        undefined,
+        'tenant_sadec_02'
+      );
+
+      // 2. W2: Campaign deduplicate, logSend, trigger detectors & cron-handler tenant isolation
+      // Even though 'cust_fran_w1' has a 'default' welcome_series row in campaign_logs, deduplicate for 'tenant_sadec_02' returns false (not sent in this tenant)!
+      const alreadySentFran = await deduplicate(mockDb as any, 'cust_fran_w1', 'welcome_series' as any, 3650, 'tenant_sadec_02');
+      expect(alreadySentFran).toBe(false);
+
+      await logSend(
+        mockDb as any,
+        {
+          customer_id: 'cust_fran_w1',
+          trigger: 'welcome_series' as any,
+          channel: 'zalo',
+          sent: true,
+        },
+        'tenant_sadec_02'
+      );
+      const insertedLog = campaignLogs.find((l) => l.id !== 'cl_def_existing');
+      expect(insertedLog?.tenant_id).toBe('tenant_sadec_02');
+
+      // Now deduplicate for 'tenant_sadec_02' returns true (already sent in 'tenant_sadec_02')
+      const alreadySentAfterLog = await deduplicate(mockDb as any, 'cust_fran_w1', 'welcome_series' as any, 3650, 'tenant_sadec_02');
+      expect(alreadySentAfterLog).toBe(true);
+
+      // Trigger detectors emit tenant-scoped SQL when tenantId='tenant_sadec_02'
+      executedSqls.length = 0;
+      await detectWelcomeCandidates(mockDb as any, 'tenant_sadec_02');
+      await detectTreeBirthday(mockDb as any, 'tenant_sadec_02');
+      await detectTreeWinback(mockDb as any, 'tenant_sadec_02');
+      await detectPostVisitCandidates(mockDb as any, 'tenant_sadec_02');
+      await detectCashbackExpiry(mockDb as any, 'tenant_sadec_02');
+      await markExpiryNotified(mockDb as any, ['cust_fran_w1'], 'tenant_sadec_02');
+      expect(
+        executedSqls.filter((q) => q.sql.includes("COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?")).length
+      ).toBeGreaterThanOrEqual(4);
+      expect(customers.find((c) => c.id === 'cust_fran_w1')?.last_expiry_warning_at).not.toBeNull();
+      expect(customers.find((c) => c.id === 'cust_def_w1')?.last_expiry_warning_at).toBeNull();
+
+      // runCampaignTriggers resolves tenantId from PILOT_TENANT_ID ('tenant_sadec_02') and tags all new campaign_logs with 'tenant_sadec_02'
+      const cronRes = await runCampaignTriggers(franEnv as any);
+      expect(cronRes.triggered).toBeGreaterThan(0);
+      expect(
+        campaignLogs.filter((l) => l.id !== 'cl_def_existing').every((l) => l.tenant_id === 'tenant_sadec_02')
+      ).toBe(true);
+
+      // 3. W3: Cron checkOverdueOrders & sendCashbackExpiryWarnings, Mautic enrollment/sync, and Loyalty getActiveCampaign
+      await checkOverdueOrders(franEnv as any);
+      expect(overdueOrders.find((o) => o.id === 'ord_overdue_fran')?.notes).toBe('[OVERDUE]');
+      expect(overdueOrders.find((o) => o.id === 'ord_overdue_def')?.notes).toBeNull();
+
+      customers.find((c) => c.id === 'cust_fran_w1')!.last_expiry_warning_at = null;
+      const warnRes = await sendCashbackExpiryWarnings(franEnv as any);
+      expect(warnRes.notified).toBe(1);
+      expect(customers.find((c) => c.id === 'cust_fran_w1')?.last_expiry_warning_at).not.toBeNull();
+      expect(customers.find((c) => c.id === 'cust_def_w1')?.last_expiry_warning_at).toBeNull();
+
+      // Mautic isAlreadyEnrolled & trackEnrollment isolate by tenantId
+      const enrolledInFranBefore = await isAlreadyEnrolled(mockDb as any, 'cust_fran_w1', 'winback', 30, 'tenant_sadec_02');
+      expect(enrolledInFranBefore).toBe(false);
+      await trackEnrollment(mockDb as any, 'cust_fran_w1', 'winback', '10', 202, 'enrolled', 'tenant_sadec_02');
+      const enrolledInFranAfter = await isAlreadyEnrolled(mockDb as any, 'cust_fran_w1', 'winback', 30, 'tenant_sadec_02');
+      expect(enrolledInFranAfter).toBe(true);
+
+      // Mautic syncMauticContacts scopes KV cursor key to 'mautic_last_sync_ts:tenant_sadec_02' when customers list is empty
+      executedSqls.length = 0;
+      const emptyFranEnv = {
+        ...franEnv,
+        MAUTIC_BASE_URL: 'https://mautic.aura.vn',
+        MAUTIC_CLIENT_ID: 'cid',
+        MAUTIC_CLIENT_SECRET: 'csec',
+        AURA_DB: {
+          prepare: vi.fn((sql: string) => ({
+            bind: (...args: unknown[]) => ({
+              all: async () => {
+                executedSqls.push({ sql, args });
+                return { results: [] };
+              },
+            }),
+          })),
+        },
+      };
+      await syncMauticContacts(emptyFranEnv as any);
+      expect(kvStore.has('mautic_last_sync_ts:tenant_sadec_02')).toBe(true);
+      expect(kvStore.has('mautic_last_sync_ts')).toBe(false);
+
+      // Loyalty getActiveCampaign & GET /api/loyalty/active-campaign return ONLY 'SADEC_OPENING' for 'tenant_sadec_02'
+      const activeFranCampaign = await getActiveCampaign(mockDb as any, 'tenant_sadec_02');
+      expect(activeFranCampaign?.code).toBe('SADEC_OPENING');
+
+      const loyaltyApp = new Hono<{ Bindings: Env }>();
+      loyaltyApp.route('/api/loyalty', loyaltyRouter);
+      const activeCampRes = await loyaltyApp.fetch(
+        new Request('https://api.test/api/loyalty/active-campaign'),
+        franEnv
+      );
+      expect(activeCampRes.status).toBe(200);
+      const activeCampBody = (await activeCampRes.json()) as { campaign: { code: string } };
+      expect(activeCampBody.campaign.code).toBe('SADEC_OPENING');
+    });
+  });
+
+  // =========================================================================
+  // Suite 28: Phase Y1–Y3 — ERPNext Retry Queue & KV BYOK Factory, Payment
+  //           Reconciliation Cron, Cal.com Bookings/Webhooks, DinDin Cart /
+  //           Checkout / Config, Customer Domain Spine & Pretix Webhook Log
+  //           Multi-Tenant Isolation
+  // =========================================================================
+  describe('Suite 28: Phase Y1–Y3 — ERPNext Queue/KV, Payment Reconcile Cron, Cal.com, DinDin, Customer Spine & Pretix Multi-Tenant Isolation', () => {
+    it('isolates ERPNext KV BYOK & retry queue, payment reconciliation cron, Cal.com bookings/webhooks, DinDin cart/config/checkout, customer domain spine, and Pretix webhook logs across tenants (Y1–Y3)', async () => {
+      const { createErpnextClientWithKv } = await import('../../erpnext/client/factory');
+      const { processErpnextRetryQueue } = await import('../../routes/cron-handlers/erpnext-sync');
+      const { runPaymentReconciliation } = await import('../../routes/cron-handlers/payment-reconcile');
+      const { createReservationFromBooking } = await import('../../tree/cal-booking/process-booking');
+      const { calBookingWebhookRouter } = await import('../../routes/cal-booking-webhook');
+      const { dindinRouter } = await import('../../routes/dindin');
+      const { registerWebhookHandler } = await import('../../routes/pretix-handlers/webhook-handler');
+      const { computeHmacSha256 } = await import('@aura/domain-security');
+      const {
+        identifyCustomer,
+        recordConsent,
+        hasActiveConsent,
+        recordVisit,
+        linkOrder,
+      } = await import('@aura/domain-customer');
+      const { Hono } = await import('hono');
+
+      const kvStore = new Map<string, string>();
+      const erpnextQueue: Array<Record<string, unknown>> = [
+        {
+          id: 'eq_def_1',
+          order_id: 'ord_def_y1',
+          doctype: 'Sales Invoice',
+          payload: JSON.stringify({ order_id: 'ord_def_y1', tenant_id: 'default', total: 50000 }),
+          attempts: 0,
+          max_attempts: 5,
+          next_retry_at: '2026-01-01T00:00:00.000Z',
+          status: 'pending',
+          tenant_id: 'default',
+          order_tenant_id: 'default',
+        },
+        {
+          id: 'eq_fran_1',
+          order_id: 'ord_fran_y1',
+          doctype: 'Sales Invoice',
+          payload: JSON.stringify({
+            order_id: 'ord_fran_y1',
+            tenant_id: 'tenant_sadec_02',
+            customer_name: 'SaDec Guest',
+            items: [{ id: 'item_1', name: 'Cà Phê Muối', quantity: 1, price: 45000 }],
+            subtotal: 45000,
+            total: 45000,
+            payment_method: 'cash',
+          }),
+          attempts: 0,
+          max_attempts: 5,
+          next_retry_at: '2026-01-01T00:00:00.000Z',
+          status: 'pending',
+          tenant_id: 'tenant_sadec_02',
+          order_tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const reconcileCandidates: Array<Record<string, unknown>> = [
+        {
+          payment_id: 'pay_def_y1',
+          order_id: 'ord_def_y1',
+          provider_tx_id: '10001',
+          amount: 50000,
+          status: 'pending',
+          order_status: 'pending',
+          created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+          order_tenant_id: 'default',
+        },
+        {
+          payment_id: 'pay_fran_y1',
+          order_id: 'ord_fran_y1',
+          provider_tx_id: '20002',
+          amount: 45000,
+          status: 'pending',
+          order_status: 'pending',
+          created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+          order_tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const reservations: Array<Record<string, unknown>> = [
+        {
+          id: 'res_def_existing',
+          table_id: 'tbl_def_1',
+          customer_name: 'Shared Caller',
+          customer_phone: '0905556666',
+          guest_count: 4,
+          date: '2026-11-10',
+          time: '19:00',
+          status: 'confirmed',
+          cal_booking_uid: 'cal_uid_def_1',
+          tenant_id: 'default',
+        },
+      ];
+
+      const cafeTables: Array<Record<string, unknown>> = [
+        { id: 'tbl_def_1', capacity: 4, seats: 4, zone: 'indoor', status: 'available', tenant_id: 'default' },
+        { id: 'tbl_fran_1', capacity: 4, seats: 4, zone: 'garden', status: 'available', tenant_id: 'tenant_sadec_02' },
+      ];
+
+      const bookings: Array<Record<string, unknown>> = [
+        {
+          id: 'bk_def_1',
+          cal_uid: 'cal_uid_def_1',
+          status: 'confirmed',
+          tenant_id: 'default',
+        },
+      ];
+
+      const dindinCarts: Array<Record<string, unknown>> = [];
+      const dindinConfigs: Array<Record<string, unknown>> = [
+        {
+          id: 1,
+          config: JSON.stringify({
+            menu: {
+              sections: [
+                {
+                  name: 'Drinks',
+                  items: [{ id: 'm_def', name: 'Default Latte', price: 35000 }],
+                },
+              ],
+            },
+            settings: { store_name: 'Default Store' },
+          }),
+          tenant_id: 'default',
+        },
+      ];
+      const dindinOrders: Array<Record<string, unknown>> = [];
+
+      const customerIdentities: Array<Record<string, unknown>> = [
+        {
+          id: 'cid_def_existing',
+          customer_id: 'cust_def_y3',
+          kind: 'phone',
+          value: '0909998888',
+          verified: 0,
+          source: 'signup',
+          tenant_id: 'default',
+        },
+      ];
+      const consents: Array<Record<string, unknown>> = [];
+      const visits: Array<Record<string, unknown>> = [];
+      const customerEvents: Array<Record<string, unknown>> = [];
+      const pretixWebhookLogs: Array<Record<string, unknown>> = [];
+
+      let activeStaffTenant = 'tenant_sadec_02';
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          if (isAccountLookup(sql)) {
+            return staffAccountRow('manager', activeStaffTenant);
+          }
+          if (/FROM payments WHERE order_id = \? AND provider = 'payos'/i.test(sql)) {
+            const oid = String(args[0]);
+            const cand = reconcileCandidates.find((r) => r.order_id === oid);
+            if (!cand) return null;
+            return {
+              id: cand.payment_id,
+              order_id: cand.order_id,
+              amount: cand.amount,
+              status: cand.status,
+              provider_tx_id: cand.provider_tx_id,
+            };
+          }
+          if (/SELECT status, payment_status, tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+            const oid = String(args[0]);
+            const cand = reconcileCandidates.find((r) => r.order_id === oid);
+            if (!cand) return null;
+            return {
+              status: cand.order_status,
+              payment_status: 'unpaid',
+              tenant_id: cand.order_tenant_id,
+            };
+          }
+          if (/FROM reservations WHERE cal_booking_uid = \?/i.test(sql)) {
+            const uid = String(args[0]);
+            return reservations.find((r) => r.cal_booking_uid === uid) || null;
+          }
+          if (/FROM bookings WHERE cal_uid = \?/i.test(sql)) {
+            const uid = String(args[0]);
+            return bookings.find((b) => b.cal_uid === uid) || null;
+          }
+          if (/FROM dindin_cart WHERE session_id IN \(\?, \?\)/i.test(sql)) {
+            const s1 = String(args[0]);
+            const s2 = String(args[1]);
+            const tid = String(args[2] || 'default');
+            return (
+              dindinCarts.find(
+                (c) =>
+                  (c.session_id === s1 || c.session_id === s2) &&
+                  String(c.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          if (/FROM dindin_cart WHERE session_id = \?/i.test(sql)) {
+            const sid = String(args[0]);
+            return dindinCarts.find((c) => c.session_id === sid) || null;
+          }
+          if (/FROM dindin_config/i.test(sql)) {
+            const tid = args[0] ? String(args[0]) : 'default';
+            return (
+              dindinConfigs.find((cfg) => String(cfg.tenant_id || 'default').trim() === tid) || null
+            );
+          }
+          if (/FROM customer_identities WHERE kind = \? AND value = \?/i.test(sql)) {
+            const kind = String(args[0]);
+            const val = String(args[1]);
+            const tid = args[2] ? String(args[2]) : 'default';
+            return (
+              customerIdentities.find(
+                (ci) =>
+                  ci.kind === kind &&
+                  ci.value === val &&
+                  String(ci.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          if (/FROM consents WHERE customer_id = \? AND purpose = \? AND granted = 1 AND revoked_at IS NULL/i.test(sql)) {
+            const cid = String(args[0]);
+            const purpose = String(args[1]);
+            const tid = args[2] ? String(args[2]) : 'default';
+            return (
+              consents.find(
+                (c) =>
+                  c.customer_id === cid &&
+                  c.purpose === purpose &&
+                  c.granted === 1 &&
+                  c.revoked_at === null &&
+                  String(c.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          if (/FROM consents WHERE customer_id = \? AND purpose = \? AND revoked_at IS NULL/i.test(sql)) {
+            const cid = String(args[0]);
+            const purpose = String(args[1]);
+            const tid = args[2] ? String(args[2]) : 'default';
+            return (
+              consents.find(
+                (c) =>
+                  c.customer_id === cid &&
+                  c.purpose === purpose &&
+                  c.revoked_at === null &&
+                  String(c.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          if (/FROM visits WHERE order_id = \?/i.test(sql)) {
+            const oid = String(args[0]);
+            const tid = args[1] ? String(args[1]) : 'default';
+            return (
+              visits.find(
+                (v) => v.order_id === oid && String(v.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          if (/FROM customer_events WHERE customer_id = \? AND event_type = 'OrderLinked'/i.test(sql)) {
+            const cid = String(args[0]);
+            const likeStr = String(args[1]).replace(/%/g, '');
+            const tid = args[2] ? String(args[2]) : 'default';
+            return (
+              customerEvents.find(
+                (e) =>
+                  e.customer_id === cid &&
+                  e.event_type === 'OrderLinked' &&
+                  String(e.payload || '').includes(likeStr) &&
+                  String(e.tenant_id || 'default').trim() === tid
+              ) || null
+            );
+          }
+          return null;
+        },
+        all: async () => {
+          if (/FROM erpnext_sync_queue/i.test(sql)) {
+            return { results: [...erpnextQueue] };
+          }
+          if (/FROM payments p\s+JOIN orders o ON o\.id = p\.order_id/i.test(sql)) {
+            return { results: [...reconcileCandidates] };
+          }
+          if (/FROM reservations WHERE cal_booking_uid = \?/i.test(sql)) {
+            const uid = String(args[0]);
+            return {
+              results: reservations.filter((r) => r.cal_booking_uid === uid),
+            };
+          }
+          if (/FROM cafe_tables/i.test(sql)) {
+            const minCap = Number(args[0] || 1);
+            return {
+              results: cafeTables.filter(
+                (t) => Number(t.capacity ?? t.seats ?? 2) >= minCap && String(t.status).toLowerCase() === 'available'
+              ),
+            };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          if (/UPDATE erpnext_sync_queue\s+SET status = 'completed'/i.test(sql)) {
+            const qid = String(args[1]);
+            const row = erpnextQueue.find((q) => q.id === qid);
+            if (row) row.status = 'completed';
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/UPDATE erpnext_sync_queue\s+SET status = \?/i.test(sql)) {
+            const qid = String(args[args.length - 1]);
+            const row = erpnextQueue.find((q) => q.id === qid);
+            if (row) row.attempts = Number(args[2]);
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/UPDATE payments SET status = 'completed'/i.test(sql)) {
+            const pid = String(args[2]);
+            const row = reconcileCandidates.find((r) => r.payment_id === pid);
+            if (row) row.status = 'completed';
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/UPDATE orders SET status = 'confirmed', payment_status = 'paid'/i.test(sql)) {
+            const oid = String(args[1]);
+            const row = reconcileCandidates.find((r) => r.order_id === oid);
+            if (row) row.order_status = 'confirmed';
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/INSERT INTO reservations/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            reservations.push({
+              id: args[0],
+              table_id: args[1],
+              customer_name: args[2],
+              customer_phone: args[3],
+              guest_count: args[4],
+              date: args[5],
+              time: args[6],
+              zone: args[7],
+              notes: args[8],
+              cal_booking_uid: args[9],
+              customer_email: args[10],
+              reservation_time: args[11],
+              special_requests: args[12],
+              status: 'confirmed',
+              tenant_id: hasTenantCol ? args[13] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE reservations SET status = 'cancelled'/i.test(sql)) {
+            const uid = String(args[args.length - 1]);
+            let changes = 0;
+            for (const r of reservations) {
+              if (r.cal_booking_uid === uid) {
+                r.status = 'cancelled';
+                changes++;
+              }
+            }
+            return { success: true, meta: { changes } };
+          }
+          if (/UPDATE bookings SET status = 'cancelled'/i.test(sql)) {
+            const uid = String(args[args.length - 1]);
+            const row = bookings.find((b) => b.cal_uid === uid);
+            if (row) row.status = 'cancelled';
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/INSERT(?: OR REPLACE)? INTO dindin_cart/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            const sid = String(args[0]);
+            const tid = hasTenantCol ? String(args[3]) : 'default';
+            const idx = dindinCarts.findIndex((c) => c.session_id === sid);
+            const record = {
+              session_id: sid,
+              raw: args[1],
+              cart: args[2],
+              tenant_id: tid,
+            };
+            if (idx >= 0) dindinCarts[idx] = record;
+            else dindinCarts.push(record);
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO orders/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            dindinOrders.push({
+              id: args[0],
+              customer_name: args[1],
+              customer_phone: args[2],
+              tenant_id: hasTenantCol ? args[8] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO dindin_config/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            const tid = hasTenantCol ? String(args[1]) : 'default';
+            const idx = dindinConfigs.findIndex(
+              (cfg) => String(cfg.tenant_id || 'default').trim() === tid
+            );
+            const record = {
+              id: dindinConfigs.length + 1,
+              config: hasTenantCol ? args[0] : args[0],
+              tenant_id: tid,
+            };
+            if (idx >= 0) dindinConfigs[idx] = record;
+            else dindinConfigs.push(record);
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE dindin_config SET config = \?/i.test(sql)) {
+            const tid = String(args[2] || 'default');
+            const row = dindinConfigs.find((cfg) => String(cfg.tenant_id || 'default').trim() === tid);
+            if (row) row.config = args[0];
+            return { success: true, meta: { changes: row ? 1 : 0 } };
+          }
+          if (/INSERT INTO customer_identities/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            customerIdentities.push({
+              id: args[0],
+              customer_id: args[1],
+              kind: args[2],
+              value: args[3],
+              verified: args[4],
+              source: args[5],
+              tenant_id: hasTenantCol ? args[6] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO consents/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            consents.push({
+              id: args[0],
+              customer_id: args[1],
+              purpose: args[2],
+              granted: args[3],
+              source: args[4],
+              policy_version: args[5],
+              granted_at: args[6],
+              revoked_at: args[7],
+              tenant_id: hasTenantCol ? args[8] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO visits/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            visits.push({
+              id: args[0],
+              customer_id: args[1],
+              visited_at: args[2],
+              channel: args[3],
+              order_id: args[4],
+              spent: args[5],
+              tenant_id: hasTenantCol ? args[6] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO customer_events/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            customerEvents.push({
+              id: args[0],
+              customer_id: args[1],
+              event_type: args[2],
+              payload: args[3],
+              tenant_id: hasTenantCol ? args[4] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO pretix_webhook_log/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            pretixWebhookLogs.push({
+              notification_id: args[0],
+              organizer: args[1],
+              event: args[2],
+              code: args[3],
+              action: args[4],
+              payload: args[5],
+              tenant_id: hasTenantCol ? args[6] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+      };
+
+      const mockKv = {
+        get: vi.fn(async (k: string) => kvStore.get(k) ?? null),
+        put: vi.fn(async (k: string, v: string) => {
+          kvStore.set(k, v);
+        }),
+        delete: vi.fn(async (k: string) => {
+          kvStore.delete(k);
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+        AUTH_KV: mockKv as any,
+        CAL_WEBHOOK_SECRET: 'cal_sec_y2',
+        PRETIX_WEBHOOK_SECRET: 'pretix_sec_y3',
+      });
+
+      // 1. Y1: ERPNext KV BYOK factory isolation & retry queue tenant filtering
+      kvStore.set('erpnext:api_url', 'https://erp-default.aura.vn');
+      kvStore.set('erpnext:api_key', 'def_key');
+      kvStore.set('erpnext:api_secret', 'def_sec');
+
+      // Non-default tenant ('tenant_sadec_02') MUST NOT inherit default tenant's KV BYOK credentials
+      const leakedClient = await createErpnextClientWithKv(franEnv as any, 'tenant_sadec_02');
+      expect(leakedClient).toBeNull();
+      const defaultClient = await createErpnextClientWithKv(franEnv as any, 'default');
+      expect(defaultClient).not.toBeNull();
+
+      // Configure tenant-specific BYOK credentials for 'tenant_sadec_02'
+      kvStore.set('erpnext:tenant_sadec_02:api_url', 'https://erp-sadec.aura.vn');
+      kvStore.set('erpnext:tenant_sadec_02:api_key', 'sadec_key');
+      kvStore.set('erpnext:tenant_sadec_02:api_secret', 'sadec_sec');
+      const sadecClient = await createErpnextClientWithKv(franEnv as any, 'tenant_sadec_02');
+      expect(sadecClient).not.toBeNull();
+
+      // processErpnextRetryQueue processes ONLY 'eq_fran_1' ('tenant_sadec_02') and leaves 'eq_def_1' ('default') untouched
+      const queueRes = await processErpnextRetryQueue(
+        {
+          ...franEnv,
+          ERPNEXT_URL: 'https://erp-sadec.aura.vn',
+          ERPNEXT_API_KEY: 'sadec_key',
+          ERPNEXT_API_SECRET: 'sadec_sec',
+        } as any,
+        'tenant_sadec_02'
+      );
+      expect(queueRes.processed).toBe(1);
+      expect(erpnextQueue.find((q) => q.id === 'eq_def_1')?.attempts).toBe(0);
+      expect(erpnextQueue.find((q) => q.id === 'eq_def_1')?.status).toBe('pending');
+      expect(
+        (erpnextQueue.find((q) => q.id === 'eq_fran_1')?.attempts as number) > 0 ||
+          erpnextQueue.find((q) => q.id === 'eq_fran_1')?.status === 'completed'
+      ).toBe(true);
+
+      // Y1: Payment reconciliation cron reconciles ONLY 'pay_fran_y1' ('tenant_sadec_02'), leaving 'pay_def_y1' ('default') pending
+      const reconcileReport = await runPaymentReconciliation(
+        {
+          ...franEnv,
+          PAYOS_CLIENT_ID: 'payos_cid',
+          PAYOS_API_KEY: 'payos_key',
+          PAYOS_CHECKSUM_KEY: 'payos_chk',
+        } as any,
+        {
+          tenantId: 'tenant_sadec_02',
+        }
+      );
+      expect(reconcileReport.processed).toBe(1);
+      expect(Object.keys(reconcileReport.outcomes)).toEqual(['pay_fran_y1']);
+      expect(reconcileReport.outcomes.pay_def_y1).toBeUndefined();
+
+      // 2. Y2: Cal.com reservation duplicate guard & webhook cancellation tenant isolation
+      const calBookingRes = await createReservationFromBooking(
+        mockDb as any,
+        {
+          uid: 'cal_uid_fran_1',
+          title: 'Table for 4',
+          startTime: '2026-11-10T12:00:00.000Z', // 19:00 ICT (+07:00)
+          endTime: '2026-11-10T13:30:00.000Z',
+          attendees: [{ name: 'Shared Caller', email: 'caller@sadec.vn', phone: '0905556666' }],
+        },
+        'tenant_sadec_02'
+      );
+      expect('error' in calBookingRes).toBe(false);
+      if (!('error' in calBookingRes)) {
+        expect(calBookingRes.status).toBe('confirmed');
+        expect(calBookingRes.table_id).toBe('tbl_fran_1');
+      }
+      const franReservation = reservations.find((r) => r.cal_booking_uid === 'cal_uid_fran_1');
+      expect(franReservation?.tenant_id).toBe('tenant_sadec_02');
+      bookings.push({
+        id: 'bk_fran_1',
+        cal_uid: 'cal_uid_fran_1',
+        status: 'confirmed',
+        tenant_id: 'tenant_sadec_02',
+      });
+
+      const calApp = new Hono<{ Bindings: Env }>();
+      calApp.route('/api/webhooks/cal', calBookingWebhookRouter);
+
+      // Cross-tenant BOOKING_CANCELLED for 'cal_uid_def_1' from 'tenant_sadec_02' is rejected with 404
+      const crossCalCancelRes = await calApp.fetch(
+        new Request('https://api.test/api/webhooks/cal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-cal-webhook-secret': 'cal_sec_y2',
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: JSON.stringify({
+            triggerEvent: 'BOOKING_CANCELLED',
+            createdAt: new Date().toISOString(),
+            payload: {
+              uid: 'cal_uid_def_1',
+              title: 'Default Table',
+              startTime: '2026-11-10T12:00:00.000Z',
+              endTime: '2026-11-10T13:00:00.000Z',
+              attendees: [{ name: 'Shared Caller', email: 'caller@def.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+              organizer: { name: 'AURA', email: 'host@aura.vn' },
+              location: 'Default Store',
+            },
+          }),
+        }),
+        franEnv
+      );
+      expect(crossCalCancelRes.status).toBe(404);
+      expect(reservations.find((r) => r.id === 'res_def_existing')?.status).toBe('confirmed');
+
+      // Same-tenant BOOKING_CANCELLED for 'cal_uid_fran_1' from 'tenant_sadec_02' succeeds (200)
+      const validCalCancelRes = await calApp.fetch(
+        new Request('https://api.test/api/webhooks/cal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-cal-webhook-secret': 'cal_sec_y2',
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: JSON.stringify({
+            triggerEvent: 'BOOKING_CANCELLED',
+            createdAt: new Date().toISOString(),
+            payload: {
+              uid: 'cal_uid_fran_1',
+              title: 'SaDec Table',
+              startTime: '2026-11-10T12:00:00.000Z',
+              endTime: '2026-11-10T13:00:00.000Z',
+              attendees: [{ name: 'Shared Caller', email: 'caller@sadec.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+              organizer: { name: 'AURA', email: 'host@aura.vn' },
+              location: 'AURA Sa Đéc',
+            },
+          }),
+        }),
+        franEnv
+      );
+      expect(validCalCancelRes.status).toBe(200);
+      expect(franReservation?.status).toBe('cancelled');
+
+      // 3. Y2: DinDin config, cart, and checkout tenant isolation
+      const dindinApp = new Hono<{ Bindings: Env }>();
+      dindinApp.route('/api/dindin', dindinRouter);
+
+      // PUT /api/dindin/config isolates config by tenant
+      activeStaffTenant = 'tenant_sadec_02';
+      const putCfgRes = await dindinApp.fetch(
+        await authRequest('PUT', '/api/dindin/config', 'manager', 'tenant_sadec_02', {
+          menu: {
+            sections: [
+              {
+                name: 'Drinks',
+                items: [{ id: 'm1', name: 'Trà Sen', price: 40000 }],
+              },
+            ],
+          },
+          settings: {
+            store_id: 'store_sadec_02',
+            store_name: 'AURA Sa Đéc',
+          },
+        }),
+        franEnv
+      );
+      expect(putCfgRes.status).toBe(200);
+      expect(kvStore.has('dindin:tenant_sadec_02:config')).toBe(true);
+      expect(dindinConfigs.find((cfg) => cfg.tenant_id === 'tenant_sadec_02')).toBeDefined();
+      expect(
+        JSON.parse(String(dindinConfigs.find((cfg) => cfg.tenant_id === 'default')?.config || '{}'))?.settings?.store_name
+      ).toBe('Default Store');
+
+      // PATCH /api/dindin/cart/:sessionId adds item into tenant-scoped KV & D1
+      const patchCartRes = await dindinApp.fetch(
+        await authRequest('PATCH', '/api/dindin/cart/sess_fran_y2', 'manager', 'tenant_sadec_02', {
+          action: 'add',
+          item: { id: 'm1', name: 'Trà Sen', price: 40000, qty: 2 },
+        }),
+        franEnv
+      );
+      expect(patchCartRes.status).toBe(200);
+      expect(kvStore.has('dindin:tenant_sadec_02:cart:sess_fran_y2')).toBe(true);
+      expect(kvStore.has('dindin:cart:sess_fran_y2')).toBe(false);
+      expect(
+        dindinCarts.find((c) => c.session_id === 'tenant_sadec_02::sess_fran_y2')?.tenant_id
+      ).toBe('tenant_sadec_02');
+
+      // GET /api/dindin/cart/:sessionId under 'default' tenant for 'sess_fran_y2' returns empty cart
+      const defEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'default',
+        AUTH_KV: mockKv as any,
+      });
+      activeStaffTenant = 'default';
+      const getDefCartRes = await dindinApp.fetch(
+        await authRequest('GET', '/api/dindin/cart/sess_fran_y2', 'manager', 'default'),
+        defEnv
+      );
+      expect(getDefCartRes.status).toBe(200);
+      const getDefCartBody = (await getDefCartRes.json()) as { data: { items: unknown[] } };
+      expect(getDefCartBody.data.items).toHaveLength(0);
+
+      // POST /api/dindin/checkout under 'tenant_sadec_02' creates tenant-tagged order & idempotency key
+      activeStaffTenant = 'tenant_sadec_02';
+      const checkoutReq = await authRequest('POST', '/api/dindin/checkout', 'manager', 'tenant_sadec_02', {
+        sessionId: 'sess_fran_y2',
+        payment_method: 'cod',
+      });
+      checkoutReq.headers.set('Idempotency-Key', 'idem_y2_1');
+      const checkoutRes = await dindinApp.fetch(checkoutReq, franEnv);
+      expect(checkoutRes.status).toBe(200);
+      expect(kvStore.has('dindin:tenant_sadec_02:idempotency:idem_y2_1')).toBe(true);
+      expect(dindinOrders[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      // 4. Y3: Customer domain spine (identifyCustomer, recordConsent, hasActiveConsent, recordVisit, linkOrder) & Pretix webhook log
+      const idRes = await identifyCustomer({
+        db: mockDb as any,
+        customerId: 'cust_fran_y3',
+        phone: '0909998888',
+        source: 'signup',
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(idRes).not.toBeNull();
+      expect(idRes?.created).toBe(true);
+      expect(
+        customerIdentities.find((ci) => ci.customer_id === 'cust_fran_y3')?.tenant_id
+      ).toBe('tenant_sadec_02');
+
+      const consentRes = await recordConsent({
+        db: mockDb as any,
+        customerId: 'cust_fran_y3',
+        purpose: 'crm',
+        granted: true,
+        source: 'signup',
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(consentRes.ok).toBe(true);
+      expect(await hasActiveConsent(mockDb as any, 'cust_fran_y3', 'crm', 'tenant_sadec_02')).toBe(true);
+      expect(await hasActiveConsent(mockDb as any, 'cust_fran_y3', 'crm', 'default')).toBe(false);
+
+      const visitRes = await recordVisit({
+        db: mockDb as any,
+        customerId: 'cust_fran_y3',
+        orderId: 'ord_fran_y3',
+        spent: 65000,
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(visitRes.ok).toBe(true);
+      expect(visitRes.created).toBe(true);
+      expect(visits[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      const linkRes = await linkOrder({
+        db: mockDb as any,
+        customerId: 'cust_fran_y3',
+        orderId: 'ord_fran_y3',
+        total: 65000,
+        tenantId: 'tenant_sadec_02',
+      });
+      expect(linkRes.ok).toBe(true);
+      expect(linkRes.created).toBe(true);
+      expect(
+        customerEvents.filter((e) => e.customer_id === 'cust_fran_y3').every((e) => e.tenant_id === 'tenant_sadec_02')
+      ).toBe(true);
+
+      // Pretix webhook handler logs tenant_id = 'tenant_sadec_02'
+      const pretixApp = new Hono<{ Bindings: Env }>();
+      registerWebhookHandler(pretixApp as any);
+      const pretixPayload = JSON.stringify({
+        notification_id: 777,
+        organizer: 'aura',
+        event: 'workshop-sadec',
+        code: 'ORD99',
+        action: 'pretix.event.order.paid',
+      });
+      const sig = await computeHmacSha256(pretixPayload, 'pretix_sec_y3');
+      const pretixRes = await pretixApp.fetch(
+        new Request('https://api.test/webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-pretix-Signature': sig,
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: pretixPayload,
+        }),
+        franEnv
+      );
+      expect(pretixRes.status).toBe(200);
+      expect(pretixWebhookLogs[0]?.tenant_id).toBe('tenant_sadec_02');
+    });
+  });
+
+  // =========================================================================
+  // Suite 29: Phase Z1–Z3 — ERPNext Invoices/Accounting & Product/POS Sync,
+  //           Zalo Webhook Dedup & ZNS Audit Logs, Mautic Enrollment Isolation,
+  //           and Standalone Reviews / Mobile Tables Multi-Tenant Hardening
+  // =========================================================================
+  describe('Suite 29: Phase Z1–Z3 — ERPNext Invoices/POS, Zalo Dedup/ZNS, Mautic Enrollment & Reviews/Tables Multi-Tenant Isolation', () => {
+    it('isolates ERPNext accounting KV BYOK, unmapped invoice fail-closed, product sync PK namespacing, POS webhook logs, Zalo msg_id dedup, ZNS audit logs, Mautic default-vs-tenant enrollment, standalone reviews, and mobile table updates across tenants (Z1–Z3)', async () => {
+      const { createErpnextAccountingClientWithKv } = await import('../../clients/erpnext-accounting-client');
+      const { ErpnextClient } = await import('../../clients/erpnext-client');
+      const { ErpnextProductClient } = await import('../../clients/erpnext-product-client');
+      const { handleErpnextInvoicesRequest } = await import('../../routes/erpnext-invoices');
+      const { handleErpnextPosRequest } = await import('../../routes/erpnext-pos');
+      const { zaloWebhookRouter } = await import('../../routes/zalo-webhook');
+      const { sendZNS } = await import('../../tree/zalo/zns-sender');
+      const { isAlreadyEnrolled } = await import('../../tree/mautic/enrollment-tracker');
+      const { reviewsRouter } = await import('../../routes/reviews');
+      const { updateTableStatus } = await import('../../routes/tables-mobile');
+      const { Hono } = await import('hono');
+
+      const kvStore = new Map<string, string>();
+      const cacheKvStore = new Map<string, string>();
+      const erpnextMappings: Array<Record<string, unknown>> = [
+        {
+          local_type: 'order',
+          local_id: 'ord_def_z1',
+          erpnext_doctype: 'Sales Invoice',
+          erpnext_name: 'SINV-DEF-001',
+          synced_at: '2026-11-02T00:00:00.000Z',
+          tenant_id: 'default',
+          order_tenant_id: 'default',
+        },
+        {
+          local_type: 'order',
+          local_id: 'ord_fran_standalone_z1',
+          erpnext_doctype: 'Sales Invoice',
+          erpnext_name: 'SINV-FRAN-001',
+          synced_at: '2026-11-02T01:00:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+          order_tenant_id: null,
+        },
+      ];
+      const erpnextProductMappings: Array<Record<string, unknown>> = [];
+      const erpnextWebhookLogs: Array<Record<string, unknown>> = [];
+      const notificationAuditLogs: Array<Record<string, unknown>> = [];
+      const campaignEnrollments: Array<Record<string, unknown>> = [
+        {
+          id: 'ce_fran_only_z2',
+          customer_id: 'cust_shared_z2',
+          campaign_type: 'winback',
+          campaign_id: 'camp_1',
+          created_at: new Date().toISOString(),
+          mautic_contact_id: '501',
+          status: 'enrolled',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+      const reviews: Array<Record<string, unknown>> = [
+        {
+          id: 'rev_def_z3',
+          order_id: '',
+          rating: 2,
+          comment: 'Default store review',
+          customer_name: 'Default Reviewer',
+          tenant_id: 'default',
+          created_at: '2026-11-02T00:00:00.000Z',
+        },
+      ];
+      const cafeTables: Array<Record<string, unknown>> = [
+        {
+          id: 'tbl_fran_z3',
+          table_number: 5,
+          name: 'Bàn 5',
+          capacity: 4,
+          zone: 'Garden',
+          status: 'Available',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+
+      let activeStaffTenant = 'tenant_sadec_02';
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          executedSqls.push({ sql, args });
+          if (isAccountLookup(sql)) {
+            return staffAccountRow('manager', activeStaffTenant);
+          }
+          if (/FROM erpnext_mappings m LEFT JOIN orders o/i.test(sql) && /WHERE m\.erpnext_name = \?/i.test(sql)) {
+            const invId = String(args[0]);
+            const hit = erpnextMappings.find((m) => m.erpnext_name === invId);
+            if (!hit) return null;
+            return {
+              tenant_id: hit.tenant_id || hit.order_tenant_id || null,
+            };
+          }
+          if (/SELECT 1 FROM campaign_enrollments WHERE customer_id = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const ctype = String(args[1]);
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[3]) : undefined;
+            const hit = campaignEnrollments.find(
+              (e) =>
+                e.customer_id === cid &&
+                e.campaign_type === ctype &&
+                (!tid || String(e.tenant_id || 'default').trim() === tid)
+            );
+            return hit ? { 1: 1 } : null;
+          }
+          if (/SELECT \* FROM reviews WHERE id = \?/i.test(sql)) {
+            const rid = String(args[0]);
+            return reviews.find((r) => r.id === rid) || null;
+          }
+          if (/SELECT id, customer_id, tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+            if (args[0] === 'ord_fran_z3') {
+              return { id: 'ord_fran_z3', customer_id: 'cust_fran_z3', tenant_id: 'tenant_sadec_02' };
+            }
+            return null;
+          }
+          if (/SELECT \* FROM cafe_tables WHERE id = \?/i.test(sql)) {
+            const tid = String(args[0]);
+            return cafeTables.find((t) => t.id === tid) || null;
+          }
+          return null;
+        },
+        all: async () => {
+          executedSqls.push({ sql, args });
+          if (/FROM erpnext_mappings m[\s\S]*LEFT JOIN orders o/i.test(sql) && /WHERE m\.local_type = \?/i.test(sql)) {
+            return {
+              results: erpnextMappings.map((m) => ({
+                local_id: m.local_id,
+                erpnext_name: m.erpnext_name,
+                synced_at: m.synced_at,
+                tenant_id: m.tenant_id || m.order_tenant_id || null,
+              })),
+            };
+          }
+          if (/SELECT r\.rating, r\.tenant_id, o\.tenant_id as order_tenant_id FROM reviews r/i.test(sql)) {
+            return {
+              results: reviews.map((r) => ({
+                rating: r.rating,
+                tenant_id: r.tenant_id,
+                order_tenant_id: null,
+              })),
+            };
+          }
+          if (/SELECT r\.\*, o\.tenant_id as order_tenant_id FROM reviews r/i.test(sql)) {
+            return {
+              results: reviews.map((r) => ({
+                ...r,
+                order_tenant_id: null,
+              })),
+            };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          executedSqls.push({ sql, args });
+          if (/INSERT INTO erpnext_product_sync/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            const pid = String(args[0]);
+            const idx = erpnextProductMappings.findIndex((p) => p.product_id === pid);
+            const rec = {
+              product_id: pid,
+              erpnext_item_code: args[1],
+              last_synced_at: args[2],
+              erpnext_modified: args[3],
+              tenant_id: hasTenantCol ? args[4] : 'default',
+            };
+            if (idx >= 0) erpnextProductMappings[idx] = rec;
+            else erpnextProductMappings.push(rec);
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO erpnext_webhook_log/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            erpnextWebhookLogs.push({
+              doctype: args[0],
+              docname: args[1],
+              action: args[2],
+              payload: args[3],
+              tenant_id: hasTenantCol ? args[4] : 'default',
+              created_at: hasTenantCol ? args[5] : args[4],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO notification_audit_log/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            notificationAuditLogs.push({
+              phone: args[0],
+              template_key: args[1],
+              data: args[2],
+              status: args[3],
+              response: args[4],
+              tenant_id: hasTenantCol ? args[5] : 'default',
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO reviews/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            reviews.push({
+              id: args[0],
+              order_id: args[1] || '',
+              rating: args[2],
+              comment: args[3],
+              customer_name: args[4],
+              tenant_id: hasTenantCol ? args[5] : 'default',
+              created_at: hasTenantCol ? args[6] : args[5],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE cafe_tables SET status = \? WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+            const newStatus = String(args[0]);
+            const tid = String(args[1]);
+            const tenant = String(args[2]);
+            const tbl = cafeTables.find(
+              (t) => t.id === tid && String(t.tenant_id || 'default').trim() === tenant
+            );
+            if (tbl) tbl.status = newStatus;
+            return { success: true, meta: { changes: tbl ? 1 : 0 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+      };
+
+      const mockKv = {
+        get: vi.fn(async (k: string) => kvStore.get(k) ?? null),
+        put: vi.fn(async (k: string, v: string) => {
+          kvStore.set(k, v);
+        }),
+        delete: vi.fn(async (k: string) => {
+          kvStore.delete(k);
+        }),
+      };
+
+      const mockCacheKv = {
+        get: vi.fn(async (k: string) => cacheKvStore.get(k) ?? null),
+        put: vi.fn(async (k: string, v: string) => {
+          cacheKvStore.set(k, v);
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+        ENVIRONMENT: 'test',
+        AUTH_KV: mockKv as any,
+        CACHE_KV: mockCacheKv as any,
+        ERPNEXT_URL: 'https://erp.aura.vn',
+        ERPNEXT_API_KEY: 'key_z1',
+        ERPNEXT_API_SECRET: 'sec_z1',
+      });
+
+      // 1. Z1: createErpnextAccountingClientWithKv isolates KV BYOK per tenant
+      const envWithoutGlobalErp = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        AUTH_KV: mockKv as any,
+        ERPNEXT_URL: undefined,
+        ERPNEXT_API_KEY: undefined,
+        ERPNEXT_API_SECRET: undefined,
+      });
+      kvStore.set('erpnext:api_url', 'https://erp-default.aura.vn');
+      kvStore.set('erpnext:api_key', 'def_key');
+      kvStore.set('erpnext:api_secret', 'def_sec');
+
+      expect(await createErpnextAccountingClientWithKv(envWithoutGlobalErp as any, 'tenant_sadec_02')).toBeNull();
+      expect(await createErpnextAccountingClientWithKv(envWithoutGlobalErp as any, 'default')).not.toBeNull();
+
+      kvStore.set('erpnext:tenant_sadec_02:api_url', 'https://erp-sadec.aura.vn');
+      kvStore.set('erpnext:tenant_sadec_02:api_key', 'sadec_key');
+      kvStore.set('erpnext:tenant_sadec_02:api_secret', 'sadec_sec');
+      expect(await createErpnextAccountingClientWithKv(envWithoutGlobalErp as any, 'tenant_sadec_02')).not.toBeNull();
+
+      // Z1: Unmapped invoice ID fails closed (404) for non-default tenant 'tenant_sadec_02' on /pdf and /vat
+      const unmappedInvRes = await handleErpnextInvoicesRequest(
+        new Request('https://api.test/api/erpnext-invoices/SINV-UNMAPPED-999/pdf', {
+          method: 'GET',
+        }),
+        franEnv as any,
+        'tenant_sadec_02'
+      );
+      expect(unmappedInvRes.status).toBe(404);
+
+      // Z1: GET /api/erpnext-invoices/list returns standalone mapping with m.tenant_id='tenant_sadec_02' and excludes 'default'
+      const listInvRes = await handleErpnextInvoicesRequest(
+        new Request('https://api.test/api/erpnext-invoices/list', {
+          method: 'GET',
+        }),
+        franEnv as any,
+        'tenant_sadec_02'
+      );
+      expect(listInvRes.status).toBe(200);
+      const listInvBody = (await listInvRes.json()) as { data: Array<{ erpnext_name: string }> };
+      expect(listInvBody.data.map((i) => i.erpnext_name)).toEqual(['SINV-FRAN-001']);
+
+      // Z1: ErpnextProductClient.syncProductsToLocal namespaces product_id per tenant to prevent PRIMARY KEY collision
+      const baseErpClient = new ErpnextClient({
+        url: 'https://erp.aura.vn',
+        apiKey: 'k',
+        apiSecret: 's',
+      });
+      const prodClient = new ErpnextProductClient(baseErpClient, {
+        AURA_DB: mockDb as any,
+        AURA_KV: mockKv as any,
+      });
+
+      const changedProducts = [
+        {
+          name: 'FNB-LATTE-1',
+          item_code: 'latte_1',
+          item_name: 'Latte',
+          modified: '2026-11-02T00:00:00.000Z',
+        },
+      ];
+      await prodClient.syncProductsToLocal({ AURA_DB: mockDb as any }, changedProducts, 'default');
+      await prodClient.syncProductsToLocal({ AURA_DB: mockDb as any }, changedProducts, 'tenant_sadec_02');
+
+      expect(erpnextProductMappings).toHaveLength(2);
+      expect(erpnextProductMappings.find((p) => p.product_id === 'latte_1')?.tenant_id).toBe('default');
+      expect(erpnextProductMappings.find((p) => p.product_id === 'tenant_sadec_02::latte_1')?.tenant_id).toBe('tenant_sadec_02');
+
+      // Z1: POST /api/erpnext-pos/webhook logs tenant_id in erpnext_webhook_log
+      const posWebhookPayload = JSON.stringify({
+        doctype: 'Item',
+        docname: 'FNB-LATTE-1',
+        action: 'on_update',
+        data: { standard_rate: 48000, disabled: 0 },
+      });
+      const posWebhookRes = await handleErpnextPosRequest(
+        new Request('https://api.test/api/erpnext-pos/webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-erpnext-webhook-secret': 'pos_sec_z1',
+            'X-Tenant-ID': 'tenant_sadec_02',
+          },
+          body: posWebhookPayload,
+        }),
+        { ...franEnv, ERPNEXT_WEBHOOK_SECRET: 'pos_sec_z1' } as any,
+        'tenant_sadec_02'
+      );
+      expect(posWebhookRes.status).toBe(200);
+      expect(erpnextWebhookLogs[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      // 2. Z2: Zalo webhook msg_id deduplication is tenant-namespaced
+      const zaloApp = new Hono<{ Bindings: Env }>();
+      zaloApp.route('/api/webhooks/zalo', zaloWebhookRouter);
+
+      const defEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'default',
+        ENVIRONMENT: 'test',
+        AUTH_KV: mockKv as any,
+        CACHE_KV: mockCacheKv as any,
+      });
+
+      const zaloPayload = JSON.stringify({
+        event_name: 'user_send_text',
+        sender: { id: 'zalo_u1' },
+        message: { msg_id: 'msg_shared_z2', text: 'menu' },
+      });
+
+      const zaloDefRes = await zaloApp.fetch(
+        new Request('https://api.test/api/webhooks/zalo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: zaloPayload,
+        }),
+        defEnv
+      );
+      expect(zaloDefRes.status).toBe(200);
+      expect(kvStore.has('zalo_msg:msg_shared_z2')).toBe(true);
+
+      // Same msg_id sent to 'tenant_sadec_02' is NOT skipped as duplicate
+      const zaloFranRes = await zaloApp.fetch(
+        new Request('https://api.test/api/webhooks/zalo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: zaloPayload,
+        }),
+        franEnv
+      );
+      expect(zaloFranRes.status).toBe(200);
+      const zaloFranBody = (await zaloFranRes.json()) as { deduplicated?: boolean };
+      expect(zaloFranBody.deduplicated).toBeUndefined();
+      expect(kvStore.has('zalo_msg:tenant_sadec_02:msg_shared_z2')).toBe(true);
+
+      // Z2: sendZNS records tenant_id in notification_audit_log
+      const { TEMPLATE_IDS } = await import('../../tree/zalo/zns-templates');
+      const prevTpl = TEMPLATE_IDS.welcome_signup;
+      TEMPLATE_IDS.welcome_signup = 'ZNS_TPL_TEST_01';
+      try {
+        await sendZNS(
+          { AURA_DB: mockDb as any, ZALO_ACCESS_TOKEN: 'zalo_tok_z2' },
+          {
+            phone: '0901234567',
+            template_key: 'welcome_signup',
+            data: { name: 'SaDec Guest', member_id: 'M1', balance: 10000 },
+            tenantId: 'tenant_sadec_02',
+          }
+        );
+      } finally {
+        TEMPLATE_IDS.welcome_signup = prevTpl;
+      }
+      expect(notificationAuditLogs[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      // Z2: Mautic isAlreadyEnrolled for 'default' tenant is NOT suppressed by 'tenant_sadec_02' enrollment
+      expect(await isAlreadyEnrolled(mockDb as any, 'cust_shared_z2', 'winback', 30, 'tenant_sadec_02')).toBe(true);
+      expect(await isAlreadyEnrolled(mockDb as any, 'cust_shared_z2', 'winback', 30, 'default')).toBe(false);
+
+      // 3. Z3: Standalone review persists tenant_id and GET /api/reviews/stats isolates per tenant
+      const revApp = new Hono<{ Bindings: Env }>();
+      revApp.route('/api/reviews', reviewsRouter);
+
+      const custFranToken = await generateJWT(
+        { id: 'cust_fran_z3', role: 'customer', tenantId: 'tenant_sadec_02' },
+        TEST_JWT_SECRET,
+        3600
+      );
+      const postRevRes = await revApp.fetch(
+        new Request('https://api.test/api/reviews', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${custFranToken}`,
+          },
+          body: JSON.stringify({
+            order_id: 'ord_fran_z3',
+            rating: 5,
+            comment: 'Excellent coffee in Sa Đéc!',
+            customer_name: 'SaDec Reviewer',
+          }),
+        }),
+        franEnv
+      );
+      expect(postRevRes.status).toBe(201);
+      expect(reviews.find((r) => r.customer_name === 'SaDec Reviewer')?.tenant_id).toBe('tenant_sadec_02');
+
+      const franStatsRes = await revApp.fetch(
+        new Request('https://api.test/api/reviews/stats', {
+          headers: { Authorization: `Bearer ${custFranToken}` },
+        }),
+        franEnv
+      );
+      expect(franStatsRes.status).toBe(200);
+      const franStatsBody = (await franStatsRes.json()) as {
+        data: { total_reviews: number; average_rating: number };
+      };
+      expect(franStatsBody.data).toEqual({ total_reviews: 1, average_rating: 5 });
+
+      const defStatsRes = await revApp.fetch(
+        new Request('https://api.test/api/reviews/stats'),
+        defEnv
+      );
+      expect(defStatsRes.status).toBe(200);
+      const defStatsBody = (await defStatsRes.json()) as {
+        data: { total_reviews: number; average_rating: number };
+      };
+      expect(defStatsBody.data).toEqual({ total_reviews: 1, average_rating: 2 });
+
+      // Z3: Mobile tables updateTableStatus scopes UPDATE by tenant_id
+      const mobileApp = new Hono<{ Bindings: Env }>();
+      mobileApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'waiter-sadec', role: 'waiter', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      mobileApp.patch('/mobile/tables/:id', (c) => updateTableStatus(c));
+
+      executedSqls.length = 0;
+      const patchTblRes = await mobileApp.fetch(
+        new Request('https://api.test/mobile/tables/tbl_fran_z3', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'occupied' }),
+        }),
+        franEnv
+      );
+      expect(patchTblRes.status).toBe(200);
+      expect(cafeTables[0]?.status).toBe('Occupied');
+      expect(
+        executedSqls.some(
+          (q) =>
+            q.sql.includes("UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args[0] === 'Occupied' &&
+            q.args[1] === 'tbl_fran_z3' &&
+            q.args[2] === 'tenant_sadec_02'
+        )
+      ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 30: Phase AA1–AA3 — Default-Tenant Campaign/Mautic/Push Isolation,
+  //           Reports RBAC & Subscriptions MRR/Invoice Hardening, Shift Cash
+  //           Reconciliation, Staff Tips, Table Sessions & SOP Audit Actor
+  // =========================================================================
+  describe('Suite 30: Phase AA1–AA3 — Default-Tenant Campaign/Mautic/Push, Reports RBAC, Subscriptions MRR, Shift Reconcile, Staff Tips & SOP Audit Isolation', () => {
+    it('enforces default-tenant isolation across Mautic/Campaigns/Push, blocks non-staff on /api/reports, protects mrr_snapshots from non-default overwrites, and scopes shift cash reconciliation, staff tips, table sessions & SOP audit actor (AA1–AA3)', async () => {
+      const { getCustomerAccount } = await import('../../../../packages/domain/crm/commands/get-customer-account');
+      const { lookupProfile } = await import('../../../../packages/domain/crm/lookup-profile');
+      const { deduplicate: deduplicateCrm } = await import('../../../../packages/domain/crm/commands/campaign/dedup');
+      const {
+        detectBirthdayCandidates: detectCrmBirthday,
+        detectWinbackCandidates: detectCrmWinback,
+      } = await import('../../../../packages/domain/crm/commands/campaign/detect');
+      const { deduplicate } = await import('../../tree/campaigns/campaign-engine');
+      const { detectWelcomeCandidates } = await import('../../tree/campaigns/triggers/welcome');
+      const { detectBirthdayCandidates: detectTreeBirthday } = await import('../../tree/campaigns/triggers/birthday');
+      const { detectWinbackCandidates: detectTreeWinback } = await import('../../tree/campaigns/triggers/winback');
+      const { detectPostVisitCandidates } = await import('../../tree/campaigns/triggers/post-visit');
+      const { detectCashbackExpiry, markExpiryNotified } = await import('../../tree/campaigns/triggers/cashback-expiry');
+      const {
+        detectBirthdayCandidates: detectMauticBirthday,
+        detectWinbackCandidates: detectMauticWinback,
+      } = await import('../../tree/mautic/campaign-detection');
+      const { sendPushToCustomer, sendPushToStaff } = await import('../../tree/push/notifier');
+      const { reportsRouter } = await import('../../routes/reports-handlers/routes');
+      const { updateMRRSnapshot } = await import('../../tree/subscriptions/mrr-calculator');
+      const { getStatsHandler } = await import('../../tree/subscriptions/sub-handlers');
+      const { listInvoices } = await import('../../tree/subscriptions/invoice-handlers');
+      const { reconcileShiftCash, getReconciliationForShift } = await import(
+        '../../../../packages/domain/shift/src/policies/cash-reconciliation-policy'
+      );
+      const { staffTipsRouter } = await import('../../../../packages/domain/staff/commands/staff-tips');
+      const { registerSessionHandlers } = await import('../../routes/table-sessions-handlers/session-handlers');
+      const { auditActor } = await import('../../routes/openapi-sop-handlers/sop-audit');
+      const { Hono } = await import('hono');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const mrrSnapshots: Array<Record<string, unknown>> = [];
+      const shiftReconciliations: Array<Record<string, unknown>> = [];
+      const orders: Array<Record<string, unknown>> = [
+        {
+          id: 'ord_def_aa1',
+          customer_id: 'cust_def_aa1',
+          customer_phone: '0901112222',
+          total: 45000,
+          tip_amount: 5000,
+          updated_by: 'staff_sadec_1',
+          status: 'completed',
+          created_at: '2026-11-02T08:00:00.000Z',
+          tenant_id: 'default',
+        },
+        {
+          id: 'ord_fran_aa1',
+          customer_id: 'cust_def_aa1',
+          customer_phone: '0901112222',
+          total: 95000,
+          tip_amount: 15000,
+          updated_by: 'staff_sadec_1',
+          status: 'completed',
+          created_at: '2026-11-02T09:00:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const payments: Array<Record<string, unknown>> = [
+        {
+          id: 'pay_cash_def',
+          method: 'cash',
+          amount: 100000,
+          status: 'completed',
+          created_at: '2026-11-02T08:30:00.000Z',
+          tenant_id: 'default',
+        },
+        {
+          id: 'pay_cash_fran',
+          method: 'cash',
+          amount: 250000,
+          status: 'completed',
+          created_at: '2026-11-02T08:45:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const cashPayouts: Array<Record<string, unknown>> = [
+        {
+          id: 'payout_def',
+          amount: 20000,
+          status: 'completed',
+          created_at: '2026-11-02T09:00:00.000Z',
+          tenant_id: 'default',
+        },
+        {
+          id: 'payout_fran',
+          amount: 50000,
+          status: 'completed',
+          created_at: '2026-11-02T09:15:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const tableSessions: Array<Record<string, unknown>> = [
+        {
+          id: 'tsess_def_aa3',
+          table_id: 'tbl_shared_1',
+          status: 'active',
+          opened_at: '2026-11-02T08:00:00.000Z',
+          tenant_id: 'default',
+        },
+        {
+          id: 'tsess_fran_aa3',
+          table_id: 'tbl_shared_1',
+          status: 'active',
+          opened_at: '2026-11-02T08:30:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      let activeStaffTenant = 'tenant_sadec_02';
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          executedSqls.push({ sql, args });
+          if (isAccountLookup(sql)) {
+            return staffAccountRow('manager', activeStaffTenant);
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            return {
+              id: 'cust_def_aa1',
+              name: 'Default Customer AA1',
+              phone: '0901112222',
+              email: 'def_aa1@aura.vn',
+              loyalty_tier: 'gold',
+              loyalty_points: 200,
+              lifetime_points: 500,
+              tenant_id: 'default',
+            };
+          }
+          if (/FROM customers WHERE \(?phone = \?/i.test(sql)) {
+            return {
+              id: 'cust_def_aa1',
+              customer_id: 'cust_def_aa1',
+              name: 'Default Customer AA1',
+              phone: '0901112222',
+              email: 'def_aa1@aura.vn',
+              loyalty_tier: 'gold',
+              loyalty_points: 200,
+              lifetime_points: 500,
+              tenant_id: 'default',
+            };
+          }
+          if (/SELECT clock_in, clock_out, tenant_id FROM staff_shifts WHERE id = \?/i.test(sql)) {
+            if (args[0] === 'shift_fran_aa3') {
+              return {
+                clock_in: '2026-11-02T08:00:00.000Z',
+                clock_out: '2026-11-02T12:00:00.000Z',
+                tenant_id: 'tenant_sadec_02',
+              };
+            }
+            return null;
+          }
+          if (/SELECT COALESCE\(SUM\(amount\), 0\) as total FROM payments/i.test(sql)) {
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[2]) : undefined;
+            const total = payments
+              .filter((p) => !tid || String(p.tenant_id || 'default').trim() === tid)
+              .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            return { total };
+          }
+          if (/SELECT COALESCE\(SUM\(amount\), 0\) as total FROM cash_payouts/i.test(sql)) {
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[2]) : undefined;
+            const total = cashPayouts
+              .filter((p) => !tid || String(p.tenant_id || 'default').trim() === tid)
+              .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            return { total };
+          }
+          if (/SELECT \* FROM shift_reconciliations WHERE shift_id = \?/i.test(sql)) {
+            const sid = String(args[0]);
+            return shiftReconciliations.find((r) => r.shift_id === sid) || null;
+          }
+          if (/SELECT \* FROM subscriptions WHERE id = \?/i.test(sql)) {
+            if (args[0] === 'sub_def_aa2') {
+              return {
+                id: 'sub_def_aa2',
+                customer_id: 'cust_fran_aa2',
+                customer_email: 'fran@aura.vn',
+                status: 'active',
+                tenant_id: 'default',
+              };
+            }
+            return null;
+          }
+          if (/SELECT \* FROM orders WHERE id = \?/i.test(sql)) {
+            const oid = String(args[0]);
+            return orders.find((o) => o.id === oid) || null;
+          }
+          if (/SELECT id, tenant_id FROM users WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), tenant_id: 'tenant_sadec_02' };
+          }
+          if (/COALESCE\(SUM\(amount_vnd\), 0\) as mrr/i.test(sql) && /FROM subscriptions/i.test(sql)) {
+            const tid = args.find((a) => a === 'tenant_sadec_02' || a === 'default');
+            return { count: 1, mrr: tid === 'tenant_sadec_02' ? 15000000 : 10000000 };
+          }
+          if (/SELECT COUNT\(\*\) as count FROM/i.test(sql)) {
+            return { count: 1 };
+          }
+          if (/SELECT COALESCE\(SUM/i.test(sql)) {
+            return { total: 100000 };
+          }
+          return null;
+        },
+        all: async () => {
+          executedSqls.push({ sql, args });
+          if (/SELECT \* FROM orders/i.test(sql)) {
+            // Simulate fallback returning both tenants' orders to test JS-level resolvedTenant filter
+            return { results: [...orders] };
+          }
+          if (/FROM push_subscriptions/i.test(sql)) {
+            const allSubs = [
+              {
+                id: 'ps_def_aa1',
+                endpoint: 'https://fcm.googleapis.com/fcm/send/def-aa1',
+                p256dh: 'p_def',
+                auth: 'a_def',
+                customer_id: 'cust_def_aa1',
+                staff_role: 'barista',
+                tenant_id: 'default',
+              },
+              {
+                id: 'ps_fran_aa1',
+                endpoint: 'https://fcm.googleapis.com/fcm/send/fran-aa1',
+                p256dh: 'p_fran',
+                auth: 'a_fran',
+                customer_id: 'cust_def_aa1',
+                staff_role: 'barista',
+                tenant_id: 'tenant_sadec_02',
+              },
+            ];
+            if (/TRIM\(tenant_id\)/i.test(sql)) {
+              const tid = String(args[args.length - 1]);
+              return {
+                results: allSubs.filter((s) => String(s.tenant_id || 'default').trim() === tid),
+              };
+            }
+            return { results: allSubs };
+          }
+          if (/FROM subscriptions WHERE status IN \('active', 'past_due', 'paused'\)/i.test(sql)) {
+            return {
+              results: [
+                {
+                  id: 'sub_def_1',
+                  status: 'active',
+                  billing_cycle: 'monthly',
+                  amount_vnd: 10000000,
+                  tenant_id: 'default',
+                },
+                {
+                  id: 'sub_fran_1',
+                  status: 'active',
+                  billing_cycle: 'monthly',
+                  amount_vnd: 15000000,
+                  tenant_id: 'tenant_sadec_02',
+                },
+              ],
+            };
+          }
+          if (/FROM subscription_plans p LEFT JOIN subscriptions s|FROM subscriptions s JOIN subscription_plans p/i.test(sql)) {
+            const tid = /TRIM\(s\.tenant_id\)/i.test(sql) ? String(args[0]) : undefined;
+            return {
+              results: [
+                {
+                  name: 'Container Basic',
+                  slug: 'container-basic',
+                  count: tid === 'tenant_sadec_02' ? 1 : 2,
+                  revenue: tid === 'tenant_sadec_02' ? 15000000 : 25000000,
+                },
+              ],
+            };
+          }
+          if (/FROM subscriptions WHERE status = 'active'/i.test(sql)) {
+            return {
+              results: [
+                {
+                  zone: 'Zone A',
+                  count: 1,
+                  revenue: 15000000,
+                },
+              ],
+            };
+          }
+          if (/SELECT \* FROM table_sessions/i.test(sql)) {
+            return { results: [...tableSessions] };
+          }
+          if (/SELECT \* FROM cafe_tables/i.test(sql)) {
+            return {
+              results: [
+                { id: 'tbl_shared_1', status: 'Available', tenant_id: 'default' },
+                { id: 'tbl_shared_1', status: 'Available', tenant_id: 'tenant_sadec_02' },
+              ],
+            };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          executedSqls.push({ sql, args });
+          if (/INSERT (?:OR REPLACE )?INTO mrr_snapshots/i.test(sql)) {
+            const mrrVal = typeof args[1] === 'number' ? args[1] : args[2];
+            mrrSnapshots.push({
+              snapshot_date: typeof args[1] === 'number' ? args[0] : args[1],
+              mrr_vnd: mrrVal,
+              arr_vnd: typeof args[1] === 'number' ? args[2] : args[3],
+              active_count: typeof args[1] === 'number' ? args[3] : args[4],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO shift_reconciliations/i.test(sql)) {
+            const hasTenantCol = /tenant_id/i.test(sql);
+            shiftReconciliations.push({
+              id: args[0],
+              shift_id: args[1],
+              staff_id: args[2],
+              opening_float: args[3],
+              expected_cash: args[4],
+              actual_cash: args[5],
+              variance: args[6],
+              variance_status: args[7],
+              denominations: args[8],
+              cash_payment_total: args[9],
+              cash_payout_total: args[10],
+              notes: args[11],
+              tenant_id: hasTenantCol ? args[12] : 'default',
+              created_at: hasTenantCol ? args[13] : args[12],
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
+          for (const s of stmts) {
+            executedSqls.push({ sql: s.sql, args: s.args });
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        }),
+      };
+
+      const franEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'tenant_sadec_02',
+        ENVIRONMENT: 'test',
+      });
+
+      // 1. AA1: getCustomerAccount & lookupProfile filter out foreign-tenant orders ('ord_fran_aa1') for 'default' customer
+      const account = await getCustomerAccount(mockDb as any, 'cust_def_aa1', { tenantId: 'default' });
+      expect(account.recentOrders.map((o) => o.id)).toEqual(['ord_def_aa1']);
+
+      const profile = await lookupProfile(mockDb as any, '0901112222', 'default');
+      expect(profile?.recentOrders.map((o) => o.id)).toEqual(['ord_def_aa1']);
+
+      // AA1: Campaign triggers, deduplication, Mautic detection & WebPush notifier scope SQL even when tenantId === 'default'
+      executedSqls.length = 0;
+      await deduplicate(mockDb as any, 'cust_def_aa1', 'welcome_series' as any, 3650, 'default');
+      await detectWelcomeCandidates(mockDb as any, 'default');
+      await detectTreeBirthday(mockDb as any, 'default');
+      await detectTreeWinback(mockDb as any, 'default');
+      await detectPostVisitCandidates(mockDb as any, 'default');
+      await detectCashbackExpiry(mockDb as any, 'default');
+      await markExpiryNotified(mockDb as any, ['cust_def_aa1'], 'default');
+      await deduplicateCrm(mockDb as any, 'cust_def_aa1', 'birthday', 365, 'default');
+      await detectCrmBirthday(mockDb as any, 'default');
+      await detectCrmWinback(mockDb as any, 'default');
+      const mauticEnv = {
+        ...franEnv,
+        MAUTIC_BASE_URL: 'https://mautic.test',
+        MAUTIC_CLIENT_ID: 'admin',
+        MAUTIC_CLIENT_SECRET: 'secret',
+        MAUTIC_CAMPAIGN_BIRTHDAY: '11',
+        MAUTIC_CAMPAIGN_WINBACK: '10',
+      };
+      await detectMauticBirthday(mauticEnv as any, 'default');
+      await detectMauticWinback(mauticEnv as any, 'default');
+      await sendPushToCustomer({ ...franEnv, VAPID_PUBLIC_KEY: undefined } as any, 'cust_def_aa1', { title: 'Hi', body: 'Default' }, 'default');
+      await sendPushToStaff({ ...franEnv, VAPID_PUBLIC_KEY: undefined } as any, { title: 'Staff', body: 'Default' }, undefined, 'default');
+
+      const defaultScopedQueries = executedSqls.filter(
+        (q) => q.sql.includes('tenant_id') && q.args.includes('default')
+      );
+      expect(defaultScopedQueries.length).toBeGreaterThanOrEqual(12);
+
+      // 2. AA2: /api/reports enforces staff RBAC when authenticated user is present (blocks customer/vendor with 403)
+      const reportsApp = new Hono<{ Bindings: Env }>();
+      reportsApp.use('*', async (c, next) => {
+        const role = c.req.header('X-Test-Role');
+        if (role) {
+          c.set('user' as any, { id: 'u1', role, tenantId: 'tenant_sadec_02' });
+        }
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      reportsApp.route('/api/reports', reportsRouter);
+
+      const custReportRes = await reportsApp.fetch(
+        new Request('https://api.test/api/reports/summary', {
+          headers: { 'X-Test-Role': 'customer' },
+        }),
+        franEnv
+      );
+      expect(custReportRes.status).toBe(403);
+
+      const mgrReportRes = await reportsApp.fetch(
+        new Request('https://api.test/api/reports/summary', {
+          headers: { 'X-Test-Role': 'manager' },
+        }),
+        franEnv
+      );
+      expect(mgrReportRes.status).toBe(200);
+
+      // AA2: updateMRRSnapshot does NOT overwrite global mrr_snapshots for non-default tenant 'tenant_sadec_02'
+      await updateMRRSnapshot(mockDb as any, 'tenant_sadec_02');
+      expect(mrrSnapshots).toHaveLength(0);
+      await updateMRRSnapshot(mockDb as any, 'default');
+      expect(mrrSnapshots).toHaveLength(1);
+      expect(mrrSnapshots[0]?.mrr_vnd).toBe(10000000);
+
+      // AA2: getStatsHandler scopes byPlan by tenant_id
+      const subApp = new Hono<{ Bindings: Env }>();
+      subApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'mgr-sadec', role: 'manager', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      subApp.get('/stats', (c) => getStatsHandler(c));
+      subApp.get('/invoices', (c) => listInvoices(c));
+
+      const subStatsRes = await subApp.fetch(new Request('https://api.test/stats'), franEnv);
+      expect(subStatsRes.status).toBe(200);
+      const subStatsBody = (await subStatsRes.json()) as {
+        data: { mrr_vnd: number; by_plan: Array<{ count: number }> };
+      };
+      expect(subStatsBody.data.mrr_vnd).toBe(15000000);
+      expect(subStatsBody.data.by_plan[0]?.count).toBe(1);
+
+      // AA2: listInvoices fails closed (empty data) when customer queries cross-tenant subscription_id
+      const custSubApp = new Hono<{ Bindings: Env }>();
+      custSubApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'cust_fran_aa2', role: 'customer', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      custSubApp.get('/invoices', (c) => listInvoices(c));
+      const crossInvRes = await custSubApp.fetch(
+        new Request('https://api.test/invoices?subscription_id=sub_def_aa2'),
+        franEnv
+      );
+      expect(crossInvRes.status).toBe(200);
+      const crossInvBody = (await crossInvRes.json()) as { data: unknown[] };
+      expect(crossInvBody.data).toEqual([]);
+
+      // 3. AA3: Shift cash reconciliation isolates cash payments/payouts by shift tenant and persists tenant_id
+      const recon = await reconcileShiftCash(
+        { AURA_DB: mockDb as any },
+        {
+          shift_id: 'shift_fran_aa3',
+          opening_float: 500000,
+          denominations: { denominations: [{ denomination: 500000, count: 1 }, { denomination: 200000, count: 1 }] },
+          notes: 'SaDec shift close',
+        },
+        'staff_sadec_1',
+        'tenant_sadec_02'
+      );
+      // Expected cash for 'tenant_sadec_02': 500,000 + 250,000 (pay_cash_fran) - 50,000 (payout_fran) = 700,000
+      expect(recon.cash_payment_total).toBe(250000);
+      expect(recon.cash_payout_total).toBe(50000);
+      expect(recon.expected_cash).toBe(700000);
+      expect(recon.variance).toBe(0);
+      expect(shiftReconciliations[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      expect(await getReconciliationForShift({ AURA_DB: mockDb as any }, 'shift_fran_aa3', 'default')).toBeNull();
+      expect(await getReconciliationForShift({ AURA_DB: mockDb as any }, 'shift_fran_aa3', 'tenant_sadec_02')).not.toBeNull();
+
+      // AA3: Staff tips POST /assign scopes UPDATE orders by tenant_id
+      const tipsApp = new Hono<{ Bindings: Env }>();
+      tipsApp.route('/api/staff-tips', staffTipsRouter);
+      executedSqls.length = 0;
+      const assignTipRes = await tipsApp.fetch(
+        await authRequest('POST', '/api/staff-tips/assign', 'manager', 'tenant_sadec_02', {
+          order_id: 'ord_fran_aa1',
+          staff_id: 'staff_sadec_1',
+          tip_amount: 20000,
+        }),
+        franEnv
+      );
+      expect(assignTipRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            q.sql.includes("UPDATE orders SET tip_amount = ?, updated_by = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args[3] === 'ord_fran_aa1' &&
+            q.args[4] === 'tenant_sadec_02'
+        )
+      ).toBe(true);
+
+      // AA3: Table sessions GET / filters by session.tenant_id even when table_id collides
+      const sessApp = new Hono<{ Bindings: Env }>();
+      sessApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
+      registerSessionHandlers(sessApp);
+      const listSessRes = await sessApp.fetch(new Request('https://api.test/'), franEnv);
+      expect(listSessRes.status).toBe(200);
+      const listSessBody = (await listSessRes.json()) as { data: Array<{ id: string }> };
+      expect(listSessBody.data.map((s) => s.id)).toEqual(['tsess_fran_aa3']);
+
+      // AA3: auditActor resolves tenantId from user.tenant_id or getTenantId(c)
+      const mockCtx = {
+        get: (k: string) =>
+          k === 'user'
+            ? { id: 'staff_sadec_1', name: 'SaDec Staff', role: 'staff', tenant_id: 'tenant_sadec_02' }
+            : k === 'tenantId'
+              ? 'tenant_sadec_02'
+              : undefined,
+        env: franEnv,
+        req: { header: () => undefined },
+      } as any;
+      const actor = auditActor(mockCtx);
+      expect(actor.tenantId).toBe('tenant_sadec_02');
+    });
+  });
+
+  // =========================================================================
+  // Suite 31: Phase AB1–AB3 — Cron & Campaign/Mautic/Push Default-Tenant Scoping,
+  //           Loyalty Policy (bonus_campaigns + KV), Referrals, Checkin/Birthday/WiFi
+  //           & Floor-Plan Isolation, and Order/Customer Spine & Inventory PO/BOM
+  // =========================================================================
+  describe('Suite 31: Phase AB1–AB3 — Cron, Campaign/Mautic/Push, Loyalty Policy, Referrals, Checkin/Birthday/WiFi, Floor-Plan & Inventory PO/BOM Isolation', () => {
+    it('enforces default-tenant scoping in cron overdue/cashback warnings, stamps default tenant_id on campaign_logs/enrollments/push/referrals/checkin/birthday/wifi/PO/stock_movements, isolates loadPolicy & getActiveCampaign, and scopes floor-plan & inventory PO/BOM (AB1–AB3)', async () => {
+      const { checkOverdueOrders } = await import('../../routes/cron-handlers/order-checks');
+      const { sendCashbackExpiryWarnings } = await import('../../routes/cron-handlers/cashback-warnings');
+      const { logSend } = await import('../../tree/campaigns/campaign-engine');
+      const { trackEnrollment } = await import('../../tree/mautic/enrollment-tracker');
+      const { pushRouter } = await import('../../routes/push');
+      const { markNotificationRead } = await import('../../routes/notifications-mobile');
+      const { loadPolicy } = await import('../../../../packages/domain/crm/commands/loyalty-policy');
+      const { consumeCrmEvent } = await import('../../../../packages/domain/crm/commands/consume-crm-event');
+      const { getActiveCampaign } = await import('../../tree/loyalty/campaign');
+      const { referralRouter } = await import('../../routes/referrals');
+      const { checkinRouter } = await import('../../routes/checkin');
+      const { birthdayRouter } = await import('../../routes/birthday');
+      const { authorizeWifiOverride } = await import('../../tree/wifi/session');
+      const { floorPlanRouter } = await import('../../routes/floor-plan');
+      const {
+        createCanonicalPurchaseOrder,
+        receivePurchaseOrder,
+        cancelPurchaseOrder,
+      } = await import('../../../../packages/domain/inventory/src/policies/purchasing-receiving-policy');
+      const { deductOrderStock } = await import(
+        '../../../../packages/domain/inventory/src/policies/inventory-recipe-policy'
+      );
+      const { purchasing } = await import('../../../../packages/domain/inventory/src/routes/purchasing');
+      const { Hono } = await import('hono');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const kvMap = new Map<string, string>();
+      const mockKv = {
+        get: vi.fn(async (key: string) => kvMap.get(key) ?? null),
+        put: vi.fn(async (key: string, val: string) => {
+          kvMap.set(key, val);
+        }),
+      };
+
+      const bonusCampaigns: Array<Record<string, unknown>> = [
+        {
+          id: 1,
+          code: 'DEF_SPRING_2X',
+          name: 'Default 2x',
+          cashback_multiplier: 2.0,
+          max_cap_per_customer_vnd: 40000,
+          start_date: '2026-01-01 00:00:00',
+          end_date: '2026-12-31 23:59:59',
+          active: 1,
+          tenant_id: 'default',
+        },
+        {
+          id: 2,
+          code: 'SADEC_GRAND_3X',
+          name: 'SaDec 3x',
+          cashback_multiplier: 3.0,
+          max_cap_per_customer_vnd: 90000,
+          start_date: '2026-01-01 00:00:00',
+          end_date: '2026-12-31 23:59:59',
+          active: 1,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      const campaignLogs: Array<Record<string, unknown>> = [];
+      const campaignEnrollments: Array<Record<string, unknown>> = [];
+      const pushSubs: Array<Record<string, unknown>> = [];
+      const checkins: Array<Record<string, unknown>> = [];
+      const birthdayRedemptions: Array<Record<string, unknown>> = [];
+      const wifiSessions: Array<Record<string, unknown>> = [];
+      const purchaseOrders: Array<Record<string, unknown>> = [];
+      const purchaseOrderItems: Array<Record<string, unknown>> = [];
+      const stockMovements: Array<Record<string, unknown>> = [];
+      const referralCodes: Array<Record<string, unknown>> = [
+        {
+          id: 'rc_def_ab2',
+          customer_id: 'cust_def_ab2',
+          code: 'FNB-DEFAB2',
+          times_used: 1,
+          total_points_earned: 0,
+          created_at: '2026-11-01T00:00:00.000Z',
+          tenant_id: 'default',
+        },
+      ];
+      const referrals: Array<Record<string, unknown>> = [
+        {
+          id: 'ref_def_1',
+          referrer_id: 'cust_def_ab2',
+          referred_customer_id: 'cust_def_friend',
+          referral_code: 'FNB-DEFAB2',
+          points_awarded: 0,
+          cashback_awarded_vnd: 10000,
+          status: 'completed',
+          created_at: '2026-11-01T01:00:00.000Z',
+          tenant_id: 'default',
+        },
+        {
+          id: 'ref_fran_1',
+          referrer_id: 'cust_def_ab2',
+          referred_customer_id: 'cust_fran_friend',
+          referral_code: 'FNB-SADEC2',
+          points_awarded: 0,
+          cashback_awarded_vnd: 10000,
+          status: 'completed',
+          created_at: '2026-11-01T02:00:00.000Z',
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+
+      let activeStaffTenant = 'default';
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          executedSqls.push({ sql, args });
+          if (isAccountLookup(sql)) {
+            return staffAccountRow('manager', activeStaffTenant);
+          }
+          if (/FROM bonus_campaigns/i.test(sql)) {
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[2]);
+              const matches = bonusCampaigns
+                .filter((c) => String(c.tenant_id || 'default').trim() === tid)
+                .sort((a, b) => Number(b.id) - Number(a.id));
+              return matches[0] ?? null;
+            }
+            const sorted = [...bonusCampaigns].sort((a, b) => Number(b.id) - Number(a.id));
+            return sorted[0] ?? null;
+          }
+          if (/SELECT \* FROM referral_codes WHERE customer_id = \?/i.test(sql)) {
+            return referralCodes.find((r) => r.customer_id === args[0]) ?? null;
+          }
+          if (/FROM checkins WHERE customer_id = \?/i.test(sql)) {
+            return null;
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            return {
+              id: String(args[0]),
+              name: 'Default Birthday Customer',
+              phone: '0905556666',
+              birthday: new Date().toISOString().slice(0, 10),
+              date_of_birth: new Date().toISOString().slice(0, 10),
+              loyalty_points: 50,
+              lifetime_points: 50,
+              loyalty_tier: 'bronze',
+              tenant_id: 'default',
+            };
+          }
+          if (/FROM birthday_redemptions WHERE customer_id = \?/i.test(sql)) {
+            return null;
+          }
+          if (/SELECT \* FROM cafe_tables WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), table_number: 1, zone: 'Indoor', status: 'Reserved', tenant_id: activeStaffTenant };
+          }
+          if (/FROM table_sessions WHERE table_id = \? AND status = 'active'/i.test(sql)) {
+            return { id: 'tsess_ab2_1', tenant_id: activeStaffTenant };
+          }
+          if (/SELECT \* FROM suppliers WHERE id = \? AND is_active = 1/i.test(sql)) {
+            return { id: String(args[0]), name: 'Default Supplier', is_active: 1, tenant_id: 'default' };
+          }
+          if (/SELECT \* FROM ingredients WHERE id = \?/i.test(sql) || /SELECT id, current_stock, tenant_id FROM ingredients WHERE id = \?/i.test(sql) || /SELECT id, tenant_id FROM ingredients WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), name: 'Coffee Beans', cost_per_unit: 200, current_stock: 500, tenant_id: 'default' };
+          }
+          if (/SELECT \* FROM purchase_orders WHERE id = \?/i.test(sql)) {
+            return purchaseOrders.find((p) => p.id === args[0]) ?? null;
+          }
+          if (/FROM stock_movements WHERE reference_id = \?/i.test(sql)) {
+            const refId = String(args[0]);
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[1]);
+              return stockMovements.find((m) => m.reference_id === refId && String(m.tenant_id || 'default') === tid) ?? null;
+            }
+            return stockMovements.find((m) => m.reference_id === refId) ?? null;
+          }
+          if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+            return { id: 'rec_ab3_1', product_id: String(args[0]), name: 'Espresso BOM', tenant_id: 'default' };
+          }
+          return null;
+        },
+        all: async () => {
+          executedSqls.push({ sql, args });
+          if (/FROM orders\s+WHERE status IN \('pending', 'confirmed', 'preparing'/i.test(sql)) {
+            return {
+              results: [
+                { id: 'ord_overdue_def', customer_name: 'Default Guest', status: 'confirmed', created_at: '2026-11-01T00:00:00Z', tenant_id: 'default' },
+              ],
+            };
+          }
+          if (/FROM cashback_transactions ct\s+JOIN cashback_wallets cw/i.test(sql)) {
+            return {
+              results: [
+                { customer_id: 'cust_warn_def', name: 'Warn Def', phone: '0901112222', total_expiring: 15000, tenant_id: 'default' },
+              ],
+            };
+          }
+          if (/SELECT COUNT\(\*\) as cnt FROM referrals WHERE referrer_id = \?/i.test(sql)) {
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[1]) : undefined;
+            const cnt = referrals.filter(
+              (r) => r.referrer_id === args[0] && (!tid || String(r.tenant_id || 'default').trim() === tid)
+            ).length;
+            return { results: [{ cnt }] };
+          }
+          if (/SELECT COALESCE\(SUM\(cashback_awarded_vnd\), 0\) as total FROM referrals/i.test(sql)) {
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[2]) : undefined;
+            const total = referrals
+              .filter((r) => r.referrer_id === args[0] && r.status === args[1] && (!tid || String(r.tenant_id || 'default').trim() === tid))
+              .reduce((s, r) => s + Number(r.cashback_awarded_vnd || 0), 0);
+            return { results: [{ total }] };
+          }
+          if (/FROM referrals r LEFT JOIN customers c/i.test(sql)) {
+            return { results: [...referrals] };
+          }
+          if (/FROM purchase_order_items WHERE purchase_order_id = \?/i.test(sql)) {
+            return { results: purchaseOrderItems.filter((i) => i.purchase_order_id === args[0]) };
+          }
+          if (/FROM recipe_items ri/i.test(sql)) {
+            return {
+              results: [{ ingredient_id: 'ing_ab3_1', quantity: 18, unit: 'g', ing_name: 'Beans', cost_per_unit: 200 }],
+            };
+          }
+          if (/SELECT \* FROM purchase_orders/i.test(sql)) {
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[0]);
+              return { results: purchaseOrders.filter((p) => String(p.tenant_id || 'default') === tid) };
+            }
+            return { results: [...purchaseOrders] };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          executedSqls.push({ sql, args });
+          if (/INSERT INTO campaign_logs/i.test(sql)) {
+            campaignLogs.push({ id: args[0], customer_id: args[1], campaign_type: args[2], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE campaign_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = campaignLogs.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO campaign_enrollments/i.test(sql)) {
+            campaignEnrollments.push({ id: args[0], customer_id: args[1], campaign_type: args[2], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE campaign_enrollments SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = campaignEnrollments.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO push_subscriptions/i.test(sql)) {
+            pushSubs.push({ id: args[0], customer_id: args[1], endpoint: args[2], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE push_subscriptions SET tenant_id = \? WHERE endpoint = \?/i.test(sql)) {
+            const row = pushSubs.find((r) => r.endpoint === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO checkins/i.test(sql)) {
+            checkins.push({ id: args[0], customer_id: args[1], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE checkins SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = checkins.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO birthday_redemptions/i.test(sql)) {
+            birthdayRedemptions.push({ id: args[0], customer_id: args[1], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE birthday_redemptions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = birthdayRedemptions.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO wifi_sessions/i.test(sql)) {
+            wifiSessions.push({ id: args[0], client_mac: args[1], tenant_id: 'default_unset' });
+          }
+          if (/UPDATE wifi_sessions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = wifiSessions.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO purchase_orders/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            purchaseOrders.push({
+              id: args[0],
+              po_number: args[1],
+              supplier_id: args[2],
+              status: 'ordered',
+              tenant_id: hasTenant ? args[11] : 'default_unset',
+            });
+          }
+          if (/INSERT INTO purchase_order_items/i.test(sql)) {
+            purchaseOrderItems.push({
+              id: args[0],
+              purchase_order_id: args[1],
+              ingredient_id: args[2],
+              quantity: args[3],
+              unit_price: args[4],
+              total_price: args[5],
+              received_quantity: 0,
+            });
+          }
+          if (/INSERT INTO stock_movements/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            stockMovements.push({
+              id: args[0],
+              ingredient_id: args[1],
+              quantity: args[2],
+              reference_id: args[3],
+              tenant_id: hasTenant ? args[args.length - 1] : 'default_unset',
+            });
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[] }>) => {
+          for (const s of stmts) {
+            executedSqls.push({ sql: s.sql, args: s.args });
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        }),
+      };
+
+      const defEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        AUTH_KV: mockKv as any,
+        PILOT_TENANT_ID: 'default',
+        ENVIRONMENT: 'test',
+      });
+
+      // 1. AB1: Cron checkOverdueOrders & sendCashbackExpiryWarnings explicitly scope SQL for 'default' tenant
+      executedSqls.length = 0;
+      await checkOverdueOrders(defEnv as any, 'default');
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM orders/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE orders SET notes/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+
+      executedSqls.length = 0;
+      const warnRes = await sendCashbackExpiryWarnings(defEnv as any, 'default');
+      expect(warnRes.notified).toBe(1);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM cashback_transactions ct\s+JOIN cashback_wallets cw/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE customers SET last_expiry_warning_at = \?/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+
+      // AB1: logSend & trackEnrollment stamp tenant_id = 'default'
+      await logSend(
+        mockDb as any,
+        {
+          customer_id: 'cust_def_ab1',
+          trigger: 'welcome_series' as any,
+          channel: 'zns',
+          sent: true,
+        },
+        'default'
+      );
+      expect(campaignLogs[0]?.tenant_id).toBe('default');
+
+      await trackEnrollment(mockDb as any, 'cust_def_ab1', 'winback', '10', 101, 'enrolled', 'default');
+      expect(campaignEnrollments[0]?.tenant_id).toBe('default');
+
+      // AB1: Push subscribe & unsubscribe stamp and scope 'default' tenant; markNotificationRead scopes 'default' tenant
+      const pushApp = new Hono<{ Bindings: Env }>();
+      pushApp.route('/api/push', pushRouter);
+      const subPushRes = await pushApp.fetch(
+        new Request('https://api.test/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: 'https://fcm.googleapis.com/fcm/send/ab1-def',
+            p256dh_key: 'p_key',
+            auth_key: 'a_key',
+            customer_id: 'cust_def_ab1',
+          }),
+        }),
+        defEnv
+      );
+      expect(subPushRes.status).toBe(201);
+      expect(pushSubs[0]?.tenant_id).toBe('default');
+
+      activeStaffTenant = 'default';
+      executedSqls.length = 0;
+      const unsubPushRes = await pushApp.fetch(
+        await authRequest('DELETE', '/api/push/subscribe', 'manager', 'default', {
+          endpoint: 'https://fcm.googleapis.com/fcm/send/ab1-def',
+        }),
+        defEnv
+      );
+      expect(unsubPushRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /DELETE FROM push_subscriptions WHERE endpoint = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[1] === 'default'
+        )
+      ).toBe(true);
+
+      const notifApp = new Hono<{ Bindings: Env }>();
+      notifApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'staff_def_1', role: 'waiter', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      notifApp.patch('/mobile/notifications/:id/read', (c) => markNotificationRead(c));
+      executedSqls.length = 0;
+      const readNotifRes = await notifApp.fetch(
+        new Request('https://api.test/mobile/notifications/notif_1/read', { method: 'PATCH' }),
+        defEnv
+      );
+      expect(readNotifRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE notifications[\s\S]*SET read_at = \?[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[3] === 'default'
+        )
+      ).toBe(true);
+
+      // 2. AB2: loadPolicy & getActiveCampaign isolate bonus_campaigns & KV override per tenant
+      kvMap.set('loyalty:policy:default', JSON.stringify({ maxCapPerTx: 45000 }));
+      kvMap.set('loyalty:policy:tenant_sadec_02', JSON.stringify({ maxCapPerTx: 95000 }));
+
+      const defPolicy = await loadPolicy(mockDb as any, mockKv as any, new Date('2026-06-01T00:00:00Z'), 'default');
+      expect(defPolicy.campaignCode).toBe('DEF_SPRING_2X');
+      expect(defPolicy.campaignMultiplier).toBe(2.0);
+      expect(defPolicy.maxCapPerTx).toBe(45000);
+
+      const franPolicy = await loadPolicy(mockDb as any, mockKv as any, new Date('2026-06-01T00:00:00Z'), 'tenant_sadec_02');
+      expect(franPolicy.campaignCode).toBe('SADEC_GRAND_3X');
+      expect(franPolicy.campaignMultiplier).toBe(3.0);
+      expect(franPolicy.maxCapPerTx).toBe(95000);
+
+      // getActiveCampaign(db, 'default') recovers 'DEF_SPRING_2X' even though 'SADEC_GRAND_3X' has higher id (id=2)
+      const defActiveCamp = await getActiveCampaign(mockDb as any, 'default');
+      expect(defActiveCamp?.code).toBe('DEF_SPRING_2X');
+
+      // AB2: referrals GET /stats for 'default' tenant excludes 'tenant_sadec_02' referrals
+      const custDefToken = await generateJWT(
+        { id: 'cust_def_ab2', role: 'customer', tenantId: 'default' },
+        TEST_JWT_SECRET,
+        3600
+      );
+      const refApp = new Hono<{ Bindings: Env }>();
+      refApp.route('/api/referrals', referralRouter);
+      const refStatsRes = await refApp.fetch(
+        new Request('https://api.test/api/referrals/stats', {
+          headers: { Authorization: `Bearer ${custDefToken}` },
+        }),
+        defEnv
+      );
+      expect(refStatsRes.status).toBe(200);
+      const refStatsBody = (await refStatsRes.json()) as {
+        data: { total_referrals: number; total_cashback_earned_vnd: number; recent_referrals: unknown[] };
+      };
+      expect(refStatsBody.data.total_referrals).toBe(1);
+      expect(refStatsBody.data.total_cashback_earned_vnd).toBe(10000);
+      expect(refStatsBody.data.recent_referrals).toHaveLength(1);
+
+      // AB2: checkin, birthday, wifi stamp tenant_id = 'default'
+      const checkinApp = new Hono<{ Bindings: Env }>();
+      checkinApp.route('/api/checkin', checkinRouter);
+      const checkinRes = await checkinApp.fetch(
+        new Request('https://api.test/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custDefToken}` },
+          body: JSON.stringify({ customer_id: 'cust_def_ab2' }),
+        }),
+        defEnv
+      );
+      expect(checkinRes.status).toBe(201);
+      expect(checkins[0]?.tenant_id).toBe('default');
+
+      const bdayApp = new Hono<{ Bindings: Env }>();
+      bdayApp.route('/api/birthday', birthdayRouter);
+      const bdayRes = await bdayApp.fetch(
+        new Request('https://api.test/api/birthday/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custDefToken}` },
+          body: JSON.stringify({ customer_id: 'cust_def_ab2' }),
+        }),
+        defEnv
+      );
+      expect(bdayRes.status).toBe(201);
+      expect(birthdayRedemptions[0]?.tenant_id).toBe('default');
+
+      await authorizeWifiOverride({ AURA_DB: mockDb as any }, { mac: 'AA:BB:CC:DD:EE:FF', action: 'grant' }, 'default');
+      expect(wifiSessions[0]?.tenant_id).toBe('default');
+
+      // AB2: floor-plan no-show & release scope table_sessions and cafe_tables by tenant_id
+      const fpApp = new Hono<{ Bindings: Env }>();
+      fpApp.route('/api/floor-plan', floorPlanRouter);
+      activeStaffTenant = 'default';
+      executedSqls.length = 0;
+      const noShowRes = await fpApp.fetch(
+        await authRequest('POST', '/api/floor-plan/tbl_fp_1/no-show', 'manager', 'default', { timeout_minutes: 15 }),
+        defEnv
+      );
+      expect(noShowRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /SELECT id, tenant_id FROM table_sessions WHERE table_id = \? AND status = 'active' AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[1] === 'default'
+        )
+      ).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE cafe_tables SET status = 'Available' WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[1] === 'default'
+        )
+      ).toBe(true);
+
+      // 3. AB3: consumeCrmEvent scopes UPDATE visits by tenant_id and forwards tenantId to loadPolicy
+      executedSqls.length = 0;
+      await consumeCrmEvent({
+        db: mockDb as any,
+        event: {
+          eventType: 'customer_linked',
+          customerId: 'cust_def_ab2',
+          orderId: 'ord_def_ab3',
+          payload: { totalAmount: 50000, tenantId: 'default' },
+        } as any,
+      });
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE visits SET customer_id = \? WHERE order_id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[2] === 'default'
+        )
+      ).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM bonus_campaigns/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+
+      // AB3: Purchasing PO creation, receiving, cancellation, GET /purchase-orders & BOM deductOrderStock stamp and scope tenant_id = 'default'
+      const createdPo = await createCanonicalPurchaseOrder(
+        mockDb as any,
+        {
+          supplierId: 'sup_def_1',
+          items: [{ ingredientId: 'ing_ab3_1', quantity: 50, unitPrice: 200 }],
+          tenantId: 'default',
+        },
+        'default'
+      );
+      expect(purchaseOrders[0]?.tenant_id).toBe('default');
+
+      // Seed a foreign-tenant stock_movement with the same receiptId 'rcpt_shared_ab3' to verify tenant-scoped idempotency
+      stockMovements.push({
+        id: 'mov_fran_rcpt',
+        ingredient_id: 'ing_fran_1',
+        quantity: 50,
+        reference_id: 'rcpt_shared_ab3',
+        tenant_id: 'tenant_sadec_02',
+      });
+      const rcvRes = await receivePurchaseOrder(
+        mockDb as any,
+        createdPo.id,
+        [{ ingredientId: 'ing_ab3_1', receivedQuantity: 50 }],
+        { receiptId: 'rcpt_shared_ab3', tenantId: 'default' }
+      );
+      expect(rcvRes.ok).toBe(true);
+      expect(rcvRes.alreadyReceived).toBe(false);
+      expect(
+        stockMovements.find((m) => m.reference_id === 'rcpt_shared_ab3' && m.tenant_id === 'default')
+      ).toBeDefined();
+
+      // Seed a foreign-tenant PO and verify GET /purchase-orders scopes SQL by tenant_id before LIMIT
+      purchaseOrders.push({
+        id: 'po_fran_ab3',
+        po_number: 'PO-999999',
+        supplier_id: 'sup_fran_1',
+        status: 'ordered',
+        tenant_id: 'tenant_sadec_02',
+      });
+      const poApp = new Hono<any>();
+      poApp.use('*', async (c, next) => {
+        c.set('tenantId', 'default');
+        await next();
+      });
+      purchasing(poApp);
+      const listPoRes = await poApp.fetch(new Request('https://api.test/purchase-orders?limit=10'), defEnv as any);
+      expect(listPoRes.status).toBe(200);
+      const listPoBody = (await listPoRes.json()) as { data: Array<{ id: string }> };
+      expect(listPoBody.data.map((p) => p.id)).toEqual([createdPo.id]);
+
+      // BOM deductOrderStock stamps tenant_id = 'default' on consumption stock_movements and isolates idempotency by tenant
+      stockMovements.push({
+        id: 'mov_fran_ord',
+        ingredient_id: 'ing_fran_1',
+        quantity: -18,
+        reference_id: 'ord_shared_ab3',
+        tenant_id: 'tenant_sadec_02',
+      });
+      const deductRes = await deductOrderStock(
+        mockDb as any,
+        'ord_shared_ab3',
+        [{ productId: 'prod_espresso', quantity: 1 }],
+        { tenantId: 'default' }
+      );
+      expect(deductRes.ok).toBe(true);
+      expect(deductRes.alreadyDeducted).toBe(false);
+      expect(
+        stockMovements.find((m) => m.reference_id === 'ord_shared_ab3' && m.tenant_id === 'default')
+      ).toBeDefined();
+    });
+  });
+
+  // =========================================================================
+  // Suite 32: Phase AC1–AC3 — Order Creation & Cancel Rollback, Reservations &
+  //           Table-Session Pagination, Catalog Menu Projection, Promotions Usage,
+  //           Referrals & Loyalty Dual-Write, Inventory RBAC & Order Deduction,
+  //           and Staff Hierarchy / Tips / SOP Violations / Analytics Export RBAC
+  // =========================================================================
+  describe('Suite 32: Phase AC1–AC3 — Order/Cancel/Reservations/Sessions, Menu Projection/Promos/Referrals/Loyalty, Inventory RBAC/Deduction & Staff/Tips/SOP/Export Isolation', () => {
+    it('enforces non-staff order tenant resolution, cancel rollback scoping, SQL pagination tenant filters, menu_items tenant projection, default-tenant promo usage, referral cashback tenant guard, loyalty dual-write tenant stamping, inventory transaction RBAC, and staff/tips/SOP/export boundaries (AC1–AC3)', async () => {
+      const { resolveOrderCreationScope } = await import(
+        '../../../../packages/domain/order/policies/order-creation-scope'
+      );
+      const { reservationsRouter } = await import(
+        '../../../../packages/domain/reservation/src/routes/reservations'
+      );
+      const { registerOrderHandlers } = await import('../../routes/table-sessions-handlers/order-handlers');
+      const { registerSessionHandlers } = await import('../../routes/table-sessions-handlers/session-handlers');
+      const { syncProductToMenuProjection } = await import(
+        '../../../../packages/domain/catalog/policies/menu-projection'
+      );
+      const { registerUsageHandlers } = await import('../../routes/openapi-promotions-handlers/usage-handlers');
+      const { reverseReferralCashback } = await import('../../tree/referrals/reverse-cashback');
+      const { processReferralCashbackOnFirstOrder } = await import('../../tree/referrals/referral-cashback');
+      const {
+        getLoyaltyAccountWithFallback,
+        syncLoyaltyAccountAndCustomerBalance,
+        recordLoyaltyTransactionDualWrite,
+      } = await import('../../routes/openapi-loyalty-handlers/loyalty-db-helpers');
+      const { handleSpendCashback } = await import('../../tree/loyalty/spend-cashback-handler');
+      const { inventoryTransactions } = await import(
+        '../../../../packages/domain/inventory/src/routes/inventory-transactions'
+      );
+      const { deductInventoryForOrder } = await import(
+        '../../../../packages/domain/inventory/src/routes/order-deduction'
+      );
+      const { staffManagementDenial } = await import('../../lib/staff-account-mutation');
+      const { staffTipsRouter } = await import('../../../../packages/domain/staff/commands/staff-tips');
+      const { recordViolation } = await import(
+        '../../../../packages/domain/sop/commands/sop-violation-repository'
+      );
+      const { registerExportHandlers } = await import('../../routes/analytics-handlers/export-handlers');
+      const { Hono } = await import('hono');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const menuItems: Array<Record<string, unknown>> = [];
+      const promotionUsages: Array<Record<string, unknown>> = [];
+      const referrals: Array<Record<string, unknown>> = [
+        {
+          id: 'ref_fran_ac2',
+          referrer_id: 'cust_referrer_fran',
+          referred_customer_id: 'cust_referred_shared',
+          referral_code: 'FNB-FRAN99',
+          status: 'completed',
+          cashback_awarded_vnd: 10000,
+          tenant_id: 'tenant_sadec_02',
+        },
+      ];
+      const cashbackWallets: Array<Record<string, unknown>> = [
+        {
+          customer_id: 'cust_spend_ac2',
+          balance: 50000,
+          lifetime_earned: 50000,
+          lifetime_spent: 0,
+          lifetime_expired: 0,
+          tenant_id: 'default',
+        },
+      ];
+      const loyaltyAccounts: Array<Record<string, unknown>> = [];
+      const loyaltyTxs: Array<Record<string, unknown>> = [];
+      const loyaltyPointLogs: Array<Record<string, unknown>> = [];
+      const inventoryTxRows: Array<Record<string, unknown>> = [];
+      const stockMovementRows: Array<Record<string, unknown>> = [];
+      const tableSessions: Array<Record<string, unknown>> = [
+        {
+          id: 'tsess_def_ac1',
+          table_id: 'tbl_ac1',
+          status: 'active',
+          orders_count: 1,
+          total_amount: 50000,
+          tenant_id: 'default',
+        },
+      ];
+
+      let activeStaffRole = 'manager';
+      let activeStaffTenant = 'default';
+      const makeStmt = (sql: string, args: unknown[] = []) => ({
+        sql,
+        args,
+        bind: (...b: unknown[]) => makeStmt(sql, b),
+        first: async () => {
+          executedSqls.push({ sql, args });
+          if (args[0] === 'staff_foreign_sadec' && /FROM users WHERE id = \?/i.test(sql)) {
+            return { id: 'staff_foreign_sadec', role: 'waiter', tenant_id: 'tenant_sadec_02' };
+          }
+          if (isAccountLookup(sql)) {
+            return staffAccountRow(activeStaffRole, activeStaffTenant);
+          }
+          if (/FROM products p[\s\S]*WHERE p\.id = \?/i.test(sql)) {
+            return {
+              id: 'prod_sadec_ac2',
+              name: 'Cà Phê Muối Sa Đéc',
+              category_id: 'cat_coffee',
+              category_slug: 'coffee',
+              price: 39000,
+              description: 'Salt coffee',
+              image_url: null,
+              is_available: 1,
+              sort_order: 1,
+              tenant_id: 'tenant_sadec_02',
+            };
+          }
+          if (/SELECT \* FROM promotions WHERE (?:UPPER\(code\)|id) = \?/i.test(sql)) {
+            return {
+              id: 'promo_def_ac2',
+              code: 'WELCOME10',
+              name: 'Welcome 10k',
+              type: 'fixed',
+              discount_type: 'fixed',
+              value: 10000,
+              discount_value: 10000,
+              min_order_amount: 20000,
+              min_order_value: 20000,
+              max_uses_per_customer: 1,
+              usage_limit_per_customer: 1,
+              current_uses: 0,
+              is_active: 1,
+              start_date: '2026-01-01T00:00:00Z',
+              end_date: '2026-12-31T23:59:59Z',
+              tenant_id: 'default',
+            };
+          }
+          if (/SELECT COUNT\(\*\) as (?:count|cnt) FROM promotion_usages/i.test(sql)) {
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[2]);
+              const count = promotionUsages.filter(
+                (u) => u.promotion_id === args[0] && u.customer_id === args[1] && String(u.tenant_id || 'default') === tid
+              ).length;
+              return { count, cnt: count };
+            }
+            return { count: promotionUsages.length, cnt: promotionUsages.length };
+          }
+          if (/SELECT id FROM promotion_usages WHERE order_id = \? AND promotion_id = \?/i.test(sql)) {
+            return null;
+          }
+          if (/SELECT \* FROM referrals WHERE id = \? AND status = \?/i.test(sql)) {
+            const rid = String(args[0]);
+            const st = String(args[1]);
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[2]);
+              return (
+                referrals.find(
+                  (r) =>
+                    r.id === rid &&
+                    r.status === st &&
+                    String(r.tenant_id || 'default').trim() === tid
+                ) ?? null
+              );
+            }
+            return referrals.find((r) => r.id === rid && r.status === st) ?? null;
+          }
+          if (/SELECT \* FROM referrals WHERE referred_customer_id = \? AND status = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const st = String(args[1]);
+            if (/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
+              const tid = String(args[2]);
+              return (
+                referrals.find(
+                  (r) =>
+                    r.referred_customer_id === cid &&
+                    r.status === st &&
+                    String(r.tenant_id || 'default').trim() === tid
+                ) ?? null
+              );
+            }
+            return referrals.find((r) => r.referred_customer_id === cid && r.status === st) ?? null;
+          }
+          if (/SELECT \* FROM loyalty_accounts WHERE customer_id = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const tid = args[1] ? String(args[1]) : 'default';
+            return loyaltyAccounts.find((a) => a.customer_id === cid && String(a.tenant_id || 'default') === tid) ?? null;
+          }
+          if (/FROM customers WHERE id = \?/i.test(sql)) {
+            return {
+              id: String(args[0]),
+              customer_id: String(args[0]),
+              points_balance: 0,
+              lifetime_points: 0,
+              tier: 'bronze',
+              referral_code: 'REF123',
+              tenant_id: 'default',
+            };
+          }
+          if (/SELECT id, total, status(?:, table_id)?(?:, tenant_id)? FROM orders WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), total: 80000, status: 'pending', table_id: null, tenant_id: 'default' };
+          }
+          if (/SELECT \* FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
+            const cid = String(args[0]);
+            const tid = String(args[1] || 'default');
+            return cashbackWallets.find((w) => w.customer_id === cid && String(w.tenant_id || 'default') === tid) ?? null;
+          }
+          if (/SELECT id FROM cashback_transactions WHERE order_id = \?/i.test(sql)) {
+            return null;
+          }
+          if (/SELECT \* FROM inventory_items WHERE id = \?/i.test(sql)) {
+            return {
+              id: String(args[0]),
+              sku: 'MILK-01',
+              name: 'Sữa Đặc',
+              current_stock: 20,
+              unit: 'lon',
+              min_stock: 5,
+              tenant_id: 'default',
+            };
+          }
+          if (/SELECT id, sku, name, current_stock, unit, tenant_id FROM inventory_items/i.test(sql)) {
+            return {
+              id: 'inv_ac3_1',
+              sku: 'MILK-01',
+              name: 'Sữa Đặc',
+              current_stock: 20,
+              unit: 'lon',
+              tenant_id: 'default',
+            };
+          }
+          if (/SELECT tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+            return { tenant_id: null };
+          }
+          if (/SELECT id, role, tenant_id FROM users WHERE id = \?/i.test(sql)) {
+            if (args[0] === 'staff_foreign_sadec') {
+              return { id: 'staff_foreign_sadec', role: 'waiter', tenant_id: 'tenant_sadec_02' };
+            }
+            return { id: String(args[0]), role: 'waiter', tenant_id: 'default' };
+          }
+          if (/SELECT \* FROM table_sessions WHERE id = \?/i.test(sql)) {
+            return tableSessions.find((s) => s.id === args[0]) ?? null;
+          }
+          if (/SELECT \* FROM cafe_tables WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), status: 'Available', tenant_id: 'default' };
+          }
+          if (/SELECT \* FROM orders WHERE id = \?/i.test(sql)) {
+            return {
+              id: String(args[0]),
+              customer_id:
+                args[0] === '33333333-3333-4333-8333-333333333333' ? 'cust_spend_ac2' : 'cust_shared_ac2',
+              total: 50000,
+              total_amount: 50000,
+              cashback_used: 0,
+              status: 'pending',
+              payment_status: 'unpaid',
+              tenant_id: 'default',
+            };
+          }
+          return null;
+        },
+        all: async () => {
+          executedSqls.push({ sql, args });
+          if (/FROM reservations r/i.test(sql)) {
+            return { results: [] };
+          }
+          return { results: [] };
+        },
+        run: async () => {
+          executedSqls.push({ sql, args });
+          if (/INSERT INTO menu_items/i.test(sql)) {
+            menuItems.push({
+              id: args[0],
+              category: args[1],
+              name: args[2],
+              tenant_id: args[9],
+            });
+          }
+          if (/INSERT INTO promotion_usages/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            promotionUsages.push({
+              id: args[0],
+              promotion_id: args[1],
+              order_id: args[2],
+              customer_id: args[3],
+              discount_amount: args[4],
+              tenant_id: hasTenant ? args[5] : 'unset',
+            });
+          }
+          if (/UPDATE promotion_usages SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = promotionUsages.find((u) => u.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO referrals/i.test(sql)) {
+            referrals.push({
+              id: args[0],
+              referrer_id: args[1],
+              referred_customer_id: args[2],
+              referral_code: args[3],
+              tenant_id: 'unset',
+            });
+          }
+          if (/UPDATE referrals SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = referrals.find((r) => r.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT(?: OR IGNORE)? INTO loyalty_accounts/i.test(sql)) {
+            loyaltyAccounts.push({
+              id: args[0],
+              customer_id: args[1],
+              points_balance: args[2] ?? 0,
+              lifetime_points: args[3] ?? 0,
+              tier: args[4] ?? 'bronze',
+              tenant_id: 'unset',
+            });
+          }
+          if (/UPDATE loyalty_accounts SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = loyaltyAccounts.find((a) => a.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO loyalty_transactions/i.test(sql)) {
+            loyaltyTxs.push({
+              id: args[0],
+              account_id: args[1],
+              customer_id: args[2],
+              type: args[3],
+              points: args[4],
+              tenant_id: 'unset',
+            });
+          }
+          if (/UPDATE loyalty_transactions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = loyaltyTxs.find((t) => t.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT(?: OR IGNORE)? INTO loyalty_point_logs/i.test(sql)) {
+            loyaltyPointLogs.push({
+              id: args[0],
+              customer_id: args[1],
+              order_id: args[2],
+              points_change: args[3],
+              tenant_id: 'unset',
+            });
+          }
+          if (/UPDATE loyalty_point_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {
+            const row = loyaltyPointLogs.find((l) => l.id === args[1]);
+            if (row) row.tenant_id = args[0];
+          }
+          if (/INSERT INTO inventory_transactions/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            inventoryTxRows.push({
+              id: args[0],
+              item_id: args[1],
+              type: args[2],
+              quantity: args[3],
+              tenant_id: hasTenant ? args[args.length - 1] : 'unset',
+            });
+          }
+          if (/INSERT INTO stock_movements/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            stockMovementRows.push({
+              id: args[0],
+              ingredient_id: args[1],
+              type: args[2],
+              quantity: args[3],
+              tenant_id: hasTenant ? args[args.length - 1] : 'unset',
+            });
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => makeStmt(sql, [])),
+        batch: vi.fn(async (stmts: Array<{ sql: string; args: unknown[]; run: () => Promise<any> }>) => {
+          for (const s of stmts) {
+            if (typeof s.run === 'function') {
+              await s.run();
+            } else {
+              executedSqls.push({ sql: s.sql, args: s.args });
+            }
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        }),
+      };
+
+      const defEnv = createMockEnv({
+        JWT_SECRET: TEST_JWT_SECRET,
+        AURA_DB: mockDb as any,
+        PILOT_TENANT_ID: 'default',
+        ENVIRONMENT: 'test',
+      });
+
+      // 1. AC1: resolveOrderCreationScope preserves non-staff actor.tenantId & resolves guest/customer X-Tenant-ID
+      const nonStaffConcrete = await resolveOrderCreationScope(
+        new Request('https://api.test/api/orders', { method: 'POST' }),
+        defEnv as any,
+        { id: 'u_guest', tenantId: 'tenant_sadec_02' }
+      );
+      expect(nonStaffConcrete.tenantId).toBe('tenant_sadec_02');
+
+      const guestHeaderTenant = await resolveOrderCreationScope(
+        new Request('https://api.test/api/orders', {
+          method: 'POST',
+          headers: { 'X-Tenant-ID': 'tenant_sadec_02' },
+        }),
+        defEnv as any,
+        { id: 'u_cust', role: 'customer', tenantId: 'default' }
+      );
+      expect(guestHeaderTenant.tenantId).toBe('tenant_sadec_02');
+
+      // AC1: GET /api/reservations pushes tenant_id into SQL before LIMIT/OFFSET
+      const resApp = new Hono<{ Bindings: Env }>();
+      resApp.route('/api/reservations', reservationsRouter);
+      executedSqls.length = 0;
+      const listRes = await resApp.fetch(
+        await authRequest('GET', '/api/reservations?limit=10&offset=0', 'manager', 'default'),
+        defEnv
+      );
+      expect(listRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM reservations r/i.test(q.sql) &&
+            q.sql.includes("AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ? ORDER BY") &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+
+      // AC1: Table sessions POST /:id/orders scopes UPDATE orders & UPDATE table_sessions by tenant_id
+      const sessOrderApp = new Hono<{ Bindings: Env }>();
+      sessOrderApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      registerOrderHandlers(sessOrderApp);
+      registerSessionHandlers(sessOrderApp);
+      executedSqls.length = 0;
+      const linkOrdRes = await sessOrderApp.fetch(
+        new Request('https://api.test/tsess_def_ac1/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: 'ord_ac1_1' }),
+        }),
+        defEnv
+      );
+      expect(linkOrdRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE orders SET table_id = \?, updated_at = \? WHERE id = \?[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[3] === 'default'
+        )
+      ).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE table_sessions[\s\S]*WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[3] === 'default'
+        )
+      ).toBe(true);
+
+      // 2. AC2: syncProductToMenuProjection propagates products.tenant_id into menu_items
+      await syncProductToMenuProjection(mockDb as any, 'prod_sadec_ac2');
+      expect(menuItems[0]?.tenant_id).toBe('tenant_sadec_02');
+
+      // AC2: Promotions usage-handlers scopes promotion_usages count for 'default' tenant & stamps tenant_id = 'default'
+      const promoUuid = '11111111-1111-4111-8111-111111111111';
+      const orderUuid = '22222222-2222-4222-8222-222222222222';
+      promotionUsages.push({
+        id: 'pu_fran_1',
+        promotion_id: promoUuid,
+        order_id: 'ord_fran_1',
+        customer_id: 'cust_shared_ac2',
+        discount_amount: 10000,
+        tenant_id: 'tenant_sadec_02',
+      });
+      const promoApp = new OpenAPIHono<{ Bindings: Env }>();
+      promoApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'cust_shared_ac2', customerId: 'cust_shared_ac2', role: 'customer', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      registerUsageHandlers(promoApp as any);
+      const applyPromoRes = await promoApp.fetch(
+        new Request('https://api.test/api/promotions/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            promotionId: promoUuid,
+            orderId: orderUuid,
+            discountAmount: 10000,
+          }),
+        }),
+        defEnv
+      );
+      expect(applyPromoRes.status).toBe(200);
+      expect(
+        promotionUsages.find((u) => u.order_id === orderUuid)?.tenant_id
+      ).toBe('default');
+
+      // AC2: reverseReferralCashback & processReferralCashbackOnFirstOrder for 'default' tenant do NOT touch 'tenant_sadec_02' referral
+      executedSqls.length = 0;
+      const revRefRes = await reverseReferralCashback(
+        mockDb as any,
+        'ref_fran_ac2',
+        'default'
+      );
+      expect(revRefRes.success).toBe(false);
+      expect(referrals[0]?.status).toBe('completed');
+
+      referrals.push({
+        id: 'ref_fran_pending_ac2',
+        referrer_id: 'cust_referrer_fran',
+        referred_customer_id: 'cust_referred_shared',
+        referral_code: 'FNB-FRAN99',
+        status: 'pending',
+        cashback_awarded_vnd: 0,
+        tenant_id: 'tenant_sadec_02',
+      });
+      const procRefRes = await processReferralCashbackOnFirstOrder(
+        mockDb as any,
+        'cust_referred_shared',
+        'ord_def_first',
+        50000,
+        'default'
+      );
+      expect(procRefRes.success).toBe(false);
+      expect(referrals[1]?.status).toBe('pending');
+
+      // AC2: Loyalty dual-write & handleSpendCashback stamp tenant_id = 'default' and scope UPDATE by tenant_id
+      const { account: acc } = await getLoyaltyAccountWithFallback(
+        mockDb as any,
+        'cust_loy_ac2',
+        '2026-11-03T00:00:00Z',
+        'default'
+      );
+      expect(acc?.tenant_id).toBe('default');
+      await syncLoyaltyAccountAndCustomerBalance(mockDb as any, {
+        accountId: acc!.id,
+        customerId: 'cust_loy_ac2',
+        newBalance: 100,
+        lifetimeDelta: 100,
+        tenantId: 'default',
+        now: '2026-11-03T00:00:00Z',
+      });
+      await recordLoyaltyTransactionDualWrite(mockDb as any, {
+        txId: 'ltx_ac2_1',
+        accountId: acc!.id,
+        customerId: 'cust_loy_ac2',
+        type: 'earn',
+        points: 100,
+        balanceAfter: 100,
+        description: 'Earned 100 pts',
+        orderId: 'ord_ac2_1',
+        tenantId: 'default',
+        now: '2026-11-03T00:00:00Z',
+      });
+      expect(loyaltyTxs[0]?.tenant_id).toBe('default');
+      expect(loyaltyPointLogs[0]?.tenant_id).toBe('default');
+
+      const spendApp = new Hono<{ Bindings: Env }>();
+      spendApp.use('*', async (c, next) => {
+        c.set('customer' as any, { id: 'cust_spend_ac2', phone: '0901234567', tenant_id: 'default' });
+        await next();
+      });
+      spendApp.post('/loyalty/spend', (c) => handleSpendCashback(c as any));
+      executedSqls.length = 0;
+      const spendRes = await spendApp.fetch(
+        new Request('https://api.test/loyalty/spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: '33333333-3333-4333-8333-333333333333',
+            amount: 15000,
+          }),
+        }),
+        defEnv
+      );
+      expect(spendRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE orders SET cashback_used = \?[\s\S]*WHERE id = \? AND COALESCE\(cashback_used, 0\) = 0 AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args[4] === 'default'
+        )
+      ).toBe(true);
+
+      // 3. AC3: inventoryTransactions blocks barista from 'in'/'adjust'/'release' (403) & allows 'waste' (201) with tenant_id stamped
+      const invApp = new Hono<{ Bindings: Env }>();
+      invApp.use('*', async (c, next) => {
+        const role = c.req.header('X-Test-Role') || 'barista';
+        c.set('user' as any, { id: 'staff_barista_1', role, tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      inventoryTransactions(invApp as any);
+
+      const baristaInRes = await invApp.fetch(
+        new Request('https://api.test/inv_ac3_1/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Role': 'barista' },
+          body: JSON.stringify({ item_id: 'inv_ac3_1', type: 'in', quantity: 50, notes: 'Unauthorized restock' }),
+        }),
+        defEnv
+      );
+      expect(baristaInRes.status).toBe(403);
+
+      const baristaWasteRes = await invApp.fetch(
+        new Request('https://api.test/inv_ac3_1/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Role': 'barista' },
+          body: JSON.stringify({ item_id: 'inv_ac3_1', type: 'waste', quantity: 2, notes: 'Spilled milk' }),
+        }),
+        defEnv
+      );
+      expect(baristaWasteRes.status).toBe(201);
+      expect(inventoryTxRows[0]?.tenant_id).toBe('default');
+
+      // AC3: deductInventoryForOrder normalizes effectiveTenant = 'default' when orders.tenant_id is NULL
+      executedSqls.length = 0;
+      await deductInventoryForOrder(defEnv as any, 'ord_null_tenant_ac3', [
+        { product_id: 'MILK-01', quantity: 2, name: 'Sữa Đặc' },
+      ]);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /SELECT id, sku, name, current_stock, unit, tenant_id FROM inventory_items[\s\S]*COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = \?/i.test(q.sql) &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+
+      // AC3: staffManagementDenial blocks supervisor from mutating staff & blocks owner from mutating admin
+      expect(
+        staffManagementDenial(
+          { role: 'supervisor', tenantId: 'default' },
+          { id: 'u_waiter', role: 'waiter', tenant_id: 'default', auth_version: 1, is_active: 1 } as any
+        )
+      ).toContain('Không đủ quyền');
+      expect(
+        staffManagementDenial(
+          { role: 'owner', tenantId: 'default' },
+          { id: 'u_admin', role: 'admin', tenant_id: 'default', auth_version: 1, is_active: 1 } as any
+        )
+      ).toContain('Chỉ admin');
+
+      // AC3: GET /api/staff-tips blocks non-manager waiter from viewing another staff member's tips (403)
+      const tipsApp = new Hono<{ Bindings: Env }>();
+      tipsApp.route('/api/staff-tips', staffTipsRouter);
+      activeStaffRole = 'waiter';
+      activeStaffTenant = 'default';
+      const crossTipsRes = await tipsApp.fetch(
+        await authRequest('GET', '/api/staff-tips?staff_id=other_staff_99', 'waiter', 'default'),
+        defEnv
+      );
+      expect(crossTipsRes.status).toBe(403);
+
+      // AC3: recordViolation rejects foreign-tenant staffId with 404 SopAccessError
+      await expect(
+        recordViolation(
+          {
+            env: defEnv as any,
+            tenantId: 'default',
+            actorId: 'mgr_def_1',
+            actorRole: 'manager',
+            canManage: true,
+          },
+          {
+            staffId: 'staff_foreign_sadec',
+            category: 'lateness' as any,
+            note: 'Cross-tenant violation attempt',
+          }
+        )
+      ).rejects.toThrow('Staff member not found');
+
+      // AC3: GET /api/analytics/export blocks non-manager waiter with 403
+      const expApp = new Hono<{ Bindings: Env }>();
+      expApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'w1', role: 'waiter', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      registerExportHandlers(expApp);
+      const expRes = await expApp.fetch(
+        new Request('https://api.test/export?start=2026-11-01&end=2026-11-02'),
+        defEnv
+      );
+      expect(expRes.status).toBe(403);
+    });
+  });
+
+  describe('Suite 33 — Phase AD1–AD3: Payment Reconcile, Invoices, ERPNext, Webhooks, CRM/Customer, Tables, Shifts, Kitchen & Inventory Isolation', () => {
+    it('AD1: runPaymentReconciliation, listInvoices/payInvoice, handleErpnextInvoicesRequest, and Cal/Pretix webhooks enforce SQL-before-LIMIT tenant isolation and default tenant stamping', async () => {
+      const { Hono } = await import('hono');
+      const { runPaymentReconciliation } = await import('../../routes/cron-handlers/payment-reconcile');
+      const { listInvoices, payInvoice } = await import('../../tree/subscriptions/invoice-handlers');
+      const { handleErpnextInvoicesRequest } = await import('../../routes/erpnext-invoices');
+      const { createReservationFromBooking } = await import('../../tree/cal-booking/process-booking');
+      const { registerWebhookHandler: registerPretixWebhookHandler } = await import('../../routes/pretix-handlers/webhook-handler');
+      const { computeHmacSha256 } = await import('@aura/domain-security');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const insertedReservations: Array<Record<string, unknown>> = [];
+      const insertedPretixLogs: Array<Record<string, unknown>> = [];
+
+      const db = {
+        prepare: (sql: string) => {
+          const runWith = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              first: async () => {
+                if (/FROM subscription_invoices WHERE id = \?/i.test(sql)) {
+                  return { id: String(args[0]), subscription_id: 'sub_ad1_1', amount_vnd: 500000, status: 'pending', tenant_id: 'default' };
+                }
+                if (/FROM subscriptions WHERE id = \?/i.test(sql)) {
+                  return { id: 'sub_ad1_1', tenant_id: 'default', status: 'active' };
+                }
+                if (/FROM cafe_tables/i.test(sql)) {
+                  return { id: 'tbl_ad1_1', capacity: 4, status: 'available', tenant_id: 'default' };
+                }
+                return null;
+              },
+              all: async () => {
+                if (/FROM payments p[\s\S]*JOIN orders o/i.test(sql)) {
+                  const hasTenantFilter = /COALESCE\(NULLIF\(TRIM\(o\.tenant_id\), ''\), 'default'\) = \?/i.test(sql);
+                  return {
+                    results: hasTenantFilter
+                      ? [{ payment_id: 'pay_sadec_1', status: 'completed', order_payment_status: 'pending', order_tenant_id: 'sadec', created_at: '2026-11-01T00:00:00Z' }]
+                      : [],
+                  };
+                }
+                if (/FROM subscription_invoices i/i.test(sql)) {
+                  const hasTenantFilter = /COALESCE\(s\.tenant_id, i\.tenant_id\)/i.test(sql);
+                  return {
+                    results: hasTenantFilter
+                      ? [{ id: 'inv_sadec_1', subscription_id: 'sub_sadec_1', sub_tenant_id: 'sadec', status: 'pending' }]
+                      : [],
+                  };
+                }
+                if (/FROM erpnext_mappings m/i.test(sql)) {
+                  const hasTenantFilter = /COALESCE\(m\.tenant_id, o\.tenant_id\)/i.test(sql);
+                  return {
+                    results: hasTenantFilter
+                      ? [{ id: 'map_sadec_1', order_id: 'ord_sadec_1', local_id: 'ord_sadec_1', sync_status: 'failed', tenant_id: 'sadec' }]
+                      : [],
+                  };
+                }
+                if (/FROM cafe_tables/i.test(sql)) {
+                  return { results: [{ id: 'tbl_ad1_1', table_number: 'T1', capacity: 4, status: 'available', tenant_id: 'default' }] };
+                }
+                return { results: [] };
+              },
+              run: async () => {
+                if (/INSERT INTO reservations/i.test(sql) && /tenant_id/i.test(sql)) {
+                  insertedReservations.push({ sql, args });
+                }
+                if (/INSERT INTO pretix_webhook_log/i.test(sql) && /tenant_id/i.test(sql)) {
+                  insertedPretixLogs.push({ sql, args });
+                }
+                return { success: true, meta: { changes: 1 } };
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => runWith(args),
+            first: () => runWith([]).first(),
+            all: () => runWith([]).all(),
+            run: () => runWith([]).run(),
+          };
+        },
+      } as unknown as D1Database;
+
+      // 1. runPaymentReconciliation pushes tenant predicate into SQL before LIMIT 25
+      await runPaymentReconciliation(
+        {
+          AURA_DB: db,
+          PAYOS_CLIENT_ID: 'cid',
+          PAYOS_API_KEY: 'key',
+          PAYOS_CHECKSUM_KEY: 'chk',
+        } as any,
+        { tenantId: 'sadec', budgetMs: 1 }
+      );
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM payments p[\s\S]*COALESCE\(NULLIF\(TRIM\(o\.tenant_id\), ''\), 'default'\) = \?[\s\S]*LIMIT 25/i.test(q.sql) &&
+            q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      // 2. listInvoices & payInvoice scope SQL by tenant_id
+      const subApp = new Hono<{ Bindings: Env }>();
+      subApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'adm_1', role: 'admin', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      subApp.get('/invoices', (c) => listInvoices(c as any));
+      subApp.post('/invoices/:id/pay', (c) => payInvoice(c as any));
+
+      const invListRes = await subApp.fetch(new Request('https://api.test/invoices'), { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(invListRes.status).toBe(200);
+      const invListJson = (await invListRes.json()) as { data: Array<{ id: string }> };
+      expect(invListJson.data.map((r) => r.id)).toEqual(['inv_sadec_1']);
+
+      // 3. handleErpnextInvoicesRequest pushes tenant predicate into GET /list before LIMIT 100
+      const erpListRes = await handleErpnextInvoicesRequest(
+        new Request('https://api.test/api/erpnext-invoices/list'),
+        { AURA_DB: db },
+        'sadec'
+      );
+      expect(erpListRes.status).toBe(200);
+      const erpListJson = (await erpListRes.json()) as { data: Array<{ id: string }> };
+      expect(erpListJson.data.map((r) => r.id)).toEqual(['map_sadec_1']);
+
+      // 4. createReservationFromBooking and Pretix webhook stamp 'default' tenant_id
+      await createReservationFromBooking(
+        db,
+        {
+          uid: 'cal_uid_def_ad1',
+          title: 'Table Booking',
+          startTime: '2026-11-04T10:00:00Z',
+          endTime: '2026-11-04T11:00:00Z',
+          attendees: [{ name: 'Khách Default', email: 'def@aura.test', phoneNumber: '0901112233' }],
+        },
+        'default'
+      );
+      expect(insertedReservations.some((r) => r.args.includes('default'))).toBe(true);
+
+      const pretixApp = new Hono<{ Bindings: Env }>();
+      registerPretixWebhookHandler(pretixApp as any);
+      const pretixBody = JSON.stringify({ notification_id: 101, organizer: 'aura', event: 'tasting', code: 'ORD1', action: 'pretix.event.order.paid' });
+      const pretixSig = await computeHmacSha256(pretixBody, 'pretix_sec_ad1');
+      await pretixApp.fetch(
+        new Request('https://api.test/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-pretix-Signature': pretixSig },
+          body: pretixBody,
+        }),
+        { AURA_DB: db, PRETIX_WEBHOOK_SECRET: 'pretix_sec_ad1' } as any
+      );
+      expect(insertedPretixLogs.some((r) => r.args.includes('default'))).toBe(true);
+    });
+
+    it('AD2: CRM segments, customer domain default-tenant stamping, consent RBAC/tenant scoping, and lookupProfile/aggregateEvents enforce tenant isolation', async () => {
+      const { Hono } = await import('hono');
+      const { registerSegmentHandlers } = await import('../../routes/crm-handlers/segment-handlers');
+      const { registerAccountHandlers } = await import('../../routes/crm-handlers/account-handlers');
+      const { recordConsent } = await import('../../../../packages/domain/customer/record-consent');
+      const { identifyCustomer } = await import('../../../../packages/domain/customer/identify-customer');
+      const { recordVisit } = await import('../../../../packages/domain/customer/record-visit');
+      const { linkOrder } = await import('../../../../packages/domain/customer/link-order');
+      const { lookupProfile } = await import('../../../../packages/domain/crm/lookup-profile');
+      const { aggregateEvents } = await import('../../../../packages/domain/crm/commands/aggregate-events');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      let activeRole = 'manager';
+      let activeTenant = 'sadec';
+
+      const db = {
+        prepare: (sql: string) => {
+          const runWith = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              first: async () => {
+                if (isAccountLookup(sql)) {
+                  return staffAccountRow(activeRole, activeTenant);
+                }
+                if (/FROM customers WHERE id = \?/i.test(sql)) {
+                  return { id: String(args[0]), name: 'Khách A', phone: '0909000111', tenant_id: activeTenant, loyalty_points: 100 };
+                }
+                if (/FROM customer_identities ci[\s\S]*LEFT JOIN customers c/i.test(sql)) {
+                  return { customer_id: 'cust_sadec_1', value: '0909000111' };
+                }
+                return null;
+              },
+              all: async () => {
+                if (/FROM customers c[\s\S]*LEFT JOIN orders o/i.test(sql)) {
+                  const hasTenantWhere = /COALESCE\(NULLIF\((?:TRIM\()?c\.tenant_id\)?, ''\), 'default'\) = \?/i.test(sql);
+                  if (!hasTenantWhere) return { results: [] };
+                  // Return 30 matching customers for sadec so count > 25 sample cap
+                  return {
+                    results: Array.from({ length: 30 }, (_, i) => ({
+                      id: `cust_sadec_${i + 1}`,
+                      name: `Khách ${i + 1}`,
+                      phone: `09090001${String(i).padStart(2, '0')}`,
+                      tier: 'gold',
+                      lifetime_points: 1500,
+                      order_count: 10,
+                      last_order_at: new Date().toISOString(),
+                      first_order_at: new Date().toISOString(),
+                    })),
+                  };
+                }
+                if (/SELECT id, tenant_id FROM customers/i.test(sql)) {
+                  return {
+                    results: Array.from({ length: 30 }, (_, i) => ({
+                      id: `cust_sadec_${i + 1}`,
+                      tenant_id: 'sadec',
+                    })),
+                  };
+                }
+                return { results: [] };
+              },
+              run: async () => ({ success: true, meta: { changes: 1 } }),
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => runWith(args),
+            first: () => runWith([]).first(),
+            all: () => runWith([]).all(),
+            run: () => runWith([]).run(),
+          };
+        },
+      } as unknown as D1Database;
+
+      const crmEnv = {
+        AURA_DB: db,
+        AUTH_KV: createMockEnv().AUTH_KV,
+        JWT_SECRET: TEST_JWT_SECRET,
+      } as unknown as Env;
+
+      // 5. GET /api/crm/segments passes tenantId to listSegments and preserves full count (30) instead of truncating to 25
+      const segApp = new Hono<{ Bindings: Env }>();
+      segApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, activeTenant);
+        await next();
+      });
+      registerSegmentHandlers(segApp);
+      const segRes = await segApp.fetch(
+        await authRequest('GET', '/segments', 'manager', 'sadec'),
+        crmEnv
+      );
+      expect(segRes.status).toBe(200);
+      const segJson = (await segRes.json()) as { data: Array<{ key: string; count: number; customers: unknown[] }> };
+      const regularSeg = segJson.data.find((s) => s.key === 'regular');
+      expect(regularSeg?.count).toBe(30);
+      expect(regularSeg?.customers).toHaveLength(25);
+
+      // 6. Customer domain commands stamp and scope 'default' tenant_id
+      activeTenant = 'default';
+      executedSqls.length = 0;
+      await recordConsent({ db, customerId: 'cust_def_1', purpose: 'marketing', granted: true, source: 'staff', tenantId: 'default' });
+      await identifyCustomer({ db, customerId: 'cust_def_1', phone: '0909123456', source: 'staff', tenantId: 'default' });
+      await recordVisit({ db, customerId: 'cust_def_1', orderId: 'ord_def_1', spent: 55000, visitedAt: '2026-11-03T01:00:00Z', tenantId: 'default' });
+      await linkOrder({ db, customerId: 'cust_def_1', orderId: 'ord_def_1', tenantId: 'default' });
+
+      expect(executedSqls.some((q) => /INSERT INTO consents[\s\S]*tenant_id/i.test(q.sql) && q.args.includes('default'))).toBe(true);
+      expect(executedSqls.some((q) => /INSERT INTO customer_identities[\s\S]*tenant_id/i.test(q.sql) && q.args.includes('default'))).toBe(true);
+      expect(executedSqls.some((q) => /INSERT INTO visits[\s\S]*tenant_id/i.test(q.sql) && q.args.includes('default'))).toBe(true);
+      expect(executedSqls.some((q) => /INSERT INTO customer_events[\s\S]*tenant_id/i.test(q.sql) && q.args.includes('default'))).toBe(true);
+
+      // 7. PATCH /api/crm/account/consent blocks waiter (403) and stamps tenant_id for authorized staff
+      const acctApp = new Hono<{ Bindings: Env }>();
+      acctApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, activeTenant);
+        await next();
+      });
+      registerAccountHandlers(acctApp);
+      activeRole = 'waiter';
+      const waiterConsentRes = await acctApp.fetch(
+        await authRequest('PATCH', '/account/consent', 'waiter', 'default', {
+          customerId: 'cust_def_1',
+          purpose: 'marketing',
+          granted: true,
+        }),
+        crmEnv
+      );
+      expect(waiterConsentRes.status).toBe(403);
+
+      activeRole = 'manager';
+      executedSqls.length = 0;
+      const mgrConsentRes = await acctApp.fetch(
+        await authRequest('PATCH', '/account/consent', 'manager', 'default', {
+          customerId: 'cust_def_1',
+          purpose: 'marketing',
+          granted: true,
+        }),
+        crmEnv
+      );
+      expect(mgrConsentRes.status).toBe(200);
+      expect(executedSqls.some((q) => /INSERT INTO consents[\s\S]*tenant_id/i.test(q.sql) && q.args.includes('default'))).toBe(true);
+
+      // 8. lookupProfile & aggregateEvents scope customer_identities, consents, and visits by tenant_id
+      activeTenant = 'sadec';
+      executedSqls.length = 0;
+      await lookupProfile(db, '0909000111', { tenantId: 'sadec' });
+      expect(executedSqls.some((q) => /FROM customer_identities ci[\s\S]*LEFT JOIN customers c/i.test(q.sql) && q.args.includes('sadec'))).toBe(true);
+      expect(executedSqls.some((q) => /FROM consents[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) && q.args.includes('sadec'))).toBe(true);
+
+      executedSqls.length = 0;
+      await aggregateEvents(db, 'cust_sadec_1', { tenantId: 'sadec' });
+      expect(executedSqls.some((q) => /FROM visits[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) && q.args.includes('sadec'))).toBe(true);
+    });
+
+    it('AD3: Table zones/tables RBAC & SQL scoping, canonical shift lifecycle, kitchen station tickets RBAC, and PO/forecasting/inventory/notifications isolation', async () => {
+      const { Hono } = await import('hono');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerZoneCrudHandlers } = await import('../../routes/openapi-tables-handlers/zone-crud-handlers');
+      const { registerTableCrudHandlers } = await import('../../routes/openapi-tables-handlers/table-crud-handlers');
+      const { openCanonicalShift, recordShiftSale, closeCanonicalShift } = await import('../../../../packages/domain/shift/src/policies/shift-lifecycle-policy');
+      const { stationTicketsRouter } = await import('../../../../packages/domain/kitchen/commands/kitchen-station-tickets');
+      const { inventoryForecastingRouter } = await import('../../routes/inventory-forecasting');
+      const { inventorySnapshots } = await import('../../../../packages/domain/inventory/src/routes/inventory-snapshots');
+      const { getNotifications, subscribePush } = await import('../../routes/notifications-mobile');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const shiftsMap = new Map<string, Record<string, unknown>>();
+
+      const db = {
+        prepare: (sql: string) => {
+          const runWith = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              first: async () => {
+                if (isAccountLookup(sql)) {
+                  return staffAccountRow('manager', 'sadec');
+                }
+                if (/FROM staff_shifts WHERE id = \?/i.test(sql)) {
+                  return shiftsMap.get(String(args[0])) ?? null;
+                }
+                if (/FROM inventory_items WHERE id = \?/i.test(sql)) {
+                  return { id: String(args[0]), current_stock: 25, tenant_id: 'default' };
+                }
+                return null;
+              },
+              all: async () => {
+                if (/FROM inventory_items/i.test(sql)) {
+                  return {
+                    results: [{ id: 'item_sadec_1', sku: 'SKU-1', name: 'Cà Phê Hạt', current_stock: 20, min_stock: 5, tenant_id: 'sadec' }],
+                  };
+                }
+                if (/FROM inventory_transactions[\s\S]*GROUP BY item_id, tenant_id/i.test(sql)) {
+                  return {
+                    results: [{ item_id: 'item_sadec_1', total_depleted: 14, tenant_id: 'sadec' }],
+                  };
+                }
+                if (/FROM notifications/i.test(sql)) {
+                  const hasTenantFilter = /COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql);
+                  return {
+                    results: hasTenantFilter
+                      ? [{ id: 'notif_sadec_1', type: 'shift', title_vi: 'Ca mới', title_en: 'New Shift', body_vi: null, body_en: null, data: '{}', read_at: null, created_at: '2026-11-03T01:00:00Z', tenant_id: 'sadec' }]
+                      : [],
+                  };
+                }
+                return { results: [] };
+              },
+              run: async () => {
+                if (/INSERT INTO staff_shifts/i.test(sql) && /tenant_id/i.test(sql)) {
+                  const id = String(args[0]);
+                  shiftsMap.set(id, {
+                    id,
+                    staff_id: args[1],
+                    staff_name: args[2],
+                    role: args[3],
+                    operating_unit_id: args[4],
+                    tenant_id: args[args.length - 1],
+                    status: 'open',
+                    opening_cash: args[6],
+                    total_sales: 0,
+                    cash_sales: 0,
+                    online_sales: 0,
+                    order_count: 0,
+                  });
+                }
+                return { success: true, meta: { changes: 1 } };
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => runWith(args),
+            first: () => runWith([]).first(),
+            all: () => runWith([]).all(),
+            run: () => runWith([]).run(),
+          };
+        },
+      } as unknown as D1Database;
+
+      // 9. Zone & Table CRUD block non-manager ('staff' / 'waiter') on structural mutations
+      const tblApp = new OpenAPIHono<{ Bindings: Env }>();
+      tblApp.use('*', async (c, next) => {
+        const role = c.req.header('X-Test-Role') || 'staff';
+        c.set('user' as any, { id: 'u_tbl', role, tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      registerZoneCrudHandlers(tblApp);
+      registerTableCrudHandlers(tblApp);
+
+      const staffZonePost = await tblApp.fetch(
+        new Request('https://api.test/api/table-zones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Role': 'staff' },
+          body: JSON.stringify({ name: 'Tầng 2', slug: 'floor-2' }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(staffZonePost.status).toBe(403);
+
+      const waiterBulkStatus = await tblApp.fetch(
+        new Request('https://api.test/api/tables/bulk-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Role': 'waiter' },
+          body: JSON.stringify({ tableIds: ['tbl_1'], status: 'available' }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(waiterBulkStatus.status).toBe(403);
+
+      // 10. Canonical shift lifecycle stamps tenant_id and blocks cross-tenant recordShiftSale & closeCanonicalShift
+      const opened = await openCanonicalShift(db, {
+        staffId: 'staff_sadec_1',
+        staffName: 'Thu Ngân Sa Đéc',
+        role: 'cashier',
+        operatingUnitId: 'sadec',
+        tenantId: 'sadec',
+        openingCash: 500000,
+      });
+      expect(opened.ok).toBe(true);
+      const shiftId = opened.shift!.id;
+      expect(shiftsMap.get(shiftId)?.tenant_id).toBe('sadec');
+
+      const foreignSale = await recordShiftSale(db, {
+        shiftId,
+        orderId: 'ord_foreign_1',
+        amount: 100000,
+        paymentMethod: 'cash',
+        tenantId: 'default',
+      });
+      expect(foreignSale.ok).toBe(false);
+      expect(foreignSale.error).toBe('shift_not_found');
+
+      const mismatchedStaffSale = await recordShiftSale(db, {
+        shiftId,
+        orderId: 'ord_sadec_1',
+        amount: 100000,
+        paymentMethod: 'cash',
+        staffId: 'other_cashier_99',
+        tenantId: 'sadec',
+      });
+      expect(mismatchedStaffSale.ok).toBe(false);
+      expect(mismatchedStaffSale.error).toBe('shift_staff_mismatch');
+
+      const foreignClose = await closeCanonicalShift(db, {
+        shiftId,
+        closedByStaffId: 'mgr_default_1',
+        closedByRole: 'manager',
+        actualCash: 500000,
+        tenantId: 'default',
+      });
+      expect(foreignClose.ok).toBe(false);
+      expect(foreignClose.error).toBe('shift_not_found');
+
+      // 11. Kitchen station tickets block 'waiter' from starting KDS items (403)
+      const kdsTktApp = new Hono<{ Bindings: Env }>();
+      kdsTktApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'w_1', role: 'waiter', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      kdsTktApp.route('/', stationTicketsRouter);
+      const waiterStartRes = await kdsTktApp.fetch(
+        new Request('https://api.test/tickets/ord_1/items/itm_1/start?station_id=KS-1', { method: 'POST' }),
+        { AURA_DB: db } as any
+      );
+      expect(waiterStartRes.status).toBe(403);
+
+      // 12. Inventory forecasting selects tenant_id in inventory_transactions, inventorySnapshots blocks waiter (403), and mobile notifications scope/stamp tenant_id
+      const forecastApp = new Hono<{ Bindings: Env }>();
+      forecastApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      forecastApp.route('/', inventoryForecastingRouter);
+      const runRateRes = await forecastApp.fetch(
+        await authRequest('GET', '/run-rate?days=7', 'manager', 'sadec'),
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect(runRateRes.status).toBe(200);
+      const runRateJson = (await runRateRes.json()) as { data: Array<{ item_id: string; daily_run_rate: number }> };
+      expect(runRateJson.data[0]?.item_id).toBe('item_sadec_1');
+      expect(runRateJson.data[0]?.daily_run_rate).toBe(2);
+
+      const snapApp = new Hono<{ Bindings: Env }>();
+      snapApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'w_1', role: 'waiter', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      inventorySnapshots(snapApp as any);
+      const waiterSnapRes = await snapApp.fetch(
+        new Request('https://api.test/inv_1/snapshots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ closing_stock: 10 }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(waiterSnapRes.status).toBe(403);
+
+      const notifApp = new Hono<{ Bindings: Env }>();
+      notifApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'u_mob_1', role: 'staff', tenantId: c.req.header('X-Test-Tenant') || 'default' });
+        c.set('tenantId' as any, c.req.header('X-Test-Tenant') || 'default');
+        await next();
+      });
+      notifApp.get('/notifications', (c) => getNotifications(c as any));
+      notifApp.post('/subscribe', (c) => subscribePush(c as any));
+
+      const notifRes = await notifApp.fetch(
+        new Request('https://api.test/notifications', { headers: { 'X-Test-Tenant': 'sadec' } }),
+        { AURA_DB: db } as any
+      );
+      expect(notifRes.status).toBe(200);
+      const notifJson = (await notifRes.json()) as { notifications: Array<{ id: string }> };
+      expect(notifJson.notifications.map((n) => n.id)).toEqual(['notif_sadec_1']);
+
+      executedSqls.length = 0;
+      const subPushRes = await notifApp.fetch(
+        new Request('https://api.test/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Test-Tenant': 'default' },
+          body: JSON.stringify({
+            endpoint: 'https://push.example.com/sub/1',
+            keys: { p256dh: 'k_p256', auth: 'k_auth' },
+          }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(subPushRes.status).toBe(201);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /INSERT INTO push_subscriptions[\s\S]*tenant_id\s*=\s*excluded\.tenant_id/i.test(q.sql) &&
+            q.args.includes('default')
+        )
+      ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 34 — Phase AE1–AE3: Analytics/Metrics/Inventory/Cron, Table Sessions/
+  // Reservations/Floor Plan & Reviews/Push/Zalo/Staff/POS Isolation
+  // =========================================================================
+  describe('Suite 34 — Phase AE1–AE3: Analytics/Metrics/Inventory/Cron, Table Sessions/Reservations/Floor Plan & Reviews/Push/Zalo/Staff/POS Isolation', () => {
+    it('AE1: scopes getMetricSummary by tenant_id, pushes tenant_id into movement/ingredient/supplier & cron queries before LIMIT, and blocks waiter/cashier on analytics/reports', async () => {
+      const { Hono } = await import('hono');
+      const { getMetricSummary } = await import('../../lib/metrics-collector');
+      const { registerMovementHandlers } = await import('../../routes/openapi-inventory-handlers/movement-handlers');
+      const { registerSummaryHandlers } = await import('../../routes/openapi-cron-handlers/summary-handlers');
+      const analyticsRouter = (await import('../../routes/analytics-handlers/routes')).default;
+      const reportsRouter = (await import('../../routes/reports-handlers/routes')).default;
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const db: D1Database = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?/i.test(sql) || /FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || 'mgr_1');
+                  const role = id.includes('waiter') ? 'waiter' : 'manager';
+                  const tenant = id.includes('sadec') ? 'sadec' : 'default';
+                  return { id, role, is_active: 1, auth_version: 1, tenant_id: tenant } as unknown as T;
+                }
+                if (/FROM _metrics/i.test(sql) && /AVG\(value\)/i.test(sql)) {
+                  const tenantArg = args[2];
+                  if (tenantArg === 'sadec') {
+                    return { avg: 120, max: 150, min: 90, count: 2 } as unknown as T;
+                  }
+                  return { avg: 500, max: 900, min: 100, count: 10 } as unknown as T;
+                }
+                if (/SELECT COUNT\(\*\)\s+as\s+total\s+FROM\s+stock_movements/i.test(sql)) {
+                  return { total: sql.includes('sm.tenant_id') ? 1 : 99 } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM stock_movements sm/i.test(sql)) {
+                  if (sql.includes('sm.tenant_id') && args.includes('sadec')) {
+                    return {
+                      results: [
+                        {
+                          id: 'mov_sadec_1',
+                          ingredient_id: 'ing_sadec_1',
+                          ingredient_name: 'Matcha',
+                          type: 'waste',
+                          quantity: -2,
+                          tenant_id: 'sadec',
+                          created_at: '2026-11-03T00:00:00Z',
+                        },
+                      ],
+                    } as unknown as D1Result<T>;
+                  }
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                if (/FROM cron_jobs/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return {
+                      results: [
+                        { id: 'job_sadec_1', name: 'Sadec Reconcile', status: 'active', tenant_id: 'sadec' },
+                      ],
+                    } as unknown as D1Result<T>;
+                  }
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                if (/FROM cron_runs/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return {
+                      results: [
+                        {
+                          id: 'run_sadec_1',
+                          job_id: 'job_sadec_1',
+                          status: 'success',
+                          duration_ms: 45,
+                          started_at: '2026-11-03T01:00:00Z',
+                          tenant_id: 'sadec',
+                        },
+                      ],
+                    } as unknown as D1Result<T>;
+                  }
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      const summary = await getMetricSummary(db, 'revenue', '24h', 'sadec');
+      expect(summary.count).toBe(2);
+      expect(summary.avg).toBe(120);
+      expect(
+        executedSqls.some(
+          (q) => /FROM _metrics/i.test(q.sql) && q.sql.includes("tags ->> '$.tenant_id'") && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const invApp = new OpenAPIHono<{ Bindings: Env }>();
+      invApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      registerMovementHandlers(invApp as any);
+      const movRes = await invApp.fetch(
+        new Request('https://api.test/api/inventory/movements?type=waste&limit=10&page=1'),
+        { AURA_DB: db } as any
+      );
+      expect(movRes.status).toBe(200);
+      const movJson = (await movRes.json()) as { data: Array<{ id: string }>; meta: { total: number } };
+      expect(movJson.data.map((m) => m.id)).toEqual(['mov_sadec_1']);
+      expect(movJson.meta.total).toBe(1);
+
+      const cronApp = new OpenAPIHono<{ Bindings: Env }>();
+      cronApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      registerSummaryHandlers(cronApp as any);
+      const cronRes = await cronApp.fetch(
+        new Request('https://api.test/api/cron/summary'),
+        { AURA_DB: db } as any
+      );
+      expect(cronRes.status).toBe(200);
+      const cronJson = (await cronRes.json()) as { data: { totalJobs: number; totalRuns: number } };
+      expect(cronJson.data.totalJobs).toBe(1);
+      expect(cronJson.data.totalRuns).toBe(1);
+
+      const finApp = new Hono<{ Bindings: Env }>();
+      finApp.route('/api/analytics', analyticsRouter);
+      finApp.route('/api/reports', reportsRouter);
+
+      const waiterAnalyticsReq = await authRequest('GET', '/api/analytics', 'waiter', 'default');
+      const waiterAnalyticsRes = await finApp.fetch(waiterAnalyticsReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(waiterAnalyticsRes.status).toBe(403);
+
+      const waiterReportsReq = await authRequest('GET', '/api/reports/daily', 'waiter', 'default');
+      const waiterReportsRes = await finApp.fetch(waiterReportsReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(waiterReportsRes.status).toBe(403);
+    });
+
+    it('AE2: isolates table sessions, disambiguates table_number across tenants in table policies, and scopes reservation/Cal booking lookups', async () => {
+      const { Hono } = await import('hono');
+      const { registerSessionHandlers } = await import('../../routes/table-sessions-handlers/session-handlers');
+      const { validateOrderTable } = await import('../../../../packages/domain/table/src/policies/table-availability-policy');
+      const { releaseTable } = await import('../../../../packages/domain/table/src/policies/table-reservation-policy');
+      const { registerBookingsHandler } = await import('../../routes/cal-booking-webhook-handlers/bookings-handler');
+
+      let sadecTableStatus: 'Available' | 'Occupied' = 'Occupied';
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const db: D1Database = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?/i.test(sql) || /FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || 'mgr_sadec');
+                  return { id, role: 'manager', is_active: 1, auth_version: 1, tenant_id: 'sadec' } as unknown as T;
+                }
+                if (/FROM cafe_tables WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || '');
+                  if (id === 'tbl_sadec_1') {
+                    return {
+                      id: 'tbl_sadec_1',
+                      table_number: 1,
+                      capacity: 4,
+                      status: sadecTableStatus,
+                      is_active: 1,
+                      tenant_id: 'sadec',
+                      operating_unit_id: 'sadec',
+                    } as unknown as T;
+                  }
+                  return null;
+                }
+                if (/FROM table_sessions WHERE table_id = \?/i.test(sql)) {
+                  const tenantArg = args[args.length - 1];
+                  if (tenantArg === 'sadec') return null;
+                  return { id: 'sess_default_1', tenant_id: 'default' } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM cafe_tables WHERE table_number = \?/i.test(sql)) {
+                  return {
+                    results: [
+                      {
+                        id: 'tbl_default_1',
+                        table_number: 1,
+                        capacity: 4,
+                        status: 'Available',
+                        is_active: 1,
+                        tenant_id: 'default',
+                        operating_unit_id: 'default',
+                      },
+                      {
+                        id: 'tbl_sadec_1',
+                        table_number: 1,
+                        capacity: 6,
+                        status: 'Available',
+                        is_active: 1,
+                        tenant_id: 'sadec',
+                        operating_unit_id: 'sadec',
+                      },
+                    ],
+                  } as unknown as D1Result<T>;
+                }
+                if (/FROM bookings/i.test(sql) || /FROM reservations/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return {
+                      results: [
+                        {
+                          id: 'bk_sadec_1',
+                          cal_uid: 'cal_sadec_1',
+                          status: 'confirmed',
+                          start_time: '2026-11-03T12:00:00Z',
+                          tenant_id: 'sadec',
+                        },
+                      ],
+                    } as unknown as D1Result<T>;
+                  }
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. validateOrderTable disambiguates shared table_number = 1 across default and sadec
+      const tableCheck = await validateOrderTable(db, '1', 'sadec');
+      expect(tableCheck.ok).toBe(true);
+      expect(tableCheck.table?.id).toBe('tbl_sadec_1');
+
+      // 2. releaseTable scopes UPDATE reservations SET status = 'completed' by tenant_id
+      executedSqls.length = 0;
+      const relRes = await releaseTable(db, { tableId: 'tbl_sadec_1', operatingUnitId: 'sadec' });
+      expect(relRes.ok).toBe(true);
+      expect(
+        executedSqls.some(
+          (q) =>
+            /UPDATE reservations SET status = 'completed'[\s\S]*tenant_id/i.test(q.sql) &&
+            q.args.includes('sadec')
+        )
+      ).toBe(true);
+      sadecTableStatus = 'Available';
+
+      // 3. POST /api/table-sessions scopes conflict lookup by tenant_id
+      const sessApp = new Hono<{ Bindings: Env }>();
+      sessApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'st_sadec', role: 'waiter', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      registerSessionHandlers(sessApp as any);
+      const createSessRes = await sessApp.fetch(
+        new Request('https://api.test/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table_id: 'tbl_sadec_1', guests: 4 }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(createSessRes.status).toBe(201);
+
+      // 4. Cal bookings GET pushes tenant_id into SQL before LIMIT
+      const calApp = new Hono<{ Bindings: Env }>();
+      registerBookingsHandler(calApp as any);
+      const bkReq = await authRequest('GET', '/bookings?limit=10', 'manager', 'sadec');
+      const bkRes = await calApp.fetch(
+        bkReq,
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect(bkRes.status).toBe(200);
+      const bkJson = (await bkRes.json()) as { data: Array<{ id: string }> };
+      expect(bkJson.data.map((b) => b.id)).toEqual(['bk_sadec_1']);
+    });
+
+    it('AE3: blocks waiter review spoofing & owner->admin PIN escalation, scopes loyalty bonus/ZNS/push by default tenant, and enforces ERPNext/DinDin POS isolation', async () => {
+      const { Hono } = await import('hono');
+      const { reviewsRouter } = await import('../../routes/reviews');
+      const { getActiveCampaign } = await import('../../tree/loyalty/campaign');
+      const { registerStaffDevice } = await import('../../../../packages/domain/staff/commands/staff-auth');
+      const { handleErpnextPosRequest } = await import('../../routes/erpnext-pos');
+      const { registerCartHandlers } = await import('../../routes/dindin-handlers/cart-handlers');
+
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const db: D1Database = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedSqls.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?/i.test(sql) || /FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || '');
+                  if (id === 'admin_platform_1') {
+                    return {
+                      id: 'admin_platform_1',
+                      name: 'Platform Admin',
+                      role: 'admin',
+                      is_active: 1,
+                      auth_version: 1,
+                      tenant_id: 'default',
+                    } as unknown as T;
+                  }
+                  const role = id.includes('waiter')
+                    ? 'waiter'
+                    : id.includes('staff')
+                      ? 'staff'
+                      : id.includes('admin')
+                        ? 'admin'
+                        : 'owner';
+                  return { id, role, is_active: 1, auth_version: 1, tenant_id: 'default' } as unknown as T;
+                }
+                if (/FROM orders WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: 'ord_cust_1',
+                    customer_id: 'cust_real_1',
+                    status: 'completed',
+                    tenant_id: 'default',
+                  } as unknown as T;
+                }
+                if (/FROM bonus_campaigns/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('default')) {
+                    return {
+                      id: 'camp_default_1',
+                      name: 'Default Double Points',
+                      multiplier: 2,
+                      active: 1,
+                      tenant_id: 'default',
+                    } as unknown as T;
+                  }
+                  return {
+                    id: 'camp_other_99',
+                    name: 'Other Store 10x',
+                    multiplier: 10,
+                    active: 1,
+                    tenant_id: 'other-store',
+                  } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM dindin_cart/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return {
+                      results: [
+                        { session_id: 'din_sadec_1', cart: '{"items":[]}', tenant_id: 'sadec', updated_at: '2026-11-03T00:00:00Z' },
+                      ],
+                    } as unknown as D1Result<T>;
+                  }
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. Waiter cannot spoof a customer review on POST /api/reviews
+      const revApp = new Hono<{ Bindings: Env }>();
+      revApp.route('/api/reviews', reviewsRouter);
+      const revReq = await authRequest('POST', '/api/reviews', 'waiter', 'default', {
+        order_id: 'ord_cust_1',
+        rating: 5,
+        comment: 'Spoofed by waiter',
+      });
+      const revRes = await revApp.fetch(revReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(revRes.status).toBe(403);
+
+      // 2. getActiveCampaign scopes by 'default' tenant in SQL before LIMIT 1
+      const activeCamp = await getActiveCampaign(db, 'default');
+      expect(activeCamp?.id).toBe('camp_default_1');
+      expect(activeCamp?.multiplier).toBe(2);
+
+      // 3. Store owner cannot register a PIN device for a platform 'admin' account
+      const ownerEscalateApp = new Hono<{ Bindings: Env }>();
+      ownerEscalateApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'owner_1', role: 'owner', tenantId: 'default' });
+        c.set('staffUser' as any, { id: 'owner_1', role: 'owner', tenantId: 'default' });
+        c.set('tenantId' as any, 'default');
+        await next();
+      });
+      ownerEscalateApp.post('/register-device', (c) => registerStaffDevice(c as any));
+      const escRes = await ownerEscalateApp.fetch(
+        new Request('https://api.test/register-device', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_token: 'dev_escalate_token_123456',
+            device_name: 'POS iPad 1',
+            staff_id: 'admin_platform_1',
+            role: 'admin',
+            pin: '1234',
+          }),
+        }),
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect(escRes.status).toBe(403);
+
+      // 4. ERPNext POS products/sync rejects 'staff' role with 403
+      const erpStaffReq = await authRequest('POST', '/api/erpnext-pos/products/sync', 'staff', 'default', {
+        products: [],
+      });
+      const erpSyncRes = await handleErpnextPosRequest(
+        erpStaffReq,
+        { AURA_DB: db, ERPNEXT_URL: 'https://erp.test', ERPNEXT_API_KEY: 'k', ERPNEXT_API_SECRET: 's' } as any,
+        'default'
+      );
+      expect(erpSyncRes.status).toBe(403);
+
+      // 5. DinDin GET /carts pushes tenant_id into SQL before LIMIT 50
+      const dinApp = new Hono<{ Bindings: Env }>();
+      dinApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      registerCartHandlers(dinApp as any);
+      const dinCartRes = await dinApp.fetch(
+        new Request('https://api.test/carts'),
+        { AURA_DB: db } as any
+      );
+      expect(dinCartRes.status).toBe(200);
+      const dinCartJson = (await dinCartRes.json()) as { carts: Array<{ sessionId: string }> };
+      expect(dinCartJson.carts.map((x) => x.sessionId)).toEqual(['din_sadec_1']);
+    });
+  });
 });
+
+
+
 
 

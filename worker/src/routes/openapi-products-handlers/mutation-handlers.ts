@@ -7,8 +7,15 @@ import {
 } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { formatProduct, matchesCatalogTenant, type ProductRow } from './helpers';
+
+const PRODUCT_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
+function resolveProductWriteTenantId(c: any): string {
+  const raw = getTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c) ? 'default' : raw;
+}
 
 async function logProductAudit(
   db: any,
@@ -56,8 +63,11 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       tags?: string[];
       translations?: Array<{ locale: string; name: string; description?: string }>;
     };
-    const user = c.get('user') as { id: string };
-    const rawTenant = getTenantId(c);
+    const user = c.get('user') as { id: string; role?: string } | undefined;
+    if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    const rawTenant = getTenantId(c).trim() || 'default';
     const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
     const now = new Date().toISOString();
 
@@ -154,7 +164,7 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // PATCH /api/products/:id - Update product
   router.openapi(ProductRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveProductWriteTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       slug?: string;
@@ -166,13 +176,20 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       tags?: string[];
       translations?: Array<{ locale: string; name: string; description?: string }>;
     };
-    const user = c.get('user') as { id: string };
+    const user = c.get('user') as { id: string; role?: string } | undefined;
+    if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
-    const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
+    const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first() as { tenant_id?: string | null } | null;
     if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
+
+    const effectiveTenant = tenantId === '*'
+      ? ((typeof existing.tenant_id === 'string' && existing.tenant_id.trim()) || 'default')
+      : tenantId;
 
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
@@ -180,7 +197,6 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const canonicalParams: (string | number | null)[] = [];
 
     if (body.slug !== undefined) {
-      const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
       let hasSlugConflict = false;
       try {
         const allRes = await db.prepare('SELECT * FROM products WHERE slug = ? AND id != ?').bind(body.slug, id).all<Record<string, unknown>>().catch(() => null);
@@ -201,7 +217,7 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     }
     if (body.categoryId !== undefined) {
       const catRow = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(body.categoryId).first().catch(() => null);
-      if (catRow && !matchesCatalogTenant(catRow, tenantId === '*' ? 'default' : tenantId)) {
+      if (catRow && !matchesCatalogTenant(catRow, effectiveTenant)) {
         return c.json({ success: false, error: 'Category not found' }, 404);
       }
       updates.push('category_id = ?');
@@ -246,18 +262,38 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     updates.push('updated_at = ?');
     params.push(now);
-    params.push(id);
 
     canonicalUpdates.push('updated_at = ?');
     canonicalParams.push(now);
-    canonicalParams.push(id);
 
     if (updates.length > 1) {
-      try {
-        await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-      } catch {
-        if (canonicalUpdates.length > 1) {
-          await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            `UPDATE products SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...params, id, tenantId).run();
+        } catch {
+          if (canonicalUpdates.length > 1) {
+            try {
+              await db.prepare(
+                `UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              ).bind(...canonicalParams, id, tenantId).run();
+            } catch {
+              if (tenantId === 'default') {
+                await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+              }
+            }
+          } else if (tenantId === 'default') {
+            await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
+          }
+        }
+      } else {
+        try {
+          await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
+        } catch {
+          if (canonicalUpdates.length > 1) {
+            await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+          }
         }
       }
       await syncProductToMenuProjection(db, id);
@@ -279,9 +315,12 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // DELETE /api/products/:id - Delete product
   router.openapi(ProductRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveProductWriteTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
-    const user = c.get('user') as { id: string };
+    const user = c.get('user') as { id: string; role?: string } | undefined;
+    if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { name?: string; slug?: string; tenant_id?: string | null } | null;
@@ -298,10 +337,30 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     }
     if (orderItems && orderItems.count > 0) {
       // Soft delete by setting is_available = 0
-      await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+      if (tenantId !== '*') {
+        await db.prepare(
+          "UPDATE products SET is_available = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(now, id, tenantId).run().catch(async () => {
+          if (tenantId === 'default') {
+            await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+          }
+        });
+      } else {
+        await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+      }
       await syncProductAvailabilityProjection(db, id, 0);
     } else {
-      await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+      if (tenantId !== '*') {
+        await db.prepare(
+          "DELETE FROM products WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(id, tenantId).run().catch(async () => {
+          if (tenantId === 'default') {
+            await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+          }
+        });
+      } else {
+        await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+      }
       await deleteProductProjection(db, id);
     }
 

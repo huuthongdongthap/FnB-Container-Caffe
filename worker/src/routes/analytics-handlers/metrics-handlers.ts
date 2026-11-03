@@ -7,6 +7,7 @@ import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
 import { getZoneStats } from '../../tree/analytics/zone-analytics';
+import { buildTenantFilter } from '../../tree/analytics/summary';
 import { topProductsSchema, peakHoursSchema, zoneSchema, buildCacheKey, getCached, setCache } from './helpers';
 
 const log = createLogger({ route: 'analytics-metrics' });
@@ -136,15 +137,10 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/payout', requireAuth(['owner']), async (c) => {
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
-    const hasTenant = Boolean(tenantId && tenantId !== '*');
-    const tenantWhere = !hasTenant
-      ? ''
-      : tenantId === 'default'
-        ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-        : ' WHERE tenant_id = ?';
+    const { clause: tenantWhere, binds: tenantBinds } = buildTenantFilter(tenantId, undefined, 'WHERE');
     const runFirst = <T>(sql: string) => {
       const stmt = db.prepare(sql);
-      return hasTenant ? stmt.bind(tenantId).first<T>() : stmt.first<T>();
+      return tenantBinds.length > 0 ? stmt.bind(...tenantBinds).first<T>() : stmt.first<T>();
     };
     try {
       let row: { cod_total: number; payos_total: number; refunded_total: number; total_orders: number } | null = null;

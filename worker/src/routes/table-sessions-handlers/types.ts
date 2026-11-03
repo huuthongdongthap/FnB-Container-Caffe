@@ -1,3 +1,29 @@
+import { matchesTenantRow } from '../../lib/db';
+
+export { matchesTenantRow };
+
+export function hasExplicitTenantId(row: Record<string, unknown> | null | undefined): boolean {
+  if (!row || !('tenant_id' in row)) return false;
+  return row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '';
+}
+
+export async function isTableAccessibleByTenant(
+  db: D1Database,
+  tableId: string | undefined,
+  tenantId: string,
+): Promise<boolean> {
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
+  if (!tableId) return normTenant === 'default';
+  try {
+    const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(tableId).first<Record<string, unknown>>();
+    if (!table) return normTenant === 'default';
+    return matchesTenantRow(table, normTenant);
+  } catch {
+    return normTenant === 'default';
+  }
+}
+
 export interface TableSession {
   id: string;
   table_id: string;

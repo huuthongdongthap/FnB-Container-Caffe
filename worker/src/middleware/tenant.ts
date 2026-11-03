@@ -2,6 +2,20 @@ import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 import { createLogger } from './logger';
 import { writeTenantOverrideAudit } from './audit-log';
+import { resolvePilotStore as resolveStrictPilotStore } from '../lib/pilot-store';
+export { matchesTenantRow } from '../lib/db';
+
+export function resolvePilotStore(env?: { [key: string]: unknown } | Env | null): string {
+  if (!env) return 'default';
+  try {
+    return resolveStrictPilotStore(env as unknown as { [key: string]: unknown });
+  } catch {
+    const raw = typeof (env as Record<string, unknown>).PILOT_TENANT_ID === 'string'
+      ? String((env as Record<string, unknown>).PILOT_TENANT_ID).trim()
+      : '';
+    return raw && raw !== '*' && raw !== 'hq' ? raw : 'default';
+  }
+}
 
 const log = createLogger({ route: 'tenant' });
 
@@ -9,9 +23,13 @@ const log = createLogger({ route: 'tenant' });
  * Check if the authenticated user is an HQ Super-Admin.
  * HQ super-admins have role 'owner' and are bound to 'default', 'hq', or unbound.
  */
-export function isHQSuperAdmin(user?: { role?: string; tenantId?: string } | null): boolean {
-  if (!user) return false;
-  return (user.role === 'owner' || user.role === 'admin') && (!user.tenantId || user.tenantId === 'default' || user.tenantId === 'hq');
+export function isHQSuperAdmin(user?: { role?: string; tenantId?: string; get?: (_k: string) => unknown } | null): boolean {
+  const resolved = typeof user?.get === 'function'
+    ? (user.get('user') as { role?: string; tenantId?: string } | null | undefined)
+    : user;
+  if (!resolved) return false;
+  const userTenant = resolved.tenantId?.trim();
+  return (resolved.role === 'owner' || resolved.role === 'admin') && (!userTenant || userTenant === 'default' || userTenant === 'hq');
 }
 
 /**
@@ -37,9 +55,10 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
     return next();
   }
 
+  const userTenant = user.tenantId?.trim() || 'default';
   if (isHQSuperAdmin(user)) {
-    const requestedTenant = c.req.query('tenant_id') || c.req.header('x-tenant-id');
-    if (requestedTenant && requestedTenant !== user.tenantId) {
+    const requestedTenant = (c.req.query('tenant_id') || c.req.header('x-tenant-id') || c.req.header('X-Tenant-ID') || '').trim() || undefined;
+    if (requestedTenant && requestedTenant !== userTenant) {
       // Privileged cross-tenant read — leave a durable trail before scoping.
       writeTenantOverrideAudit(c, user, user.tenantId, requestedTenant);
       c.set('tenantId', requestedTenant);
@@ -47,11 +66,11 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
     }
   }
 
-  if (!user.tenantId) {
+  if (!user.tenantId?.trim()) {
     log.warn(`User ${user.id} has no tenant binding — falling back to 'default'`);
   }
 
-  c.set('tenantId', user.tenantId ?? 'default');
+  c.set('tenantId', userTenant);
   await next();
 };
 
@@ -69,22 +88,44 @@ export function getTenantId(c: {
   if (typeof c?.get !== 'function') {
     return 'default';
   }
-  const explicitTenant = c.get('tenantId') as string | undefined;
+  const explicitTenant = (c.get('tenantId') as string | undefined)?.trim();
   if (explicitTenant) {
     return explicitTenant;
   }
 
   const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenantId?: string } | undefined;
   if (user) {
+    const userTenant = user.tenantId?.trim() || 'default';
     if (isHQSuperAdmin(user)) {
-      const requestedTenant = c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id');
-      if (requestedTenant && requestedTenant !== user.tenantId) {
+      const requestedTenant = (c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id') || c.req?.header?.('X-Tenant-ID') || '').trim() || undefined;
+      if (requestedTenant && requestedTenant !== userTenant) {
         writeTenantOverrideAudit(c as Parameters<typeof writeTenantOverrideAudit>[0], user, user.tenantId, requestedTenant);
         return requestedTenant;
       }
     }
-    return user.tenantId ?? 'default';
+    return userTenant;
   }
 
   return 'default';
 }
+
+/**
+ * Resolves tenantId for public/guest-accessible routes that support optional staff auth.
+ * Authenticated users use getTenantId(c); unauthenticated guests resolve from
+ * explicit context tenantId, ?tenant_id query, X-Tenant-ID header, or PILOT_TENANT_ID.
+ */
+export function resolvePublicTenantId(c: Parameters<typeof getTenantId>[0]): string {
+  if (c.get?.('user')) {
+    return getTenantId(c);
+  }
+  const explicitCtx = c.get?.('tenantId') as string | undefined;
+  if (explicitCtx && explicitCtx.trim() && explicitCtx.trim() !== '*') {
+    return explicitCtx.trim();
+  }
+  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
+  if (!raw || raw === '*') {
+    return resolvePilotStore(((c as unknown as { env?: Env }).env ?? {}) as Env);
+  }
+  return raw;
+}
+

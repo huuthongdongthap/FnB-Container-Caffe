@@ -6,6 +6,8 @@
  * Falls back to 'Mang đi' for orders with no table_id.
  */
 
+import { buildTenantFilter } from './summary';
+
 export interface ZoneRow {
   label: string;
   value: number; // total revenue (VND)
@@ -17,15 +19,28 @@ export async function getZoneStats(
   days: number,
   tenantId?: string
 ): Promise<ZoneRow[]> {
-  const hasTenant = Boolean(tenantId && tenantId !== '*');
-  const tenantClause = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
-  const binds: Array<number | string> = hasTenant && tenantId ? [days, tenantId] : [days];
+  const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId, 'o');
+  const binds: Array<number | string> = [days, ...tenantBinds];
   try {
-    const { results } = await db.prepare(`  SELECT
+    const tableTenantJoin = tenantId && tenantId !== '*'
+      ? " AND COALESCE(NULLIF(TRIM(ct.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
+      : '';
+    let results: ZoneRow[] | undefined;
+    try {
+      const res = await db.prepare(`  SELECT
+    COALESCE(ct.zone, 'Mang đi') AS label,
+    COALESCE(SUM(o.total), 0) AS value,
+    COUNT(*) AS count
+  FROM orders o
+  LEFT JOIN cafe_tables ct ON ct.id = o.table_id${tableTenantJoin}
+  WHERE o.status != 'cancelled'
+    AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
+  GROUP BY label
+  ORDER BY value DESC
+ `).bind(...binds).all<ZoneRow>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(`  SELECT
     COALESCE(ct.zone, 'Mang đi') AS label,
     COALESCE(SUM(o.total), 0) AS value,
     COUNT(*) AS count
@@ -36,6 +51,8 @@ export async function getZoneStats(
   GROUP BY label
   ORDER BY value DESC
  `).bind(...binds).all<ZoneRow>();
+      results = res.results;
+    }
 
     return results || [];
   } catch {

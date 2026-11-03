@@ -16,8 +16,11 @@ export async function listApplications(c: Context<{ Bindings: Env }>) {
   try {
     const tenant = privacyStore(c, ['owner', 'manager']);
     if (tenant instanceof Response) return tenant;
+    const tenantClause = tenant === 'default'
+      ? "(tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : '(tenant_id = ? OR TRIM(tenant_id) = ?1)';
     let query = `SELECT id, full_name AS fullName, phone, birth_year AS birthYear, position, shifts, experience,
-      note, status, created_at AS createdAt, updated_at AS updatedAt FROM recruitment_applications WHERE tenant_id = ?`;
+      note, status, created_at AS createdAt, updated_at AS updatedAt FROM recruitment_applications WHERE ${tenantClause}`;
     const params: string[] = [tenant];
     for (const field of ['status', 'position'] as const) {
       const value = c.req.query(field);
@@ -40,8 +43,11 @@ export async function updateApplicationStatus(c: Context<{ Bindings: Env }>) {
     if (tenant instanceof Response) return tenant;
     const parsed = statusSchema.safeParse(await c.req.json());
     if (!parsed.success) return errorResponse('Trạng thái không hợp lệ', 400);
+    const tenantClause = tenant === 'default'
+      ? "(tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : '(tenant_id = ? OR TRIM(tenant_id) = ?3)';
     const result = await c.env.AURA_DB.prepare(`UPDATE recruitment_applications
-      SET status = ?, updated_at = datetime('now') WHERE id = ? AND tenant_id = ?`)
+      SET status = ?, updated_at = datetime('now') WHERE id = ? AND ${tenantClause}`)
       .bind(parsed.data.status, c.req.param('id'), tenant).run();
     if (!result.meta.changes) return errorResponse('Không tìm thấy hồ sơ', 404);
     return jsonResponse({ success: true, message: 'Cập nhật trạng thái thành công' });
@@ -51,7 +57,10 @@ export async function deleteApplication(c: Context<{ Bindings: Env }>) {
   try {
     const tenant = privacyStore(c, ['owner', 'manager']);
     if (tenant instanceof Response) return tenant;
-    const result = await c.env.AURA_DB.prepare('DELETE FROM recruitment_applications WHERE id = ? AND tenant_id = ?')
+    const tenantClause = tenant === 'default'
+      ? "(tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : '(tenant_id = ? OR TRIM(tenant_id) = ?2)';
+    const result = await c.env.AURA_DB.prepare(`DELETE FROM recruitment_applications WHERE id = ? AND ${tenantClause}`)
       .bind(c.req.param('id'), tenant).run();
     if (!result.meta.changes) return errorResponse('Không tìm thấy hồ sơ', 404);
     return jsonResponse({ success: true, message: 'Đã xóa hồ sơ ứng viên' });

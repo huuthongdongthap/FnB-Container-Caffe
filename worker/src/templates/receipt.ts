@@ -5,6 +5,15 @@ export interface ReceiptData {
   payment_time?: string;
 }
 
+function escapeHtml(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderReceipt(order: ReceiptData): string {
   const fmt = (n: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
   const paidAt = order.payment_time
@@ -25,11 +34,11 @@ export function renderReceipt(order: ReceiptData): string {
     </tr>
     <tr>
       <td style="padding:24px">
-        <p style="color:#333;font-size:16px">Biên nhận thanh toán đơn hàng <strong>#${order.id}</strong></p>
+        <p style="color:#333;font-size:16px">Biên nhận thanh toán đơn hàng <strong>#${escapeHtml(order.id)}</strong></p>
 
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:16px;margin:16px 0">
           <tr><td style="padding:4px 0;color:#666;font-size:13px">Tổng tiền</td><td style="padding:4px 0;text-align:right;font-weight:bold;font-size:18px;color:#0A1A2E">${fmt(order.total || 0)}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;font-size:13px">Phương thức</td><td style="padding:4px 0;text-align:right;font-size:13px">${order.payment_method || '—'}</td></tr>
+          <tr><td style="padding:4px 0;color:#666;font-size:13px">Phương thức</td><td style="padding:4px 0;text-align:right;font-size:13px">${escapeHtml(order.payment_method || '—')}</td></tr>
           <tr><td style="padding:4px 0;color:#666;font-size:13px">Thời gian</td><td style="padding:4px 0;text-align:right;font-size:13px">${paidAt}</td></tr>
         </table>
 

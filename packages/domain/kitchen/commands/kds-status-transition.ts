@@ -13,6 +13,7 @@ export interface KdsTransitionOptions {
   kv?: { put(key: string, val: string, opts?: { expirationTtl?: number }): Promise<void> } | null;
   waitUntil?: (promise: Promise<unknown>) => void;
   env?: Record<string, unknown>;
+  skipCancelSideEffects?: boolean;
 }
 
 /**
@@ -35,6 +36,391 @@ export async function executeKdsStatusTransition(
   if (!result.success || result.idempotent) return result;
   const order = result.order!;
   const now = new Date().toISOString();
+
+  if (targetStatus === 'cancelled' && !options?.skipCancelSideEffects) {
+    const rawDb = db as unknown as import('@cloudflare/workers-types').D1Database;
+    const ordRow = await rawDb
+      .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+      .bind(orderId)
+      .first<{ total?: number; total_amount?: number; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+      .catch(() => null);
+    const ordTenantAttr = ordRow?.tenant_id && String(ordRow.tenant_id).trim() && String(ordRow.tenant_id).trim() !== '*'
+      ? String(ordRow.tenant_id).trim()
+      : undefined;
+    const resolvedTenant = ordTenantAttr || (options?.tenantId && options.tenantId !== '*' ? options.tenantId : undefined);
+    const effectiveCancelTenant = resolvedTenant || 'default';
+    try {
+      const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+      await restoreInventoryForOrder({ AURA_DB: rawDb }, orderId, effectiveCancelTenant);
+    } catch {
+      // Non-blocking when inventory tables are absent in minimal test schemas
+    }
+    try {
+      const earnRow = await rawDb
+        .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")
+        .bind(orderId)
+        .first<{ customer_id?: string }>()
+        .catch(() => null);
+      if (earnRow?.customer_id) {
+        const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
+        const totalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
+        const ordTenant = effectiveCancelTenant;
+        const policy = await loadPolicy(rawDb, options?.kv as any, new Date(), ordTenant).catch(() => null);
+        if (policy) {
+          await reverseAccrual(rawDb, policy, {
+            orderId,
+            customerId: earnRow.customer_id,
+            refundAmountVnd: totalVnd,
+            reason: 'order_cancelled',
+            tenantId: ordTenant,
+          }).catch(() => {});
+        }
+      }
+      const existingRefund = await rawDb
+        .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(orderId, effectiveCancelTenant)
+        .first<{ id?: string }>()
+        .catch(() =>
+          rawDb
+            .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' LIMIT 1")
+            .bind(orderId)
+            .first<{ id?: string }>()
+            .catch(() => null)
+        );
+      if (!existingRefund?.id) {
+        const spendRow = await rawDb
+          .prepare("SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type IN ('spend', 'redeem') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(orderId, effectiveCancelTenant)
+          .first<{ id?: string; customer_id?: string; amount?: number }>()
+          .catch(() =>
+            rawDb
+              .prepare("SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1")
+              .bind(orderId)
+              .first<{ id?: string; customer_id?: string; amount?: number }>()
+              .catch(() => null)
+          );
+        let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
+        let refundAmount = Number(spendRow?.amount ?? 0);
+        if (!refundCustomerId || !(refundAmount > 0)) {
+          const ordSpend = ordRow ?? await rawDb
+            .prepare('SELECT customer_id, cashback_used FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<{ customer_id?: string | null; cashback_used?: number | null }>()
+            .catch(() => null);
+          if (!refundCustomerId && ordSpend?.customer_id) {
+            refundCustomerId = String(ordSpend.customer_id).trim();
+          }
+          if (!(refundAmount > 0) && Number(ordSpend?.cashback_used ?? 0) > 0) {
+            refundAmount = Number(ordSpend?.cashback_used ?? 0);
+          }
+        }
+        if (refundCustomerId && refundAmount > 0) {
+          const wRow = await rawDb
+            .prepare("SELECT id FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+            .bind(refundCustomerId, effectiveCancelTenant)
+            .first<{ id?: string }>()
+            .catch(() =>
+              rawDb
+                .prepare('SELECT id FROM cashback_wallets WHERE customer_id = ? LIMIT 1')
+                .bind(refundCustomerId)
+                .first<{ id?: string }>()
+                .catch(() => null)
+            );
+          const walletId = wRow?.id || `wal_${refundCustomerId}`;
+          const refundTxId = `cb_ref_${orderId}`;
+          let insertedRefund = true;
+          try {
+            const insRes = await rawDb
+              .prepare(
+                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
+                 SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
+              )
+              .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, effectiveCancelTenant, orderId)
+              .run();
+            const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+              ?? (insRes as unknown as { changes?: number })?.changes;
+            if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
+          } catch {
+            try {
+              const insRes = await rawDb
+                .prepare(
+                  `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
+                   SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
+                   WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
+                )
+                .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, orderId)
+                .run();
+              const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+                ?? (insRes as unknown as { changes?: number })?.changes;
+              if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
+            } catch {
+              try {
+                await rawDb
+                  .prepare(
+                    "INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, created_at) VALUES (?, ?, ?, 'refund', ?, datetime('now'))",
+                  )
+                  .bind(refundTxId, refundCustomerId, orderId, refundAmount)
+                  .run();
+              } catch {
+                // Optional cashback_transactions schema differences
+              }
+            }
+          }
+          if (insertedRefund) {
+            await rawDb
+              .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+              .bind(refundAmount, refundCustomerId, effectiveCancelTenant)
+              .run()
+              .catch(() =>
+                rawDb
+                  .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ?")
+                  .bind(refundAmount, refundCustomerId)
+                  .run()
+                  .catch(() => {})
+              );
+            await rawDb
+              .prepare("UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+              .bind(orderId, effectiveCancelTenant)
+              .run()
+              .catch(() =>
+                rawDb
+                  .prepare('UPDATE orders SET cashback_used = 0 WHERE id = ?')
+                  .bind(orderId)
+                  .run()
+                  .catch(() => {})
+              );
+          }
+        }
+      }
+      const refRow = await rawDb
+        .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' LIMIT 1")
+        .bind(orderId)
+        .first<{ id?: string }>()
+        .catch(() => null);
+      if (refRow?.id) {
+        const { reverseReferralCashback } = await import('@aura/domain-crm');
+        await reverseReferralCashback(rawDb, refRow.id, effectiveCancelTenant).catch(() => {});
+      }
+      const decrementedPromoIds = new Set<string>();
+      const redRow = await rawDb
+        .prepare('SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1')
+        .bind(orderId)
+        .first<{ promotion_id?: string; code?: string }>()
+        .catch(() => null);
+      if (redRow && (redRow.promotion_id || redRow.code)) {
+        const promoTenant = effectiveCancelTenant;
+        if (redRow.promotion_id) {
+          decrementedPromoIds.add(String(redRow.promotion_id).trim());
+          await rawDb
+            .prepare(
+              `UPDATE promotions
+               SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
+                   used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
+                   usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+            )
+            .bind(redRow.promotion_id, promoTenant)
+            .run()
+            .catch(async () => {
+              try {
+                await rawDb
+                  .prepare(
+                    "UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                  )
+                  .bind(redRow.promotion_id, promoTenant)
+                  .run();
+              } catch {
+                if (promoTenant === 'default') {
+                  await rawDb
+                    .prepare('UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ?')
+                    .bind(redRow.promotion_id)
+                    .run()
+                    .catch(() => {});
+                }
+              }
+            });
+        } else if (redRow.code) {
+          await rawDb
+            .prepare(
+              `UPDATE promotions
+               SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
+                   used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
+                   usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
+               WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+            )
+            .bind(redRow.code, promoTenant)
+            .run()
+            .catch(async () => {
+              try {
+                await rawDb
+                  .prepare(
+                    "UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                  )
+                  .bind(redRow.code, promoTenant)
+                  .run();
+              } catch {
+                if (promoTenant === 'default') {
+                  await rawDb
+                    .prepare('UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?)')
+                    .bind(redRow.code)
+                    .run()
+                    .catch(() => {});
+                }
+              }
+            });
+        }
+        await rawDb.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+      }
+      try {
+        const usageRes = await rawDb
+          .prepare('SELECT id, promotion_id FROM promotion_usages WHERE order_id = ?')
+          .bind(orderId)
+          .all<{ id?: string; promotion_id?: string }>()
+          .catch(async () => {
+            const single = await rawDb
+              .prepare('SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? LIMIT 1')
+              .bind(orderId)
+              .first<{ id?: string; promotion_id?: string }>()
+              .catch(() => null);
+            return { results: single ? [single] : [] };
+          });
+        const usageRows = usageRes?.results ?? [];
+        for (const usageRow of usageRows) {
+          const promoId = usageRow.promotion_id ? String(usageRow.promotion_id).trim() : '';
+          if (promoId && !decrementedPromoIds.has(promoId)) {
+            decrementedPromoIds.add(promoId);
+            await rawDb
+              .prepare(
+                `UPDATE promotions
+                 SET current_uses = MAX(0, COALESCE(current_uses, 0) - 1),
+                     used_count = MAX(0, COALESCE(used_count, 0) - 1),
+                     usage_count = MAX(0, COALESCE(usage_count, 0) - 1)
+                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+              )
+              .bind(promoId, effectiveCancelTenant)
+              .run()
+              .catch(async () => {
+                try {
+                  await rawDb
+                    .prepare(
+                      "UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                    )
+                    .bind(promoId, effectiveCancelTenant)
+                    .run();
+                } catch {
+                  if (effectiveCancelTenant === 'default') {
+                    await rawDb
+                      .prepare('UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ?')
+                      .bind(promoId)
+                      .run()
+                      .catch(() => {});
+                  }
+                }
+              });
+          }
+        }
+        if (usageRows.length > 0) {
+          await rawDb.prepare('DELETE FROM promotion_usages WHERE order_id = ?').bind(orderId).run().catch(() => {});
+        }
+      } catch {
+        // Optional promotion_usages table in partial schemas
+      }
+    } catch {
+      // Optional CRM/promotion tables in partial schemas
+    }
+  }
+
+  if (targetStatus === 'completed') {
+    try {
+      const rawDb = db as unknown as import('@cloudflare/workers-types').D1Database;
+      const { creditLoyaltyIfEligible, sanitizeCustomerIdentity } = await import('../../order/policies/loyalty-trigger');
+      const envForLoyalty = options?.env ?? (options?.kv ? { AUTH_KV: options.kv } : {});
+      await creditLoyaltyIfEligible(rawDb, envForLoyalty, orderId).catch(() => {});
+
+      const ordRow = await rawDb
+        .prepare(
+          'SELECT total, total_amount, payment_status, order_type, table_id, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?',
+        )
+        .bind(orderId)
+        .first<{
+          total?: number | null;
+          total_amount?: number | null;
+          payment_status?: string | null;
+          order_type?: string | null;
+          table_id?: string | null;
+          customer_id?: string | null;
+          customer_email?: string | null;
+          customer_phone?: string | null;
+          tenant_id?: string | null;
+        }>()
+        .catch(() => null);
+      if (ordRow) {
+        const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
+          ordRow.customer_phone,
+          ordRow.customer_email,
+        );
+        const ordTenant =
+          (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim()) ||
+          (options?.tenantId && options.tenantId !== '*' ? options.tenantId : 'default');
+        let resolvedCustId = ordRow.customer_id ? String(ordRow.customer_id).trim() || null : null;
+        if (!resolvedCustId && (normalizedPhone || sanitizedEmail)) {
+          let cust: { id: string } | null = null;
+          try {
+            cust = await rawDb
+              .prepare(
+                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1",
+              )
+              .bind(sanitizedEmail, normalizedPhone, ordTenant, ordTenant)
+              .first<{ id: string }>();
+          } catch {
+            cust = await rawDb
+              .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
+              .bind(sanitizedEmail, normalizedPhone)
+              .first<{ id: string }>()
+              .catch(() => null);
+          }
+          resolvedCustId = cust?.id ?? null;
+        }
+        const totalVnd = Number(ordRow.total ?? ordRow.total_amount ?? 0);
+        if (resolvedCustId) {
+          try {
+            const { recordVisit } = await import('@aura/domain-customer');
+            const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
+              ordRow.order_type === 'delivery'
+                ? 'online_delivery'
+                : ordRow.order_type === 'takeaway'
+                  ? 'online_pickup'
+                  : ordRow.table_id
+                    ? 'qr_table'
+                    : 'in_store';
+            await recordVisit({
+              db: rawDb,
+              customerId: resolvedCustId,
+              orderId,
+              spent: totalVnd,
+              channel: visitChannel,
+              tenantId: ordTenant,
+            }).catch(() => {});
+          } catch {
+            // Optional customer visit table in minimal test schemas
+          }
+          if (totalVnd >= 20000 && (!ordRow.payment_status || ordRow.payment_status === 'paid')) {
+            try {
+              const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+              const refTenant = ordTenant !== '*' ? ordTenant : undefined;
+              const refPolicy = await resolveReferralPolicy(options?.kv as any, refTenant).catch(() => DEFAULT_REFERRAL_POLICY);
+              await rewardReferralOnFirstOrder(rawDb, resolvedCustId, orderId, totalVnd, refPolicy, refTenant).catch(() => {});
+            } catch {
+              // Optional referral tables in minimal test schemas
+            }
+          }
+        }
+      }
+    } catch {
+      // Optional loyalty/customer/referral tables in partial schemas
+    }
+  }
 
   if (options?.kv) {
     const eventPayload = JSON.stringify({

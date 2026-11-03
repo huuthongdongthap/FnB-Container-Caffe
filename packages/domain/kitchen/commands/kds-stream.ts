@@ -83,7 +83,7 @@ function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
  */
 kdsStreamRouter.get('/stream', async(c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   if (!db) {
     return c.json({ error: 'DB not available' }, 500);
   }
@@ -120,8 +120,8 @@ kdsStreamRouter.get('/stream', async(c) => {
         const tenantClause = tenantId === '*'
           ? ''
           : tenantId === 'default'
-            ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-            : ' AND tenant_id = ?';
+            ? " AND (TRIM(tenant_id) = ? OR tenant_id IS NULL OR TRIM(tenant_id) = '')"
+            : ' AND TRIM(tenant_id) = ?';
         let results: OrderRecord[] | undefined;
         try {
           const statement = db.prepare(

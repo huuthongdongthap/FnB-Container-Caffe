@@ -55,7 +55,7 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/loyalty/tiers/{tier} - Update loyalty tier config
   app.openapi(LoyaltyRoutes.tiers.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
     if (!user || !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
@@ -112,9 +112,14 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.discountPercent !== undefined) {
       updates.push('discount_percent = ?'); params.push(body.discountPercent);
     }
-    if (body.birthdayBonus !== undefined) {
-      updates.push('birthday_bonus = ?'); params.push(body.birthdayBonus);
-      loyaltyTiersUpdates.push('birthday_discount = ?'); loyaltyTiersParams.push(body.birthdayBonus);
+    const bodyAny = body as Record<string, unknown>;
+    const birthdayBonus = bodyAny.birthday_bonus ?? body.birthdayBonus;
+    if (birthdayBonus !== undefined) {
+      updates.push('birthday_bonus = ?'); params.push(Number(birthdayBonus));
+    }
+    const birthdayDiscount = bodyAny.birthday_discount ?? bodyAny.birthdayDiscount;
+    if (birthdayDiscount !== undefined) {
+      loyaltyTiersUpdates.push('birthday_discount = ?'); loyaltyTiersParams.push(Number(birthdayDiscount));
     }
     if (body.freeShipping !== undefined) { updates.push('free_shipping = ?'); params.push(body.freeShipping ? 1 : 0); }
     if (body.prioritySupport !== undefined) { updates.push('priority_support = ?'); params.push(body.prioritySupport ? 1 : 0); }
@@ -131,14 +136,13 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       loyaltyTiersUpdates.push('perks = ?'); loyaltyTiersParams.push(benefitsJson);
     }
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && canonicalUpdates.length === 0 && loyaltyTiersUpdates.length === 0) {
       return c.json({ success: true, data: existing });
     }
 
-    updates.push('updated_at = ?');
-    params.push(now, tier);
-
-    if (!usingCanonical) {
+    if (updates.length > 0 && !usingCanonical) {
+      updates.push('updated_at = ?');
+      params.push(now, tier);
       await db.prepare(`UPDATE loyalty_tier_configs SET ${updates.join(', ')} WHERE tier = ?`).bind(...params).run();
     }
 

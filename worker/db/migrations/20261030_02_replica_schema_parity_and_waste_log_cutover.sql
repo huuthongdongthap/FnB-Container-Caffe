@@ -103,6 +103,148 @@ ALTER TABLE payment_transactions ADD COLUMN gateway_response TEXT;
 ALTER TABLE ha_device_states ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 ALTER TABLE happy_hour_windows ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 
+-- 6b. kds_stations table & 8 inventory/purchasing parity columns
+CREATE TABLE IF NOT EXISTS kds_stations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  categories TEXT NOT NULL DEFAULT '[]',
+  is_active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO kds_stations (id, name, categories, is_active) VALUES
+  ('bar',    'Quầy Bar & Pha Chế', '["coffee","tea","freeze","juice","traditional-coffee","hot-coffee","italian-soda","other-drinks","yogurt"]', 1),
+  ('hot',    'Bếp Nóng',           '["food","hot","combo"]', 1),
+  ('cold',   'Bếp Lạnh',           '["cold","salad","dessert"]', 1),
+  ('bakery', 'Quầy Bánh',          '["pastry","bakery","cake","snacks"]', 1);
+
+ALTER TABLE inventory_items ADD COLUMN reorder_point REAL DEFAULT 10;
+ALTER TABLE inventory_items ADD COLUMN location TEXT DEFAULT 'main';
+ALTER TABLE inventory_items ADD COLUMN expiry_date TEXT;
+ALTER TABLE inventory_items ADD COLUMN supplier_id TEXT;
+
+ALTER TABLE ingredients ADD COLUMN supplier_id TEXT;
+ALTER TABLE ingredients ADD COLUMN last_restocked_at TEXT;
+
+ALTER TABLE suppliers ADD COLUMN notes TEXT;
+
+ALTER TABLE purchase_order_items ADD COLUMN unit TEXT NOT NULL DEFAULT 'g';
+
+-- 6c. Canonical Container Lease Subscription Plans & SaaS Pricing Tiers
+INSERT OR IGNORE INTO subscription_plans (
+  id, name, slug, description, container_size,
+  monthly_price_vnd, deposit_vnd, features,
+  max_occupants, is_popular, is_active, sort_order
+) VALUES
+  (
+    'plan_container_10ft',
+    'Container 10ft Kiosk',
+    'container-10ft',
+    'Kiosk cà phê tinh gọn cho điểm bán mang đi và mặt bằng nhỏ.',
+    '10ft',
+    8000000,
+    16000000,
+    '["Diện tích 7.5m² tối ưu mang đi","Quầy bar inox + hệ thống điện nước","POS & QR Order tích hợp sẵn","Bảo trì định kỳ miễn phí"]',
+    2,
+    0,
+    1,
+    1
+  ),
+  (
+    'plan_container_20ft',
+    'Container 20ft Tiêu Chuẩn',
+    'container-20ft',
+    'Mô hình chuẩn AURA SPACE với quầy pha chế hoàn chỉnh và khu ngồi khách.',
+    '20ft',
+    12000000,
+    24000000,
+    '["Diện tích 15m² (1-2 nhân sự + chỗ ngồi)","Trang bị điều hòa, cách nhiệt PU, quầy pha chế","Full bộ POS, KDS, Loyalty & QR tại bàn","Hỗ trợ setup menu & công thức BOM chuẩn"]',
+    4,
+    1,
+    1,
+    2
+  ),
+  (
+    'plan_container_40ft',
+    'Container 40ft Flagship',
+    'container-40ft',
+    'Không gian Flagship kết hợp cà phê đặc sản, bánh ngọt và khu sự kiện.',
+    '40ft',
+    20000000,
+    40000000,
+    '["Diện tích 30m² + sân thượng/deck mở rộng","2 trạm pha chế + bếp bánh + khu khách VIP","Tích hợp Smart IoT, WiFi Marketing & ERPNext","Quản lý đa chi nhánh & hỗ trợ vận hành 24/7"]',
+    8,
+    0,
+    1,
+    3
+  );
+
+INSERT OR IGNORE INTO saas_pricing (
+  id, slug, name_vi, name_en, description_vi, description_en,
+  price_vnd, price_usd, currency, billing_period, sort_order, is_recommended,
+  features_vi, features_en, cta_text_vi, cta_text_en, cta_link, active
+) VALUES
+  (
+    'saas_starter',
+    'starter',
+    'Gói Khởi Đầu (10ft Kiosk)',
+    'Starter (10ft Kiosk)',
+    'Dành cho quầy cà phê mang đi hoặc 1 điểm bán đơn lẻ.',
+    'Built for compact takeaway kiosks and single-location coffee bars.',
+    990000,
+    39,
+    'VND',
+    'monthly',
+    1,
+    0,
+    '["POS & QR Order tại bàn không giới hạn","Quản lý thực đơn, modifier & định lượng BOM","Báo cáo doanh thu ca làm việc theo thời gian thực","Tích hợp thanh toán VietQR / PayOS tự động"]',
+    '["Unlimited POS & table QR ordering","Menu, modifier & BOM recipe management","Real-time shift & daily revenue analytics","Automated VietQR / PayOS payment reconciliation"]',
+    'Dùng thử 14 ngày',
+    'Start 14-day trial',
+    '/saas/onboard?tier=starter',
+    1
+  ),
+  (
+    'saas_growth',
+    'growth',
+    'Gói Tăng Trưởng (20ft Standard)',
+    'Growth (20ft Standard)',
+    'Giải pháp toàn diện cho quán Container tiêu chuẩn với KDS, Loyalty & dự báo tồn kho AI.',
+    'Complete operating system for standard Container cafes with KDS, Loyalty & AI inventory forecasting.',
+    1990000,
+    79,
+    'VND',
+    'monthly',
+    2,
+    1,
+    '["Toàn bộ tính năng gói Khởi Đầu","Màn hình bếp/bar KDS đa trạm & cảnh báo SLA","CRM, tích điểm Loyalty, hạng thành viên & giới thiệu bạn bè","Dự báo tồn kho AI & tự động đề xuất đơn nhập hàng (PO)"]',
+    '["Everything in Starter","Multi-station KDS with SLA timers & audio alerts","CRM, Loyalty tiers, cashback wallet & referral engine","AI inventory run-rate forecasting & automated PO suggestions"]',
+    'Chọn gói Tăng Trưởng',
+    'Choose Growth',
+    '/saas/onboard?tier=growth',
+    1
+  ),
+  (
+    'saas_enterprise',
+    'enterprise',
+    'Gói Chuỗi & Nhượng Quyền (40ft Flagship)',
+    'Enterprise & Franchise (40ft Flagship)',
+    'Quản trị chuỗi đa chi nhánh, đồng bộ ERPNext, nhượng quyền và SLA 99.9%.',
+    'Multi-store franchise HQ, ERPNext two-way sync, custom branding, and 99.9% SLA.',
+    4990000,
+    199,
+    'VND',
+    'monthly',
+    3,
+    0,
+    '["Quản lý đa chi nhánh (Multi-tenant HQ) & phí bản quyền nhượng quyền","Đồng bộ 2 chiều ERPNext (Kế toán, Kho tổng, Mua hàng)","WiFi Captive Portal & tự động hóa chiến dịch Mautic/Zalo ZNS","Hỗ trợ kỹ thuật 24/7 & triển khai riêng theo yêu cầu"]',
+    '["Multi-tenant Franchise HQ & automated royalty ledger","Two-way ERPNext sync (Accounting, Central Warehouse, Purchasing)","WiFi Captive Portal & Mautic/Zalo ZNS campaign automation","24/7 priority engineering support & custom onboarding"]',
+    'Liên hệ tư vấn',
+    'Contact Sales',
+    '/saas/onboard?tier=enterprise',
+    1
+  );
+
 -- 7. Backfill newly added parity columns on loyalty_accounts & tier_configs
 UPDATE loyalty_accounts
 SET points_balance = COALESCE(current_points, 0),

@@ -11,18 +11,24 @@ const log = createLogger({ route: 'orders' });
 export async function getStats(request: Request, env: Record<string, unknown>, tenantId?: string) {
   try {
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-    const hasTenant = Boolean(tenantId && tenantId !== '*');
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const hasTenant = Boolean(cleanTenant && cleanTenant !== '*');
     const tenantWhere = !hasTenant
       ? ''
-      : tenantId === 'default'
-        ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-        : ' WHERE tenant_id = ?';
-    const tenantAnd = !hasTenant
+      : cleanTenant === 'default'
+        ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+        : ' WHERE (tenant_id = ? OR TRIM(tenant_id) = ?1)';
+    const tenantAnd1 = !hasTenant
       ? ''
-      : tenantId === 'default'
-        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-        : ' AND tenant_id = ?';
-    const tenantBinds = hasTenant && tenantId ? [tenantId] : [];
+      : cleanTenant === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+        : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?1)';
+    const tenantAnd2 = !hasTenant
+      ? ''
+      : cleanTenant === 'default'
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+        : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
+    const tenantBinds = hasTenant && cleanTenant ? [cleanTenant] : [];
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStartParam = todayStart.toISOString().slice(0, 10) + ' 00:00:00';
@@ -32,14 +38,14 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       const res = await db.prepare(`
         SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
       `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
       ordersTodayResult = res.results || [];
     } catch {
       const res = await db.prepare(`
         SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
       `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
       ordersTodayResult = res.results || [];
     }
@@ -56,7 +62,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
     const topProductsStmt = db.prepare(`
       SELECT items, COUNT(*) as order_count
       FROM orders
-      WHERE status != 'cancelled'${tenantAnd}
+      WHERE status != 'cancelled'${tenantAnd1}
       GROUP BY items
       ORDER BY order_count DESC
       LIMIT 10
@@ -93,7 +99,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       const res = await db.prepare(`
         SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
         GROUP BY DATE(created_at)
         ORDER BY date DESC
       `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
@@ -102,7 +108,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       const res = await db.prepare(`
         SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd}
+        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
         GROUP BY DATE(created_at)
         ORDER BY date DESC
       `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();

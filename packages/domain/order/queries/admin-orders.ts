@@ -15,7 +15,9 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const status = url.searchParams.get('status');
     const paymentStatus = url.searchParams.get('payment_status');
     const queryTenant = url.searchParams.get('tenant_id');
-    const resolvedTenant = tenantId || (queryTenant ?? undefined);
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const cleanQueryTenant = queryTenant ? queryTenant.trim() : '';
+    const resolvedTenant = (cleanTenant === '*' ? (cleanQueryTenant || '*') : cleanTenant) || (cleanQueryTenant || undefined);
     const limit = url.searchParams.get('limit') || '50';
     const offset = url.searchParams.get('offset') || '0';
     const sortParam = (url.searchParams.get('sort') || 'created_at') as OrderSortColumn;

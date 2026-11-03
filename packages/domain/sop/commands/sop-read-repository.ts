@@ -13,11 +13,11 @@ import { toRun } from '../src/model/sop-row-mapper';
 import { sopDatabase } from './sop-violation-columns';
 import { type SopScope } from './sop-access';
 
-/** Only the fields a run needs from its template, to avoid over-selecting. */
-const RUN_TEMPLATE_COLUMNS = `SELECT ti.id, ti.template_id, ti.order_index, ti.is_critical,
-  ti.requires_note, ti.requires_value FROM sop_template_items ti`;
+/** Fields a run needs from its template to evaluate rules and render item labels. */
+const RUN_TEMPLATE_COLUMNS = `SELECT ti.id, ti.tenant_id, ti.template_id, ti.label, ti.description,
+  ti.order_index, ti.is_critical, ti.requires_note, ti.requires_value FROM sop_template_items ti`;
 
-/** Rows for the run list, without their item join — the list view does not read ticks. */
+/** Rows for the run list when item hydration is not available. */
 export function toRunListRow(row: SopRunRow): SopRun {
   return toRun(row);
 }
@@ -32,27 +32,111 @@ function runWithItems(
   return toRun(row, itemRows, templateItems, order);
 }
 
+export interface ListRunsForStaffDayOptions {
+  staffId?: string;
+  date?: string;
+  templateId?: string;
+}
+
 /**
- * Runs for one day. An empty `staffId` means the caller may see every member of
- * the store — the shift leader's view — so the staff predicate is dropped rather
- * than bound to `''`, which matches no row and silently returns nothing. The
- * tenant predicate always stays: it is what keeps one store out of another's
- * compliance records.
+ * Runs for one day, optionally filtered by staffId and templateId, with run
+ * items and template item rules batch-hydrated so progress and overdue views
+ * reflect actual checklist ticks.
  */
-export async function listRunsForStaffDay(scope: SopScope, staffId: string, date: string): Promise<SopRun[]> {
+export async function listRunsForStaffDay(
+  scope: SopScope,
+  staffIdOrOptions: string | ListRunsForStaffDayOptions,
+  dateArg?: string,
+  templateIdArg?: string | { templateId?: string }
+): Promise<SopRun[]> {
+  const staffId =
+    typeof staffIdOrOptions === 'string'
+      ? staffIdOrOptions
+      : (staffIdOrOptions.staffId ?? '');
+  const date =
+    typeof staffIdOrOptions === 'string'
+      ? (dateArg ?? '')
+      : (staffIdOrOptions.date ?? dateArg ?? '');
+  const rawTemplateId =
+    typeof staffIdOrOptions === 'object' && staffIdOrOptions !== null
+      ? staffIdOrOptions.templateId
+      : typeof templateIdArg === 'string'
+        ? templateIdArg
+        : templateIdArg?.templateId;
+  const templateId = typeof rawTemplateId === 'string' ? rawTemplateId.trim() : '';
+
   const staffFilter = staffId.length > 0 ? ' AND r.staff_id = ?' : '';
+  const templateFilter = templateId.length > 0 ? ' AND r.template_id = ?' : '';
+  const bindParams: string[] = [
+    scope.tenantId,
+    ...(staffId.length > 0 ? [staffId] : []),
+    date,
+    ...(templateId.length > 0 ? [templateId] : []),
+  ];
+
   const runs = await sopDatabase(scope)
     .prepare(
       `SELECT r.id, r.tenant_id, r.template_id, r.template_version, r.shift_id, r.staff_id, r.staff_name,
               r.shift_type, r.status, r.scheduled_date, r.started_at, r.completed_at, r.abandoned_reason,
               r.reminder_sent_at, r.created_at, r.updated_at
-       FROM sop_runs r WHERE r.tenant_id = ?${staffFilter} AND r.scheduled_date = ?`
+       FROM sop_runs r WHERE r.tenant_id = ?${staffFilter} AND r.scheduled_date = ?${templateFilter}`
     )
-    .bind(scope.tenantId, ...(staffId.length > 0 ? [staffId] : []), date)
+    .bind(...bindParams)
     .all<SopRunRow>();
-  // Mapped without the item join: the day view shows progress and status, and
-  // joining every tick for every run of the day is work nobody reads.
-  return (runs.results ?? []).map(toRunListRow);
+
+  const rows = (runs.results ?? []).filter(
+    (row) => templateId.length === 0 || row.template_id === templateId
+  );
+  if (rows.length === 0) return [];
+
+  try {
+    const runIds = rows.map((row) => row.id);
+    const runPlaceholders = runIds.map(() => '?').join(', ');
+    const allItems = await sopDatabase(scope)
+      .prepare(
+        `SELECT id, tenant_id, run_id, template_item_id, is_checked, checked_at, checked_by,
+                note, value, created_at
+         FROM sop_run_items WHERE tenant_id = ? AND run_id IN (${runPlaceholders})`
+      )
+      .bind(scope.tenantId, ...runIds)
+      .all<SopRunItemRow>();
+
+    const templateIds = [...new Set(rows.map((row) => row.template_id))];
+    const tplPlaceholders = templateIds.map(() => '?').join(', ');
+    const allTemplateItems = await sopDatabase(scope)
+      .prepare(
+        `${RUN_TEMPLATE_COLUMNS} WHERE ti.tenant_id = ? AND ti.template_id IN (${tplPlaceholders}) ORDER BY ti.order_index, ti.id`
+      )
+      .bind(scope.tenantId, ...templateIds)
+      .all<SopTemplateItemRow>();
+
+    const itemsByRun = new Map<string, SopRunItemRow[]>();
+    for (const item of allItems.results ?? []) {
+      const list = itemsByRun.get(item.run_id) ?? [];
+      list.push(item);
+      itemsByRun.set(item.run_id, list);
+    }
+
+    const tplItemsByTemplate = new Map<string, SopTemplateItemRow[]>();
+    for (const tplItem of allTemplateItems.results ?? []) {
+      const list = tplItemsByTemplate.get(tplItem.template_id) ?? [];
+      list.push(tplItem);
+      tplItemsByTemplate.set(tplItem.template_id, list);
+    }
+
+    return rows.map((row) => {
+      const rItems = itemsByRun.get(row.id) ?? [];
+      const tItems = tplItemsByTemplate.get(row.template_id) ?? [];
+      return runWithItems(
+        row,
+        rItems,
+        tItems,
+        tItems.map((item) => item.id)
+      );
+    });
+  } catch {
+    return rows.map(toRunListRow);
+  }
 }
 
 export async function findRun(scope: SopScope, runId: string): Promise<SopRun | null> {

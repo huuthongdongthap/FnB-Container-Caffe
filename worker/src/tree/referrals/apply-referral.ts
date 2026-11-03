@@ -9,29 +9,44 @@ function genId(prefix: string): string {
 }
 
 export async function applyReferralForNewCustomer(db: D1Database, newCustomerId: string, referralCode: string, tenantId?: string): Promise<Record<string, unknown>> {
-  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() : null;
+  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
   if (!referralCode) {
     return { success: false, reason: 'no_code' };
   }
 
   const normalized = referralCode.trim().toUpperCase();
-  const rc = await db.prepare('SELECT * FROM referral_codes WHERE code = ?').bind(normalized).first<ReferralCode>();
+  const rc = await db.prepare('SELECT * FROM referral_codes WHERE code = ?').bind(normalized).first<ReferralCode & { tenant_id?: string | null; max_uses?: number | null }>();
   if (!rc) {
     return { success: false, reason: 'invalid_code' };
   }
   if (rc.customer_id === newCustomerId) {
     return { success: false, reason: 'self_referral' };
   }
+  if (effectiveTenant && 'tenant_id' in rc && rc.tenant_id !== undefined) {
+    const rcTenant = (String(rc.tenant_id ?? '').trim()) || 'default';
+    if (rcTenant !== effectiveTenant) {
+      return { success: false, reason: 'referrer_not_found' };
+    }
+  }
+  if (typeof rc.max_uses === 'number' && rc.max_uses > 0 && Number(rc.times_used ?? 0) >= rc.max_uses) {
+    return { success: false, reason: 'code_exhausted' };
+  }
 
-  let pending: { id: string; bonus_type: string | null } | null = null;
+  let pending: { id: string; bonus_type: string | null; tenant_id?: string | null } | null = null;
   try {
-    pending = await db.prepare('SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string; bonus_type: string | null }>();
+    pending = await db.prepare('SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string; bonus_type: string | null; tenant_id?: string | null }>();
   } catch {
     const row = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(newCustomerId, 'pending').first<{ id: string }>();
     pending = row ? { id: row.id, bonus_type: 'cashback' } : null;
   }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
+  }
+  if (effectiveTenant && 'tenant_id' in pending && pending.tenant_id !== undefined) {
+    const pendingTenant = (String(pending.tenant_id ?? '').trim()) || 'default';
+    if (pendingTenant !== effectiveTenant) {
+      return { success: false, reason: 'no_pending_referral' };
+    }
   }
   if (pending.bonus_type === 'points') {
     return { success: false, reason: 'already_processed_points' };
@@ -65,17 +80,25 @@ export async function applyReferralForNewCustomer(db: D1Database, newCustomerId:
   const REFERRER_CASHBACK_VND = 10000;
   const now = new Date().toISOString();
   const refId = genId('ref_');
+  const stampTenant = effectiveTenant || 'default';
 
   try {
     await db.prepare(
-      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
-       VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
-    ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
+      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, tenant_id, created_at)
+       VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?, ?)`
+    ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', stampTenant, now).run();
   } catch {
-    await db.prepare(
-      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
-       VALUES (?, ?, ?, ?, 0, 'pending', ?)`
-    ).bind(refId, referrer.id, newCustomerId, normalized, now).run();
+    try {
+      await db.prepare(
+        `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
+         VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
+      ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
+         VALUES (?, ?, ?, ?, 0, 'pending', ?)`
+      ).bind(refId, referrer.id, newCustomerId, normalized, now).run();
+    }
   }
 
   await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();

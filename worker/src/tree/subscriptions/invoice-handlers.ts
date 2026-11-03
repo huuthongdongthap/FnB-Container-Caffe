@@ -13,7 +13,7 @@ import { verifyJWT } from '../../lib/jwt';
 
 export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const status = c.req.query('status');
   const subId = c.req.query('subscription_id');
 
@@ -42,14 +42,15 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const isSelfServiceCaller = callerRole === 'customer' || callerRole === 'vendor';
   if (isSelfServiceCaller && subId) {
     const subOwner = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(subId).first<SubscriptionRecord>().catch(() => null);
-    if (subOwner && matchesTenantRow(subOwner as unknown as Record<string, unknown>, tenantId)) {
-      const subCustId = subOwner.customer_id ? String(subOwner.customer_id) : '';
-      const subEmail = subOwner.customer_email ? String(subOwner.customer_email).toLowerCase() : '';
-      const ownsById = Boolean(callerId && subCustId && subCustId === callerId);
-      const ownsByEmail = Boolean(!subCustId && callerEmail && subEmail && subEmail === callerEmail.toLowerCase());
-      if (!ownsById && !ownsByEmail) {
-        return c.json({ success: false, error: 'Forbidden' }, 403);
-      }
+    if (!subOwner || !matchesTenantRow(subOwner as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: true, data: [] });
+    }
+    const subCustId = subOwner.customer_id ? String(subOwner.customer_id) : '';
+    const subEmail = subOwner.customer_email ? String(subOwner.customer_email).toLowerCase() : '';
+    const ownsById = Boolean(callerId && subCustId && subCustId === callerId);
+    const ownsByEmail = Boolean(!subCustId && callerEmail && subEmail && subEmail === callerEmail.toLowerCase());
+    if (!ownsById && !ownsByEmail) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
   }
 
@@ -63,20 +64,26 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
     query += ' AND i.subscription_id = ?';
     params.push(subId);
   }
+  const tenantScopedQuery = `${query} AND (? = '*' OR COALESCE(NULLIF(TRIM(COALESCE(s.tenant_id, i.tenant_id)), ''), 'default') = ?) ORDER BY i.created_at DESC LIMIT 500`;
   query += ' ORDER BY i.created_at DESC LIMIT 500';
 
   let rows: any[] = [];
   let usedFallback = false;
   try {
-    const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
+    const invoices = await db.prepare(tenantScopedQuery).bind(...params, tenantId, tenantId).all<InvoiceRecord>();
     rows = invoices.results || [];
   } catch {
-    usedFallback = true;
-    const fallbackQuery = query
-      .replace(', s.customer_id as sub_customer_id, s.customer_email as sub_customer_email', '')
-      .replace(', s.tenant_id as sub_tenant_id', '');
-    const invoices = await db.prepare(fallbackQuery).bind(...params).all<InvoiceRecord>();
-    rows = invoices.results || [];
+    try {
+      const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
+      rows = invoices.results || [];
+    } catch {
+      usedFallback = true;
+      const fallbackQuery = query
+        .replace(', s.customer_id as sub_customer_id, s.customer_email as sub_customer_email', '')
+        .replace(', s.tenant_id as sub_tenant_id', '');
+      const invoices = await db.prepare(fallbackQuery).bind(...params).all<InvoiceRecord>();
+      rows = invoices.results || [];
+    }
   }
   const filtered = rows.filter((r) => {
     const subTenant = typeof r.sub_tenant_id === 'string' && r.sub_tenant_id.trim() ? r.sub_tenant_id.trim() : undefined;
@@ -106,7 +113,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const invoiceId = c.req.param('id')!;
   const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const parsed = payInvoiceSchema.safeParse(rawBody);
@@ -131,8 +138,9 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   } else if (!matchesTenantRow(invoice as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Invoice not found' }, 404);
   }
-  if (invoice.status === 'paid') {
-    return c.json({ success: false, error: 'Already paid' }, 400);
+  const normalizedStatus = String(invoice.status || '').trim().toLowerCase();
+  if (['paid', 'manual', 'cancelled'].includes(normalizedStatus)) {
+    return c.json({ success: false, error: normalizedStatus === 'cancelled' ? 'Invoice is cancelled' : 'Already paid' }, 400);
   }
 
   // Try NowPayments if configured
@@ -140,9 +148,16 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
 
   if (npResult) {
     // Store payment_ref (NowPayments invoice id) and set status=processing
-    await db.prepare(
-      'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ?'
-    ).bind(npResult.paymentRef, nowStr(), invoiceId).run();
+    const updatedAt = nowStr();
+    try {
+      await db.prepare(
+        'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(npResult.paymentRef, updatedAt, invoiceId, tenantId, tenantId).run();
+    } catch {
+      await db.prepare(
+        'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ?'
+      ).bind(npResult.paymentRef, updatedAt, invoiceId).run();
+    }
 
     return c.json({
       success: true,
@@ -153,16 +168,39 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   }
 
   // Fallback: mark manual (no gateway configured)
-  await db.prepare(
-    'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?'
-  ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', nowStr(), nowStr(), invoiceId).run();
+  const paidAt = nowStr();
+  try {
+    await db.prepare(
+      'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', paidAt, paidAt, invoiceId, tenantId, tenantId).run();
+  } catch {
+    await db.prepare(
+      'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?'
+    ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', paidAt, paidAt, invoiceId).run();
+  }
 
-  await db.prepare(
-    `UPDATE subscriptions SET current_period_start = current_period_end,
-     current_period_end = date(current_period_end, '+1 month'),
-     next_billing_date = date(current_period_end, '+1 month'),
-     updated_at = ? WHERE id = ?`
-  ).bind(nowStr(), invoice.subscription_id).run();
+  if (tenantId && tenantId !== '*') {
+    await db.prepare(
+      `UPDATE subscriptions SET current_period_start = current_period_end,
+       current_period_end = date(current_period_end, '+1 month'),
+       next_billing_date = date(current_period_end, '+1 month'),
+       updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+    ).bind(nowStr(), invoice.subscription_id, tenantId).run().catch(() =>
+      db.prepare(
+        `UPDATE subscriptions SET current_period_start = current_period_end,
+         current_period_end = date(current_period_end, '+1 month'),
+         next_billing_date = date(current_period_end, '+1 month'),
+         updated_at = ? WHERE id = ?`
+      ).bind(nowStr(), invoice.subscription_id).run()
+    );
+  } else {
+    await db.prepare(
+      `UPDATE subscriptions SET current_period_start = current_period_end,
+       current_period_end = date(current_period_end, '+1 month'),
+       next_billing_date = date(current_period_end, '+1 month'),
+       updated_at = ? WHERE id = ?`
+    ).bind(nowStr(), invoice.subscription_id).run();
+  }
 
   return c.json({ success: true, message: 'Invoice marked as paid (manual)', data: { id: invoiceId, status: 'manual' } });
 }
@@ -174,22 +212,33 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
 
   const todayDate = today();
   let due: { results?: SubscriptionRecord[] };
   try {
     due = await db.prepare(
       `SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?
+       AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
        AND NOT EXISTS (
          SELECT 1 FROM subscription_invoices i
          WHERE i.subscription_id = subscriptions.id AND i.period_start = ? AND i.status != 'cancelled'
        )`
-    ).bind(todayDate, todayDate).all<SubscriptionRecord>();
+    ).bind(todayDate, tenantId, tenantId, todayDate).all<SubscriptionRecord>();
   } catch {
-    due = await db.prepare(
-      'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
-    ).bind(todayDate).all<SubscriptionRecord>();
+    try {
+      due = await db.prepare(
+        `SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?
+         AND NOT EXISTS (
+           SELECT 1 FROM subscription_invoices i
+           WHERE i.subscription_id = subscriptions.id AND i.period_start = ? AND i.status != 'cancelled'
+         )`
+      ).bind(todayDate, todayDate).all<SubscriptionRecord>();
+    } catch {
+      due = await db.prepare(
+        'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
+      ).bind(todayDate).all<SubscriptionRecord>();
+    }
   }
 
   const scopedSubs = (due.results || []).filter((sub) =>
@@ -222,9 +271,15 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
       ).run();
     }
 
-    await db.prepare(
-      'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ?'
-    ).bind(periodEnd, createdAt, sub.id).run().catch(() => null);
+    try {
+      await db.prepare(
+        'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(periodEnd, createdAt, sub.id, tenantId, tenantId).run();
+    } catch {
+      await db.prepare(
+        'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ?'
+      ).bind(periodEnd, createdAt, sub.id).run().catch(() => null);
+    }
 
     generated++;
   }

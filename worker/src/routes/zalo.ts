@@ -30,6 +30,8 @@ export async function handleZaloRequest(request: Request, env: ZaloEnv, resolved
   const url = new URL(request.url);
   const path = url.pathname.replace('/api/zalo', '');
   const method = request.method;
+  const rawTenantHeader = (request.headers.get('X-Tenant-ID') || request.headers.get('x-tenant-id') || '').trim();
+  const effectiveTenantId = resolvedTenantId ?? (rawTenantHeader && rawTenantHeader !== '*' ? rawTenantHeader : undefined);
 
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
@@ -51,7 +53,7 @@ export async function handleZaloRequest(request: Request, env: ZaloEnv, resolved
         customer_id,
         template_key,
         data,
-        tenantId: resolvedTenantId
+        tenantId: effectiveTenantId
       });
       return json({ success: result.ok, data: result });
     }
@@ -60,7 +62,8 @@ export async function handleZaloRequest(request: Request, env: ZaloEnv, resolved
       const result = await sendZNS(env, {
         phone,
         template_key,
-        data
+        data,
+        ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {})
       });
       return json({ success: result.ok, data: result });
     }

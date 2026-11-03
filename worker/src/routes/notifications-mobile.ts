@@ -1,9 +1,17 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { matchesTenantRow } from '../middleware/tenant';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
 const log = createLogger({ route: 'notifications-mobile' });
+
+function resolveMobileStaffTenant(c: Context<{ Bindings: Env }>): string {
+  const explicit = c.get('tenantId') as string | undefined;
+  if (explicit && explicit.trim()) return explicit.trim();
+  const user = c.get('user') as { tenantId?: string } | undefined;
+  return (user?.tenantId && user.tenantId.trim()) || 'default';
+}
 
 /**
  * GET /mobile/notifications
@@ -15,39 +23,67 @@ export async function getNotifications(c: Context<{ Bindings: Env }>) {
   if (!userId) return errorResponse('Vui lòng đăng nhập', 401);
 
   try {
-    const { results } = await c.env.AURA_DB
-      .prepare(
-        `SELECT id, type, title_vi, title_en, body_vi, body_en,
-                data, read_at, created_at
-           FROM notifications
-          WHERE user_id = ?
-          ORDER BY created_at DESC
-          LIMIT 50`
-      )
-      .bind(userId)
-      .all<{
-        id: string;
-        type: string;
-        title_vi: string;
-        title_en: string;
-        body_vi: string | null;
-        body_en: string | null;
-        data: string;
-        read_at: string | null;
-        created_at: string;
-      }>();
+    type NotifRow = {
+      id: string;
+      type: string;
+      title_vi: string;
+      title_en: string;
+      body_vi: string | null;
+      body_en: string | null;
+      data: string;
+      read_at: string | null;
+      created_at: string;
+      tenant_id?: string | null;
+    };
+    const tenantId = resolveMobileStaffTenant(c);
+    let results: NotifRow[] | undefined;
+    try {
+      const res = await c.env.AURA_DB
+        .prepare(
+          `SELECT id, type, title_vi, title_en, body_vi, body_en,
+                  data, read_at, created_at, tenant_id
+             FROM notifications
+            WHERE user_id = ?
+              AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+            ORDER BY created_at DESC
+            LIMIT 50`
+        )
+        .bind(userId, tenantId, tenantId)
+        .all<NotifRow>();
+      results = res.results;
+    } catch (innerErr) {
+      const innerMsg = innerErr instanceof Error ? innerErr.message : String(innerErr);
+      if (innerMsg.includes('no such column')) {
+        const res = await c.env.AURA_DB
+          .prepare(
+            `SELECT id, type, title_vi, title_en, body_vi, body_en,
+                    data, read_at, created_at
+               FROM notifications
+              WHERE user_id = ?
+              ORDER BY created_at DESC
+              LIMIT 50`
+          )
+          .bind(userId)
+          .all<NotifRow>();
+        results = res.results;
+      } else {
+        throw innerErr;
+      }
+    }
 
-    const list = (results ?? []).map(row => ({
-      id: row.id,
-      type: row.type,
-      title_vi: row.title_vi,
-      title_en: row.title_en,
-      body_vi: row.body_vi,
-      body_en: row.body_en,
-      data: parseData(row.data),
-      read_at: row.read_at,
-      created_at: row.created_at,
-    }));
+    const list = (results ?? [])
+      .filter(row => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
+      .map(row => ({
+        id: row.id,
+        type: row.type,
+        title_vi: row.title_vi,
+        title_en: row.title_en,
+        body_vi: row.body_vi,
+        body_en: row.body_en,
+        data: parseData(row.data),
+        read_at: row.read_at,
+        created_at: row.created_at,
+      }));
 
     return jsonResponse({ success: true, notifications: list, data: { items: list, unreadCount: list.filter(n => !n.read_at).length } });
   } catch (err) {
@@ -74,16 +110,43 @@ export async function markNotificationRead(c: Context<{ Bindings: Env }>) {
 
   try {
     const now = new Date().toISOString();
-    await c.env.AURA_DB
-      .prepare(
-        `UPDATE notifications
-            SET read_at = ?
-          WHERE id = ?
-            AND user_id = ?
-            AND read_at IS NULL`
-      )
-      .bind(now, notifId, userId)
-      .run();
+    const tenantId = resolveMobileStaffTenant(c);
+    if (tenantId && tenantId !== '*') {
+      await c.env.AURA_DB
+        .prepare(
+          `UPDATE notifications
+              SET read_at = ?
+            WHERE id = ?
+              AND user_id = ?
+              AND read_at IS NULL
+              AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        )
+        .bind(now, notifId, userId, tenantId)
+        .run()
+        .catch(() =>
+          c.env.AURA_DB
+            .prepare(
+              `UPDATE notifications
+                  SET read_at = ?
+                WHERE id = ?
+                  AND user_id = ?
+                  AND read_at IS NULL`
+            )
+            .bind(now, notifId, userId)
+            .run()
+        );
+    } else {
+      await c.env.AURA_DB
+        .prepare(
+          `UPDATE notifications
+              SET read_at = ?
+            WHERE id = ?
+              AND user_id = ?
+              AND read_at IS NULL`
+        )
+        .bind(now, notifId, userId)
+        .run();
+    }
 
     return jsonResponse({ success: true });
   } catch (err) {
@@ -152,13 +215,15 @@ export async function subscribePush(c: Context<{ Bindings: Env }>) {
     const p256dh = body.keys?.p256dh ?? '';
     const auth = body.keys?.auth ?? '';
     const userAgent = body.user_agent ?? c.req.header('User-Agent') ?? '';
+    const rawTenant = resolveMobileStaffTenant(c);
+    const tenantId = rawTenant === '*' ? 'default' : rawTenant;
 
     try {
       await c.env.AURA_DB
         .prepare(
           `INSERT INTO push_subscriptions
-               (id, user_id, endpoint, auth_key, p256dh_key, role, user_agent, last_used_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               (id, user_id, endpoint, auth_key, p256dh_key, role, user_agent, last_used_at, created_at, updated_at, tenant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(endpoint) DO UPDATE SET
                user_id     = excluded.user_id,
                auth_key    = excluded.auth_key,
@@ -166,26 +231,65 @@ export async function subscribePush(c: Context<{ Bindings: Env }>) {
                role        = excluded.role,
                user_agent  = excluded.user_agent,
                last_used_at= excluded.last_used_at,
-               updated_at  = excluded.updated_at`
+               updated_at  = excluded.updated_at,
+               tenant_id   = excluded.tenant_id`
         )
-        .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now, now)
+        .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now, now, tenantId)
         .run();
-    } catch {
-      await c.env.AURA_DB
-        .prepare(
-          `INSERT INTO push_subscriptions
-               (id, customer_id, endpoint, auth_key, p256dh_key, role, user_agent, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(endpoint) DO UPDATE SET
-               customer_id = excluded.customer_id,
-               auth_key    = excluded.auth_key,
-               p256dh_key  = excluded.p256dh_key,
-               role        = excluded.role,
-               user_agent  = excluded.user_agent,
-               updated_at  = excluded.updated_at`
-        )
-        .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now)
-        .run();
+    } catch (firstErr) {
+      const firstErrMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (/tenant_id/i.test(firstErrMsg)) {
+        try {
+          await c.env.AURA_DB
+            .prepare(
+              `INSERT INTO push_subscriptions
+                   (id, user_id, endpoint, auth_key, p256dh_key, role, user_agent, last_used_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(endpoint) DO UPDATE SET
+                   user_id     = excluded.user_id,
+                   auth_key    = excluded.auth_key,
+                   p256dh_key  = excluded.p256dh_key,
+                   role        = excluded.role,
+                   user_agent  = excluded.user_agent,
+                   last_used_at= excluded.last_used_at,
+                   updated_at  = excluded.updated_at`
+            )
+            .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now, now)
+            .run();
+        } catch {
+          await c.env.AURA_DB
+            .prepare(
+              `INSERT INTO push_subscriptions
+                   (id, customer_id, endpoint, auth_key, p256dh_key, role, user_agent, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(endpoint) DO UPDATE SET
+                   customer_id = excluded.customer_id,
+                   auth_key    = excluded.auth_key,
+                   p256dh_key  = excluded.p256dh_key,
+                   role        = excluded.role,
+                   user_agent  = excluded.user_agent,
+                   updated_at  = excluded.updated_at`
+            )
+            .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now)
+            .run();
+        }
+      } else {
+        await c.env.AURA_DB
+          .prepare(
+            `INSERT INTO push_subscriptions
+                 (id, customer_id, endpoint, auth_key, p256dh_key, role, user_agent, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(endpoint) DO UPDATE SET
+                 customer_id = excluded.customer_id,
+                 auth_key    = excluded.auth_key,
+                 p256dh_key  = excluded.p256dh_key,
+                 role        = excluded.role,
+                 user_agent  = excluded.user_agent,
+                 updated_at  = excluded.updated_at`
+          )
+          .bind(id, userId, endpoint, auth, p256dh, role, userAgent, now, now)
+          .run();
+      }
     }
 
     return jsonResponse({ success: true, message: 'Đăng ký push thành công' }, 201);

@@ -3,7 +3,7 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { createMetricsCollector } from '../../lib/metrics-collector';
-import { verifyPassword, hashPassword, getAuthToken } from '../../lib/jwt';
+import { verifyPassword, hashPassword, getAuthToken, cookieWriteBlockReason } from '../../lib/jwt';
 import { authenticateRequest } from '../../lib/staff-session-auth';
 import { staffSessionErrorResponse } from '../../lib/staff-session';
 import { verifyStaffPassword, changeStaffPassword } from '../../lib/staff-password';
@@ -15,6 +15,8 @@ const log = createLogger({ route: 'auth' });
 
 export async function changePassword(request: Request, env: Record<string, unknown>) {
   try {
+    const csrfBlock = cookieWriteBlockReason(request.method, request);
+    if (csrfBlock) return errorResponse(csrfBlock, 403);
     const body = await parseJSON(request);
     const parsed = changePasswordSchema.safeParse(body);
     if (!parsed.success) {
@@ -62,6 +64,17 @@ export async function changePassword(request: Request, env: Record<string, unkno
         if (existingById || !payload.email) {
           await authKV.put(`user:${payload.id}`, JSON.stringify(user)).catch(() => {});
         }
+      }
+      const custId = String(user.id || payload.id || '');
+      if (custId && authKV) {
+        await authKV.put(`cust_auth_ver:${custId}`, String(user.auth_version)).catch(() => {});
+      }
+      if (env.AURA_DB) {
+        await (env.AURA_DB as import('@cloudflare/workers-types').D1Database)
+          .prepare("UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE id = ? OR email = ?")
+          .bind(user.password, custId || null, payload.email || null)
+          .run()
+          .catch(() => {});
       }
     }
     const rawToken = getAuthToken(request);

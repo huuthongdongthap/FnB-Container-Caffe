@@ -6,8 +6,19 @@ import { registerExportHandler } from './export-handler';
 
 export const adminAuditLogsRouter = new Hono<{ Bindings: Env }>();
 
-// All routes require auth owner/manager/supervisor/staff/admin
-adminAuditLogsRouter.use('*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
+const AUDIT_LOG_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
+// All routes require auth owner/manager/supervisor/admin
+adminAuditLogsRouter.use('*', async (c, next) => {
+  const preUser = c.get('user' as never) as { role?: string } | undefined;
+  if (preUser?.role) {
+    if (!AUDIT_LOG_ALLOWED_ROLES.includes(String(preUser.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    return next();
+  }
+  return requireAuth(AUDIT_LOG_ALLOWED_ROLES)(c, next);
+});
 
 registerQueryHandler(adminAuditLogsRouter);
 registerExportHandler(adminAuditLogsRouter);

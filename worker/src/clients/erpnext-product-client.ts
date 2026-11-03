@@ -149,7 +149,11 @@ export class ErpnextProductClient {
     }));
   }
 
-  async syncProductsToLocal(env: ProductEnv, products: ChangedProduct[]): Promise<SyncResult> {
+  async syncProductsToLocal(
+    env: ProductEnv,
+    products: ChangedProduct[],
+    tenantId?: string | { tenantId?: string }
+  ): Promise<SyncResult> {
     if (!env.AURA_DB) {
       throw new Error('syncProductsToLocal: AURA_DB not configured in env');
     }
@@ -160,6 +164,8 @@ export class ErpnextProductClient {
 
     const db = env.AURA_DB;
     const now = new Date().toISOString();
+    const rawTenant = typeof tenantId === 'string' ? tenantId : tenantId?.tenantId;
+    const effectiveTenant = rawTenant && rawTenant.trim() && rawTenant.trim() !== '*' ? rawTenant.trim() : 'default';
     let updated = 0;
     const errors: Array<{ productId: string; error: string }> = [];
 
@@ -171,28 +177,43 @@ export class ErpnextProductClient {
         continue;
       }
 
+      const productKey = effectiveTenant !== 'default' ? `${effectiveTenant}::${localId}` : localId;
+
       try {
         try {
           await db.prepare(`
             INSERT INTO erpnext_product_sync
-              (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
-            VALUES (?, ?, ?, ?)
+              (product_id, erpnext_item_code, last_synced_at, erpnext_modified, tenant_id)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(product_id) DO UPDATE SET
               erpnext_item_code = excluded.erpnext_item_code,
               last_synced_at    = excluded.last_synced_at,
-              erpnext_modified  = excluded.erpnext_modified
-          `).bind(localId, product.name, now, product.modified || now).run();
+              erpnext_modified  = excluded.erpnext_modified,
+              tenant_id         = excluded.tenant_id
+          `).bind(productKey, product.name, now, product.modified || now, effectiveTenant).run();
         } catch {
-          await db.prepare(`
-            INSERT INTO erpnext_product_sync
-              (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date)
-            VALUES (?, 0, ?, ?, ?, ?)
-            ON CONFLICT(product_id) DO UPDATE SET
-              erpnext_item_code  = excluded.erpnext_item_code,
-              last_synced_at     = excluded.last_synced_at,
-              erpnext_modified   = excluded.erpnext_modified,
-              erpnext_write_date = excluded.erpnext_write_date
-          `).bind(localId, product.name, now, product.modified || now, product.modified || now).run();
+          try {
+            await db.prepare(`
+              INSERT INTO erpnext_product_sync
+                (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
+              VALUES (?, ?, ?, ?)
+              ON CONFLICT(product_id) DO UPDATE SET
+                erpnext_item_code = excluded.erpnext_item_code,
+                last_synced_at    = excluded.last_synced_at,
+                erpnext_modified  = excluded.erpnext_modified
+            `).bind(productKey, product.name, now, product.modified || now).run();
+          } catch {
+            await db.prepare(`
+              INSERT INTO erpnext_product_sync
+                (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date)
+              VALUES (?, 0, ?, ?, ?, ?)
+              ON CONFLICT(product_id) DO UPDATE SET
+                erpnext_item_code  = excluded.erpnext_item_code,
+                last_synced_at     = excluded.last_synced_at,
+                erpnext_modified   = excluded.erpnext_modified,
+                erpnext_write_date = excluded.erpnext_write_date
+            `).bind(productKey, product.name, now, product.modified || now, product.modified || now).run();
+          }
         }
 
         updated++;
@@ -204,7 +225,7 @@ export class ErpnextProductClient {
     return { updated, errors };
   }
 
-  async updateProduct(itemCode: string, data: Record<string, unknown>): Promise<boolean> {
+  async updateProduct(itemCode: string, data: Record<string, unknown>, tenantId?: string): Promise<boolean> {
     if (!itemCode) {
       throw new Error('updateProduct: itemCode is required');
     }
@@ -228,8 +249,12 @@ export class ErpnextProductClient {
     await this.client.update('Item', itemCode, sanitizedUpdates);
 
     if (this.auraKv) {
+      const normalizedTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' && tenantId.trim() !== 'default' ? tenantId.trim() : '';
+      const cacheKey = normalizedTenant
+        ? `erpnext:product:availability:${normalizedTenant}:${itemCode}`
+        : `erpnext:product:availability:${itemCode}`;
       try {
-        await this.auraKv.delete(`erpnext:product:availability:${itemCode}`);
+        await this.auraKv.delete(cacheKey);
       } catch {
         // Cache invalidation failure is non-fatal
       }
@@ -252,9 +277,10 @@ export function createErpnextProductClient(env: ProductEnv): ErpnextProductClien
 }
 
 export async function createErpnextProductClientWithKv(
-  env: ProductEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
+  env: ProductEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
+  tenantId?: string,
 ): Promise<ErpnextProductClient | null> {
-  const client = await createErpnextClientWithKv(env);
+  const client = await createErpnextClientWithKv(env, tenantId);
   if (!client) {
     return null;
   }

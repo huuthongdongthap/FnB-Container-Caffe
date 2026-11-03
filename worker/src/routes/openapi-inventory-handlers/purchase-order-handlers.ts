@@ -1,18 +1,9 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
-import { getDatabase } from '../../lib/db';
+import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { getTenantId } from '../../middleware/tenant';
 import { checkSupplierTenant } from './supplier-handlers';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 async function checkIngredientTenant(
   db: any,
@@ -20,9 +11,10 @@ async function checkIngredientTenant(
   row: Record<string, unknown>,
   tenantId: string
 ): Promise<boolean> {
-  if (tenantId === '*') return true;
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
   if ('tenant_id' in row && row.tenant_id !== undefined) {
-    return matchesTenantRow(row, tenantId);
+    return matchesTenantRow(row, normTenant);
   }
   const invRow = (await db
     .prepare('SELECT id, tenant_id FROM inventory_items WHERE id = ?')
@@ -30,9 +22,9 @@ async function checkIngredientTenant(
     .first()
     .catch(() => null)) as Record<string, unknown> | null;
   if (invRow && 'tenant_id' in invRow && invRow.tenant_id !== undefined) {
-    return matchesTenantRow(invRow, tenantId);
+    return matchesTenantRow(invRow, normTenant);
   }
-  return tenantId === 'default';
+  return normTenant === 'default';
 }
 
 async function checkPurchaseOrderTenant(
@@ -40,9 +32,10 @@ async function checkPurchaseOrderTenant(
   po: Record<string, unknown>,
   tenantId: string
 ): Promise<boolean> {
-  if (tenantId === '*') return true;
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
   if ('tenant_id' in po && po.tenant_id !== undefined) {
-    return matchesTenantRow(po, tenantId);
+    return matchesTenantRow(po, normTenant);
   }
   const poId = String(po.id || '');
   if (poId) {
@@ -52,7 +45,7 @@ async function checkPurchaseOrderTenant(
       .first()
       .catch(() => null)) as Record<string, unknown> | null;
     if (itemRow && itemRow.ingredient_id) {
-      return checkIngredientTenant(db, String(itemRow.ingredient_id), itemRow, tenantId);
+      return checkIngredientTenant(db, String(itemRow.ingredient_id), itemRow, normTenant);
     }
   }
   if (po.supplier_id) {
@@ -62,7 +55,7 @@ async function checkPurchaseOrderTenant(
       .first()
       .catch(() => null)) as Record<string, unknown> | null;
     if (supRow && 'tenant_id' in supRow && supRow.tenant_id !== undefined) {
-      return matchesTenantRow(supRow, tenantId);
+      return matchesTenantRow(supRow, normTenant);
     }
   }
   if (po.created_by) {
@@ -72,10 +65,10 @@ async function checkPurchaseOrderTenant(
       .first()
       .catch(() => null)) as Record<string, unknown> | null;
     if (userRow && 'tenant_id' in userRow && userRow.tenant_id !== undefined) {
-      return matchesTenantRow(userRow, tenantId);
+      return matchesTenantRow(userRow, normTenant);
     }
   }
-  return tenantId === 'default';
+  return normTenant === 'default';
 }
 
 async function writePoAuditLog(
@@ -113,7 +106,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
   // GET /api/inventory/purchase-orders - List purchase orders
   app.openapi(InventoryRoutes.purchaseOrders.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -145,33 +138,78 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
     let total = 0;
     try {
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+      if (tenantId !== '*') {
+        try {
+          const tenantWhere = whereClause
+            ? `${whereClause}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? `
+            : "WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ";
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${tenantWhere}`).bind(...params, tenantId).first()) as { total: number } | null;
+          total = countResult?.total || 0;
+        } catch {
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first()) as { total: number } | null;
+          total = countResult?.total || 0;
+        }
+      } else {
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM purchase_orders ${whereClause}`).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
+      }
     } catch {
       total = 0;
     }
 
     let itemsResults: any[] = [];
-    try {
-      const aliasWhere = whereClause
-        ? whereClause.replace(/supplier_id/g, 'po.supplier_id').replace(/status/g, 'po.status')
-        : '';
-      const items = (await db.prepare(
-        `SELECT po.*, s.name as supplier_name
-         FROM purchase_orders po
-         LEFT JOIN suppliers s ON po.supplier_id = s.id
-         ${aliasWhere}
-         ORDER BY po.created_at DESC LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
-      itemsResults = items.results || [];
-    } catch {
+    const aliasWhere = whereClause
+      ? whereClause.replace(/supplier_id/g, 'po.supplier_id').replace(/status/g, 'po.status')
+      : '';
+    let fetchedItems = false;
+    if (tenantId !== '*') {
+      try {
+        const tenantAliasWhere = aliasWhere
+          ? `${aliasWhere}AND COALESCE(NULLIF(TRIM(po.tenant_id), ''), 'default') = ? `
+          : "WHERE COALESCE(NULLIF(TRIM(po.tenant_id), ''), 'default') = ? ";
+        const items = (await db.prepare(
+          `SELECT po.*, s.name as supplier_name
+           FROM purchase_orders po
+           LEFT JOIN suppliers s ON po.supplier_id = s.id
+           ${tenantAliasWhere}
+           ORDER BY po.created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...params, tenantId, limit, offset).all()) as { results: any[] };
+        itemsResults = items.results || [];
+        fetchedItems = true;
+      } catch {
+        try {
+          const tenantWhere = whereClause
+            ? `${whereClause}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? `
+            : "WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ";
+          const items = (await db.prepare(
+            `SELECT * FROM purchase_orders ${tenantWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+          ).bind(...params, tenantId, limit, offset).all()) as { results: any[] };
+          itemsResults = items.results || [];
+          fetchedItems = true;
+        } catch {
+          fetchedItems = false;
+        }
+      }
+    }
+    if (!fetchedItems) {
       try {
         const items = (await db.prepare(
-          `SELECT * FROM purchase_orders ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+          `SELECT po.*, s.name as supplier_name
+           FROM purchase_orders po
+           LEFT JOIN suppliers s ON po.supplier_id = s.id
+           ${aliasWhere}
+           ORDER BY po.created_at DESC LIMIT ? OFFSET ?`
         ).bind(...params, limit, offset).all()) as { results: any[] };
         itemsResults = items.results || [];
       } catch {
-        itemsResults = [];
+        try {
+          const items = (await db.prepare(
+            `SELECT * FROM purchase_orders ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+          ).bind(...params, limit, offset).all()) as { results: any[] };
+          itemsResults = items.results || [];
+        } catch {
+          itemsResults = [];
+        }
       }
     }
 
@@ -198,7 +236,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
   // GET /api/inventory/purchase-orders/{id} - Get purchase order by ID
   app.openapi(InventoryRoutes.purchaseOrders.get as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const { id } = c.req.valid('param');
 
     let po: any = null;
@@ -241,8 +279,11 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
   // POST /api/inventory/purchase-orders - Create purchase order
   app.openapi(InventoryRoutes.purchaseOrders.create as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
@@ -284,42 +325,71 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       totalAmount += (item.quantity || 1) * (item.unitCost || 0);
     }
 
-    try {
-      await db.prepare(
-        `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_date, expected_delivery_date, status, total_amount, notes, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        poNumber,
-        body.supplierId,
-        body.orderDate || now.split('T')[0],
-        expectedDate,
-        expectedDate,
-        'draft',
-        totalAmount,
-        body.notes || null,
-        user.id,
-        now,
-        now
-      ).run();
-    } catch {
+    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
+    let insertedPo = false;
+    if (tenantId && tenantId !== '*') {
       try {
         await db.prepare(
-          `INSERT INTO purchase_orders (id, supplier_id, order_date, expected_date, status, notes, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_date, expected_delivery_date, status, total_amount, notes, created_by, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           id,
+          poNumber,
           body.supplierId,
           body.orderDate || now.split('T')[0],
           expectedDate,
+          expectedDate,
           'draft',
+          totalAmount,
+          body.notes || null,
+          user.id,
+          effectiveTenant,
+          now,
+          now
+        ).run();
+        insertedPo = true;
+      } catch {
+        insertedPo = false;
+      }
+    }
+    if (!insertedPo) {
+      try {
+        await db.prepare(
+          `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_date, expected_delivery_date, status, total_amount, notes, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          poNumber,
+          body.supplierId,
+          body.orderDate || now.split('T')[0],
+          expectedDate,
+          expectedDate,
+          'draft',
+          totalAmount,
           body.notes || null,
           user.id,
           now,
           now
         ).run();
       } catch {
-        // Fallback for minimal schema
+        try {
+          await db.prepare(
+            `INSERT INTO purchase_orders (id, supplier_id, order_date, expected_date, status, notes, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id,
+            body.supplierId,
+            body.orderDate || now.split('T')[0],
+            expectedDate,
+            'draft',
+            body.notes || null,
+            user.id,
+            now,
+            now
+          ).run();
+        } catch {
+          // Fallback for minimal schema
+        }
       }
     }
 
@@ -388,8 +458,11 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
   // PATCH /api/inventory/purchase-orders/{id} - Update purchase order
   app.openapi(InventoryRoutes.purchaseOrders.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -399,8 +472,15 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
 
-    if (existing.status === 'received') {
-      return c.json({ success: false, error: 'Cannot update received purchase order' }, 409);
+    if (existing.status === 'received' || existing.status === 'cancelled') {
+      return c.json(
+        {
+          success: false,
+          error: `Cannot modify a ${existing.status} purchase order`,
+          code: 'INVALID_OPERATION',
+        },
+        400
+      );
     }
 
     const updates: string[] = [];
@@ -458,6 +538,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
       await db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).run();
 
+      let recalculatedTotal = 0;
       for (const item of body.items) {
         let ingredient: any = null;
         try {
@@ -471,6 +552,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
         const unitCost = item.unitCost || ingredient.cost_per_unit || 0;
         const itemTotal = (item.quantity || 1) * unitCost;
+        recalculatedTotal += itemTotal;
         const itemRand = new Uint8Array(4);
         crypto.getRandomValues(itemRand);
         const itemId = `poi_${Date.now()}_${Array.from(itemRand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
@@ -487,6 +569,14 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           ).bind(itemId, id, item.ingredientId, item.quantity, unitCost, now).run();
         }
       }
+
+      try {
+        await db.prepare('UPDATE purchase_orders SET total_amount = ?, updated_at = ? WHERE id = ?')
+          .bind(recalculatedTotal, now, id).run();
+      } catch {
+        await db.prepare('UPDATE purchase_orders SET total = ?, updated_at = ? WHERE id = ?')
+          .bind(recalculatedTotal, now, id).run().catch(() => {});
+      }
     }
 
     await writePoAuditLog(db, user.id, 'purchase_order_update', id, JSON.stringify(body), now);
@@ -501,8 +591,11 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
   // POST /api/inventory/purchase-orders/{id}/receive - Receive purchase order items
   app.openapi(InventoryRoutes.purchaseOrders.receive as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -511,6 +604,8 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     if (!existing || !(await checkPurchaseOrderTenant(db, existing, tenantId))) {
       return c.json({ success: false, error: 'Purchase order not found' }, 404);
     }
+    const rawExistingTenant = existing.tenant_id && String(existing.tenant_id).trim() ? String(existing.tenant_id).trim() : undefined;
+    const effectiveTenant = tenantId === '*' ? (rawExistingTenant || 'default') : (rawExistingTenant || tenantId || 'default');
 
     if (existing.status === 'received') {
       return c.json({ success: false, error: 'Purchase order already received' }, 409);
@@ -521,16 +616,62 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
 
     let poItems: Array<Record<string, unknown>> = [];
     try {
-      const poItemsRes = await db.prepare('SELECT ingredient_id FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+      const poItemsRes = await db
+        .prepare(
+          'SELECT id, ingredient_id, quantity, unit_price, received_quantity FROM purchase_order_items WHERE purchase_order_id = ?'
+        )
+        .bind(id)
+        .all();
       poItems = (poItemsRes?.results as Array<Record<string, unknown>> | undefined) || [];
     } catch {
-      poItems = [];
+      try {
+        const poItemsRes = await db.prepare('SELECT id, ingredient_id, quantity, received_quantity FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+        poItems = (poItemsRes?.results as Array<Record<string, unknown>> | undefined) || [];
+      } catch {
+        try {
+          const poItemsRes = await db.prepare('SELECT ingredient_id, quantity FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+          poItems = (poItemsRes?.results as Array<Record<string, unknown>> | undefined) || [];
+        } catch {
+          try {
+            const poItemsRes = await db.prepare('SELECT ingredient_id FROM purchase_order_items WHERE purchase_order_id = ?').bind(id).all();
+            poItems = (poItemsRes?.results as Array<Record<string, unknown>> | undefined) || [];
+          } catch {
+            poItems = [];
+          }
+        }
+      }
     }
 
-    const resolvedItems: Array<{ item: any; ingredient: any; usingCanonical: boolean }> = [];
-    for (const item of body.items) {
-      if (poItems.length > 0 && !poItems.some((pi) => String(pi.ingredient_id) === String(item.ingredientId))) {
+    const dedupedItemsMap = new Map<string, any>();
+    for (const rawItem of body.items) {
+      const key = String(rawItem.ingredientId);
+      if (!dedupedItemsMap.has(key)) {
+        dedupedItemsMap.set(key, rawItem);
+      }
+    }
+    const uniqueItems = Array.from(dedupedItemsMap.values());
+
+    const resolvedItems: Array<{
+      item: any;
+      orderedItem?: Record<string, unknown>;
+      receiveQty: number;
+      ingredient: any;
+      usingCanonical: boolean;
+    }> = [];
+    for (const item of uniqueItems) {
+      const receiveQty = Number(item.receivedQuantity ?? item.received_quantity);
+      if (!Number.isFinite(receiveQty) || receiveQty < 0) {
+        return c.json({ success: false, error: 'Invalid received_quantity' }, 400);
+      }
+      const orderedItem = poItems.find((pi) => String(pi.ingredient_id) === String(item.ingredientId));
+      if (poItems.length > 0 && !orderedItem) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} is not part of this purchase order` }, 400);
+      }
+      if (orderedItem && orderedItem.quantity !== undefined && orderedItem.quantity !== null) {
+        const alreadyReceived = Math.max(0, Number(orderedItem.received_quantity || 0));
+        if (alreadyReceived + receiveQty > Number(orderedItem.quantity)) {
+          return c.json({ success: false, error: `Received quantity exceeds ordered quantity for ingredient ${item.ingredientId}` }, 400);
+        }
       }
       let ingredient: any = null;
       let usingCanonical = false;
@@ -545,27 +686,70 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           usingCanonical = true;
         }
       }
-      if (!ingredient || !(await checkIngredientTenant(db, item.ingredientId, ingredient, tenantId))) {
+      if (!ingredient || !(await checkIngredientTenant(db, item.ingredientId, ingredient, effectiveTenant))) {
         return c.json({ success: false, error: `Ingredient ${item.ingredientId} not found` }, 400);
       }
-      resolvedItems.push({ item, ingredient, usingCanonical });
+      resolvedItems.push({ item, orderedItem, receiveQty, ingredient, usingCanonical });
     }
 
-    const casRes = await db.prepare(
-      "UPDATE purchase_orders SET status = 'received', updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled')"
-    ).bind(now, id).run();
+    let casRes: any;
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        casRes = await db.prepare(
+          "UPDATE purchase_orders SET status = 'received', updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(now, id, effectiveTenant).run();
+      } catch {
+        casRes = await db.prepare(
+          "UPDATE purchase_orders SET status = 'received', updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled')"
+        ).bind(now, id).run();
+      }
+    } else {
+      casRes = await db.prepare(
+        "UPDATE purchase_orders SET status = 'received', updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled')"
+      ).bind(now, id).run();
+    }
     if (casRes && casRes.meta && typeof casRes.meta.changes === 'number' && casRes.meta.changes === 0) {
       return c.json({ success: false, error: 'Purchase order already received' }, 409);
     }
 
-    for (const { item, ingredient, usingCanonical } of resolvedItems) {
-      const previousStock = Number(ingredient.current_stock || 0);
-      const newStock = previousStock + item.receivedQuantity;
+    for (const { item, orderedItem, receiveQty, ingredient, usingCanonical } of resolvedItems) {
       const movId = `mov_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      const hasIngTenantCol = Boolean(ingredient && typeof ingredient === 'object' && 'tenant_id' in ingredient);
+      const poItemId = orderedItem?.id ? String(orderedItem.id) : undefined;
+      if (poItemId) {
+        await db
+          .prepare('UPDATE purchase_order_items SET received_quantity = ? WHERE id = ?')
+          .bind(receiveQty, poItemId)
+          .run()
+          .catch(() =>
+            db
+              .prepare('UPDATE purchase_order_items SET received_quantity = ? WHERE purchase_order_id = ? AND ingredient_id = ?')
+              .bind(receiveQty, id, item.ingredientId)
+              .run()
+              .catch(() => {})
+          );
+      } else {
+        await db
+          .prepare('UPDATE purchase_order_items SET received_quantity = ? WHERE purchase_order_id = ? AND ingredient_id = ?')
+          .bind(receiveQty, id, item.ingredientId)
+          .run()
+          .catch(() => {});
+      }
 
       if (!usingCanonical) {
-        await db.prepare('UPDATE ingredients SET current_stock = ?, updated_at = ? WHERE id = ?')
-          .bind(newStock, now, item.ingredientId).run();
+        if (effectiveTenant && effectiveTenant !== '*' && hasIngTenantCol) {
+          try {
+            await db.prepare(
+              "UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(receiveQty, now, item.ingredientId, effectiveTenant).run();
+          } catch {
+            await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
+              .bind(receiveQty, now, item.ingredientId).run();
+          }
+        } else {
+          await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
+            .bind(receiveQty, now, item.ingredientId).run();
+        }
 
         await db.prepare(
           `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
@@ -574,7 +758,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           movId,
           item.ingredientId,
           'purchase_receipt',
-          item.receivedQuantity,
+          receiveQty,
           id,
           'purchase_order',
           `Received from PO ${id}`,
@@ -582,8 +766,17 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           now
         ).run();
 
-        await db.prepare('UPDATE inventory_items SET current_stock = ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-          .bind(newStock, now, now, item.ingredientId).run().catch(() => {});
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await db.prepare(
+            "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(receiveQty, now, now, item.ingredientId, effectiveTenant).run().catch(() =>
+            db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+              .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {})
+          );
+        } else {
+          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+            .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
+        }
 
         await db.prepare(
           `INSERT OR IGNORE INTO inventory_transactions (
@@ -594,15 +787,30 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         ).bind(
           movId,
           item.ingredientId,
-          item.receivedQuantity,
+          receiveQty,
           id,
           `Received from PO ${id}`,
           now,
           item.ingredientId
         ).run().catch(() => {});
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await db.prepare('UPDATE stock_movements SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
+          await db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
+        }
       } else {
-        await db.prepare('UPDATE inventory_items SET current_stock = ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-          .bind(newStock, now, now, item.ingredientId).run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          try {
+            await db.prepare(
+              "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(receiveQty, now, now, item.ingredientId, effectiveTenant).run();
+          } catch {
+            await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+              .bind(receiveQty, now, now, item.ingredientId).run();
+          }
+        } else {
+          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+            .bind(receiveQty, now, now, item.ingredientId).run();
+        }
 
         await db.prepare(
           `INSERT INTO inventory_transactions (
@@ -611,11 +819,14 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         ).bind(
           movId,
           item.ingredientId,
-          item.receivedQuantity,
+          receiveQty,
           id,
           `Received from PO ${id}`,
           now
         ).run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
+        }
       }
     }
 

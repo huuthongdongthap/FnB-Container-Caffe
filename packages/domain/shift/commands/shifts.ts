@@ -23,10 +23,15 @@ shiftsRouter.post('/clock-in', async (c) => {
   return c.json({ success: true, data: shiftDto(await clockIn(scope, parsed.data.staff_id, parsed.data.notes)) }, 201);
 });
 shiftsRouter.post('/clock-out', async (c) => {
-  const parsed = clockOutSchema.safeParse(await c.req.json().catch(() => null));
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = clockOutSchema.safeParse(rawBody);
   if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const rawNotes = rawBody && typeof rawBody === 'object' ? (rawBody as Record<string, unknown>).notes : undefined;
+  if (rawNotes !== undefined && (typeof rawNotes !== 'string' || rawNotes.length > 500)) {
+    return c.json({ success: false, error: 'Invalid notes' }, 400);
+  }
   const scope = await shiftScope(c.env, c.get('user'));
-  return c.json({ success: true, data: shiftDto(await clockOut(scope, parsed.data.staff_id)) });
+  return c.json({ success: true, data: shiftDto(await clockOut(scope, parsed.data.staff_id, undefined, rawNotes)) });
 });
 shiftsRouter.get('/today', async (c) => {
   const scope = await shiftScope(c.env, c.get('user'));

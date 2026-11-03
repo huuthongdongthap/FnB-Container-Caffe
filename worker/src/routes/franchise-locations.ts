@@ -45,11 +45,9 @@ franchiseRouter.get('/locations', async (c) => {
   let sql = 'SELECT * FROM franchise_locations WHERE 1=1';
   const params: unknown[] = [];
   if (targetTenant !== '*') {
-    if (targetTenant === 'default') {
-      sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
-    } else {
-      sql += ' AND tenant_id = ?';
-    }
+    sql += targetTenant === 'default'
+      ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      : ' AND tenant_id = ?';
     params.push(targetTenant);
   }
   sql += ' ORDER BY code ASC';
@@ -143,7 +141,7 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
     FROM orders
     WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1) AND status != 'cancelled'
   `;
-  const params: unknown[] = [location.tenant_id || 'default'];
+  const params: unknown[] = [(typeof location.tenant_id === 'string' && location.tenant_id.trim()) || 'default'];
 
   if (startDate) {
     query += ' AND created_at >= ?';

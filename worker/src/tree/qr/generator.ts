@@ -33,6 +33,32 @@ export async function bulkGenerateSlugs(
   tables: CafeTable[]
 ): Promise<Map<number | string, string>> {
   const result = new Map<number | string, string>();
+  if (tables.length === 0) return result;
+
+  const prefetchedSlugs = new Map<string, string>();
+  if (typeof db.batch === 'function') {
+    try {
+      const candidateIds = tables.map((t) => {
+        const rawId = String(t.id);
+        return typeof t.id === 'number' ? t.id : (/^\d+$/.test(rawId) ? parseInt(rawId, 10) : rawId);
+      });
+      const placeholders = candidateIds.map(() => '?').join(', ');
+      const allExisting = await db
+        .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+        .bind(...candidateIds)
+        .all<{ table_id: number | string; slug: string }>();
+      for (const row of allExisting?.results || []) {
+        if (row.table_id !== undefined && row.slug) {
+          prefetchedSlugs.set(String(row.table_id), row.slug);
+        }
+      }
+    } catch {
+      // Fall back to per-table lookup when bulk query is unsupported
+    }
+  }
+
+  const batchUpsertStmts: import('@cloudflare/workers-types').D1PreparedStatement[] = [];
+  const pendingUpsertArgs: Array<{ idKey: number | string; slug: string }> = [];
 
   for (const table of tables) {
     const rawId = String(table.id);
@@ -46,42 +72,78 @@ export async function bulkGenerateSlugs(
       : '';
     const desiredSlug = `${tenantPrefix}${baseSlug}`;
 
-    // Try to find existing slug for this table
-    let existing: { slug: string } | null = null;
-    try {
-      existing = await db
-        .prepare('SELECT slug FROM table_qr_codes WHERE table_id = ?')
-        .bind(idKey)
-        .first<{ slug: string }>();
-    } catch {
-      existing = null;
+    let existingSlug: string | undefined = prefetchedSlugs.get(String(idKey)) ?? prefetchedSlugs.get(rawId);
+    if (!existingSlug) {
+      try {
+        const existing = await db
+          .prepare('SELECT slug FROM table_qr_codes WHERE table_id = ?')
+          .bind(idKey)
+          .first<{ slug: string }>();
+        existingSlug = existing?.slug;
+      } catch {
+        existingSlug = undefined;
+      }
     }
 
-    const slug = existing?.slug ?? desiredSlug;
+    const slug = existingSlug ?? desiredSlug;
     result.set(idKey, slug);
     result.set(String(table.id), slug);
 
-    // Upsert: INSERT OR REPLACE
-    try {
-      await db
-        .prepare(
-          `INSERT INTO table_qr_codes (table_id, slug, updated_at)
-           VALUES (?, ?, datetime('now'))
-           ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
-        )
-        .bind(idKey, slug)
-        .run();
-    } catch (err) {
-      if (String((err as Error)?.message || '').includes('column')) {
-        await db
+    if (typeof db.batch === 'function') {
+      batchUpsertStmts.push(
+        db
           .prepare(
-            `INSERT INTO table_qr_codes (table_id, slug, created_at)
+            `INSERT INTO table_qr_codes (table_id, slug, updated_at)
              VALUES (?, ?, datetime('now'))
-             ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
+             ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
           )
           .bind(idKey, slug)
-          .run()
-          .catch(() => {});
+      );
+      pendingUpsertArgs.push({ idKey, slug });
+    } else {
+      try {
+        await db
+          .prepare(
+            `INSERT INTO table_qr_codes (table_id, slug, updated_at)
+             VALUES (?, ?, datetime('now'))
+             ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, updated_at = excluded.updated_at`
+          )
+          .bind(idKey, slug)
+          .run();
+      } catch (err) {
+        if (String((err as Error)?.message || '').includes('column')) {
+          await db
+            .prepare(
+              `INSERT INTO table_qr_codes (table_id, slug, created_at)
+               VALUES (?, ?, datetime('now'))
+               ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
+            )
+            .bind(idKey, slug)
+            .run()
+            .catch(() => {});
+        } else if (!String((err as Error)?.message || '').includes('no such table')) {
+          throw err;
+        }
+      }
+    }
+  }
+
+  if (batchUpsertStmts.length > 0 && typeof db.batch === 'function') {
+    try {
+      await db.batch(batchUpsertStmts);
+    } catch (err) {
+      if (String((err as Error)?.message || '').includes('column')) {
+        for (const item of pendingUpsertArgs) {
+          await db
+            .prepare(
+              `INSERT INTO table_qr_codes (table_id, slug, created_at)
+               VALUES (?, ?, datetime('now'))
+               ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
+            )
+            .bind(item.idKey, item.slug)
+            .run()
+            .catch(() => {});
+        }
       } else if (!String((err as Error)?.message || '').includes('no such table')) {
         throw err;
       }

@@ -64,20 +64,27 @@ export async function applyAccrual(
 ): Promise<AccrualResult> {
   const { orderId, customerId, orderTotalVnd } = input;
 
-  let order: { total?: number; total_amount?: number; cashback_used?: number } | null = null;
+  let order: { total?: number; total_amount?: number; cashback_used?: number; customer_id?: string | null; tenant_id?: string | null } | null = null;
   try {
     order = await db
-      .prepare('SELECT total, cashback_used FROM orders WHERE id = ?')
+      .prepare('SELECT total, cashback_used, customer_id, tenant_id FROM orders WHERE id = ?')
       .bind(orderId)
-      .first<{ total?: number; total_amount?: number; cashback_used?: number }>();
+      .first<{ total?: number; total_amount?: number; cashback_used?: number; customer_id?: string | null; tenant_id?: string | null }>();
   } catch {
     try {
       order = await db
-        .prepare('SELECT * FROM orders WHERE id = ?')
+        .prepare('SELECT total, cashback_used FROM orders WHERE id = ?')
         .bind(orderId)
         .first<{ total?: number; total_amount?: number; cashback_used?: number }>();
-    } catch (e) {
-      return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
+    } catch {
+      try {
+        order = await db
+          .prepare('SELECT * FROM orders WHERE id = ?')
+          .bind(orderId)
+          .first<{ total?: number; total_amount?: number; cashback_used?: number; customer_id?: string | null; tenant_id?: string | null }>();
+      } catch (e) {
+        return { ok: false, reason: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
+      }
     }
   }
   if (!order) {
@@ -163,6 +170,20 @@ export async function applyAccrual(
     const custTenant = String(customer.tenant_id ?? '').trim() || 'default';
     if (custTenant !== effectiveTenant) {
       return { ok: false, reason: 'customer_not_found' };
+    }
+  }
+  if (
+    typeof order.customer_id === 'string' &&
+    order.customer_id.trim() !== '' &&
+    order.customer_id !== 'guest' &&
+    order.customer_id !== customer.id
+  ) {
+    return { ok: false, reason: 'order_not_found' };
+  }
+  if (effectiveTenant && 'tenant_id' in order && order.tenant_id !== undefined) {
+    const ordTenant = String(order.tenant_id ?? '').trim() || 'default';
+    if (ordTenant !== effectiveTenant) {
+      return { ok: false, reason: 'order_not_found' };
     }
   }
 
@@ -251,23 +272,26 @@ export async function applyAccrual(
 
   const newPoints = (customer.loyalty_points ?? 0) + points;
   const newLifetimePoints = (customer.lifetime_points ?? 0) + points;
+  // Deterministic ledger IDs keyed by orderId prevent concurrent order_paid + order_completed double-accrual.
+  const earnTxId = `cbt_earn_${orderId}`;
+  const earnPtLogId = `ptl_earn_${orderId}`;
 
   // ── Batch: wallet + transaction + customer + point log + audit + order ──
   const walletUpdateStmt = effectiveTenant
     ? db
         .prepare(
           `UPDATE cashback_wallets
-           SET balance = ?, total_earned = total_earned + ?, updated_at = ?
+           SET balance = COALESCE(balance, 0) + ?, total_earned = COALESCE(total_earned, 0) + ?, updated_at = ?
            WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
         )
-        .bind(newBalance, cashback, now, customer.id, effectiveTenant)
+        .bind(cashback, cashback, now, customer.id, effectiveTenant)
     : db
         .prepare(
           `UPDATE cashback_wallets
-           SET balance = ?, total_earned = total_earned + ?, updated_at = ?
+           SET balance = COALESCE(balance, 0) + ?, total_earned = COALESCE(total_earned, 0) + ?, updated_at = ?
            WHERE customer_id = ?`,
         )
-        .bind(newBalance, cashback, now, customer.id);
+        .bind(cashback, cashback, now, customer.id);
 
   const stmts = [
     walletUpdateStmt,
@@ -279,7 +303,7 @@ export async function applyAccrual(
          VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        genId('cbt_'),
+        earnTxId,
         walletId,
         customer.id,
         orderId,
@@ -294,10 +318,10 @@ export async function applyAccrual(
     db
       .prepare(
         `UPDATE customers
-         SET loyalty_points = ?, lifetime_points = ?, updated_at = ?
+         SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
          WHERE id = ?`,
       )
-      .bind(newPoints, newLifetimePoints, now, customer.id),
+      .bind(points, points, now, customer.id),
     db
       .prepare(
         `INSERT INTO loyalty_point_logs
@@ -305,7 +329,7 @@ export async function applyAccrual(
          VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?)`,
       )
       .bind(
-        genId('ptl_'),
+        earnPtLogId,
         customer.id,
         orderId,
         points,
@@ -407,6 +431,30 @@ export async function applyAccrual(
     }
   }
 
+  const finalTier = tierUpgraded ? computed.tierName : (customer.loyalty_tier ?? tier.tierName);
+  try {
+    await db
+      .prepare(
+        'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, tier = ?, updated_at = ? WHERE customer_id = ?',
+      )
+      .bind(points, points, finalTier, now, customer.id)
+      .run();
+  } catch {
+    // loyalty_accounts is optional in minimal schemas
+  }
+
+  if (effectiveTenant) {
+    try {
+      await db.batch([
+        db.prepare('UPDATE cashback_transactions SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL').bind(effectiveTenant, earnTxId),
+        db.prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL').bind(effectiveTenant, earnPtLogId),
+        db.prepare("UPDATE loyalty_audit_log SET tenant_id = ? WHERE order_id = ? AND customer_id = ? AND action = 'cashback_earn' AND tenant_id IS NULL").bind(effectiveTenant, orderId, customer.id),
+      ]);
+    } catch {
+      // Optional tenant_id column in minimal schemas
+    }
+  }
+
   return {
     ok: true,
     cashback,
@@ -414,7 +462,7 @@ export async function applyAccrual(
     walletBalance: newBalance,
     totalPoints: newPoints,
     lifetimePoints: newLifetimePoints,
-    tier: tierUpgraded ? computed.tierName : (customer.loyalty_tier ?? tier.tierName),
+    tier: finalTier,
     tierUpgraded,
     multiplierApplied: multiplier,
     campaignCode: policy.campaignCode,

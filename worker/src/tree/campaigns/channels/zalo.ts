@@ -9,12 +9,14 @@ const log = createLogger({ route: 'campaign-zalo' });
 
 export async function sendCampaignZalo(
   env: Record<string, unknown>,
-  message: CampaignMessage
+  message: CampaignMessage,
+  tenantId?: string
 ): Promise<CampaignResult> {
   const customerId = (message.data?.customer_id as string) || 'unknown';
 
   try {
     const zaloData = message.data || {};
+    const resolvedTenant = tenantId || (zaloData.tenant_id as string | undefined) || 'default';
     const result = await notifyMember(env as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database }, {
       customer_id: customerId,
       template_key: mapTriggerToZaloTemplate(message.trigger),
@@ -22,8 +24,9 @@ export async function sendCampaignZalo(
         name: zaloData.name as string | undefined,
         amount: zaloData.amount as number | undefined,
         days: (zaloData.days_left as number) || (zaloData.days as number)
-      }
-    });
+      },
+      tenantId: resolvedTenant
+    }, resolvedTenant);
 
     if (result.ok) {
       log.info('campaign_zalo_sent', { trigger: message.trigger, customerId });

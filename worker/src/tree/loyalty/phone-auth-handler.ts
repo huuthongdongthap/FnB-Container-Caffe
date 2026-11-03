@@ -280,7 +280,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
       customer = { id, email, name, phone, loyalty_points: 0, lifetime_points: 0, loyalty_tier: DEFAULT_TIER, created_at: now } as Customer;
 
       try {
-        const campaign = await getActiveCampaign(db);
+        const campaign = await getActiveCampaign(db, tenantId);
         if (campaign && campaign.signup_bonus_vnd > 0) {
           const grantedCount = await db.prepare(
             'SELECT COUNT(*) as count FROM signup_bonus_log WHERE campaign_id = ?'
@@ -344,12 +344,12 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             const { identifyCustomer, recordConsent } = await import('../customer');
             const identity = await identifyCustomer({
               db, customerId: id, phone, zalo: zalo || undefined,
-              source: 'signup'
+              source: 'signup', tenantId
             });
             if (identity) {
               await recordConsent({
                 db, customerId: id,
-                purpose: 'crm', granted: true, source: 'signup'
+                purpose: 'crm', granted: true, source: 'signup', tenantId
               });
             }
           } catch (custErr) {

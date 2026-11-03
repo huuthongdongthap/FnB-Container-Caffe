@@ -5,13 +5,22 @@ export interface OrderConfirmData {
   payment_method: string;
 }
 
+function escapeHtml(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderOrderConfirm(order: OrderConfirmData): string {
   const fmt = (n: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
 
   const itemsHtml = (order.items || [])
     .map((i) => `
       <tr>
-        <td style="padding:8px 0;border-bottom:1px solid #e0e0e0">${i.name} × ${i.qty || 1}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e0e0e0">${escapeHtml(i.name)} × ${i.qty || 1}</td>
         <td style="padding:8px 0;border-bottom:1px solid #e0e0e0;text-align:right">${fmt((i.price || 0) * (i.qty || 1))}</td>
       </tr>`)
     .join('');
@@ -31,7 +40,7 @@ export function renderOrderConfirm(order: OrderConfirmData): string {
     <tr>
       <td style="padding:24px">
         <p style="color:#333;font-size:16px">Cảm ơn bạn đã đặt hàng tại AURA CAFE!</p>
-        <p style="color:#666;font-size:14px;margin-bottom:16px">Mã đơn: <strong style="color:#0A1A2E">#${order.id}</strong></p>
+        <p style="color:#666;font-size:14px;margin-bottom:16px">Mã đơn: <strong style="color:#0A1A2E">#${escapeHtml(order.id)}</strong></p>
 
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
           <thead>
@@ -49,7 +58,7 @@ export function renderOrderConfirm(order: OrderConfirmData): string {
           </tfoot>
         </table>
 
-        <p style="color:#666;font-size:13px">Thanh toán: ${order.payment_method || 'COD'}</p>
+        <p style="color:#666;font-size:13px">Thanh toán: ${escapeHtml(order.payment_method || 'COD')}</p>
         <p style="color:#999;font-size:12px;margin-top:16px">Nếu có thắc mắc, vui lòng liên hệ qua Zalo hoặc gọi 0912 345 678.</p>
       </td>
     </tr>

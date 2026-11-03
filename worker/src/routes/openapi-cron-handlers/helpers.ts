@@ -6,21 +6,22 @@ export async function isAllowedCronLocationForTenant(
   if (locationId === undefined || locationId === null || String(locationId).trim() === '') {
     return true;
   }
-  if (!tenantId || tenantId === '*') return true;
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
   const locId = String(locationId).trim();
-  if (locId === tenantId) return true;
+  if (locId === normTenant) return true;
   try {
     const locRow = await db
       .prepare('SELECT tenant_id FROM locations WHERE id = ? LIMIT 1')
       .bind(locId)
       .first();
     if (locRow && locRow.tenant_id !== undefined && locRow.tenant_id !== null && String(locRow.tenant_id).trim() !== '') {
-      return String(locRow.tenant_id).trim() === tenantId;
+      return String(locRow.tenant_id).trim() === normTenant;
     }
   } catch {
     // Optional locations table
   }
-  if (tenantId !== 'default') {
+  if (normTenant !== 'default') {
     return false;
   }
   if (/^tenant[-_]/i.test(locId) && locId !== 'default') {
@@ -35,22 +36,11 @@ export async function checkCronJobTenant(
   tenantId: string
 ): Promise<boolean> {
   if (!job) return false;
-  if (!tenantId || tenantId === '*') return true;
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
 
   if (job.tenant_id !== undefined && job.tenant_id !== null && String(job.tenant_id).trim() !== '') {
-    return String(job.tenant_id).trim() === tenantId;
-  }
-
-  if (job.payload) {
-    try {
-      const parsed = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
-      const payloadTenant = parsed?.tenant_id ?? parsed?.tenantId;
-      if (payloadTenant && String(payloadTenant).trim() !== '') {
-        return String(payloadTenant).trim() === tenantId;
-      }
-    } catch {
-      // Ignore non-JSON payload
-    }
+    return String(job.tenant_id).trim() === normTenant;
   }
 
   if (job.created_by) {
@@ -60,29 +50,57 @@ export async function checkCronJobTenant(
         .bind(job.created_by)
         .first();
       if (creator && creator.tenant_id !== undefined && creator.tenant_id !== null && String(creator.tenant_id).trim() !== '') {
-        return String(creator.tenant_id).trim() === tenantId;
+        return String(creator.tenant_id).trim() === normTenant;
       }
     } catch {
       // Optional users table
     }
   }
 
-  if (job.id) {
+  if (job.payload) {
     try {
-      const auditRow = await db
-        .prepare(
-          `SELECT metadata, details FROM audit_logs
-           WHERE (entity_id = ? OR resource_id = ?) AND action = 'cron_job_create'
-           ORDER BY created_at DESC LIMIT 1`
-        )
-        .bind(job.id, job.id)
-        .first();
+      const parsed = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+      const payloadTenant = parsed?.tenant_id ?? parsed?.tenantId;
+      if (payloadTenant && String(payloadTenant).trim() !== '') {
+        return String(payloadTenant).trim() === normTenant;
+      }
+    } catch {
+      // Ignore non-JSON payload
+    }
+  }
+
+  const auditCandidateIds = [job.id, job.job_id].filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+  for (const candidateId of auditCandidateIds) {
+    try {
+      let auditRow: any = null;
+      try {
+        auditRow = await db
+          .prepare(
+            `SELECT metadata, details, tenant_id FROM audit_logs
+             WHERE (entity_id = ? OR resource_id = ?) AND action IN ('cron_job_create', 'cron_job_trigger', 'cron_run_retry')
+             ORDER BY created_at DESC LIMIT 1`
+          )
+          .bind(candidateId, candidateId)
+          .first();
+      } catch {
+        auditRow = await db
+          .prepare(
+            `SELECT metadata, details FROM audit_logs
+             WHERE (entity_id = ? OR resource_id = ?) AND action IN ('cron_job_create', 'cron_job_trigger', 'cron_run_retry')
+             ORDER BY created_at DESC LIMIT 1`
+          )
+          .bind(candidateId, candidateId)
+          .first();
+      }
+      if (auditRow?.tenant_id && String(auditRow.tenant_id).trim() !== '') {
+        return String(auditRow.tenant_id).trim() === normTenant;
+      }
       const rawMeta = auditRow?.metadata ?? auditRow?.details;
       if (rawMeta) {
         const parsed = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : rawMeta;
         const metaTenant = parsed?.tenant_id ?? parsed?.tenantId;
         if (metaTenant && String(metaTenant).trim() !== '') {
-          return String(metaTenant).trim() === tenantId;
+          return String(metaTenant).trim() === normTenant;
         }
       }
     } catch {
@@ -91,10 +109,42 @@ export async function checkCronJobTenant(
   }
 
   if (job.location_id !== undefined && job.location_id !== null && String(job.location_id).trim() !== '') {
-    return isAllowedCronLocationForTenant(db, job.location_id, tenantId);
+    return isAllowedCronLocationForTenant(db, job.location_id, normTenant);
   }
 
-  return tenantId === 'default';
+  return normTenant === 'default';
+}
+
+export function ensureCronPayloadTenant(rawPayload: unknown, tenantId: string): string | null {
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') {
+    if (rawPayload === undefined || rawPayload === null) return null;
+    return typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload);
+  }
+  if (rawPayload === undefined || rawPayload === null || rawPayload === '') {
+    return JSON.stringify({ tenant_id: normTenant });
+  }
+  if (typeof rawPayload === 'object' && !Array.isArray(rawPayload)) {
+    const copy: Record<string, unknown> = { ...(rawPayload as Record<string, unknown>) };
+    delete copy.tenantId;
+    copy.tenant_id = normTenant;
+    return JSON.stringify(copy);
+  }
+  if (typeof rawPayload === 'string') {
+    try {
+      const parsed = JSON.parse(rawPayload);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const copy: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+        delete copy.tenantId;
+        copy.tenant_id = normTenant;
+        return JSON.stringify(copy);
+      }
+      return rawPayload;
+    } catch {
+      return rawPayload;
+    }
+  }
+  return JSON.stringify(rawPayload);
 }
 
 export function formatJob(j: Record<string, any>) {

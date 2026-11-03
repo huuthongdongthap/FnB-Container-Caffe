@@ -57,7 +57,8 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
   ).bind(input.paymentId).first<PaymentOrderRow>();
 
   const rowTenant = row?.order_tenant_id && String(row.order_tenant_id).trim() ? String(row.order_tenant_id).trim() : 'default';
-  if (!row || (input.tenantId && input.tenantId !== '*' && rowTenant !== input.tenantId)) {
+  const normInputTenant = input.tenantId ? input.tenantId.trim() : '';
+  if (!row || (normInputTenant && normInputTenant !== '*' && rowTenant !== normInputTenant)) {
     return { ok: false, status: 404, outcome: 'not_found', error: 'Payment not found' };
   }
 
@@ -163,7 +164,7 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
 
     if (paymentChanged) {
       await input.db.prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, 1, ?, ?)')
-        .bind('payment_success', JSON.stringify({ method: 'payos', source: input.source }), nowIso)
+        .bind('payment_success', JSON.stringify({ method: 'payos', source: input.source, tenant_id: rowTenant }), nowIso)
         .run().catch(() => {});
       if (input.kv) {
         await input.kv.put(
@@ -171,6 +172,58 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
           JSON.stringify({ type: 'payment_confirmed', orderId: row.order_id, amount: expectedAmount, reference: '', timestamp: nowIso }),
           { expirationTtl: 300 }
         ).catch(() => {});
+        await input.kv.put(
+          `order_event:${row.order_id}`,
+          JSON.stringify({ orderId: row.order_id, status: after?.order_status ?? fresh.order_status, payment_status: 'paid', timestamp: nowIso }),
+          { expirationTtl: 60 }
+        ).catch(() => {});
+      }
+      if (fresh.order_status !== 'cancelled' && after?.order_status !== 'cancelled') {
+        try {
+          const { creditLoyaltyIfEligible, sanitizeCustomerIdentity } = await import('../../order/policies/loyalty-trigger');
+          const envForLoyalty: Record<string, unknown> = input.kv ? { AUTH_KV: input.kv } : {};
+          await creditLoyaltyIfEligible(input.db, envForLoyalty, row.order_id).catch(() => {});
+
+          const ordRow = await input.db
+            .prepare('SELECT total, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?')
+            .bind(row.order_id)
+            .first<{ total?: number | null; customer_id?: string | null; customer_email?: string | null; customer_phone?: string | null; tenant_id?: string | null }>()
+            .catch(() => null);
+          const totalVnd = Number(ordRow?.total ?? expectedOrderTotal ?? 0);
+          if (ordRow && totalVnd >= 20000) {
+            let resolvedCustId = ordRow.customer_id ? String(ordRow.customer_id).trim() || null : null;
+            if (!resolvedCustId) {
+              const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
+                ordRow.customer_phone ?? null,
+                ordRow.customer_email ?? null,
+              );
+              if (normalizedPhone || sanitizedEmail) {
+                const cust = await input.db
+                  .prepare(
+                    "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1",
+                  )
+                  .bind(sanitizedEmail, normalizedPhone, rowTenant, rowTenant)
+                  .first<{ id: string }>()
+                  .catch(() =>
+                    input.db
+                      .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
+                      .bind(sanitizedEmail, normalizedPhone)
+                      .first<{ id: string }>()
+                      .catch(() => null),
+                  );
+                resolvedCustId = cust?.id ?? null;
+              }
+            }
+            if (resolvedCustId) {
+              const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+              const refTenant = rowTenant !== '*' ? rowTenant : undefined;
+              const refPolicy = await resolveReferralPolicy(input.kv as any, refTenant).catch(() => DEFAULT_REFERRAL_POLICY);
+              await rewardReferralOnFirstOrder(input.db, resolvedCustId, row.order_id, totalVnd, refPolicy, refTenant).catch(() => {});
+            }
+          }
+        } catch {
+          // Non-blocking loyalty/referral side effects after payment settlement
+        }
       }
     }
 

@@ -21,26 +21,42 @@ async function writeStaffAuditLog(
   entityType: string,
   entityId: string,
   metadata: string,
-  now: string
+  now: string,
+  tenantId: string = 'default'
 ): Promise<void> {
+  const effectiveTenant = !tenantId || tenantId === '*' ? 'default' : tenantId.trim() || 'default';
   try {
     await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, effectiveTenant, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, effectiveTenant, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
+        } catch {
+          try {
+            await db.prepare(
+              `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+          } catch {
+            // Ignore audit log error
+          }
+        }
       }
     }
   }
@@ -50,14 +66,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
   app.openapi(StaffRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
 
     let whereClause = "WHERE role != 'customer'";
     const params: (string | number)[] = [];
     if (tenantId !== '*') {
-      whereClause += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+      whereClause += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
       params.push(tenantId);
     }
 
@@ -107,7 +123,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       let canonicalWhere = "WHERE role != 'customer'";
       const canonicalParams: (string | number)[] = [];
       if (tenantId !== '*') {
-        canonicalWhere += " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+        canonicalWhere += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
         canonicalParams.push(tenantId);
       }
       if (role) {
@@ -156,10 +172,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff/:id - Get staff by ID
   app.openapi(StaffRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const { id } = c.req.valid('param');
     const account = await loadStaffAccount(db, id);
-    if (!account.ok || (tenantId !== '*' && (account.account.tenant_id || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
+    if (!account.ok || (tenantId !== '*' && ((account.account.tenant_id || '').trim() || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
 
 
     let staff: any = null;
@@ -233,11 +249,22 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (existing) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
+    if (body.phone && String(body.phone).trim() !== '') {
+      let existingPhone: unknown = null;
+      try {
+        existingPhone = await db.prepare('SELECT id, tenant_id FROM users WHERE phone = ?').bind(String(body.phone).trim()).first();
+      } catch {
+        existingPhone = await db.prepare('SELECT id FROM users WHERE phone = ?').bind(String(body.phone).trim()).first().catch(() => null);
+      }
+      if (existingPhone) {
+        return c.json({ success: false, error: 'Phone number already exists' }, 409);
+      }
+    }
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
-    const rawTenantId = getTenantId(c);
-    const staffTenant = rawTenantId === '*' ? (user?.tenantId || user?.tenant_id || 'default') : rawTenantId;
+    const rawTenantId = getTenantId(c).trim() || 'default';
+    const staffTenant = rawTenantId === '*' ? (String(user?.tenantId || user?.tenant_id || '').trim() || 'default') : rawTenantId;
 
     if (!await createStaffIdentity(c.env, { id, name: body.name, email: body.email,
       phone: body.phone || '', role: body.role, tenant_id: staffTenant,
@@ -253,7 +280,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Audit log (redact password)
     const { password: _redactedPassword, ...auditCreateBody } = body;
-    await writeStaffAuditLog(db, user.id, 'staff_create', 'user', id, JSON.stringify(auditCreateBody), now);
+    await writeStaffAuditLog(db, user.id, 'staff_create', 'user', id, JSON.stringify(auditCreateBody), now, staffTenant);
 
     let created: any = null;
     try {
@@ -332,6 +359,17 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       updates.push('email = ?'); params.push(body.email);
     }
     if (body.phone !== undefined) {
+      if (String(body.phone).trim() !== '') {
+        let phoneExists: unknown = null;
+        try {
+          phoneExists = await db.prepare('SELECT id FROM users WHERE phone = ? AND id != ?').bind(String(body.phone).trim(), id).first();
+        } catch {
+          phoneExists = null;
+        }
+        if (phoneExists) {
+          return c.json({ success: false, error: 'Phone number already exists' }, 409);
+        }
+      }
       updates.push('phone = ?');
       params.push(body.phone);
       canonicalUpdates.push('phone = ?');
@@ -377,10 +415,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let saved;
     try {
       saved = await saveAccount(`UPDATE users SET ${updates.join(', ')} WHERE ${guard.sql}`, params);
-    } catch {
+    } catch (err) {
+      if (/UNIQUE constraint failed/i.test(String((err as Error)?.message || err))) {
+        return c.json({ success: false, error: 'Phone or email already exists' }, 409);
+      }
       try {
         saved = await saveAccount(`UPDATE users SET ${canonicalUpdates.join(', ')} WHERE ${guard.sql}`, canonicalParams);
-      } catch { throw new SessionUnavailableError(); }
+      } catch (innerErr) {
+        if (/UNIQUE constraint failed/i.test(String((innerErr as Error)?.message || innerErr))) {
+          return c.json({ success: false, error: 'Phone or email already exists' }, 409);
+        }
+        throw new SessionUnavailableError();
+      }
     }
     if (!saved.meta.changes) return c.json({ success: false, error: 'Không thể thay đổi owner cuối cùng hoặc trạng thái đã đổi; vui lòng tải lại' }, 409);
 
@@ -397,7 +443,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       staffParams.push(now);
       staffParams.push(id);
       if (staffUpdates.length > 1) {
-        await db.prepare(`UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ?`).bind(...staffParams).run();
+        const targetStaffTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || 'default';
+        try {
+          await db.prepare(
+            `UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...staffParams, targetStaffTenant).run();
+        } catch {
+          await db.prepare(`UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ?`).bind(...staffParams).run();
+        }
       }
     } catch {
       // staff_users table optional
@@ -444,7 +497,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Audit log (redact password if present)
     const { password: _redactedUpdatePw, ...auditUpdateBody } = body;
-    await writeStaffAuditLog(db, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now);
+    const updateAuditTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || getTenantId(c).trim() || 'default';
+    await writeStaffAuditLog(db, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now, updateAuditTenant);
 
     let updated: any = null;
     try {
@@ -503,7 +557,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!result.meta.changes) return c.json({ success: false, error: 'Không thể vô hiệu hóa owner cuối cùng hoặc trạng thái đã đổi' }, 409);
 
     try {
-      await db.prepare('UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+      const targetStaffTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || 'default';
+      try {
+        await db.prepare(
+          "UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(now, id, targetStaffTenant).run();
+      } catch {
+        await db.prepare('UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+      }
     } catch {
       // staff_users table optional
     }
@@ -533,7 +594,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Audit log
-    await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now);
+    const deleteAuditTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || getTenantId(c).trim() || 'default';
+    await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now, deleteAuditTenant);
 
     return c.json({ success: true, data: { success: true } });
   });

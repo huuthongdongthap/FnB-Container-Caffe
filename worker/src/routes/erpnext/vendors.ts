@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
-import { createErpnextClient } from '../../clients/erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv } from '../../clients/erpnext-client';
 
 const VendorSyncSchema = z.object({
   name: z.string().min(1),
@@ -77,7 +77,11 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
         return c.json({ success: true, data: { name: `mock-vendor-${Date.now()}`, mock: true, tax_id: data.tax_id, address: data.address, phone: data.phone }, synced: true });
       }
 
-      const client = createErpnextClient(c.env);
+      const tenantId = getTenantId(c);
+      const client =
+        (c.env.AUTH_KV && typeof createErpnextClientWithKv === 'function'
+          ? await createErpnextClientWithKv(c.env, tenantId)
+          : null) ?? createErpnextClient(c.env);
       if (!client) {
         return c.json({ success: false, error: 'ERPNext not configured' }, 503);
       }

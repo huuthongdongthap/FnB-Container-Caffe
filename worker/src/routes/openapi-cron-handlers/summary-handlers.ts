@@ -11,7 +11,7 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
 
     let whereClause = 'WHERE 1=1';
     const params: (string | number)[] = [];
@@ -30,12 +30,26 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     if (tenantId !== '*') {
-      const allJobsRes = await db.prepare(
-        `SELECT * FROM cron_jobs ${whereClause}`
-      ).bind(...params).all().catch(() => ({ results: [] }));
-      const rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+      let rawJobs: Record<string, any>[] = [];
+      try {
+        const scopedJobsRes = await db.prepare(
+          `SELECT * FROM cron_jobs ${whereClause} AND (COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? OR location_id = ?) LIMIT 1000`
+        ).bind(...params, tenantId, tenantId).all();
+        rawJobs = ((scopedJobsRes as any)?.results || []) as Record<string, any>[];
+        if (rawJobs.length === 0) {
+          const allJobsRes = await db.prepare(
+            `SELECT * FROM cron_jobs ${whereClause} LIMIT 1000`
+          ).bind(...params).all().catch(() => ({ results: [] }));
+          rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+        }
+      } catch {
+        const allJobsRes = await db.prepare(
+          `SELECT * FROM cron_jobs ${whereClause} LIMIT 1000`
+        ).bind(...params).all().catch(() => ({ results: [] }));
+        rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+      }
 
-      if (rawJobs.length > 0 || tenantId !== 'default') {
+      if (tenantId !== '*') {
         const tenantJobs: Record<string, any>[] = [];
         for (const j of rawJobs) {
           if (await checkCronJobTenant(db, j, tenantId)) {
@@ -61,12 +75,38 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           runWhere += ' AND date(started_at) <= ?';
           runParams.push(dateTo);
         }
-        const allRunsRes = await db.prepare(
-          `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC`
-        ).bind(...runParams).all().catch(() => ({ results: [] }));
-        const rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
-          (r) => allowedJobIds.has(r.job_id)
-        );
+        let rawRuns: Record<string, any>[] = [];
+        try {
+          const scopedRunsRes = await db.prepare(
+            `SELECT * FROM cron_runs ${runWhere} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY started_at DESC LIMIT 1000`
+          ).bind(...runParams, tenantId).all();
+          rawRuns = (((scopedRunsRes as any)?.results || []) as Record<string, any>[]).filter(
+            (r) => allowedJobIds.has(r.job_id)
+          );
+          if (rawRuns.length === 0 && allowedJobIds.size > 0) {
+            const byJobRunsRes = await db.prepare(
+              `SELECT * FROM cron_runs ${runWhere} AND job_id IN (SELECT id FROM cron_jobs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY started_at DESC LIMIT 1000`
+            ).bind(...runParams, tenantId).all();
+            rawRuns = (((byJobRunsRes as any)?.results || []) as Record<string, any>[]).filter(
+              (r) => allowedJobIds.has(r.job_id)
+            );
+          }
+        } catch {
+          const allRunsRes = await db.prepare(
+            `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC LIMIT 1000`
+          ).bind(...runParams).all().catch(() => ({ results: [] }));
+          rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
+            (r) => allowedJobIds.has(r.job_id)
+          );
+        }
+        if (rawRuns.length === 0 && allowedJobIds.size > 0) {
+          const allRunsRes = await db.prepare(
+            `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC LIMIT 1000`
+          ).bind(...runParams).all().catch(() => ({ results: [] }));
+          rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
+            (r) => allowedJobIds.has(r.job_id)
+          );
+        }
 
         let successfulRuns = 0;
         let failedRuns = 0;
@@ -194,3 +234,6 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     });
   });
 }
+
+export const registerSummaryRoutes = registerSummaryHandlers;
+

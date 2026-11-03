@@ -5,10 +5,28 @@
  */
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
+import { matchesTenantRow, resolvePilotStore } from 'worker/src/middleware/tenant';
 import type { MenuItem } from 'worker/src/types/models';
 import { parseAvailabilityFilter, toAvailabilityFlag } from '../policies/availability';
 
 const log = createLogger({ route: 'menu' });
+
+function resolveMenuTenantId(request: Request, env: Record<string, unknown>, tenantIdOverride?: string): string {
+  if (tenantIdOverride && tenantIdOverride.trim() && tenantIdOverride.trim() !== '*') {
+    return tenantIdOverride.trim();
+  }
+  const url = new URL(request.url);
+  const raw = (
+    url.searchParams.get('tenant_id') ||
+    request.headers.get('X-Tenant-ID') ||
+    request.headers.get('x-tenant-id') ||
+    ''
+  ).trim();
+  if (!raw || raw === '*') {
+    return resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  }
+  return raw;
+}
 
 function parseTags(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
@@ -23,7 +41,7 @@ function parseTags(raw: unknown): unknown[] {
   return [];
 }
 
-export async function getMenu(request: Request, env: Record<string, unknown>) {
+export async function getMenu(request: Request, env: Record<string, unknown>, tenantIdOverride?: string) {
   try {
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
@@ -77,22 +95,66 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
       results = res.results ?? [];
     }
 
-    const items = (results ?? []).map((item: MenuItem) => ({
+    const tenantId = resolveMenuTenantId(request, env, tenantIdOverride);
+    const hasTenantCol = results.some(
+      (r) => r && typeof r === 'object' && 'tenant_id' in r && (r as unknown as Record<string, unknown>).tenant_id !== undefined
+    );
+    let filteredResults = (results ?? []).filter((item) =>
+      matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)
+    );
+
+    const tableName = useProductsFallback ? 'products' : 'menu_items';
+    const catCol = useProductsFallback ? 'category_id' : 'category';
+    const availCol = useProductsFallback ? 'is_available' : 'available';
+
+    if (hasTenantCol && tenantId !== '*' && filteredResults.length < results.length) {
+      try {
+        const selectPrefix = useProductsFallback
+          ? 'SELECT *, category_id as category, is_available as available FROM products WHERE 1=1'
+          : 'SELECT * FROM menu_items WHERE 1=1';
+        let scopedQuery = `${selectPrefix} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+        const scopedParams: unknown[] = [tenantId];
+        if (category) {
+          scopedQuery += ` AND ${catCol} = ?`;
+          scopedParams.push(category);
+        }
+        if (availableFlag !== null) {
+          scopedQuery += ` AND ${availCol} = ?`;
+          scopedParams.push(availableFlag);
+        }
+        if (search) {
+          scopedQuery += ' AND (name LIKE ? OR description LIKE ?)';
+          scopedParams.push(`%${search}%`, `%${search}%`);
+        }
+        scopedQuery += ` ORDER BY ${catCol}, name LIMIT ? OFFSET ?`;
+        scopedParams.push(parseInt(limit), parseInt(offset));
+        const scopedRes = await db.prepare(scopedQuery).bind(...scopedParams).all<MenuItem>();
+        filteredResults = (scopedRes.results ?? []).filter((item) =>
+          matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)
+        );
+      } catch {
+        // Keep in-memory filtered results if tenant_id SQL expression is unsupported
+      }
+    }
+
+    const items = filteredResults.map((item: MenuItem) => ({
       ...item,
       tags: parseTags(item.tags),
       price: parseInt(item.price as unknown as string),
       available: toAvailabilityFlag(item.available ?? (item as unknown as { is_available?: unknown }).is_available)
     }));
 
-    const tableName = useProductsFallback ? 'products' : 'menu_items';
-    const catCol = useProductsFallback ? 'category_id' : 'category';
-    const availCol = useProductsFallback ? 'is_available' : 'available';
     const countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE 1=1${
+      hasTenantCol && tenantId !== '*' ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : ''
+    }${
       category ? ` AND ${catCol} = ?` : ''
     }${availableFlag !== null ? ` AND ${availCol} = ?` : ''
     }${search ? ' AND (name LIKE ? OR description LIKE ?)' : ''}`;
 
     const countParams: unknown[] = [];
+    if (hasTenantCol && tenantId !== '*') {
+      countParams.push(tenantId);
+    }
     if (category) {
       countParams.push(category);
     }
@@ -121,26 +183,27 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
   }
 }
 
-export async function getMenuItem(request: Request, env: Record<string, unknown>, id: string) {
+export async function getMenuItem(request: Request, env: Record<string, unknown>, id: string, tenantIdOverride?: string) {
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const tenantId = resolveMenuTenantId(request, env, tenantIdOverride);
     let rawItem: MenuItem | undefined;
     try {
       const { results } = await db.prepare('SELECT * FROM menu_items WHERE id = ?').bind(id).all<MenuItem>();
-      rawItem = results?.[0];
+      rawItem = (results ?? []).find((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
       const { results } = await db.prepare('SELECT *, category_id as category, is_available as available FROM products WHERE id = ?').bind(id).all<MenuItem>();
-      rawItem = results?.[0];
+      rawItem = (results ?? []).find((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     }
     if (!rawItem) {
       try {
         const { results } = await db.prepare('SELECT *, category_id as category, is_available as available FROM products WHERE id = ?').bind(id).all<MenuItem>();
-        rawItem = results?.[0];
+        rawItem = (results ?? []).find((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
       } catch {
         // Ignore if products fallback fails after menu_items succeeded
       }
     }
-    if (!rawItem) {
+    if (!rawItem || !matchesTenantRow(rawItem as unknown as Record<string, unknown>, tenantId)) {
       return errorResponse('Menu item not found', 404);
     }
 

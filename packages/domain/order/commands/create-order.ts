@@ -63,14 +63,24 @@ export async function createOrder(
     if (rawPromoCode) {
       const isWelcome = rawPromoCode === 'WELCOME';
       type PromoRow = {
-        id: string; code: string; percent: number; max_discount: number; min_order: number;
-        starts_at?: string | null; expires_at?: string | null; usage_limit: number; usage_count: number;
-        is_active?: number; tenant_id?: string | null;
+        id: string; code: string;
+        percent?: number | null; discount_type?: string | null; discount_value?: number | null;
+        max_discount?: number | null; max_discount_value?: number | null;
+        min_order?: number | null; min_order_value?: number | null;
+        starts_at?: string | null; valid_from?: string | null;
+        expires_at?: string | null; valid_to?: string | null;
+        usage_limit?: number | null; max_uses?: number | null;
+        usage_count?: number | null; current_uses?: number | null;
+        is_active?: number; type?: string | null; tenant_id?: string | null;
       };
       let promo = await db.prepare(
-        "SELECT * FROM promotions WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?"
+        "SELECT id, code, percent, discount_type, discount_value, max_discount, max_discount_value, min_order, min_order_value, starts_at, valid_from, expires_at, valid_to, usage_limit, max_uses, usage_count, current_uses, is_active, type, tenant_id FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
       ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
-        db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?').bind(rawPromoCode).first<PromoRow>().catch(() => null)
+        db.prepare(
+          "SELECT * FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+        ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
+          db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?').bind(rawPromoCode).first<PromoRow>().catch(() => null)
+        )
       );
       if (promo && 'tenant_id' in promo && promo.tenant_id !== undefined && tenantId !== '*') {
         const promoTenant = (promo.tenant_id && String(promo.tenant_id).trim()) || 'default';
@@ -85,46 +95,82 @@ export async function createOrder(
         promo = { id: 'promo_welcome', code: 'WELCOME', percent: 10, max_discount: 30000, min_order: 0, usage_limit: 0, usage_count: 0, is_active: 1 };
       }
       if (!promo) return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
-      if (promo.starts_at && new Date(promo.starts_at) > new Date()) return errorResponse('Chương trình khuyến mãi chưa bắt đầu', 400);
-      if (!isWelcome && promo.expires_at && new Date(promo.expires_at) < new Date()) return errorResponse('Mã khuyến mãi đã hết hạn', 400);
-      if (!isWelcome && promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
-      if (promo.min_order > 0 && snapshot.subtotal < promo.min_order) return errorResponse(`Đơn hàng tối thiểu ${promo.min_order}đ`, 400);
+      const startsAt = promo.starts_at ?? promo.valid_from;
+      const expiresAt = promo.expires_at ?? promo.valid_to;
+      const minOrder = Number(promo.min_order ?? promo.min_order_value ?? 0);
+      const usageLimit = promo.usage_limit ?? promo.max_uses;
+      const usageCount = Number(promo.usage_count ?? promo.current_uses ?? 0);
+      if (startsAt && new Date(startsAt) > new Date()) return errorResponse('Chương trình khuyến mãi chưa bắt đầu', 400);
+      if (!isWelcome && expiresAt && new Date(expiresAt) < new Date()) return errorResponse('Mã khuyến mãi đã hết hạn', 400);
+      if (!isWelcome && usageLimit != null && Number(usageLimit) > 0 && usageCount >= Number(usageLimit)) {
+        return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
+      }
+      if (minOrder > 0 && snapshot.subtotal < minOrder) return errorResponse(`Đơn hàng tối thiểu ${minOrder}đ`, 400);
       if (isWelcome) {
-        const normalizedPhone = (data.customer_phone || '').replace(/[\s\-().]/g, '');
-        if (!data.customer_name?.trim() || !normalizedPhone) {
+        const rawPhone = String(data.customer_phone || '').trim();
+        const normalizedPhone = rawPhone.replace(/\D/g, '');
+        if (!data.customer_name?.trim() || !normalizedPhone || /^0+$/.test(normalizedPhone)) {
           return errorResponse('Mã WELCOME yêu cầu khách hàng mới để lại thông tin đăng ký', 400);
         }
         const prior = await db.prepare(
-          "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND status NOT IN ('cancelled', 'failed')"
+          "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3) AND status NOT IN ('cancelled', 'failed')"
         ).bind(resolvedCustomerId, normalizedPhone, tenantId).first<{ cnt?: number }>().catch(() =>
           db.prepare(
             "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
           ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
         );
-        if (Number(prior?.cnt ?? 0) > 0) {
+        let priorCount = Number(prior?.cnt ?? 0);
+        if (priorCount === 0) {
+          const priorFormatted = await db.prepare(
+            "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_phone = ? OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?) AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3) AND status NOT IN ('cancelled', 'failed')"
+          ).bind(rawPhone, normalizedPhone, tenantId).first<{ cnt?: number }>().catch(() =>
+            db.prepare(
+              "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_phone = ? OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?) AND status NOT IN ('cancelled', 'failed')"
+            ).bind(rawPhone, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+          );
+          priorCount = Number(priorFormatted?.cnt ?? 0);
+        }
+        if (priorCount > 0) {
           return errorResponse('Mã WELCOME chỉ áp dụng cho khách hàng mới lần đầu đến quán', 400);
         }
       }
       let reservedInPlace = false;
       if (!isWelcome || promo.id !== 'promo_welcome') {
         const reserveRes = await db.prepare(
-          "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
+          "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
         ).bind(promo.code, tenantId).run().catch(() =>
-          db.prepare(
-            'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
-          ).bind(promo.code).run().catch(() => null)
+          (tenantId === 'default' || tenantId === '*')
+            ? db.prepare(
+                'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+              ).bind(promo.code).run().catch(() => null)
+            : null
         ) as { meta?: { changes?: number }; changes?: number } | null;
         const changes = reserveRes?.meta?.changes ?? reserveRes?.changes;
         if (changes !== undefined && Number(changes) < 1) {
           return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
         }
+        if (promo.id) {
+          await db.prepare(
+            "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+          ).bind(promo.id, tenantId).run().catch(() =>
+            db.prepare('UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ?').bind(promo.id).run().catch(() => {})
+          );
+        }
         reservedInPlace = true;
       }
-      const pct = isWelcome ? (promo.percent || 10) : promo.percent;
-      const cap = isWelcome ? (promo.max_discount || 30000) : promo.max_discount;
-      const rawDisc = Math.round((snapshot.subtotal * pct) / 100);
-      snapshot.discount = cap > 0 ? Math.min(rawDisc, cap) : rawDisc;
-      snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + snapshot.shipping_fee + snapshot.tip_amount;
+      const promoType = String(promo.discount_type ?? promo.type ?? '').toLowerCase();
+      let rawDiscount: number;
+      if (promoType === 'fixed') {
+        rawDiscount = Math.round(Number(promo.discount_value ?? promo.percent ?? 0));
+      } else {
+        const rawPct = Number(promo.percent ?? promo.discount_value ?? 0);
+        const pct = isWelcome ? (rawPct || 10) : rawPct;
+        rawDiscount = Math.round((snapshot.subtotal * pct) / 100);
+      }
+      const maxDiscount = promo.max_discount ?? promo.max_discount_value ?? (isWelcome ? 30000 : null);
+      const cappedDisc = maxDiscount != null && Number(maxDiscount) > 0 ? Math.min(rawDiscount, Number(maxDiscount)) : rawDiscount;
+      snapshot.discount = Math.min(snapshot.subtotal, Math.max(0, cappedDisc));
+      snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
       appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount, reservedInPlace };
     }
     const responseBody = {
@@ -189,8 +235,8 @@ export async function createOrder(
       throw error;
     }
     if (appliedPromo) {
+      const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
       if (!appliedPromo.reservedInPlace) {
-        const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         await db.prepare(
           "UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
         ).bind(appliedPromo.code, promoTenant).run().catch(async () => {
@@ -200,10 +246,16 @@ export async function createOrder(
             ).bind(appliedPromo.code).run().catch(() => {});
           }
         });
+        await db.prepare(
+          "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(appliedPromo.code, promoTenant).run().catch(() => {});
       }
       await db.prepare(
         'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
       ).bind(appliedPromo.id, appliedPromo.code, orderId, appliedPromo.discountAmount, snapshot.subtotal, now).run().catch(() => {});
+      await db.prepare(
+        'UPDATE promotion_redemptions SET tenant_id = ?, customer_id = ? WHERE order_id = ?'
+      ).bind(promoTenant, resolvedCustomerId ?? null, orderId).run().catch(() => {});
     }
     await publishOrderEvent(env.AUTH_KV as KVNamespace | undefined, orderId, 'pending');
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.

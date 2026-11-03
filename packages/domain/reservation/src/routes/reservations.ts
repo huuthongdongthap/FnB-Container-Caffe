@@ -1,15 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
-import { getTenantId } from 'worker/src/middleware/tenant';
+import { getTenantId, matchesTenantRow, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
+function resolveRequestTenantId(c: any): string {
+  const user = c.get?.('user');
+  if (user) {
+    return getTenantId(c).trim() || 'default';
   }
-  return tenantId === 'default';
+  return resolvePublicTenantId(c).trim() || 'default';
 }
 
 const reservationSchema = z.object({
@@ -48,7 +47,7 @@ async function checkRateLimit(c: { env: Env; req: { header: (n: string) => strin
 // GET /api/reservations/availability?date=YYYY-MM-DD&time=HH:MM
 reservationsRouter.get('/availability', optionalAuth() as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = resolveRequestTenantId(c);
   const date = c.req.query('date');
   const time = c.req.query('time');
 
@@ -101,7 +100,7 @@ reservationsRouter.get('/availability', optionalAuth() as any, async (c) => {
 // POST /api/reservations
 reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = resolveRequestTenantId(c);
 
   const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
   const allowed = await checkRateLimit(c, `rl:rsv:${ip}`, 5, 3600);
@@ -143,6 +142,10 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   const table = candidateTables.find((t) => matchesTenantRow(t, tenantId)) ?? null;
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
+  }
+  const tableCapacity = Number(table.capacity ?? 0);
+  if (Number.isFinite(tableCapacity) && tableCapacity > 0 && guests > tableCapacity) {
+    return c.json({ success: false, error: 'Guest count exceeds table capacity' }, 400);
   }
 
   const canonicalTableId = String(table.id ?? table_id);
@@ -212,7 +215,15 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   }
 
   if (date === today) {
-    await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ?").bind(canonicalTableId).run();
+    if (effectiveTenant && effectiveTenant !== '*') {
+      await db
+        .prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(canonicalTableId, effectiveTenant)
+        .run()
+        .catch(() => db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available'").bind(canonicalTableId).run());
+    } else {
+      await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available'").bind(canonicalTableId).run();
+    }
   }
 
   return c.json({
@@ -232,21 +243,70 @@ async function matchesReservationTenant(
   const rawRsvTenant = 'tenant_id' in rsv && rsv.tenant_id !== undefined && rsv.tenant_id !== null
     ? String(rsv.tenant_id).trim()
     : '';
-  if (rawRsvTenant && rawRsvTenant !== 'default') {
+  if (rawRsvTenant) {
+    if (rawRsvTenant !== 'default') {
+      return rawRsvTenant === tenantId;
+    }
+    if (rsv.table_id) {
+      let tblById = await db
+        .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+        .bind(rsv.table_id)
+        .first<Record<string, unknown>>()
+        .catch(() => null);
+      if (!tblById) {
+        const candidate = await db
+          .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
+          .bind(rsv.table_id, rsv.table_id)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+        if (candidate && (!('id' in candidate) || String(candidate.id) === String(rsv.table_id))) {
+          tblById = candidate;
+        }
+      }
+      if (tblById && (!('id' in tblById) || String(tblById.id) === String(rsv.table_id))) {
+        return matchesTenantRow(tblById, tenantId);
+      }
+    }
     return rawRsvTenant === tenantId;
   }
   if (rsv.table_id) {
-    const tbl = await db
-      .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
-      .bind(rsv.table_id, rsv.table_id)
+    const tblById = await db
+      .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+      .bind(rsv.table_id)
       .first<Record<string, unknown>>()
       .catch(() => null);
-    if (tbl) {
-      return matchesTenantRow(tbl, tenantId);
+    if (tblById && (!('id' in tblById) || String(tblById.id) === String(rsv.table_id))) {
+      return matchesTenantRow(tblById, tenantId);
     }
-  }
-  if (rawRsvTenant) {
-    return rawRsvTenant === tenantId;
+    let tablesByNum: Record<string, unknown>[] = [];
+    try {
+      const stmt = db.prepare('SELECT * FROM cafe_tables WHERE table_number = ?').bind(rsv.table_id);
+      if (typeof stmt.all === 'function') {
+        const res = await stmt.all<Record<string, unknown>>();
+        if (Array.isArray(res?.results) && res.results.length > 0) {
+          tablesByNum = res.results;
+        }
+      }
+      if (tablesByNum.length === 0 && typeof stmt.first === 'function') {
+        const single = await stmt.first<Record<string, unknown>>();
+        if (single) tablesByNum = [single];
+      }
+    } catch {
+      tablesByNum = [];
+    }
+    if (tablesByNum.length === 0) {
+      const legacyTbl = tblById ?? (await db
+        .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
+        .bind(rsv.table_id, rsv.table_id)
+        .first<Record<string, unknown>>()
+        .catch(() => null));
+      if (legacyTbl) {
+        tablesByNum = [legacyTbl];
+      }
+    }
+    if (tablesByNum.length > 0) {
+      return tablesByNum.some((t) => matchesTenantRow(t, tenantId));
+    }
   }
   return tenantId === 'default';
 }
@@ -254,16 +314,15 @@ async function matchesReservationTenant(
 // GET /api/reservations?date=&limit=&offset=
 reservationsRouter.get('/', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = getTenantId(c as any).trim() || 'default';
   const date = c.req.query('date');
   const rawLimit = parseInt(c.req.query('limit') || '50', 10);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
   const rawOffset = parseInt(c.req.query('offset') || '0', 10);
   const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
-  const fetchLimit = tenantId === '*' ? limit : Math.max(limit + offset, 200);
-  const fetchOffset = tenantId === '*' ? offset : 0;
 
   let results: unknown[] = [];
+  let sqlTenantScoped = false;
   try {
     let query = `
       SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
@@ -271,30 +330,72 @@ reservationsRouter.get('/', requireAuth(reservationStaffRoles) as any, async (c)
       WHERE 1=1
     `;
     const params: unknown[] = [];
+    if (tenantId !== '*') {
+      query += " AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?";
+      params.push(tenantId);
+    }
     if (date) {
       query += ' AND r.date = ?'; params.push(date);
     }
     query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
-    params.push(fetchLimit, fetchOffset);
+    params.push(limit, offset);
 
     const res = await db.prepare(query).bind(...params).all();
     results = res.results || [];
-  } catch {
-    let fallbackQuery = `
-      SELECT r.*, r.reservation_date AS date, r.reservation_time AS time, r.phone AS customer_phone, r.pax AS guest_count,
-             t.table_number, t.zone AS table_zone, t.capacity
-      FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
-      WHERE 1=1
-    `;
-    const params: unknown[] = [];
-    if (date) {
-      fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
+    sqlTenantScoped = tenantId !== '*';
+    if (results.length === 0 && tenantId !== 'default' && tenantId !== '*') {
+      const fetchLimit = Math.max(limit + offset, 200);
+      let legacyNullTenantQuery = `
+        SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
+        FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
+        WHERE 1=1
+      `;
+      const legacyParams: unknown[] = [];
+      if (date) {
+        legacyNullTenantQuery += ' AND r.date = ?';
+        legacyParams.push(date);
+      }
+      legacyNullTenantQuery += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
+      legacyParams.push(fetchLimit, 0);
+      const fallbackRes = await db.prepare(legacyNullTenantQuery).bind(...legacyParams).all().catch(() => ({ results: [] }));
+      results = fallbackRes.results || [];
+      sqlTenantScoped = false;
     }
-    fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
-    params.push(fetchLimit, fetchOffset);
+  } catch {
+    const fetchLimit = tenantId === '*' ? limit : Math.max(limit + offset, 200);
+    const fetchOffset = tenantId === '*' ? offset : 0;
+    try {
+      let query = `
+        SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
+        FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
+        WHERE 1=1
+      `;
+      const params: unknown[] = [];
+      if (date) {
+        query += ' AND r.date = ?'; params.push(date);
+      }
+      query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
+      params.push(fetchLimit, fetchOffset);
 
-    const res = await db.prepare(fallbackQuery).bind(...params).all();
-    results = res.results || [];
+      const res = await db.prepare(query).bind(...params).all();
+      results = res.results || [];
+    } catch {
+      let fallbackQuery = `
+        SELECT r.*, r.reservation_date AS date, r.reservation_time AS time, r.phone AS customer_phone, r.pax AS guest_count,
+               t.table_number, t.zone AS table_zone, t.capacity
+        FROM reservations r LEFT JOIN cafe_tables t ON r.table_id = t.id
+        WHERE 1=1
+      `;
+      const params: unknown[] = [];
+      if (date) {
+        fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
+      }
+      fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
+      params.push(fetchLimit, fetchOffset);
+
+      const res = await db.prepare(fallbackQuery).bind(...params).all();
+      results = res.results || [];
+    }
   }
   if (tenantId !== '*' && results.length > 0) {
     const filtered: unknown[] = [];
@@ -303,7 +404,7 @@ reservationsRouter.get('/', requireAuth(reservationStaffRoles) as any, async (c)
         filtered.push(r);
       }
     }
-    results = filtered.slice(offset, offset + limit);
+    results = sqlTenantScoped ? filtered : filtered.slice(offset, offset + limit);
   }
   return c.json({ success: true, data: results });
 });
@@ -311,7 +412,7 @@ reservationsRouter.get('/', requireAuth(reservationStaffRoles) as any, async (c)
 // PATCH /api/reservations/:id/approve
 reservationsRouter.patch('/:id/approve', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = getTenantId(c as any).trim() || 'default';
   const id = c.req.param('id');
 
   const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -319,14 +420,29 @@ reservationsRouter.patch('/:id/approve', requireAuth(reservationStaffRoles) as a
     return c.json({ success: false, error: 'Reservation not found' }, 404);
   }
 
-  await db.prepare("UPDATE reservations SET status = 'confirmed', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+  const rsvTenant =
+    tenantId === '*'
+      ? ('tenant_id' in rsv && rsv.tenant_id !== undefined && rsv.tenant_id !== null && String(rsv.tenant_id).trim() && String(rsv.tenant_id).trim() !== '*'
+          ? String(rsv.tenant_id).trim()
+          : null)
+      : tenantId;
+  const now = new Date().toISOString();
+  if (rsvTenant) {
+    await db
+      .prepare("UPDATE reservations SET status = 'confirmed', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(now, id, rsvTenant)
+      .run()
+      .catch(() => db.prepare("UPDATE reservations SET status = 'confirmed', updated_at = ? WHERE id = ?").bind(now, id).run());
+  } else {
+    await db.prepare("UPDATE reservations SET status = 'confirmed', updated_at = ? WHERE id = ?").bind(now, id).run();
+  }
   return c.json({ success: true, message: 'Reservation confirmed' });
 });
 
 // PATCH /api/reservations/:id/reject
 reservationsRouter.patch('/:id/reject', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = getTenantId(c as any).trim() || 'default';
   const id = c.req.param('id');
 
   const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -334,15 +450,35 @@ reservationsRouter.patch('/:id/reject', requireAuth(reservationStaffRoles) as an
     return c.json({ success: false, error: 'Reservation not found' }, 404);
   }
 
-  await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
+  const rsvTenant =
+    tenantId === '*'
+      ? ('tenant_id' in rsv && rsv.tenant_id !== undefined && rsv.tenant_id !== null && String(rsv.tenant_id).trim() && String(rsv.tenant_id).trim() !== '*'
+          ? String(rsv.tenant_id).trim()
+          : null)
+      : tenantId;
+  const now = new Date().toISOString();
+  if (rsvTenant) {
+    await db
+      .prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(now, id, rsvTenant)
+      .run()
+      .catch(() => db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run());
+    await db
+      .prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(rsv.table_id, rsvTenant)
+      .run()
+      .catch(() => db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run());
+  } else {
+    await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
+    await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
+  }
   return c.json({ success: true, message: 'Reservation rejected' });
 });
 
 // DELETE /api/reservations/:id
 reservationsRouter.delete('/:id', requireAuth(reservationStaffRoles) as any, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as any);
+  const tenantId = getTenantId(c as any).trim() || 'default';
   const id = c.req.param('id');
 
   const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -350,7 +486,27 @@ reservationsRouter.delete('/:id', requireAuth(reservationStaffRoles) as any, asy
     return c.json({ success: false, error: 'Reservation not found' }, 404);
   }
 
-  await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-  await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
+  const rsvTenant =
+    tenantId === '*'
+      ? ('tenant_id' in rsv && rsv.tenant_id !== undefined && rsv.tenant_id !== null && String(rsv.tenant_id).trim() && String(rsv.tenant_id).trim() !== '*'
+          ? String(rsv.tenant_id).trim()
+          : null)
+      : tenantId;
+  const now = new Date().toISOString();
+  if (rsvTenant) {
+    await db
+      .prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(now, id, rsvTenant)
+      .run()
+      .catch(() => db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run());
+    await db
+      .prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(rsv.table_id, rsvTenant)
+      .run()
+      .catch(() => db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run());
+  } else {
+    await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
+    await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'").bind(rsv.table_id).run();
+  }
   return c.json({ success: true, message: 'Reservation cancelled' });
 });

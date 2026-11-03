@@ -36,7 +36,7 @@ export async function transitionOrderStatus(
     fields?: { notes?: unknown; delivery_time?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
-  const tenantId = options.tenantId ?? 'default';
+  const tenantId = (options.tenantId ?? '').trim() || 'default';
   const tenantClause = tenantId === '*'
     ? ''
     : tenantId === 'default'

@@ -85,10 +85,14 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
       const current = await db.prepare('SELECT status FROM payments WHERE id = ?').bind(payment.id).first<{ status: string }>();
       if (current?.status !== 'completed') return c.json({ error: 1, message: 'Payment requires reconciliation' }, 409);
     }
+    const settledOrderTenant =
+      typeof (order as Record<string, unknown>).tenant_id === 'string' && String((order as Record<string, unknown>).tenant_id).trim()
+        ? String((order as Record<string, unknown>).tenant_id).trim()
+        : 'default';
     if (settled.paymentChanged) {
       const metrics = createMetricsCollector(db);
-      safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id }));
-      if (success) safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos' }));
+      safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id, tenant_id: settledOrderTenant }));
+      if (success) safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
     }
     if (success && (settled.orderChanged || settled.paymentChanged)) {
       const kv = c.env.AUTH_KV;
@@ -105,35 +109,50 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
         } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
       }
       const orderRecord = order as Record<string, unknown>;
-      if (orderRecord.customer_id || orderRecord.customer_phone || orderRecord.customer_email) {
+      const orderStatus = String(orderRecord.status || '');
+      const isCancelledOrFailedOrder = ['cancelled', 'failed', 'expired'].includes(orderStatus);
+      if (isCancelledOrFailedOrder) {
+        await writePaymentReviewMarker(c.env.AUTH_KV, {
+          paymentId: payment.id,
+          orderId: payment.order_id,
+          orderCode,
+          source: 'webhook',
+          stage: 'cancelled_order_paid',
+          errorCode: 'PAID_ON_CANCELLED_ORDER',
+        });
+      }
+      if (!isCancelledOrFailedOrder && (orderRecord.customer_id || orderRecord.customer_phone || orderRecord.customer_email)) {
         try {
           const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
           await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, payment.order_id);
         } catch (err) { log.warn('PayOS loyalty credit error (non-blocking)', { message: (err as Error).message }); }
         try {
-          let refCustomerId = (orderRecord.customer_id as string | undefined) || null;
-          if (!refCustomerId && (orderRecord.customer_phone || orderRecord.customer_email)) {
-            const normalizedPhone = String(orderRecord.customer_phone || '').replace(/\D/g, '');
+          const digits = String(orderRecord.customer_phone || '').replace(/\D/g, '');
+          const normalizedPhone = digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
+          const trimmedEmail = typeof orderRecord.customer_email === 'string' ? orderRecord.customer_email.trim() : '';
+          const sanitizedEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
+          let refCustomerId = orderRecord.customer_id ? String(orderRecord.customer_id).trim() || null : null;
+          if (!refCustomerId && (normalizedPhone || sanitizedEmail)) {
             const orderTenant = (orderRecord.tenant_id && String(orderRecord.tenant_id).trim()) || 'default';
             let cust: { id: string } | null = null;
             try {
               cust = await db.prepare(
                 "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-              ).bind(orderRecord.customer_email ?? null, normalizedPhone || null, orderTenant, orderTenant).first<{ id: string }>();
+              ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
             } catch {
               cust = await db.prepare(
                 'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-              ).bind(orderRecord.customer_email ?? null, normalizedPhone || null).first<{ id: string }>().catch(() => null);
+              ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
             }
             refCustomerId = cust?.id ?? null;
           }
           if (refCustomerId && orderAmount >= 20000) {
             const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-            const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
             const orderTenantForRef =
               typeof orderRecord.tenant_id === 'string' && String(orderRecord.tenant_id).trim()
                 ? String(orderRecord.tenant_id).trim()
                 : undefined;
+            const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
             await rewardReferralOnFirstOrder(db, refCustomerId, payment.order_id, orderAmount, refPolicy, orderTenantForRef);
           }
         } catch (err) { log.warn('PayOS referral reward error (non-blocking)', { message: (err as Error).message }); }

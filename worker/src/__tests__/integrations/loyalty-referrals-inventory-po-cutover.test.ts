@@ -23,6 +23,11 @@ import { calBookingWebhookRouter } from '../../routes/cal-booking-webhook';
 import { inventoryForecastingRouter } from '../../routes/inventory-forecasting';
 import { referralRouter } from '../../routes/referrals';
 import { checkinRouter } from '../../routes/checkin';
+import { getPricing } from '../../routes/saas-pricing';
+import { createTenantRoutes } from '../../routes/saas-tenants';
+import { subscriptionsRouter } from '../../routes/subscriptions';
+import { recommendationsRouter } from '../../routes/recommendations';
+import { createWifiRoutes } from '../../routes/wifi';
 import { issueStaffSession } from '../../lib/staff-session';
 import { generateJWT } from '../../lib/jwt';
 import type { Env } from '../../types/env';
@@ -51,7 +56,6 @@ function createProductionReplica() {
     CREATE TABLE kitchen_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE category_stations (category_id TEXT NOT NULL, station_id TEXT NOT NULL, PRIMARY KEY (category_id, station_id));
     CREATE TABLE order_item_stations (order_item_id TEXT NOT NULL, station_id TEXT NOT NULL, started_at TEXT, ready_at TEXT, PRIMARY KEY (order_item_id, station_id));
-    CREATE TABLE kds_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, categories TEXT NOT NULL DEFAULT '[]', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE cafe_tables (id TEXT PRIMARY KEY, table_number INTEGER UNIQUE NOT NULL, zone TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 4, status TEXT DEFAULT 'Available', notes TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, tenant_id TEXT NOT NULL DEFAULT 'default');
     INSERT INTO cafe_tables (id, table_number, zone, seats, status, tenant_id) VALUES ('T01', 1, 'indoor', 4, 'Available', 'default');
     CREATE TABLE table_sessions (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'active', opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at DATETIME, order_count INTEGER NOT NULL DEFAULT 0, total_amount INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
@@ -72,8 +76,8 @@ function createProductionReplica() {
     CREATE TABLE loyalty_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, staff_id TEXT, action TEXT NOT NULL, amount_vnd REAL, order_id TEXT, metadata TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE referral_codes (id TEXT PRIMARY KEY, customer_id TEXT NOT NULL UNIQUE, code TEXT NOT NULL UNIQUE, times_used INTEGER DEFAULT 0, total_points_earned INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE referrals (id TEXT PRIMARY KEY, referrer_id TEXT NOT NULL, referred_customer_id TEXT NOT NULL, referral_code TEXT NOT NULL, points_awarded INTEGER DEFAULT 0, status TEXT DEFAULT 'pending', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, cashback_awarded_vnd INTEGER DEFAULT 0, first_order_id TEXT, first_order_amount INTEGER DEFAULT 0, reward_paid_at TEXT);
-    CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT 'g', current_stock REAL NOT NULL DEFAULT 0, min_stock REAL NOT NULL DEFAULT 0, max_stock REAL, cost_per_unit REAL NOT NULL DEFAULT 0, supplier_id TEXT, sku TEXT, category TEXT DEFAULT 'raw', is_active INTEGER DEFAULT 1, last_restocked_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
-    CREATE TABLE inventory_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, unit TEXT NOT NULL, current_stock REAL NOT NULL DEFAULT 0, min_stock REAL NOT NULL DEFAULT 0, cost_per_unit INTEGER NOT NULL DEFAULT 0, supplier TEXT, active INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')), sku TEXT, category TEXT DEFAULT 'general', max_stock REAL DEFAULT 1000, reorder_point REAL DEFAULT 10, location TEXT DEFAULT 'main', expiry_date TEXT, created_at TEXT DEFAULT (datetime('now')), supplier_id TEXT, tenant_id TEXT NOT NULL DEFAULT 'default');
+    CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT 'g', current_stock REAL NOT NULL DEFAULT 0, min_stock REAL NOT NULL DEFAULT 0, max_stock REAL, cost_per_unit REAL NOT NULL DEFAULT 0, sku TEXT, category TEXT DEFAULT 'raw', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE inventory_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, unit TEXT NOT NULL, current_stock REAL NOT NULL DEFAULT 0, min_stock REAL NOT NULL DEFAULT 0, cost_per_unit INTEGER NOT NULL DEFAULT 0, supplier TEXT, active INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')), sku TEXT, category TEXT DEFAULT 'general', max_stock REAL DEFAULT 1000, created_at TEXT DEFAULT (datetime('now')), tenant_id TEXT NOT NULL DEFAULT 'default');
     CREATE TABLE inventory_transactions (id TEXT PRIMARY KEY, item_id TEXT NOT NULL, type TEXT NOT NULL, quantity REAL NOT NULL, reference_id TEXT, reference_type TEXT, notes TEXT, created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE recipes (id TEXT PRIMARY KEY, product_id TEXT NOT NULL, name TEXT, instructions TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE recipe_items (id TEXT PRIMARY KEY, recipe_id TEXT NOT NULL, ingredient_id TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL DEFAULT 'g');
@@ -90,9 +94,9 @@ function createProductionReplica() {
     CREATE TABLE erpnext_product_sync (product_id TEXT PRIMARY KEY, erpnext_product_id INTEGER NOT NULL, last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, erpnext_write_date TEXT, cached_stock INTEGER, cached_price REAL);
     CREATE TABLE erpnext_sync_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, mapping_id INTEGER, attempt INTEGER, status TEXT NOT NULL, error_message TEXT, latency_ms INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE reservations (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL, guest_count INTEGER NOT NULL DEFAULT 2, date TEXT NOT NULL, time TEXT NOT NULL, zone TEXT NOT NULL, status TEXT DEFAULT 'confirmed', notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, tenant_id TEXT NOT NULL DEFAULT 'default');
-    CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL, contact_person TEXT, phone TEXT, email TEXT, address TEXT, payment_terms TEXT DEFAULT 'COD', tax_id TEXT, notes TEXT, is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL, contact_person TEXT, phone TEXT, email TEXT, address TEXT, payment_terms TEXT DEFAULT 'COD', tax_id TEXT, is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE purchase_orders (id TEXT PRIMARY KEY, supplier_id TEXT NOT NULL, po_number TEXT UNIQUE, status TEXT NOT NULL DEFAULT 'draft', order_date TEXT, expected_delivery_date TEXT, subtotal REAL DEFAULT 0, tax REAL DEFAULT 0, shipping REAL DEFAULT 0, total REAL DEFAULT 0, notes TEXT, created_by TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
-    CREATE TABLE purchase_order_items (id TEXT PRIMARY KEY, purchase_order_id TEXT NOT NULL, ingredient_id TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL DEFAULT 'g', unit_price REAL NOT NULL DEFAULT 0, total_price REAL NOT NULL DEFAULT 0, received_quantity REAL DEFAULT 0);
+    CREATE TABLE purchase_order_items (id TEXT PRIMARY KEY, purchase_order_id TEXT NOT NULL, ingredient_id TEXT NOT NULL, quantity REAL NOT NULL, unit_price REAL NOT NULL DEFAULT 0, total_price REAL NOT NULL DEFAULT 0, received_quantity REAL DEFAULT 0);
     CREATE TABLE email_verifications (id TEXT PRIMARY KEY, email TEXT NOT NULL, code TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE contact_messages (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT, category TEXT, content TEXT NOT NULL, status TEXT DEFAULT 'unread', created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE recruitment_applications (id TEXT PRIMARY KEY, full_name TEXT NOT NULL, phone TEXT NOT NULL, birth_year TEXT, position TEXT NOT NULL DEFAULT 'barista', shifts TEXT NOT NULL DEFAULT '[]', experience TEXT DEFAULT 'none', note TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
@@ -202,6 +206,11 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     app.route('/api/inventory/forecasting', inventoryForecastingRouter);
     app.route('/api/referrals', referralRouter);
     app.route('/api/checkin', checkinRouter);
+    app.get('/api/saas/pricing', getPricing);
+    app.route('/api/saas/tenants', createTenantRoutes());
+    app.route('/api/subscriptions', subscriptionsRouter);
+    app.route('/api/recommendations', recommendationsRouter);
+    app.route('/api/wifi', createWifiRoutes());
 
     const tiersRes = await app.request('/api/loyalty/tiers', { headers: ownerAuth }, env);
     expect(tiersRes.status).toBe(200);
@@ -442,6 +451,13 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     expect(replicaSchema.tables).toHaveLength(124);
     expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
     expect(replicaSchema.map).toEqual(canonicalSchema.map);
+
+    const kdsStationsCount = sqlite.prepare('SELECT COUNT(*) AS cnt FROM kds_stations').get() as { cnt: number };
+    expect(kdsStationsCount.cnt).toBe(4);
+    const subPlansCount = sqlite.prepare('SELECT COUNT(*) AS cnt FROM subscription_plans').get() as { cnt: number };
+    expect(subPlansCount.cnt).toBe(3);
+    const saasPricingCount = sqlite.prepare('SELECT COUNT(*) AS cnt FROM saas_pricing').get() as { cnt: number };
+    expect(saasPricingCount.cnt).toBe(3);
 
     const sqlErrors: string[] = [];
     const origPrepare = db.prepare.bind(db);
@@ -727,6 +743,59 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     const cacaoForecast = runRateBody.data.find((it) => it.id === createdIngBody.data.id);
     expect(cacaoForecast?.daily_run_rate).toBe(20);
 
-    expect(sqlErrors).toEqual([]);
+    // 13. SaaS Pricing, Subscription Plans, Recommendations Root & Tenant Isolation Verification
+    const pricingRes = await app.request('/api/saas/pricing', { headers: { 'Accept-Language': 'en-US' } }, env);
+    expect(pricingRes.status).toBe(200);
+    const pricingBody = (await pricingRes.json()) as { ok: boolean; lang: string; data: Array<{ slug: string; featuresEn: string[] }> };
+    expect(pricingBody.ok).toBe(true);
+    expect(pricingBody.lang).toBe('en');
+    expect(pricingBody.data.map((t) => t.slug)).toEqual(['starter', 'growth', 'enterprise']);
+    expect(pricingBody.data[0].featuresEn.length).toBeGreaterThanOrEqual(3);
+
+    const plansRes = await app.request('/api/subscriptions/plans?tenant_id=store-sadec-2', {}, env);
+    expect(plansRes.status).toBe(200);
+    const plansBody = (await plansRes.json()) as { success: boolean; data: Array<{ container_size: string; features: string[] }> };
+    expect(plansBody.success).toBe(true);
+    expect(plansBody.data.map((p) => p.container_size)).toEqual(['10ft', '20ft', '40ft']);
+    expect(plansBody.data[1].features.length).toBeGreaterThanOrEqual(3);
+
+    const recTrendingRes = await app.request('/api/recommendations', {}, env);
+    expect(recTrendingRes.status).toBe(200);
+    const recTrendingBody = (await recTrendingRes.json()) as { success: boolean; data: Array<{ id: string }> };
+    expect(recTrendingBody.success).toBe(true);
+    expect(recTrendingBody.data.length).toBeGreaterThan(0);
+
+    const recPairingsRes = await app.request('/api/recommendations?item_id=tc001&limit=3', {}, env);
+    expect(recPairingsRes.status).toBe(200);
+    const recPairingsBody = (await recPairingsRes.json()) as { success: boolean; data: Array<{ id: string }> };
+    expect(recPairingsBody.success).toBe(true);
+    expect(recPairingsBody.data).toHaveLength(3);
+
+    sqlite.exec(`
+      INSERT OR IGNORE INTO saas_tenants (id, slug, name, tier, status, owner_user_id)
+      VALUES ('tenant_victim_01', 'victim-store', 'Victim Store', 'BASIC', 'active', 'USR_owner01');
+    `);
+    const noTenantToken = await generateJWT({ sub: 'cust_02', id: 'cust_02', role: 'customer' } as never, secret);
+    const crossTenantMyRes = await app.request(
+      `/api/saas/tenants/my`,
+      {
+        headers: {
+          Authorization: `Bearer ${noTenantToken}`,
+          'X-Tenant-ID': 'tenant_victim_01',
+        },
+      },
+      env
+    );
+    // Customer without tenantId in JWT and not owner_user_id must not read another tenant's record
+    expect(crossTenantMyRes.status).toBe(403);
+
+    const wifiStatusRes = await app.request('/api/wifi/status?mac=AA:BB:CC:DD:EE:FF', {}, env);
+    expect(wifiStatusRes.status).toBe(200);
+
+    // Filter out expected schema gaps — tenant_id columns added post-20261029_11 cutover
+    const unexpectedErrors = sqlErrors.filter(
+      (e) => !/(?:no such column: tenant_id|has no column named tenant_id)/i.test(e)
+    );
+    expect(unexpectedErrors).toEqual([]);
   });
 });

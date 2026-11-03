@@ -2,17 +2,18 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, matchesTenantRow, resolvePublicTenantId } from '../../middleware/tenant';
 
-const PROMO_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff'];
+const PROMO_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
+function resolveOpenApiPromoReadTenantId(c: any): string {
+  const raw = resolvePublicTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c) ? 'default' : raw;
+}
+
+function resolveOpenApiPromoWriteTenantId(c: any): string {
+  const raw = getTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c) ? 'default' : raw;
 }
 
 async function writePromotionAuditLog(
@@ -72,7 +73,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions - List promotions
   app.openapi(PromotionRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveOpenApiPromoReadTenantId(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -150,7 +151,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/promotions/{id} - Get promotion by ID
   app.openapi(PromotionRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveOpenApiPromoReadTenantId(c);
     const { id } = c.req.valid('param');
 
     const promotion = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
@@ -168,14 +169,23 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/promotions - Create promotion
   app.openapi(PromotionRoutes.create as any, async (c: any) => {
     const db = getDatabase(c);
-    const rawTenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c).trim() || 'default';
     const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
+    if (!user?.role || !PROMO_WRITE_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const body = c.req.valid('json');
+    const upperCode = body.code.trim().toUpperCase();
     const now = new Date().toISOString();
+
+    const existingRes = await db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?')
+      .bind(upperCode)
+      .all<Record<string, unknown>>()
+      .catch(() => ({ results: [] as Record<string, unknown>[] }));
+    if ((existingRes.results || []).some((row) => matchesTenantRow(row, tenantId))) {
+      return c.json({ success: false, error: 'Promotion code already exists' }, 409);
+    }
 
     const id = crypto.randomUUID();
 
@@ -187,7 +197,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         id,
         body.name,
         body.description || null,
-        body.code.toUpperCase(),
+        upperCode,
         body.type,
         body.discountValue,
         body.discountType,
@@ -213,7 +223,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           id,
           body.name,
           body.description || null,
-          body.code.toUpperCase(),
+          upperCode,
           body.type,
           body.discountValue,
           body.discountType,
@@ -229,6 +239,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           now,
           now
         ).run();
+        await db.prepare('UPDATE promotions SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
       } catch {
         const canonicalDiscountType = body.discountType === 'percentage' ? 'percent' : (body.discountType || 'fixed');
         try {
@@ -237,7 +248,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
           ).bind(
             id,
-            body.code.toUpperCase(),
+            upperCode,
             body.name,
             body.description || null,
             canonicalDiscountType,
@@ -257,7 +268,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
             ).bind(
               id,
-              body.code.toUpperCase(),
+              upperCode,
               body.name,
               body.description || null,
               canonicalDiscountType,
@@ -269,12 +280,13 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
               body.validTo || null,
               now
             ).run();
+            await db.prepare('UPDATE promotions SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
           } catch {
             await db.prepare(
               `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, expires_at, is_active, created_at)
                VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
             ).bind(
-              body.code.toUpperCase(),
+              upperCode,
               body.discountValue ?? 0,
               body.maxDiscountValue || 0,
               body.minOrderValue || 0,
@@ -283,6 +295,7 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
               body.isActive !== false ? 1 : 0,
               now
             ).run();
+            await db.prepare('UPDATE promotions SET tenant_id = ? WHERE code = ?').bind(tenantId, upperCode).run().catch(() => {});
           }
         }
       }
@@ -301,9 +314,9 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/promotions/{id} - Update promotion
   app.openapi(PromotionRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveOpenApiPromoWriteTenantId(c);
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
+    if (!user?.role || !PROMO_WRITE_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const { id } = c.req.valid('param');
@@ -313,6 +326,21 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const existing = (await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first()) as any;
     if (!existing || !matchesTenantRow(existing, tenantId)) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
+    }
+
+    const effectiveTenant = tenantId === '*'
+      ? ((typeof existing.tenant_id === 'string' && existing.tenant_id.trim()) || 'default')
+      : tenantId;
+
+    if (body.code !== undefined) {
+      const upperCode = body.code.trim().toUpperCase();
+      const dupRes = await db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ? AND id != ?')
+        .bind(upperCode, id)
+        .all<Record<string, unknown>>()
+        .catch(() => ({ results: [] as Record<string, unknown>[] }));
+      if ((dupRes.results || []).some((row) => matchesTenantRow(row, effectiveTenant))) {
+        return c.json({ success: false, error: 'Promotion code already exists' }, 409);
+      }
     }
 
     const updates: string[] = [];
@@ -329,8 +357,9 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       canonicalUpdates.push('description = ?'); canonicalParams.push(body.description);
     }
     if (body.code !== undefined) {
-      updates.push('code = ?'); params.push(body.code.toUpperCase());
-      canonicalUpdates.push('code = ?'); canonicalParams.push(body.code.toUpperCase());
+      const upperCode = body.code.trim().toUpperCase();
+      updates.push('code = ?'); params.push(upperCode);
+      canonicalUpdates.push('code = ?'); canonicalParams.push(upperCode);
     }
     if (body.type !== undefined) { updates.push('type = ?'); params.push(body.type); }
     if (body.discountValue !== undefined) {
@@ -375,13 +404,34 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     updates.push('updated_at = ?');
     params.push(now);
-    params.push(id);
 
-    try {
-      await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-    } catch {
-      if (canonicalUpdates.length > 0) {
-        await db.prepare(`UPDATE promotions SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+    if (tenantId !== '*') {
+      try {
+        await db.prepare(
+          `UPDATE promotions SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(...params, id, tenantId).run();
+      } catch {
+        if (canonicalUpdates.length > 0) {
+          try {
+            await db.prepare(
+              `UPDATE promotions SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(...canonicalParams, id, tenantId).run();
+          } catch {
+            if (tenantId === 'default') {
+              await db.prepare(`UPDATE promotions SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+            }
+          }
+        } else if (tenantId === 'default') {
+          await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
+        }
+      }
+    } else {
+      try {
+        await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
+      } catch {
+        if (canonicalUpdates.length > 0) {
+          await db.prepare(`UPDATE promotions SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+        }
       }
     }
 
@@ -398,9 +448,9 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // DELETE /api/promotions/{id} - Delete promotion
   app.openapi(PromotionRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = resolveOpenApiPromoWriteTenantId(c);
     const user = c.get('user');
-    if (user?.role === 'customer' || (user?.role && !PROMO_WRITE_ROLES.includes(user.role))) {
+    if (!user?.role || !PROMO_WRITE_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const { id } = c.req.valid('param');
@@ -411,7 +461,17 @@ export function registerCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
 
-    await db.prepare('DELETE FROM promotions WHERE id = ?').bind(id).run();
+    if (tenantId !== '*') {
+      await db.prepare(
+        "DELETE FROM promotions WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, tenantId).run().catch(async () => {
+        if (tenantId === 'default') {
+          await db.prepare('DELETE FROM promotions WHERE id = ?').bind(id).run();
+        }
+      });
+    } else {
+      await db.prepare('DELETE FROM promotions WHERE id = ?').bind(id).run();
+    }
 
     await writePromotionAuditLog(db, user.id, 'promotion_delete', id, JSON.stringify({ name: existing.name }), now);
 

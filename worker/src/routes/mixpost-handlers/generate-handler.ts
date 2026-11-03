@@ -1,16 +1,8 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import { mixpostGenerateSchema, zodErrorResponse } from '../../lib/validators';
 import type { PromotionRow, ProductRow } from '../../tree/mixpost/types';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /generate — generate social content from source
@@ -38,17 +30,29 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
       }
 
       const promoId = data.id as string;
-      const { results } = await db.prepare(
-        'SELECT * FROM promotions WHERE code = ?'
-      ).bind(promoId).all<PromotionRow>();
-
-      const promos = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      let promos: PromotionRow[] = [];
+      if (tenantId !== '*') {
+        try {
+          const { results: scopedResults } = await db.prepare(
+            "SELECT * FROM promotions WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 10"
+          ).bind(promoId, tenantId).all<PromotionRow>();
+          promos = (scopedResults || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        } catch {
+          promos = [];
+        }
+      }
+      if (promos.length === 0) {
+        const { results } = await db.prepare(
+          'SELECT * FROM promotions WHERE code = ?'
+        ).bind(promoId).all<PromotionRow>();
+        promos = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      }
       if (promos.length === 0) {
         return c.json({ success: false, error: 'Promotion not found' }, 404);
       }
 
-      const promo = promos[0] as PromotionRow & { discount_value?: number };
-      const discountPercent = promo.percent ?? promo.discount_value ?? 0;
+      const promo = promos[0] as PromotionRow & { discount_value?: number; value?: number };
+      const discountPercent = promo.percent ?? promo.discount_value ?? promo.value ?? 0;
       const content = `🔥 ${promo.code}: Giảm ${discountPercent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
       return c.json({
         success: true,
@@ -62,18 +66,39 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
       }
 
       const categoryId = data.category as number | undefined;
-      let query = 'SELECT * FROM products WHERE is_available = 1';
-      const params: unknown[] = [];
-      if (categoryId) {
-        query += ' AND category_id = ?';
-        params.push(categoryId);
+      let products: ProductRow[] = [];
+      if (tenantId !== '*') {
+        try {
+          let scopedQuery = 'SELECT * FROM products WHERE is_available = 1';
+          const scopedParams: unknown[] = [];
+          if (categoryId) {
+            scopedQuery += ' AND category_id = ?';
+            scopedParams.push(categoryId);
+          }
+          scopedQuery += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 50";
+          scopedParams.push(tenantId);
+          const { results: scopedResults } = await db.prepare(scopedQuery).bind(...scopedParams).all<ProductRow>();
+          products = (scopedResults || [])
+            .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+            .slice(0, 5);
+        } catch {
+          products = [];
+        }
       }
-      query += ' LIMIT 50';
+      if (products.length === 0) {
+        let query = 'SELECT * FROM products WHERE is_available = 1';
+        const params: unknown[] = [];
+        if (categoryId) {
+          query += ' AND category_id = ?';
+          params.push(categoryId);
+        }
+        query += ' LIMIT 50';
 
-      const { results } = await db.prepare(query).bind(...params).all<ProductRow>();
-      const products = (results || [])
-        .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
-        .slice(0, 5);
+        const { results } = await db.prepare(query).bind(...params).all<ProductRow>();
+        products = (results || [])
+          .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+          .slice(0, 5);
+      }
 
       if (products.length === 0) {
         const content = '☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay';

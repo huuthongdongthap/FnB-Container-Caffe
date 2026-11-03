@@ -4,7 +4,7 @@ import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, resolvePublicTenantId } from '../../middleware/tenant';
 import { handleGetOrderSummary } from './order-summary-handlers';
 import { canAccessOrder } from '@aura/domain-order';
 
@@ -49,33 +49,39 @@ function projectForActor(
 export async function fetchOrderForRead(
   db: ReturnType<typeof getDatabase>,
   id: string,
-  tenantId: string
+  tenantId: string,
 ): Promise<Record<string, any> | null> {
-  const scoped = tenantId !== '*';
+  const cleanTenant = (tenantId || '').trim() || 'default';
+  const scoped = cleanTenant !== '*';
   const joinTenantClause = !scoped
     ? ''
-    : tenantId === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
+    : cleanTenant === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      : ' AND (o.tenant_id = ?2 OR TRIM(o.tenant_id) = ?2)';
+  const tableJoinTenantClause = !scoped
+    ? " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
+    : cleanTenant === 'default'
+      ? " AND (t.tenant_id IS NULL OR t.tenant_id = '' OR TRIM(t.tenant_id) = '' OR TRIM(t.tenant_id) = 'default')"
+      : ' AND TRIM(t.tenant_id) = ?2';
   const bareTenantClause = !scoped
     ? ''
-    : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
-  let order: Record<string, any> | null = null;
+    : cleanTenant === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
+  const idPlaceholder = scoped && cleanTenant !== 'default' ? '?1' : '?';
   try {
-    order = (await db.prepare(
-      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-       FROM orders o
-       LEFT JOIN cafe_tables t ON o.table_id = t.id
-       WHERE o.id = ?${joinTenantClause}`
-    ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
-    return order;
+    return (await db.prepare(
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id${tableJoinTenantClause} WHERE o.id = ${idPlaceholder}${joinTenantClause}`
+    ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
   } catch {
-    order = (await db.prepare(
-      `SELECT * FROM orders WHERE id = ?${bareTenantClause}`
-    ).bind(...(scoped ? [id, tenantId] : [id])).first() as Promise<Record<string, any> | null>);
-    return order;
+    try {
+      return (await db.prepare(
+        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ${idPlaceholder}${joinTenantClause}`
+      ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+    } catch {
+      return (await db.prepare(`SELECT * FROM orders WHERE id = ${idPlaceholder}${bareTenantClause}`)
+        .bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+    }
   }
 }
 
@@ -87,58 +93,35 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
 
   let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   if (tenantId !== '*') {
     whereClause += tenantId === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '')"
-      : ' AND o.tenant_id = ?';
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      : ' AND (o.tenant_id = ? OR TRIM(o.tenant_id) = ?1)';
     params.push(tenantId);
   }
 
   if (scope.allowAll) {
-    if (customerId) {
-      whereClause += ' AND o.customer_id = ?';
-      params.push(customerId);
-    }
+    if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
   } else if (scope.owner) {
-    whereClause += ' AND o.customer_id = ?';
-    params.push(scope.owner);
+    whereClause += ' AND o.customer_id = ?'; params.push(scope.owner);
   } else {
     whereClause += ' AND 1=0';
   }
 
-  if (tableId) {
-    whereClause += ' AND o.table_id = ?';
-    params.push(tableId);
-  }
-  if (locationId) {
-    whereClause += ' AND o.location_id = ?';
-    params.push(locationId);
-  }
-  if (status) {
-    whereClause += ' AND o.status = ?';
-    params.push(status);
-  }
-  if (paymentStatus) {
-    whereClause += ' AND o.payment_status = ?';
-    params.push(paymentStatus);
-  }
-  if (dateFrom) {
-    whereClause += ' AND date(o.created_at) >= ?';
-    params.push(dateFrom);
-  }
-  if (dateTo) {
-    whereClause += ' AND date(o.created_at) <= ?';
-    params.push(dateTo);
-  }
+  if (tableId) { whereClause += ' AND o.table_id = ?'; params.push(tableId); }
+  if (locationId) { whereClause += ' AND o.location_id = ?'; params.push(locationId); }
+  if (status) { whereClause += ' AND o.status = ?'; params.push(status); }
+  if (paymentStatus) { whereClause += ' AND o.payment_status = ?'; params.push(paymentStatus); }
+  if (dateFrom) { whereClause += ' AND date(o.created_at) >= ?'; params.push(dateFrom); }
+  if (dateTo) { whereClause += ' AND date(o.created_at) <= ?'; params.push(dateTo); }
 
-  const countResult = (await db.prepare(
-    `SELECT COUNT(*) as total FROM orders o ${whereClause}`
-  ).bind(...params).first()) as { total?: number } | null;
+  const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
   const total = Number(countResult?.total || 0);
-  const pageNum = Number(page || 1);
-  const limitNum = Number(limit || 20);
-
+  const rawPage = Number(page || 1);
+  const pageNum = Number.isFinite(rawPage) ? Math.max(1, Math.trunc(rawPage)) : 1;
+  const rawLimit = Number(limit || 20);
+  const limitNum = Number.isFinite(rawLimit) ? Math.min(Math.max(1, Math.trunc(rawLimit)), 100) : 20;
   const offset = (pageNum - 1) * limitNum;
   const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';
   const safeDirection = (order?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
@@ -146,21 +129,17 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   let rows: { results: any[] };
   try {
     rows = (await db.prepare(
-      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-       FROM orders o
-       LEFT JOIN cafe_tables t ON o.table_id = t.id
-       ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
     ).bind(...params, limitNum, offset).all()) as { results: any[] };
   } catch {
-    rows = (await db.prepare(
-      `SELECT o.*
-       FROM orders o
-       ${whereClause}
-       ORDER BY ${orderClause}
-       LIMIT ? OFFSET ?`
-    ).bind(...params, limitNum, offset).all()) as { results: any[] };
+    try {
+      rows = (await db.prepare(
+        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+      ).bind(...params, limitNum, offset).all()) as { results: any[] };
+    } catch {
+      rows = (await db.prepare(`SELECT o.* FROM orders o ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`)
+        .bind(...params, limitNum, offset).all()) as { results: any[] };
+    }
   }
 
   const orders = await Promise.all(rows.results.map(async (_order) => {
@@ -174,17 +153,24 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   });
 }
 
+function resolveReadTenantId(c: Context<{ Bindings: Env }>): string {
+  const user = c.get('user');
+  if (user) return getTenantId(c).trim() || 'default';
+  try {
+    return resolvePublicTenantId(c);
+  } catch {
+    return getTenantId(c).trim() || 'default';
+  }
+}
+
 export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
   const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
   const user = c.get('user');
-  const tenantId = getTenantId(c);
+  const tenantId = resolveReadTenantId(c);
 
   const order = await fetchOrderForRead(db, id, tenantId);
-
-  if (!order) {
-    return c.json({ success: false, error: 'Order not found' }, 404);
-  }
+  if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
 
   const access = canAccessOrder(user, { id: order.id, customer_id: order.customer_id });
   if (!access.allowed) {
@@ -194,7 +180,6 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
 
   const scope = resolveCustomerScope(c);
   const { items, payments } = await fetchOrderItemsAndPayments(db, id);
-
   return c.json({
     success: true,
     data: projectForActor(scope, order, items, formatOrder, formatCustomerOrder, payments),
@@ -205,17 +190,12 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
   const db = getDatabase(c);
   const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
   const user = c.get('user');
-  const tenantId = getTenantId(c);
+  const tenantId = resolveReadTenantId(c);
 
   const order = await fetchOrderForRead(db, id, tenantId);
+  if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
 
-  if (!order) {
-    return c.json({ success: false, error: 'Order not found' }, 404);
-  }
-
-  // The tracking link is shareable, so it must not double as an enumeration
-  // oracle: an anonymous caller resolves guest orders only, and a signed-in
-  // customer resolves their own orders only.
+  // Anonymous callers resolve guest orders only; signed-in customers resolve their own orders only.
   const access = canAccessOrder(user, { id: order.id, customer_id: order.customer_id });
   if (!access.allowed) {
     const status = !user ? 401 : 403;
@@ -223,11 +203,7 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
   }
 
   const { items } = await fetchOrderItemsAndPayments(db, id);
-
-  return c.json({
-    success: true,
-    data: formatCustomerOrder(order, items),
-  });
+  return c.json({ success: true, data: formatCustomerOrder(order, items) });
 }
 
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {

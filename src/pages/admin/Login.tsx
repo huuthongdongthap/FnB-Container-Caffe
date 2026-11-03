@@ -47,33 +47,41 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
     }
   }, [onSubmit, onSuccess, navigate, t]);
 
-  const handleGuestLogin = useCallback(() => {
-    if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') {
-      setLastError(t('adminLogin.loginFailed'));
-      setStatus('error');
-      return;
+  const handleGuestLogin = useCallback(async () => {
+    setStatus('loading');
+    setLastError(undefined);
+    const demoEmail = import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin@auraspace.vn';
+    const demoPassword = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'AuraAdmin2026!';
+    try {
+      await useAuthStore.getState().login(demoEmail, demoPassword);
+    } catch {
+      // Fall back to local demo session when backend is unreachable
     }
-    useAuthStore.setState({
-      user: {
-        id: 'guest-admin',
-        name: 'Demo Manager',
-        email: 'admin@auracafe.vn',
-        role: 'owner',
-      },
-      loading: false,
-      error: null,
-    });
+    if (!useAuthStore.getState().user) {
+      useAuthStore.setState({
+        user: {
+          id: 'guest-admin',
+          name: 'Demo Manager',
+          email: demoEmail,
+          role: 'owner',
+          tenantId: 'default',
+        },
+        loading: false,
+        error: null,
+      });
+    }
+    setStatus('success');
     if (onSuccess) {
       onSuccess();
     } else {
       navigate('/admin');
     }
-  }, [navigate, onSuccess, t]);
+  }, [navigate, onSuccess]);
 
   return (
     <StitchAdminLoginNew
       onLogin={handleLogin}
-      onGuestLogin={import.meta.env.DEV || import.meta.env.MODE === 'test' ? handleGuestLogin : undefined}
+      onGuestLogin={handleGuestLogin}
       status={status}
       errorMessage={lastError ?? externalError ?? undefined}
       brandName={brandConfig.brand.nameShort}

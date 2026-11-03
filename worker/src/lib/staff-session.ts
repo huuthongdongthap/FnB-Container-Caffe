@@ -42,7 +42,7 @@ export function staffSessionErrorResponse(error: unknown): Response | null {
     ? Response.json({ success: false, error: error.message, code: error.code }, { status: error.status }) : null;
 }
 export const isAccountActive = (account: StaffAccount) => account.is_active === 1;
-export const staffTenant = (account: StaffAccount) => account.tenant_id || 'default';
+export const staffTenant = (account: StaffAccount) => (account.tenant_id ? String(account.tenant_id).trim() : '') || 'default';
 
 /** No KV or legacy-column fallback: missing auth schema is an outage, not a guest. */
 export async function loadStaffAccount(db: D1Database, staffId: string): Promise<SessionCheckResult> {
@@ -70,7 +70,7 @@ export function evaluateStaffSession(
 ): { valid: true; remainingSeconds: number } | { valid: false; code: StaffSessionCode } {
   if (!isAccountActive(account)) return { valid: false, code: 'STAFF_ACCOUNT_INACTIVE' };
   if (!isStaffRole(account.role) || claims.id !== account.id || claims.role !== account.role
-    || (claims.tenantId || 'default') !== staffTenant(account) || !Number.isSafeInteger(claims.authVersion)
+    || ((claims.tenantId ? String(claims.tenantId).trim() : '') || 'default') !== staffTenant(account) || !Number.isSafeInteger(claims.authVersion)
     || claims.authVersion !== account.auth_version || !Number.isSafeInteger(claims.authTime)
     || claims.authTime! > now || claims.authTime! < 0
     || !['staff-web', 'staff-mobile'].includes(claims.sessionType || '')

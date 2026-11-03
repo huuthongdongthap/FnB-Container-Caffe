@@ -208,4 +208,158 @@ describe('customers smoke', () => {
     const deleteRes = await deleteAdminCustomer(env, 'c_1');
     expect(deleteRes.status).toBe(200);
   });
+
+  it('Phase Z1-Z4 — enforces catalog handler tenant resolution, AI barista & assistant pilot store fallback, customer TRIM(tenant_id), and signage canonical filtering', async() => {
+    const { getCustomerMenuHandler, getMenuItemHandler } = await import('../../routes/catalog-handlers/handlers');
+    const { aiBaristaRouter } = await import('../../routes/ai-barista');
+    const { customerAssistantRouter } = await import('../../routes/customer-assistant');
+    const { signageRouter } = await import('../../routes/signage');
+
+    // Z1: catalog-handlers resolve PILOT_TENANT_ID and filter out foreign tenant products
+    const catalogDb = createMockDB();
+    catalogDb.prepare = vi.fn(() => ({
+      bind: (...args: unknown[]) => ({
+        all: async() => ({
+          results: args[0] === 'p_other'
+            ? [{ id: 'p_other', name: 'Trà Sữa Chi Nhánh Khác', price: 45000, category_id: 'cat_1', category_name: 'Cà Phê', is_available: 1, tenant_id: 'tenant_other' }]
+            : [
+                { id: 'p_sadec', name: 'Bạc Xỉu Sa Đéc', price: 32000, category_id: 'cat_1', category_name: 'Cà Phê', is_available: 1, tenant_id: '  tenant_sadec_02  ' },
+                { id: 'p_other', name: 'Trà Sữa Chi Nhánh Khác', price: 45000, category_id: 'cat_1', category_name: 'Cà Phê', is_available: 1, tenant_id: 'tenant_other' }
+              ]
+        })
+      }),
+      all: async() => ({ results: [] })
+    })) as any;
+
+    const catalogApp = new Hono<{ Bindings: any }>();
+    catalogApp.get('/api/catalog/menu', getCustomerMenuHandler);
+    catalogApp.get('/api/catalog/menu/:id', getMenuItemHandler);
+
+    const catalogMenuRes = await catalogApp.fetch(
+      new Request('https://test.aura/api/catalog/menu'),
+      { ...createMockEnv(), PILOT_TENANT_ID: 'tenant_sadec_02', AURA_DB: catalogDb }
+    );
+    expect(catalogMenuRes.status).toBe(200);
+    const catalogMenuJson = await catalogMenuRes.json() as any;
+    expect(catalogMenuJson.data.totalItems).toBe(1);
+    expect(catalogMenuJson.data.categories[0].items[0].id).toBe('p_sadec');
+
+    const catalogItemRes = await catalogApp.fetch(
+      new Request('https://test.aura/api/catalog/menu/p_other'),
+      { ...createMockEnv(), PILOT_TENANT_ID: 'tenant_sadec_02', AURA_DB: catalogDb }
+    );
+    expect(catalogItemRes.status).toBe(404);
+
+    // Z2: ai-barista & customer-assistant resolve PILOT_TENANT_ID on unauthenticated guest calls
+    const boundArgs: unknown[][] = [];
+    const assistantDb = createMockDB();
+    assistantDb.prepare = vi.fn(() => ({
+      bind: (...args: unknown[]) => {
+        boundArgs.push(args);
+        return {
+          all: async() => ({
+            results: [
+              { id: 'p_sadec', name: 'Cà Phê Muối', price: 35000, category_name: 'Signature', is_available: 1, tenant_id: 'tenant_sadec_02' }
+            ]
+          }),
+          first: async() => null,
+          run: async() => ({ success: true })
+        };
+      }
+    })) as any;
+
+    const assistantApp = new Hono<{ Bindings: any }>();
+    assistantApp.route('/api/barista', aiBaristaRouter);
+    assistantApp.route('/api/assistant', customerAssistantRouter);
+
+    const baristaRes = await assistantApp.fetch(
+      new Request('https://test.aura/api/barista/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mood: 'tired', weather: 'hot' })
+      }),
+      { ...createMockEnv(), PILOT_TENANT_ID: 'tenant_sadec_02', AURA_DB: assistantDb }
+    );
+    expect(baristaRes.status).toBe(200);
+    expect(boundArgs.some((args) => args.includes('tenant_sadec_02'))).toBe(true);
+
+    boundArgs.length = 0;
+    const chatRes = await assistantApp.fetch(
+      new Request('https://test.aura/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'Cho mình xem menu quán' })
+      }),
+      { ...createMockEnv(), PILOT_TENANT_ID: 'tenant_sadec_02', AURA_DB: assistantDb }
+    );
+    expect(chatRes.status).toBe(200);
+    expect(boundArgs.some((args) => args.includes('tenant_sadec_02'))).toBe(true);
+
+    // Z3: getAdminCustomers normalizes TRIM(c.tenant_id) and filters out foreign rows
+    const adminSqls: string[] = [];
+    const adminDb = createMockDB();
+    adminDb.prepare = vi.fn((sql: string) => {
+      adminSqls.push(sql);
+      return {
+        bind: () => ({
+          all: async() => ({
+            results: [
+              { id: 'c_sadec', name: 'Khách Sa Đéc', phone: '0901112222', email: 'sadec@loyalty.aura', loyalty_tier: 'gold', tenant_id: '  tenant_sadec_02  ' },
+              { id: 'c_other', name: 'Khách Khác', phone: '0909998888', email: 'other@loyalty.aura', loyalty_tier: 'silver', tenant_id: 'tenant_other' }
+            ]
+          }),
+          first: async() => ({ total: 1 })
+        })
+      };
+    }) as any;
+
+    const adminListRes = await getAdminCustomers(
+      new Request('https://test.aura/api/admin/customers'),
+      { AURA_DB: adminDb, PILOT_TENANT_ID: 'tenant_sadec_02' }
+    );
+    expect(adminListRes.status).toBe(200);
+    const adminListJson = await adminListRes.json() as any;
+    expect(adminListJson.customers.map((c: { id: string }) => c.id)).toEqual(['c_sadec']);
+    expect(adminSqls.some((s) => s.includes('TRIM(c.tenant_id)') && s.includes('TRIM(cw.tenant_id)'))).toBe(true);
+
+    // Z4: signageRouter filters cross-tenant products and categories using canonical matchesTenantRow
+    const signageDb = createMockDB();
+    signageDb.prepare = vi.fn(() => ({
+      all: async() => ({
+        results: [
+          {
+            product_name: 'Cà Phê Sữa Đá',
+            price: 29000,
+            image_url: null,
+            description: 'Đậm vị',
+            category_id: 1,
+            category_name: 'Cà Phê',
+            category_sort_order: 1,
+            tenant_id: '  tenant_sadec_02  '
+          },
+          {
+            product_name: 'Món Chi Nhánh Khác',
+            price: 39000,
+            image_url: null,
+            description: 'Khác',
+            category_id: 2,
+            category_name: 'Khác',
+            category_sort_order: 2,
+            tenant_id: 'tenant_other'
+          }
+        ]
+      })
+    })) as any;
+
+    const signageApp = new Hono<{ Bindings: any }>();
+    signageApp.route('/api/signage', signageRouter);
+    const signageRes = await signageApp.fetch(
+      new Request('https://test.aura/api/signage/menu'),
+      { ...createMockEnv(), PILOT_TENANT_ID: 'tenant_sadec_02', AURA_DB: signageDb }
+    );
+    expect(signageRes.status).toBe(200);
+    const signageJson = await signageRes.json() as any;
+    expect(signageJson.data).toHaveLength(1);
+    expect(signageJson.data[0].products[0].name).toBe('Cà Phê Sữa Đá');
+  });
 });

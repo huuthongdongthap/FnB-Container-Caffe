@@ -5,6 +5,7 @@
  * Cancelled POs cannot increase stock; Receiving is idempotent; Never trust client totals.
  */
 import type { D1Database } from '@cloudflare/workers-types';
+import { matchesTenantRow } from 'worker/src/lib/db';
 
 export interface ReceiveItemInput {
   ingredientId: string;
@@ -32,19 +33,26 @@ export async function createCanonicalPurchaseOrder(
     notes?: string;
     expectedDate?: string;
     createdBy?: string;
-  }
+    tenantId?: string;
+  },
+  tenantId?: string
 ) {
+  const effectiveTenant = (tenantId ?? input.tenantId)?.trim() || undefined;
   if (!Array.isArray(input.items) || input.items.length === 0) {
     throw new Error('Purchase order requires at least one item');
   }
 
   const supplier = await db.prepare(
-    'SELECT id, name FROM suppliers WHERE id = ? AND is_active = 1'
-  ).bind(input.supplierId).first<{ id: string; name: string }>();
+    'SELECT * FROM suppliers WHERE id = ? AND is_active = 1'
+  ).bind(input.supplierId).first<{ id: string; name: string; tenant_id?: string | null }>();
 
-  if (!supplier) {
+  if (!supplier || (effectiveTenant && !matchesTenantRow(supplier, effectiveTenant))) {
     throw new Error('Supplier not found or inactive');
   }
+  const supplierTenant = 'tenant_id' in supplier && supplier.tenant_id !== undefined
+    ? ((typeof supplier.tenant_id === 'string' && supplier.tenant_id.trim()) || 'default')
+    : undefined;
+  const poTenant = effectiveTenant && effectiveTenant !== '*' ? effectiveTenant : supplierTenant;
 
   const now = new Date().toISOString();
   const poId = `po_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -61,9 +69,11 @@ export async function createCanonicalPurchaseOrder(
       throw new Error(`Invalid unit price for ingredient ${item.ingredientId}`);
     }
     const ing = await db.prepare(
-      'SELECT id, cost_per_unit FROM ingredients WHERE id = ?'
-    ).bind(item.ingredientId).first<{ id: string; cost_per_unit: number }>();
-    if (!ing) throw new Error(`Ingredient ${item.ingredientId} not found`);
+      'SELECT * FROM ingredients WHERE id = ?'
+    ).bind(item.ingredientId).first<{ id: string; cost_per_unit: number; tenant_id?: string | null }>();
+    if (!ing || (poTenant && !matchesTenantRow(ing, poTenant))) {
+      throw new Error(`Ingredient ${item.ingredientId} not found`);
+    }
 
     const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : Number(ing.cost_per_unit || 0);
     const totalPrice = item.quantity * unitPrice;
@@ -81,10 +91,24 @@ export async function createCanonicalPurchaseOrder(
   }
 
   // Pure document creation — NEVER touches ingredients.current_stock
-  await db.prepare(
-    `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_delivery_date, status, subtotal, total, notes, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'ordered', ?, ?, ?, ?, ?, ?)`
-  ).bind(poId, poNumber, input.supplierId, now.slice(0, 10), input.expectedDate || null, subtotal, subtotal, input.notes || null, input.createdBy || 'system', now, now).run();
+  if (poTenant && poTenant !== '*') {
+    try {
+      await db.prepare(
+        `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_delivery_date, status, subtotal, total, notes, created_by, created_at, updated_at, tenant_id)
+         VALUES (?, ?, ?, ?, ?, 'ordered', ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(poId, poNumber, input.supplierId, now.slice(0, 10), input.expectedDate || null, subtotal, subtotal, input.notes || null, input.createdBy || 'system', now, now, poTenant).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_delivery_date, status, subtotal, total, notes, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'ordered', ?, ?, ?, ?, ?, ?)`
+      ).bind(poId, poNumber, input.supplierId, now.slice(0, 10), input.expectedDate || null, subtotal, subtotal, input.notes || null, input.createdBy || 'system', now, now).run();
+    }
+  } else {
+    await db.prepare(
+      `INSERT INTO purchase_orders (id, po_number, supplier_id, order_date, expected_delivery_date, status, subtotal, total, notes, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'ordered', ?, ?, ?, ?, ?, ?)`
+    ).bind(poId, poNumber, input.supplierId, now.slice(0, 10), input.expectedDate || null, subtotal, subtotal, input.notes || null, input.createdBy || 'system', now, now).run();
+  }
 
   for (const item of processedItems) {
     await db.prepare(
@@ -100,21 +124,46 @@ export async function receivePurchaseOrder(
   db: D1Database,
   poId: string,
   items: ReceiveItemInput[],
-  options?: { receiptId?: string; receivedBy?: string }
+  options?: { receiptId?: string; receivedBy?: string; tenantId?: string }
 ): Promise<ReceivePurchaseOrderResult> {
   const po = await db.prepare(
-    'SELECT id, status, supplier_id FROM purchase_orders WHERE id = ?'
-  ).bind(poId).first<{ id: string; status: string; supplier_id: string }>();
+    'SELECT * FROM purchase_orders WHERE id = ?'
+  ).bind(poId).first<{ id: string; status: string; supplier_id: string; tenant_id?: string | null }>();
 
-  if (!po) return { ok: false, error: 'purchase_order_not_found' };
+  if (!po || (options?.tenantId && !matchesTenantRow(po, options.tenantId))) {
+    return { ok: false, error: 'purchase_order_not_found' };
+  }
   if (po.status === 'cancelled') return { ok: false, error: 'cancelled_purchase_order' };
   if (!Array.isArray(items) || items.length === 0) return { ok: false, error: 'invalid_received_items' };
 
+  const effectiveTenant =
+    options?.tenantId && options.tenantId.trim() && options.tenantId.trim() !== '*'
+      ? options.tenantId.trim()
+      : po.tenant_id && String(po.tenant_id).trim()
+        ? String(po.tenant_id).trim()
+        : undefined;
+
   // 1. Idempotency Guard
   if (options?.receiptId) {
-    const existing = await db.prepare(
-      'SELECT id FROM stock_movements WHERE reference_id = ? LIMIT 1'
-    ).bind(options.receiptId).first();
+    let existing: Record<string, unknown> | null = null;
+    if (effectiveTenant) {
+      try {
+        existing = await db.prepare(
+          "SELECT id, tenant_id FROM stock_movements WHERE reference_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(options.receiptId, effectiveTenant).first<Record<string, unknown>>();
+      } catch {
+        const unscoped = await db.prepare(
+          'SELECT id FROM stock_movements WHERE reference_id = ? LIMIT 1'
+        ).bind(options.receiptId).first<Record<string, unknown>>();
+        if (unscoped && matchesTenantRow(unscoped, effectiveTenant)) {
+          existing = unscoped;
+        }
+      }
+    } else {
+      existing = await db.prepare(
+        'SELECT id FROM stock_movements WHERE reference_id = ? LIMIT 1'
+      ).bind(options.receiptId).first<Record<string, unknown>>();
+    }
     if (existing) {
       return { ok: true, alreadyReceived: true, status: po.status as any, receivedItems: [] };
     }
@@ -131,13 +180,19 @@ export async function receivePurchaseOrder(
   const poItems = poiRows.results || [];
   if (poItems.length === 0) return { ok: false, error: 'empty_purchase_order' };
 
-  // 2. Validate Items & Guard Against Supplier Mismatch
+  // 2. Validate Items & Guard Against Supplier Mismatch and Over-Receiving
+  const cumulativeByIngredient = new Map<string, number>();
   for (const rcv of items) {
     const matching = poItems.find(p => p.ingredient_id === rcv.ingredientId);
     if (!matching) return { ok: false, error: 'supplier_item_mismatch' };
     if (typeof rcv.receivedQuantity !== 'number' || !Number.isFinite(rcv.receivedQuantity) || rcv.receivedQuantity <= 0) {
       return { ok: false, error: 'invalid_received_quantity' };
     }
+    const nextTotal = (cumulativeByIngredient.get(rcv.ingredientId) ?? Number(matching.received_quantity || 0)) + rcv.receivedQuantity;
+    if (nextTotal > Number(matching.quantity)) {
+      return { ok: false, error: 'Cannot receive more than ordered quantity' };
+    }
+    cumulativeByIngredient.set(rcv.ingredientId, nextTotal);
   }
 
   // 3. Increment Stock & Record Immutable Movement
@@ -155,23 +210,65 @@ export async function receivePurchaseOrder(
     ).bind(newTotalReceived, poi.id).run();
 
     // Receiving is the ONLY gateway that increases stock from purchases
-    await db.prepare(
-      'UPDATE ingredients SET current_stock = current_stock + ?, cost_per_unit = ?, updated_at = ? WHERE id = ?'
-    ).bind(rcv.receivedQuantity, poi.unit_price, now, rcv.ingredientId).run();
+    if (effectiveTenant) {
+      await db.prepare(
+        "UPDATE ingredients SET current_stock = current_stock + ?, cost_per_unit = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(rcv.receivedQuantity, poi.unit_price, now, rcv.ingredientId, effectiveTenant).run().catch(() =>
+        db.prepare(
+          'UPDATE ingredients SET current_stock = current_stock + ?, cost_per_unit = ?, updated_at = ? WHERE id = ?'
+        ).bind(rcv.receivedQuantity, poi.unit_price, now, rcv.ingredientId).run()
+      );
+    } else {
+      await db.prepare(
+        'UPDATE ingredients SET current_stock = current_stock + ?, cost_per_unit = ?, updated_at = ? WHERE id = ?'
+      ).bind(rcv.receivedQuantity, poi.unit_price, now, rcv.ingredientId).run();
+    }
 
     // Immutable ledger log with canonical incoming cost
-    await db.prepare(
-      `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
-       VALUES (?, ?, 'purchase_receipt', ?, ?, 'purchase_order', ?, ?, ?)`
-    ).bind(
-      `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      rcv.ingredientId,
-      rcv.receivedQuantity,
-      receiptKey,
-      `Received from PO ${poId}`,
-      options?.receivedBy || 'system',
-      now
-    ).run();
+    const movId = `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    if (effectiveTenant) {
+      try {
+        await db.prepare(
+          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at, tenant_id)
+           VALUES (?, ?, 'purchase_receipt', ?, ?, 'purchase_order', ?, ?, ?, ?)`
+        ).bind(
+          movId,
+          rcv.ingredientId,
+          rcv.receivedQuantity,
+          receiptKey,
+          `Received from PO ${poId}`,
+          options?.receivedBy || 'system',
+          now,
+          effectiveTenant
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
+           VALUES (?, ?, 'purchase_receipt', ?, ?, 'purchase_order', ?, ?, ?)`
+        ).bind(
+          movId,
+          rcv.ingredientId,
+          rcv.receivedQuantity,
+          receiptKey,
+          `Received from PO ${poId}`,
+          options?.receivedBy || 'system',
+          now
+        ).run();
+      }
+    } else {
+      await db.prepare(
+        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
+         VALUES (?, ?, 'purchase_receipt', ?, ?, 'purchase_order', ?, ?, ?)`
+      ).bind(
+        movId,
+        rcv.ingredientId,
+        rcv.receivedQuantity,
+        receiptKey,
+        `Received from PO ${poId}`,
+        options?.receivedBy || 'system',
+        now
+      ).run();
+    }
 
     receivedSummaries.push({
       ingredientId: rcv.ingredientId,
@@ -186,20 +283,45 @@ export async function receivePurchaseOrder(
   const allFullyReceived = poItems.every(p => p.received_quantity >= p.quantity);
   const nextStatus = allFullyReceived ? 'received' : 'partially_received';
 
-  await db.prepare(
-    'UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ?'
-  ).bind(nextStatus, now, poId).run();
+  if (effectiveTenant) {
+    await db.prepare(
+      "UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(nextStatus, now, poId, effectiveTenant).run().catch(() =>
+      db.prepare(
+        'UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ?'
+      ).bind(nextStatus, now, poId).run()
+    );
+  } else {
+    await db.prepare(
+      'UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ?'
+    ).bind(nextStatus, now, poId).run();
+  }
 
   return { ok: true, alreadyReceived: false, status: nextStatus, receivedItems: receivedSummaries };
 }
 
-export async function cancelPurchaseOrder(db: D1Database, poId: string) {
-  const po = await db.prepare('SELECT id, status FROM purchase_orders WHERE id = ?').bind(poId).first<{ id: string; status: string }>();
-  if (!po) return { ok: false, error: 'purchase_order_not_found' };
+export async function cancelPurchaseOrder(db: D1Database, poId: string, tenantId?: string) {
+  const normTenant = tenantId ? tenantId.trim() : undefined;
+  const po = await db.prepare('SELECT * FROM purchase_orders WHERE id = ?').bind(poId).first<{ id: string; status: string; tenant_id?: string | null }>();
+  if (!po || (normTenant && !matchesTenantRow(po, normTenant))) return { ok: false, error: 'purchase_order_not_found' };
   if (po.status === 'received') return { ok: false, error: 'cannot_cancel_received_order' };
 
-  await db.prepare('UPDATE purchase_orders SET status = \'cancelled\', updated_at = ? WHERE id = ?')
-    .bind(new Date().toISOString(), poId).run();
+  const effectiveTenant = normTenant && normTenant !== '*'
+    ? normTenant
+    : po.tenant_id && String(po.tenant_id).trim()
+      ? String(po.tenant_id).trim()
+      : undefined;
+  const now = new Date().toISOString();
+  if (effectiveTenant && effectiveTenant !== '*') {
+    await db.prepare(
+      "UPDATE purchase_orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(now, poId, effectiveTenant).run().catch(() =>
+      db.prepare('UPDATE purchase_orders SET status = \'cancelled\', updated_at = ? WHERE id = ?').bind(now, poId).run()
+    );
+  } else {
+    await db.prepare('UPDATE purchase_orders SET status = \'cancelled\', updated_at = ? WHERE id = ?')
+      .bind(now, poId).run();
+  }
   return { ok: true };
 }
 

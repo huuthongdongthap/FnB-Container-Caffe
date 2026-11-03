@@ -11,6 +11,7 @@ import {
   type CustomerMenuCategory,
   type CustomerMenuItem,
 } from '@aura/domain-catalog';
+import { resolvePublicTenantId as resolveCustomerMenuTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 
 export const customerMenuRouter = new Hono<{ Bindings: Env }>();
@@ -55,12 +56,14 @@ customerMenuRouter.get('/', async (c) => {
   const rawOffset = Number(c.req.query('offset'));
   const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
 
+  const tenantId = resolveCustomerMenuTenantId(c);
   const menu = await getCustomerMenu(db, {
     category,
     includeUnavailable,
     locale,
     channel,
     now: new Date(),
+    tenantId,
   });
 
   const matchedItems = menu.categories.flatMap((cat) =>
@@ -112,7 +115,8 @@ customerMenuRouter.get('/:id', async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const channel = c.req.query('channel');
-  const item = await getCustomerMenuItem(db, id, { channel, now: new Date() });
+  const tenantId = resolveCustomerMenuTenantId(c);
+  const item = await getCustomerMenuItem(db, id, { channel, now: new Date(), tenantId });
 
   if (!item) {
     return c.json({ success: false, error: 'Menu item not found' }, 404);

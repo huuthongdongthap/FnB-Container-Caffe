@@ -53,7 +53,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
     const limitParam = c.req.query('limit');
     const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 20), 100) : undefined;
 
-    const result = await aggregateEvents(db, customerId, { limit });
+    const result = await aggregateEvents(db, customerId, { limit, tenantId });
 
     return c.json({ success: true, data: result });
   });
@@ -74,7 +74,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
-    const events = await aggregateEvents(db, customerId, { limit: 10 });
+    const events = await aggregateEvents(db, customerId, { limit: 10, tenantId });
     return c.json({ success: true, data: { customerId, recentEvents: events.events, total: events.total } });
   });
 
@@ -99,7 +99,7 @@ export function registerCustomerHandlers(router: Hono<{ Bindings: Env }>): void 
     const eventLimitParam = c.req.query('eventLimit');
     const eventLimit = eventLimitParam ? Math.min(Math.max(1, parseInt(eventLimitParam, 10) || 20), 100) : undefined;
 
-    const result = await getCustomer360(db, customerId, kv, { eventLimit });
+    const result = await getCustomer360(db, customerId, kv, { eventLimit, tenantId });
 
     return c.json({ success: true, data: result });
   });

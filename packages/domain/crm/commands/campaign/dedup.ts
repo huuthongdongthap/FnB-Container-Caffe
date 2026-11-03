@@ -14,14 +14,39 @@ export async function deduplicate(
   customerId: string,
   trigger: CampaignTrigger,
   sinceDays: number,
+  tenantId?: string,
 ): Promise<boolean> {
   const cutoff = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const scoped = Boolean(tenantId && tenantId !== '*');
+  if (scoped && tenantId) {
+    try {
+      const row = await db.prepare(
+        `SELECT id, tenant_id FROM campaign_logs
+         WHERE customer_id = ? AND trigger = ? AND sent_at > ?
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         ORDER BY sent_at DESC LIMIT 1`
+      ).bind(customerId, trigger, cutoff, tenantId).first<{ id?: string; tenant_id?: string | null }>();
+      if (!row) return false;
+      if ('tenant_id' in row) {
+        const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+        return rowTenant === tenantId;
+      }
+      return true;
+    } catch {
+      // Fallback if tenant_id column is absent
+    }
+  }
   const row = await db.prepare(
     `SELECT id FROM campaign_logs
      WHERE customer_id = ? AND trigger = ? AND sent_at > ?
      ORDER BY sent_at DESC LIMIT 1`
-  ).bind(customerId, trigger, cutoff).first();
-  return row !== null;
+  ).bind(customerId, trigger, cutoff).first<{ id?: string; tenant_id?: string | null }>();
+  if (!row) return false;
+  if (scoped && tenantId && 'tenant_id' in row) {
+    const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+    return rowTenant === tenantId;
+  }
+  return true;
 }
 
 /**
@@ -30,8 +55,10 @@ export async function deduplicate(
 export async function logSend(
   db: D1Database,
   result: CampaignResult,
+  tenantId?: string,
 ): Promise<void> {
   const id = `camp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const effectiveTenant = tenantId || result.tenant_id || undefined;
   await db.prepare(
     `INSERT INTO campaign_logs (id, customer_id, trigger, channel, sent_at, status, error)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -44,4 +71,8 @@ export async function logSend(
     result.sent ? 'sent' : 'failed',
     result.error || null,
   ).run();
+  if (effectiveTenant && effectiveTenant !== '*') {
+    await db.prepare('UPDATE campaign_logs SET tenant_id = ? WHERE id = ?')
+      .bind(effectiveTenant, id).run().catch(() => null);
+  }
 }

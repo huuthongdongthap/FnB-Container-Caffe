@@ -2,25 +2,22 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 
 export async function checkSupplierTenant(
   db: any,
   row: Record<string, unknown>,
   tenantId: string
 ): Promise<boolean> {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    return matchesTenantRow(row, tenantId);
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
+  if (
+    'tenant_id' in row &&
+    row.tenant_id !== undefined &&
+    row.tenant_id !== null &&
+    String(row.tenant_id).trim() !== ''
+  ) {
+    return matchesTenantRow(row, normTenant);
   }
   const supId = String(row.id || '');
   if (supId) {
@@ -35,14 +32,14 @@ export async function checkSupplierTenant(
       .catch(() => null)) as Record<string, unknown> | null;
     if (auditRow) {
       if (auditRow.tenant_id) {
-        return String(auditRow.tenant_id) === tenantId;
+        return (String(auditRow.tenant_id).trim() || 'default') === normTenant;
       }
       const rawMeta = String(auditRow.metadata || auditRow.details || '');
       if (rawMeta) {
         try {
           const parsed = JSON.parse(rawMeta);
           if (parsed && typeof parsed.tenant_id === 'string') {
-            return parsed.tenant_id === tenantId;
+            return (parsed.tenant_id.trim() || 'default') === normTenant;
           }
         } catch {
           // Ignore JSON parse error
@@ -56,12 +53,12 @@ export async function checkSupplierTenant(
           .first()
           .catch(() => null)) as Record<string, unknown> | null;
         if (userRow && 'tenant_id' in userRow && userRow.tenant_id !== undefined) {
-          return matchesTenantRow(userRow, tenantId);
+          return matchesTenantRow(userRow, normTenant);
         }
       }
     }
   }
-  return tenantId === 'default';
+  return normTenant === 'default';
 }
 
 async function writeSupplierAuditLog(
@@ -100,7 +97,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers - List suppliers
   app.openapi(InventoryRoutes.suppliers.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -122,16 +119,41 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(query.isActive ? 1 : 0);
     }
 
+    const scopedWhere = `${whereClause ? whereClause : 'WHERE 1=1 '}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+
     let total = 0;
     let supplierResults: any[] = [];
     try {
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+      let sqlTenantScoped = false;
+      let rawItems: any[] = [];
+      if (tenantId !== '*') {
+        try {
+          const scopedCount = (await db.prepare(
+            `SELECT COUNT(*) as total FROM suppliers ${scopedWhere}`
+          ).bind(...params, tenantId).first()) as { total: number } | null;
+          total = scopedCount?.total || 0;
 
-      const items = (await db.prepare(
-        `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-      ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
-      const rawItems = items.results || [];
+          const scopedItems = (await db.prepare(
+            `SELECT * FROM suppliers ${scopedWhere} ORDER BY name ASC LIMIT ? OFFSET ?`
+          ).bind(...params, tenantId, limit, offset).all()) as { results: any[] };
+          rawItems = scopedItems.results || [];
+          sqlTenantScoped = true;
+        } catch {
+          sqlTenantScoped = false;
+        }
+      }
+
+      if (!sqlTenantScoped || (rawItems.length === 0 && tenantId !== 'default' && offset === 0)) {
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
+
+        const items = (await db.prepare(
+          `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
+        ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+        rawItems = items.results || [];
+        sqlTenantScoped = false;
+      }
+
       if (tenantId === '*') {
         supplierResults = rawItems;
       } else {
@@ -141,8 +163,12 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             checked.push(row);
           }
         }
-        total = checked.length;
-        supplierResults = checked.slice(offset, offset + limit);
+        if (!sqlTenantScoped || checked.length !== rawItems.length || (offset === 0 && checked.length < limit)) {
+          total = checked.length;
+          supplierResults = checked.slice(offset, offset + limit);
+        } else {
+          supplierResults = checked;
+        }
       }
     } catch {
       try {
@@ -187,7 +213,7 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers/{id} - Get supplier by ID
   app.openapi(InventoryRoutes.suppliers.get as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const { id } = c.req.valid('param');
 
     let supplier: any = null;
@@ -214,9 +240,12 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // POST /api/inventory/suppliers - Create supplier
   app.openapi(InventoryRoutes.suppliers.create as any, async (c: any) => {
     const db = getDatabase(c);
-    const rawTenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c).trim() || 'default';
     const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const user = c.get('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
@@ -226,21 +255,40 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let usingFallback = false;
     try {
-      await db.prepare(
-        `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.contactPerson || null,
-        body.phone || null,
-        body.email || null,
-        body.address || null,
-        body.paymentTerms || 30,
-        body.isActive !== false ? 1 : 0,
-        now,
-        now
-      ).run();
+      try {
+        await db.prepare(
+          `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.contactPerson || null,
+          body.phone || null,
+          body.email || null,
+          body.address || null,
+          body.paymentTerms || 30,
+          body.isActive !== false ? 1 : 0,
+          tenantId,
+          now,
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.contactPerson || null,
+          body.phone || null,
+          body.email || null,
+          body.address || null,
+          body.paymentTerms || 30,
+          body.isActive !== false ? 1 : 0,
+          now,
+          now
+        ).run();
+      }
     } catch {
       usingFallback = true;
     }
@@ -270,19 +318,26 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // PATCH /api/inventory/suppliers/{id} - Update supplier
   app.openapi(InventoryRoutes.suppliers.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = getTenantId(c).trim() || 'default';
     const writeTenant = tenantId === '*' ? 'default' : tenantId;
     const user = c.get('user');
+    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
 
     let existing: any = null;
     let usingFallback = false;
+    let hasVerifiedTenantOwnership = false;
     try {
       existing = await db.prepare('SELECT * FROM suppliers WHERE id = ?').bind(id).first();
-      if (existing && !(await checkSupplierTenant(db, existing, tenantId))) {
-        existing = null;
+      if (existing) {
+        hasVerifiedTenantOwnership = await checkSupplierTenant(db, existing, tenantId);
+        if (!hasVerifiedTenantOwnership) {
+          existing = null;
+        }
       }
     } catch {
       usingFallback = true;
@@ -290,11 +345,14 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const matched = (rows.results || []).find((r) => matchesTenantRow(r, tenantId));
       if (matched) {
         existing = { id, name: id, is_active: 1 };
+        hasVerifiedTenantOwnership = true;
       }
     }
-    if (!existing) {
+    if (!existing || !hasVerifiedTenantOwnership) {
       return c.json({ success: false, error: 'Supplier not found' }, 404);
     }
+    const isLegacyUnscopedRow =
+      existing.tenant_id === undefined || existing.tenant_id === null;
 
     const updates: string[] = [];
     const params: (string | number | boolean)[] = [];
@@ -316,7 +374,28 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(id);
 
     if (!usingFallback) {
-      await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      if (tenantId !== '*') {
+        try {
+          const upd = await db.prepare(
+            `UPDATE suppliers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...params, tenantId).run();
+          if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+            if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+              await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+            } else {
+              return c.json({ success: false, error: 'Supplier not found' }, 404);
+            }
+          }
+        } catch {
+          if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+            await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+          } else {
+            return c.json({ success: false, error: 'Supplier not found' }, 404);
+          }
+        }
+      } else {
+        await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      }
     }
 
     await writeSupplierAuditLog(db, user.id, 'supplier_update', id, JSON.stringify(body), now, writeTenant);

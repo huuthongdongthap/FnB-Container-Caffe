@@ -5,6 +5,8 @@
  * Returns: total_customers, new_30d, repeat_rate, avg_order_value
  */
 
+import { buildTenantFilter } from './summary';
+
 export interface CustomerMetrics {
   total_customers: number;
   new_30d: number;
@@ -20,20 +22,11 @@ export async function getCustomerMetrics(
   db: import('@cloudflare/workers-types').D1Database,
   tenantId?: string
 ): Promise<CustomerMetrics> {
-  const hasTenant = Boolean(tenantId && tenantId !== '*');
-  const tenantWhere = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' WHERE tenant_id = ?';
-  const tenantAnd = !hasTenant
-    ? ''
-    : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
+  const { clause: tenantWhere, binds: tenantBinds } = buildTenantFilter(tenantId, undefined, 'WHERE');
+  const { clause: tenantAnd } = buildTenantFilter(tenantId, undefined, 'AND');
   const runFirst = <T>(sql: string) => {
     const stmt = db.prepare(sql);
-    return hasTenant && tenantId ? stmt.bind(tenantId).first<T>() : stmt.first<T>();
+    return tenantBinds.length > 0 ? stmt.bind(...tenantBinds).first<T>() : stmt.first<T>();
   };
 
   const [totalRow, newRow, repeatRow, avgRow] = await Promise.all([

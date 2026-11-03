@@ -41,15 +41,21 @@ const EMPTY: CustomerAccount = {
 
 export interface AccountOptions {
   orderLimit?: number;
+  tenantId?: string;
 }
 
 export async function getCustomerAccount(
   db: D1Database,
   customerId: string,
-  opts: AccountOptions = {},
+  opts: AccountOptions | string = {},
 ): Promise<CustomerAccount> {
-  const rawLimit = Number(opts.orderLimit ?? 10);
+  const normalizedOpts: AccountOptions = typeof opts === 'string' ? { tenantId: opts } : (opts || {});
+  const rawLimit = Number(normalizedOpts.orderLimit ?? 10);
   const orderLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, Math.floor(rawLimit)), 50) : 10;
+  const requestedTenant =
+    typeof normalizedOpts.tenantId === 'string' && normalizedOpts.tenantId.trim()
+      ? normalizedOpts.tenantId.trim()
+      : null;
 
   try {
     const customer = await db
@@ -68,6 +74,9 @@ export async function getCustomerAccount(
     }
 
     const customerTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
+    if (requestedTenant && requestedTenant !== '*' && 'tenant_id' in customer && customer.tenant_id !== undefined && customerTenant !== requestedTenant) {
+      return { ...EMPTY, customerId };
+    }
     const nonEmptyPhone = customer.phone && customer.phone.trim() ? customer.phone.trim() : null;
 
     const [orders, consents, policy] = await Promise.all([
@@ -94,19 +103,32 @@ export async function getCustomerAccount(
             .catch(() =>
               db
                 .prepare(
-                  `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
-                   WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                  `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at, tenant_id FROM orders
+                   WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?
+                     AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   ORDER BY created_at DESC LIMIT ?`,
                 )
-                .bind(nonEmptyPhone, orderLimit)
+                .bind(nonEmptyPhone, customerTenant, orderLimit)
                 .all<Record<string, unknown>>()
                 .catch(() =>
-                  db
-                    .prepare(
-                      `SELECT id, total, status, created_at FROM orders
-                       WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
-                    )
-                    .bind(nonEmptyPhone, orderLimit)
-                    .all<Record<string, unknown>>(),
+                  customerTenant === 'default'
+                    ? db
+                        .prepare(
+                          `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
+                           WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                        )
+                        .bind(nonEmptyPhone, orderLimit)
+                        .all<Record<string, unknown>>()
+                        .catch(() =>
+                          db
+                            .prepare(
+                              `SELECT id, total, status, created_at FROM orders
+                               WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                            )
+                            .bind(nonEmptyPhone, orderLimit)
+                            .all<Record<string, unknown>>(),
+                        )
+                    : Promise.resolve({ results: [] as Record<string, unknown>[] }),
                 ),
             ),
         ),
@@ -128,7 +150,7 @@ export async function getCustomerAccount(
             .all<{ purpose: string; granted: number; updated_at: string }>(),
         ),
 
-      loadPolicy(db).catch(() => null),
+      loadPolicy(db, undefined, new Date(), customerTenant).catch(() => null),
     ]);
 
     const lifetimePoints = customer.lifetime_points ?? 0;

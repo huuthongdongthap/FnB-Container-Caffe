@@ -88,7 +88,7 @@ describe('POST /lead', () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.error).toBe('API timeout');
+    expect(body.error).toBe('Internal integration error');
   });
 });
 

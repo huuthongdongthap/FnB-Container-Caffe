@@ -3,20 +3,21 @@ import type { Env } from '../../types/env';
 import { getTenantId } from '../../middleware/tenant';
 import type { DailyReport, SummaryReport } from './types';
 
-export function buildTenantClause(tenantId: string): { where: string; and: string; binds: string[] } {
+export function buildTenantClause(tenantId: string, alias?: string): { where: string; and: string; binds: string[] } {
   if (!tenantId || tenantId === '*') {
     return { where: '', and: '', binds: [] };
   }
+  const col = alias ? `${alias}.tenant_id` : 'tenant_id';
   if (tenantId === 'default') {
     return {
-      where: " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')",
-      and: " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')",
+      where: ` WHERE (${col} = ? OR ${col} IS NULL OR ${col} = '' OR TRIM(${col}) = '')`,
+      and: ` AND (${col} = ? OR ${col} IS NULL OR ${col} = '' OR TRIM(${col}) = '')`,
       binds: [tenantId],
     };
   }
   return {
-    where: ' WHERE tenant_id = ?',
-    and: ' AND tenant_id = ?',
+    where: ` WHERE ${col} = ?`,
+    and: ` AND ${col} = ?`,
     binds: [tenantId],
   };
 }
@@ -28,7 +29,7 @@ export function buildCustomerJoinTenantClause(tenantId: string): { join: string;
   if (tenantId === 'default') {
     return {
       join: ' LEFT JOIN customers c ON c.id = t.customer_id',
-      and: " AND (c.tenant_id = ? OR c.tenant_id IS NULL OR c.tenant_id = '')",
+      and: " AND (c.tenant_id = ? OR c.tenant_id IS NULL OR c.tenant_id = '' OR TRIM(c.tenant_id) = '')",
       binds: [tenantId],
     };
   }
@@ -102,25 +103,65 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
     // Cashback redeemed by day
     let cashbackRedeemed: { date: string; amount: number }[] = [];
+    const promoJoin = !tenantId || tenantId === '*'
+      ? ''
+      : ' LEFT JOIN orders o ON o.id = t.order_id LEFT JOIN customers c ON c.id = t.customer_id';
+    const promoAndWithTenantCol = !tenantId || tenantId === '*'
+      ? ''
+      : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
+    const promoAndJoinOnly = !tenantId || tenantId === '*'
+      ? ''
+      : " AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
+    const promoBinds = !tenantId || tenantId === '*' ? [] : [tenantId];
     try {
       const res = await db.prepare(
-        `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
-         FROM promotion_redemptions t${cjf.join}
-         WHERE DATE(t.created_at) BETWEEN ? AND ?${cjf.and}
-         GROUP BY DATE(t.created_at) ORDER BY date`
-      ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+        `SELECT DATE(COALESCE(t.redeemed_at, t.created_at)) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+         FROM promotion_redemptions t${promoJoin}
+         WHERE DATE(COALESCE(t.redeemed_at, t.created_at)) BETWEEN ? AND ?${promoAndWithTenantCol}
+         GROUP BY DATE(COALESCE(t.redeemed_at, t.created_at)) ORDER BY date`
+      ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
       cashbackRedeemed = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(t.created_at) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
-           FROM cashback_transactions t${cjf.join}
-           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
-           GROUP BY DATE(t.created_at) ORDER BY date`
-        ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+          `SELECT DATE(t.redeemed_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+           FROM promotion_redemptions t${promoJoin}
+           WHERE DATE(t.redeemed_at) BETWEEN ? AND ?${promoAndWithTenantCol}
+           GROUP BY DATE(t.redeemed_at) ORDER BY date`
+        ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
         cashbackRedeemed = res.results || [];
       } catch {
-        cashbackRedeemed = [];
+        try {
+          const res = await db.prepare(
+            `SELECT DATE(t.redeemed_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+             FROM promotion_redemptions t${promoJoin}
+             WHERE DATE(t.redeemed_at) BETWEEN ? AND ?${promoAndJoinOnly}
+             GROUP BY DATE(t.redeemed_at) ORDER BY date`
+          ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
+          cashbackRedeemed = res.results || [];
+        } catch {
+          try {
+            const res = await db.prepare(
+              `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+               FROM promotion_redemptions t${promoJoin}
+               WHERE DATE(t.created_at) BETWEEN ? AND ?${promoAndJoinOnly}
+               GROUP BY DATE(t.created_at) ORDER BY date`
+            ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
+            cashbackRedeemed = res.results || [];
+          } catch {
+            try {
+              const res = await db.prepare(
+                `SELECT DATE(t.created_at) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+                 FROM cashback_transactions t${cjf.join}
+                 WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
+                 GROUP BY DATE(t.created_at) ORDER BY date`
+              ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+              cashbackRedeemed = res.results || [];
+            } catch {
+              cashbackRedeemed = [];
+            }
+          }
+        }
       }
     }
 
@@ -231,6 +272,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
+    }
 
     const { results } = await db.prepare(
       `SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
@@ -247,6 +291,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
+    }
 
     const { results } = await db.prepare(
       `SELECT items FROM orders
@@ -291,6 +338,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
+    }
 
     const { results } = await db.prepare(
       `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,

@@ -54,7 +54,7 @@ export async function getOrdersMobile(
     const params: string[] = [];
     if (tenantId !== '*') {
       query += tenantId === 'default'
-        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : ' AND tenant_id = ?';
       params.push(tenantId);
     }
@@ -64,7 +64,7 @@ export async function getOrdersMobile(
       params.push(tableId);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY created_at DESC LIMIT 100';
 
     const stmt = params.length > 0
       ? await context.env.AURA_DB.prepare(query).bind(...params)
@@ -143,7 +143,7 @@ export async function getOrderDetail(
     const tenantClause = tenantId === '*'
       ? ''
       : tenantId === 'default'
-        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+        ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : ' AND tenant_id = ?';
     const row = await context.env.AURA_DB
       .prepare(`SELECT * FROM orders WHERE id = ?${tenantClause}`)

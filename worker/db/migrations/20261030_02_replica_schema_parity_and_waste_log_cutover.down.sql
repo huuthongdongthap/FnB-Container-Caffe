@@ -7,6 +7,20 @@ DROP INDEX IF EXISTS idx_waste_log_date;
 DROP INDEX IF EXISTS idx_waste_log_item;
 DROP TABLE IF EXISTS waste_log;
 
+DELETE FROM saas_pricing WHERE id IN ('saas_starter', 'saas_growth', 'saas_enterprise');
+DELETE FROM subscription_plans WHERE id IN ('plan_container_10ft', 'plan_container_20ft', 'plan_container_40ft');
+
+ALTER TABLE purchase_order_items DROP COLUMN unit;
+ALTER TABLE suppliers DROP COLUMN notes;
+ALTER TABLE ingredients DROP COLUMN last_restocked_at;
+ALTER TABLE ingredients DROP COLUMN supplier_id;
+ALTER TABLE inventory_items DROP COLUMN supplier_id;
+ALTER TABLE inventory_items DROP COLUMN expiry_date;
+ALTER TABLE inventory_items DROP COLUMN location;
+ALTER TABLE inventory_items DROP COLUMN reorder_point;
+
+DROP TABLE IF EXISTS kds_stations;
+
 ALTER TABLE happy_hour_windows DROP COLUMN tenant_id;
 ALTER TABLE ha_device_states DROP COLUMN tenant_id;
 

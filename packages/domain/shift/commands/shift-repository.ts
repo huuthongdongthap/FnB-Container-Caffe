@@ -9,7 +9,7 @@ export interface ShiftQuery {
 }
 export async function listShifts(scope: ShiftScope, query: ShiftQuery = {}) {
   const staffId = shiftStaffFilter(scope, query.staffId);
-  const clauses = ['tenant_id = ?', 'staff_id IS NOT NULL'];
+  const clauses = ["COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?", 'staff_id IS NOT NULL'];
   const values: (string | number)[] = [scope.tenantId];
   if (staffId) { clauses.push('staff_id = ?'); values.push(staffId); }
   if (query.attendanceOnly) clauses.push('clock_in IS NOT NULL');
@@ -34,7 +34,7 @@ export async function listShifts(scope: ShiftScope, query: ShiftQuery = {}) {
 }
 export async function getShift(scope: ShiftScope, id: string): Promise<ShiftRow> {
   const staffId = shiftStaffFilter(scope);
-  const row = await scope.env.AURA_DB.prepare(`SELECT * FROM staff_shifts WHERE id = ? AND tenant_id = ? AND staff_id IS NOT NULL${staffId ? ' AND staff_id = ?' : ''}`)
+  const row = await scope.env.AURA_DB.prepare(`SELECT * FROM staff_shifts WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id IS NOT NULL${staffId ? ' AND staff_id = ?' : ''}`)
     .bind(shiftId(id), scope.tenantId, ...(staffId ? [staffId] : [])).first<ShiftRow>();
   if (!row) throw new ShiftContractError('Shift not found', 404);
   return row;

@@ -11,7 +11,8 @@ export async function trackEnrollment(
   campaignType: string,
   campaignId: string,
   mauticContactId: number,
-  status: string
+  status: string,
+  tenantId?: string
 ): Promise<string> {
   const id = `ce_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   try {
@@ -19,6 +20,10 @@ export async function trackEnrollment(
       `INSERT INTO campaign_enrollments (id, customer_id, campaign_type, campaign_id, created_at, mautic_contact_id, status)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(id, customerId, campaignType, campaignId, new Date().toISOString(), String(mauticContactId), status).run();
+    if (tenantId && tenantId !== '*') {
+      await db.prepare('UPDATE campaign_enrollments SET tenant_id = ? WHERE id = ?')
+        .bind(tenantId, id).run().catch(() => null);
+    }
   } catch {
     // Non-blocking if campaign_enrollments table is not provisioned
   }
@@ -29,10 +34,22 @@ export async function isAlreadyEnrolled(
   db: D1Database,
   customerId: string,
   campaignType: string,
-  days: number
+  days: number,
+  tenantId?: string
 ): Promise<boolean> {
   try {
     const since = new Date(Date.now() - days * 86400000).toISOString();
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    if (!tenantId || tenantId.trim() !== '*') {
+      try {
+        const scopedRow = await db.prepare(
+          "SELECT 1 FROM campaign_enrollments WHERE customer_id = ? AND campaign_type = ? AND created_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(customerId, campaignType, since, effectiveTenant).first();
+        return !!scopedRow;
+      } catch {
+        // Fallback if tenant_id column is absent
+      }
+    }
     const row = await db.prepare(
       'SELECT 1 FROM campaign_enrollments WHERE customer_id = ? AND campaign_type = ? AND created_at >= ? LIMIT 1'
     ).bind(customerId, campaignType, since).first();

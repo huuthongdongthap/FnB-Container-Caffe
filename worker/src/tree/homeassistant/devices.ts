@@ -5,6 +5,7 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
+import { matchesTenantRow } from '../../lib/db';
 
 const log = createLogger({ route: 'ha-devices' });
 
@@ -29,11 +30,21 @@ export function matchesHaTenant(
   tenantId?: string
 ): boolean {
   if (!row) return false;
-  if (!tenantId || tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
+  const clean = tenantId ? tenantId.trim() : '';
+  if (!clean || clean === '*') return true;
+  return matchesTenantRow(row, clean);
+}
+
+export function safeParseJsonObject(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== 'string') {
+    return typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   }
-  return tenantId === 'default';
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function getDeviceState(
@@ -78,7 +89,7 @@ export async function getDeviceState(
     const device: DeviceState = {
       entity_id: row.entity_id,
       state: row.state,
-      attributes: row.attributes ? JSON.parse(row.attributes as unknown as string) : null,
+      attributes: row.attributes ? safeParseJsonObject(row.attributes) : null,
       last_changed: row.last_changed,
       last_updated: row.last_updated
     };
@@ -129,10 +140,11 @@ export async function toggleDevice(
       return errorResponse('Device not found', 404);
     }
 
-    if ('tenant_id' in existing && existing.tenant_id !== undefined && tenantId && tenantId !== '*') {
+    const cleanTenant = tenantId ? tenantId.trim() : '';
+    if ('tenant_id' in existing && existing.tenant_id !== undefined && cleanTenant && cleanTenant !== '*') {
       await db
-        .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
-        .bind(newState, entityId, tenantId)
+        .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(newState, entityId, cleanTenant)
         .run();
     } else {
       await db
@@ -144,7 +156,7 @@ export async function toggleDevice(
     const result: ToggleResult = {
       entity_id: existing.entity_id,
       state: newState,
-      attributes: existing.attributes ? JSON.parse(existing.attributes as unknown as string) : null
+      attributes: existing.attributes ? safeParseJsonObject(existing.attributes) : null
     };
 
     return jsonResponse({ result });
@@ -192,7 +204,7 @@ export async function getZoneDevices(
       .map((r) => ({
         entity_id: r.entity_id,
         state: r.state,
-        attributes: r.attributes ? JSON.parse((r.attributes as unknown) as string) : null,
+        attributes: r.attributes ? safeParseJsonObject(r.attributes) : null,
         last_changed: r.last_changed,
         last_updated: r.last_updated
       }));

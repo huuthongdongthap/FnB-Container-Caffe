@@ -109,8 +109,11 @@ describe('GET /check', () => {
 
 describe('POST /redeem', () => {
   test('redeems birthday discount and returns 201', async () => {
+    // Use today's month/day so the birthday window check passes
+    const now = new Date();
+    const todayBirthday = `1990-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     env.AURA_DB = createMockD1({
-      customers: [{ id: 'cust1', name: 'Alice', birthday: '1990-06-15' }],
+      customers: [{ id: 'cust1', name: 'Alice', birthday: todayBirthday }],
     });
 
     const res = await router.request('/redeem', {
@@ -151,8 +154,11 @@ describe('POST /redeem', () => {
   });
 
   test('returns 400 when already redeemed this year', async () => {
+    // Use today's month/day so the birthday window check passes before the duplicate check
+    const now = new Date();
+    const todayBirthday = `1990-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     env.AURA_DB = createMockD1({
-      customers: [{ id: 'cust1', name: 'Alice', birthday: '1990-06-15' }],
+      customers: [{ id: 'cust1', name: 'Alice', birthday: todayBirthday }],
       birthday_redemptions: [{ id: 'bday1', customer_id: 'cust1', redeemed_at: new Date().toISOString() }],
     });
 

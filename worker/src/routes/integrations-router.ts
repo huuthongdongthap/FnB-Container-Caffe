@@ -28,8 +28,20 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
   vendorRoutes(app);
   expenseRoutes(app);
   app.all('/api/erpnext/*', (c) => handleErpnextRequest(c.req.raw, c.env as unknown as Record<string, unknown>, getTenantId(c)));
-  app.use('/api/erpnext-pos/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
-  app.all('/api/erpnext-pos/*', (c) => handleErpnextPosRequest(c.req.raw, c.env as unknown as Record<string, unknown>, getTenantId(c)));
+  const erpnextPosAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+  app.use('/api/erpnext-pos/*', async (c, next) => {
+    if (c.req.path === '/api/erpnext-pos/webhook' || c.req.path.endsWith('/erpnext-pos/webhook')) {
+      return next();
+    }
+    return erpnextPosAuth(c, next);
+  });
+  app.all('/api/erpnext-pos/*', (c) =>
+    handleErpnextPosRequest(
+      c.req.raw,
+      c.env as unknown as Record<string, unknown>,
+      c.get('user') ? getTenantId(c) : undefined,
+    )
+  );
   app.use('/api/erpnext-invoices/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
   app.all('/api/erpnext-invoices/*', (c) => handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>, getTenantId(c)));
   app.get('/api/public/products/:productId/availability', (c) =>

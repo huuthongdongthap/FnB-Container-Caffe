@@ -8,7 +8,7 @@ import { registerExportHandlers } from './export-handlers';
 export const analyticsRouter = new Hono<{ Bindings: Env }>();
 
 // Auth enforced by features-router; this gate ensures direct-mount safety.
-analyticsRouter.use('*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']));
+analyticsRouter.use('*', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
 
 registerSummaryHandlers(analyticsRouter);
 registerMetricsHandlers(analyticsRouter);

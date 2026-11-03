@@ -12,7 +12,7 @@
 import { Hono } from 'hono';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { optionalAuth } from '../middleware/auth';
-import { getTenantId as getCanonicalTenantId } from '../lib/db';
+import { getTenantId as getCanonicalTenantId, matchesTenantRow } from '../lib/db';
 import type { Env } from '../types/env';
 import { createLogger } from '../utils/logger.js';
 
@@ -30,15 +30,40 @@ function getTenantId(c: any): string {
   }
 }
 
-function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (!row || typeof row !== 'object') return false;
+function matchesCategoryTenant(row: SignageDbRow, tenantId: string): boolean {
   if (tenantId === '*') return true;
-  const r = row as Record<string, unknown>;
-  if (r.tenant_id === undefined) {
-    return tenantId === 'default';
+  if (!('category_tenant_id' in row) || row.category_tenant_id === undefined) return true;
+  const catTenant = typeof row.category_tenant_id === 'string' && row.category_tenant_id.trim() !== ''
+    ? row.category_tenant_id.trim()
+    : 'default';
+  return catTenant === tenantId;
+}
+
+function isPromoWithinUsageLimits(row: Record<string, unknown>): boolean {
+  const used = Number(row.used_count ?? row.current_uses ?? row.usage_count ?? 0);
+  if (row.max_uses !== undefined && row.max_uses !== null) {
+    const maxUses = Number(row.max_uses);
+    if (Number.isFinite(maxUses) && maxUses > 0 && used >= maxUses) {
+      return false;
+    }
   }
-  const rowTenant = typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default';
-  return rowTenant === tenantId;
+  if (row.usage_limit !== undefined && row.usage_limit !== null) {
+    const usageLimit = Number(row.usage_limit);
+    if (Number.isFinite(usageLimit) && usageLimit > 0 && used >= usageLimit) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function normalizeSignagePromo(row: Record<string, unknown>): SignagePromo {
+  return {
+    code: String(row.code ?? ''),
+    percent: Number(row.percent ?? row.discount_value ?? row.value ?? 0),
+    max_discount: Number(row.max_discount ?? row.max_discount_value ?? 0),
+    min_order: Number(row.min_order ?? row.min_order_value ?? 0),
+    expires_at: (row.expires_at ?? row.valid_to ?? row.end_date ?? null) as unknown as string,
+  };
 }
 
 interface SignageProduct {
@@ -72,6 +97,7 @@ interface SignageDbRow {
   category_name: string;
   category_sort_order: number;
   tenant_id?: string | null;
+  category_tenant_id?: string | null;
 }
 
 const log = createLogger({ route: 'signage' });
@@ -101,30 +127,53 @@ signageRouter.get('/menu', async(c) => {
           p.tenant_id,
           c.id AS category_id,
           c.name AS category_name,
-          c.sort_order AS category_sort_order
+          c.sort_order AS category_sort_order,
+          c.tenant_id AS category_tenant_id
         FROM products p
         JOIN categories c ON p.category_id = c.id
         WHERE p.is_available = 1
         ORDER BY c.sort_order ASC, p.name ASC
       `).all<SignageDbRow>();
-      rows = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+      rows = (results || []).filter((r) => matchesTenantRow(r, tenantId) && matchesCategoryTenant(r, tenantId));
     } catch {
-      const { results } = await db.prepare(`
-        SELECT
-          p.name AS product_name,
-          p.price,
-          p.image_url,
-          p.description,
-          p.category_id,
-          c.id AS category_id,
-          c.name AS category_name,
-          c.sort_order AS category_sort_order
-        FROM products p
-        JOIN categories c ON p.category_id = c.id
-        WHERE p.is_available = 1
-        ORDER BY c.sort_order ASC, p.name ASC
-      `).all<SignageDbRow>();
-      rows = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+      try {
+        const { results } = await db.prepare(`
+          SELECT
+            p.name AS product_name,
+            p.price,
+            p.image_url,
+            p.description,
+            p.category_id,
+            p.tenant_id,
+            c.id AS category_id,
+            c.name AS category_name,
+            c.sort_order AS category_sort_order
+          FROM products p
+          JOIN categories c ON p.category_id = c.id
+          WHERE p.is_available = 1
+          ORDER BY c.sort_order ASC, p.name ASC
+        `).all<SignageDbRow>();
+        rows = (results || []).filter((r) => matchesTenantRow(r, tenantId) && matchesCategoryTenant(r, tenantId));
+      } catch {
+        if (tenantId === 'default' || tenantId === '*') {
+          const { results } = await db.prepare(`
+            SELECT
+              p.name AS product_name,
+              p.price,
+              p.image_url,
+              p.description,
+              p.category_id,
+              c.id AS category_id,
+              c.name AS category_name,
+              c.sort_order AS category_sort_order
+            FROM products p
+            JOIN categories c ON p.category_id = c.id
+            WHERE p.is_available = 1
+            ORDER BY c.sort_order ASC, p.name ASC
+          `).all<SignageDbRow>();
+          rows = (results || []).filter((r) => matchesTenantRow(r, tenantId));
+        }
+      }
     }
 
     // Group products by category
@@ -164,49 +213,73 @@ signageRouter.get('/promos', async(c) => {
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   try {
-    let rawResults: Array<SignagePromo & { tenant_id?: string | null }> | undefined;
+    let rawResults: Array<Record<string, unknown>> | undefined;
     try {
       const res = await db.prepare(
-        `SELECT code, percent, max_discount, min_order, expires_at, tenant_id
+        `SELECT
+           code,
+           COALESCE(percent, discount_value, value, 0) AS percent,
+           COALESCE(max_discount, max_discount_value, 0) AS max_discount,
+           COALESCE(min_order, min_order_value, 0) AS min_order,
+           COALESCE(expires_at, valid_to, end_date) AS expires_at,
+           tenant_id,
+           max_uses,
+           usage_limit,
+           used_count
          FROM promotions
          WHERE is_active = 1
            AND (starts_at IS NULL OR starts_at <= datetime('now'))
-           AND (expires_at IS NULL OR expires_at >= datetime('now'))`
-      ).all<SignagePromo & { tenant_id?: string | null }>();
+           AND (expires_at IS NULL OR expires_at >= datetime('now'))
+           AND (valid_from IS NULL OR valid_from <= datetime('now'))
+           AND (valid_to IS NULL OR valid_to >= datetime('now'))
+           AND (max_uses IS NULL OR max_uses <= (0) OR COALESCE(used_count, 0) < max_uses)
+           AND (usage_limit IS NULL OR usage_limit <= (0) OR COALESCE(used_count, 0) < usage_limit)`
+      ).all<Record<string, unknown>>();
       rawResults = res.results;
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT code, percent, max_discount, min_order, expires_at
+          `SELECT
+             *,
+             COALESCE(discount_value, 0) AS percent,
+             COALESCE(max_discount_value, 0) AS max_discount,
+             COALESCE(min_order_value, 0) AS min_order,
+             valid_to AS expires_at
            FROM promotions
            WHERE is_active = 1
-             AND (starts_at IS NULL OR starts_at <= datetime('now'))
-             AND (expires_at IS NULL OR expires_at >= datetime('now'))`
-        ).all<SignagePromo>();
+             AND (valid_from IS NULL OR valid_from <= datetime('now'))
+             AND (valid_to IS NULL OR valid_to >= datetime('now'))
+             AND (max_uses IS NULL OR max_uses <= (0) OR COALESCE(current_uses, 0) < max_uses)`
+        ).all<Record<string, unknown>>();
         rawResults = res.results;
       } catch {
-        const now = new Date().toISOString();
-        const res = await db.prepare(
-          `SELECT code, value AS percent, max_discount, min_order, end_date AS expires_at
-           FROM promotions
-           WHERE is_active = 1
-             AND (start_date IS NULL OR datetime(start_date) <= datetime(?))
-             AND (end_date IS NULL OR datetime(end_date) > datetime(?))
-           ORDER BY value DESC`
-        ).bind(now, now).all<SignagePromo>();
-        rawResults = res.results;
+        try {
+          const res = await db.prepare(
+            `SELECT *
+             FROM promotions
+             WHERE is_active = 1
+               AND (starts_at IS NULL OR starts_at <= datetime('now'))
+               AND (expires_at IS NULL OR expires_at >= datetime('now'))`
+          ).all<Record<string, unknown>>();
+          rawResults = res.results;
+        } catch {
+          const now = new Date().toISOString();
+          const res = await db.prepare(
+            `SELECT *, value AS percent, end_date AS expires_at
+             FROM promotions
+             WHERE is_active = 1
+               AND (start_date IS NULL OR datetime(start_date) <= datetime(?))
+               AND (end_date IS NULL OR datetime(end_date) > datetime(?))
+             ORDER BY value DESC`
+          ).bind(now, now).all<Record<string, unknown>>();
+          rawResults = res.results;
+        }
       }
     }
 
     const filtered = (rawResults || [])
-      .filter((r) => matchesTenantRow(r, tenantId))
-      .map(({ code, percent, max_discount, min_order, expires_at }) => ({
-        code,
-        percent,
-        max_discount,
-        min_order,
-        expires_at
-      }));
+      .filter((r) => matchesTenantRow(r, tenantId) && isPromoWithinUsageLimits(r))
+      .map(normalizeSignagePromo);
 
     c.header('Cache-Control', 'public, max-age=300');
     return c.json({ success: true, data: filtered });

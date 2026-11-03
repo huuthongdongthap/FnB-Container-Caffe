@@ -35,9 +35,9 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/segments', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
     const db = c.env.AURA_DB;
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-    const tenantId = getTenantId(c as any);
+    const tenantId = getTenantId(c as any).trim() || 'default';
 
-    const segments = await listSegments(db, kv);
+    const segments = await listSegments(db, kv, new Date(), { tenantId });
     if (tenantId === '*') {
       return c.json({ success: true, data: segments });
     }
@@ -57,9 +57,10 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
       const customers = (seg.customers || []).filter(
         (cust) => (tenantMap.get(cust.id) ?? 'default') === tenantId
       );
+      const rejected = (seg.customers || []).length - customers.length;
       return {
         ...seg,
-        count: customers.length,
+        count: Math.max(0, (seg.count ?? customers.length) - rejected),
         customers,
       };
     });
@@ -85,14 +86,14 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
     const offsetParam = c.req.query('offset');
     const limit = limitParam ? parseInt(limitParam, 10) : 50;
     const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
-    const tenantId = getTenantId(c as any);
+    const tenantId = getTenantId(c as any).trim() || 'default';
 
     if (tenantId === '*') {
       const result = await buildSegment(db, key, kv, { limit, offset });
       return c.json({ success: true, data: result });
     }
 
-    const full = await buildSegment(db, key, kv, { limit: 0 });
+    const full = await buildSegment(db, key, kv, { limit: 0, tenantId });
     const tenantMap = await loadCustomerTenantMap(db);
     if (!tenantMap) {
       if (tenantId !== 'default') {
@@ -108,16 +109,18 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
       });
     }
 
-    const filtered = (full.customers || []).filter(
+    const allCustomers = full.customers || [];
+    const filtered = allCustomers.filter(
       (cust) => (tenantMap.get(cust.id) ?? 'default') === tenantId
     );
+    const rejected = allCustomers.length - filtered.length;
     const paginated = limit === 0 ? filtered : filtered.slice(offset, offset + limit);
 
     return c.json({
       success: true,
       data: {
         ...full,
-        count: filtered.length,
+        count: Math.max(0, (full.count ?? filtered.length) - rejected),
         customers: paginated,
       },
     });

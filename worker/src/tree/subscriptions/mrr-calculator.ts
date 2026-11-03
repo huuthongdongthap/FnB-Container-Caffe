@@ -2,7 +2,14 @@
 
 import { today, nowStr } from './helpers';
 
-export async function updateMRRSnapshot(db: import('@cloudflare/workers-types').D1Database): Promise<void> {
+export async function updateMRRSnapshot(
+  db: import('@cloudflare/workers-types').D1Database,
+  tenantId: string = 'default'
+): Promise<void> {
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant !== 'default' && normTenant !== '*') {
+    return;
+  }
   const date = today();
   let activeSubs: { count: number; mrr: number } | null = null;
   try {

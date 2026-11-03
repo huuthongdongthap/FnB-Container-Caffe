@@ -67,7 +67,7 @@ export async function checkWifiSessionStatus(
   const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
   const session = await db
     .prepare(
-      `SELECT * FROM wifi_sessions WHERE client_mac = ? AND status = 'authorized' AND expires_at > ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? THEN 0 ELSE 1 END, expires_at DESC LIMIT 1`
+      `SELECT * FROM wifi_sessions WHERE client_mac = ? AND status = 'authorized' AND expires_at > ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3 THEN 0 ELSE 1 END, expires_at DESC LIMIT 1`
     )
     .bind(normalizedMac, now, effectiveTenant)
     .first<WifiSessionRecord & { tenant_id?: string | null }>()
@@ -121,7 +121,7 @@ export async function loginWifiGuest(
   const expiresIso = new Date(now.getTime() + timeoutSeconds * 1000).toISOString();
 
   let customer = await db
-    .prepare("SELECT id, phone, name, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? THEN 0 ELSE 1 END LIMIT 1")
+    .prepare("SELECT id, phone, name, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2 THEN 0 ELSE 1 END LIMIT 1")
     .bind(normalizedPhone, effectiveTenant)
     .first<{ id: string; phone: string; name: string; tenant_id?: string | null }>()
     .catch(() =>
@@ -135,37 +135,66 @@ export async function loginWifiGuest(
     await db.prepare('UPDATE customers SET updated_at = ? WHERE id = ?').bind(nowIso, customerId).run().catch(() => {});
   } else {
     customerId = `CUS_WIFI_${crypto.randomUUID().slice(0, 8)}`;
-    const email = `${normalizedPhone}@wifi.aura`;
+    const email = effectiveTenant === 'default'
+      ? `${normalizedPhone}@wifi.aura`
+      : `${normalizedPhone}+${effectiveTenant}@wifi.aura`;
     const name = data.name?.trim() || 'Khách WiFi';
     try {
       await db
         .prepare(
-          `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 0, 0, 'BRONZE', 'wifi_portal', ?, ?)`
+          `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at, tenant_id)
+           VALUES (?, ?, ?, ?, 0, 0, 'BRONZE', 'wifi_portal', ?, ?, ?)`
         )
-        .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
+        .bind(customerId, email, name, normalizedPhone, nowIso, nowIso, effectiveTenant)
         .run();
     } catch {
-      await db
-        .prepare('INSERT INTO customers (id, email, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
-        .run()
-        .catch((err) => log.warn('customer_create_fallback_failed', { error: (err as Error).message }));
+      try {
+        await db
+          .prepare(
+            `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 0, 0, 'BRONZE', 'wifi_portal', ?, ?)`
+          )
+          .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
+          .run();
+      } catch {
+        try {
+          await db
+            .prepare('INSERT INTO customers (id, email, name, phone, created_at, updated_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .bind(customerId, email, name, normalizedPhone, nowIso, nowIso, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare('INSERT INTO customers (id, email, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
+            .run()
+            .catch((err) => log.warn('customer_create_fallback_failed', { error: (err as Error).message }));
+        }
+      }
     }
-    if (effectiveTenant !== 'default') {
+    if (effectiveTenant && effectiveTenant !== '*') {
       await db.prepare('UPDATE customers SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, customerId).run().catch(() => {});
     }
   }
 
   const sessionId = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?)`
-    )
-    .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, customerId, timeoutSeconds, nowIso, expiresIso, nowIso)
-    .run();
-  if (effectiveTenant !== 'default') {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at, tenant_id)
+         VALUES (?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?, ?)`
+      )
+      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, customerId, timeoutSeconds, nowIso, expiresIso, nowIso, effectiveTenant)
+      .run();
+  } catch {
+    await db
+      .prepare(
+        `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?)`
+      )
+      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, customerId, timeoutSeconds, nowIso, expiresIso, nowIso)
+      .run();
+  }
+  if (effectiveTenant && effectiveTenant !== '*') {
     await db.prepare('UPDATE wifi_sessions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, sessionId).run().catch(() => {});
   }
   log.info('wifi_guest_authorized', { mac: normalizedMac, customerId, sessionId });
@@ -187,11 +216,13 @@ export async function authorizeWifiOverride(
   if (data.action === 'revoke') {
     if (tenantId !== '*') {
       await db
-        .prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+        .prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)")
         .bind(nowIso, normalizedMac, effectiveTenant)
         .run()
         .catch(() =>
-          db.prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ?").bind(nowIso, normalizedMac).run()
+          effectiveTenant === 'default'
+            ? db.prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ?").bind(nowIso, normalizedMac).run()
+            : null
         );
     } else {
       await db.prepare("UPDATE wifi_sessions SET status = 'revoked', expires_at = ? WHERE client_mac = ?").bind(nowIso, normalizedMac).run();
@@ -203,14 +234,24 @@ export async function authorizeWifiOverride(
   const timeoutSeconds = clampWifiDuration(data.duration_seconds, 7200);
   const expiresIso = new Date(now.getTime() + timeoutSeconds * 1000).toISOString();
   const sessionId = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at)
-       VALUES (?, ?, NULL, NULL, NULL, 'authorized', ?, ?, ?, ?)`
-    )
-    .bind(sessionId, normalizedMac, timeoutSeconds, nowIso, expiresIso, nowIso)
-    .run();
-  if (effectiveTenant !== 'default') {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at, tenant_id)
+         VALUES (?, ?, NULL, NULL, NULL, 'authorized', ?, ?, ?, ?, ?)`
+      )
+      .bind(sessionId, normalizedMac, timeoutSeconds, nowIso, expiresIso, nowIso, effectiveTenant)
+      .run();
+  } catch {
+    await db
+      .prepare(
+        `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at)
+         VALUES (?, ?, NULL, NULL, NULL, 'authorized', ?, ?, ?, ?)`
+      )
+      .bind(sessionId, normalizedMac, timeoutSeconds, nowIso, expiresIso, nowIso)
+      .run();
+  }
+  if (effectiveTenant && effectiveTenant !== '*') {
     await db.prepare('UPDATE wifi_sessions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, sessionId).run().catch(() => {});
   }
   log.info('wifi_session_manually_granted', { mac: normalizedMac, timeoutSeconds });

@@ -45,6 +45,7 @@ export interface MetricSummary {
  * Map range string to number of hours.
  */
 const RANGE_HOURS: Record<string, number> = {
+  '1h': 1,
   '24h': 24,
   '7d': 168,
   '30d': 720
@@ -188,10 +189,82 @@ export async function pruneOldMetrics(
 export async function getMetricSummary(
   db: D1Database,
   name: string,
-  range: string = '24h'
+  range: '1h' | '24h' | '7d' | '30d' | (string & {}) = '24h',
+  tenantId?: string
 ): Promise<MetricSummary | null> {
   try {
     const hours = resolveRangeHours(range);
+    const trimmedTenant = tenantId?.trim();
+    if (trimmedTenant && trimmedTenant !== '*') {
+      try {
+        const scopedRow = await db.prepare(
+          `SELECT
+             AVG(value) AS avg,
+             MAX(value) AS max,
+             MIN(value) AS min,
+             COUNT(*)   AS count
+           FROM _metrics
+           WHERE name = ? AND created_at > datetime('now', ?)
+             AND COALESCE(NULLIF(TRIM(tags ->> '$.tenant_id'), ''), 'default') = ?`
+        )
+          .bind(name, `-${hours} hours`, trimmedTenant)
+          .first<{ avg: number | null; max: number | null; min: number | null; count: number }>();
+
+        if (!scopedRow || scopedRow.count === 0) {
+          return null;
+        }
+
+        return {
+          name,
+          avg: scopedRow.avg ?? 0,
+          max: scopedRow.max ?? 0,
+          min: scopedRow.min ?? 0,
+          count: scopedRow.count
+        };
+      } catch {
+        try {
+          const rowsRes = await db.prepare(
+            `SELECT value, tags FROM _metrics WHERE name = ? AND created_at > datetime('now', ?)`
+          )
+            .bind(name, `-${hours} hours`)
+            .all<{ value: number; tags?: string | null }>();
+          const rawRows = rowsRes?.results || [];
+          const matchingValues: number[] = [];
+          for (const r of rawRows) {
+            let rowTenant = 'default';
+            if (r && typeof r.tags === 'string' && r.tags.trim()) {
+              try {
+                const parsed = JSON.parse(r.tags) as Record<string, unknown>;
+                if (typeof parsed?.tenant_id === 'string' && parsed.tenant_id.trim()) {
+                  rowTenant = parsed.tenant_id.trim();
+                }
+              } catch {
+                // Keep default tenant when tags JSON is malformed
+              }
+            }
+            if (rowTenant === trimmedTenant) {
+              const numVal = Number(r.value ?? 0);
+              if (Number.isFinite(numVal)) {
+                matchingValues.push(numVal);
+              }
+            }
+          }
+          if (matchingValues.length === 0) {
+            return null;
+          }
+          const sum = matchingValues.reduce((acc, v) => acc + v, 0);
+          return {
+            name,
+            avg: sum / matchingValues.length,
+            max: Math.max(...matchingValues),
+            min: Math.min(...matchingValues),
+            count: matchingValues.length
+          };
+        } catch {
+          // Fall back to unscoped aggregate query when tags column or .all() is unavailable
+        }
+      }
+    }
 
     const row = await db.prepare(
       `SELECT

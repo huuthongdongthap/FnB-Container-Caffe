@@ -12,6 +12,7 @@ export interface TIWebhookPayload {
   order_id?: string | number;
   ti_order_id?: string | number;
   local_order_id?: string;
+  tenant_id?: string;
   status?: string;
   data?: Record<string, unknown>;
   timestamp?: string;
@@ -47,14 +48,30 @@ export function mapTIStatusToLocal(tiStatus: string): string {
   }
 }
 
+function matchesWebhookOrderTenant(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
+  if (!tenantId || tenantId === '*') return true;
+  if (!row) return false;
+  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null) {
+    const rowTenant = String(row.tenant_id).trim() || 'default';
+    return rowTenant === tenantId;
+  }
+  return tenantId === 'default';
+}
+
 export async function processTIWebhook(
   env: Record<string, unknown>,
-  payload: TIWebhookPayload
+  payload: TIWebhookPayload,
+  tenantId?: string
 ): Promise<{ success: boolean; mapped_status: string; local_order_id?: string; bridge_id?: string; updated: boolean }> {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
   if (!db) {
     throw new Error('D1 database binding missing');
   }
+  const scopedTenant = (
+    tenantId ??
+    payload.tenant_id ??
+    (typeof payload.data?.tenant_id === 'string' ? payload.data.tenant_id : '')
+  ).trim();
 
   const rawTiId = payload.ti_order_id ?? payload.order_id;
   const tiOrderId = rawTiId !== undefined ? String(rawTiId) : undefined;
@@ -84,12 +101,22 @@ export async function processTIWebhook(
   if (bridgeRow) {
     bridgeId = bridgeRow.id;
     localOrderId = bridgeRow.local_order_id;
-    await db
-      .prepare(
-        "UPDATE ti_order_bridge SET status = ?, ti_order_id = COALESCE(?, ti_order_id), synced_at = datetime('now') WHERE id = ?"
-      )
-      .bind(mappedStatus, tiOrderId ?? null, bridgeId)
-      .run();
+    if (!localOrderId) {
+      const bridgeTenantAllowed =
+        !scopedTenant ||
+        scopedTenant === '*' ||
+        !('tenant_id' in bridgeRow) ||
+        (bridgeRow as Record<string, unknown>).tenant_id === undefined ||
+        matchesWebhookOrderTenant(bridgeRow as unknown as Record<string, unknown>, scopedTenant);
+      if (bridgeTenantAllowed) {
+        await db
+          .prepare(
+            "UPDATE ti_order_bridge SET status = ?, ti_order_id = COALESCE(?, ti_order_id), synced_at = datetime('now') WHERE id = ?"
+          )
+          .bind(mappedStatus, tiOrderId ?? null, bridgeId)
+          .run();
+      }
+    }
   } else {
     bridgeId = crypto.randomUUID();
     const safeInboundOrderId =
@@ -105,14 +132,21 @@ export async function processTIWebhook(
       .run();
   }
 
-  // Only mutate local orders when an existing ti_order_bridge links this webhook and state machine guards pass
+  // Only mutate bridge status and local orders when an existing ti_order_bridge links this webhook and state machine guards pass
   if (bridgeRow && localOrderId) {
     try {
       let currentOrder = await db
-        .prepare('SELECT id, status, order_type, payment_status FROM orders WHERE id = ? LIMIT 1')
+        .prepare('SELECT id, status, order_type, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1')
         .bind(localOrderId)
-        .first<{ id: string; status: string; order_type?: string | null; payment_status?: string | null }>()
+        .first<{ id: string; status: string; order_type?: string | null; payment_status?: string | null; tenant_id?: string | null }>()
         .catch(() => null);
+      if (!currentOrder) {
+        currentOrder = await db
+          .prepare('SELECT id, status, order_type, payment_status FROM orders WHERE id = ? LIMIT 1')
+          .bind(localOrderId)
+          .first<{ id: string; status: string; order_type?: string | null; payment_status?: string | null }>()
+          .catch(() => null);
+      }
       if (!currentOrder) {
         currentOrder = await db
           .prepare('SELECT id, status FROM orders WHERE id = ? LIMIT 1')
@@ -144,26 +178,90 @@ export async function processTIWebhook(
         !currentStatus ||
         currentStatus === mappedStatus ||
         (!isTerminalState && (allowedNext[currentStatus]?.includes(mappedStatus) ?? false));
+      const tenantAllowed =
+        !scopedTenant ||
+        scopedTenant === '*' ||
+        (Boolean(currentOrder) && matchesWebhookOrderTenant(currentOrder as unknown as Record<string, unknown>, scopedTenant)) ||
+        (!currentOrder &&
+          (!('tenant_id' in bridgeRow) ||
+            (bridgeRow as Record<string, unknown>).tenant_id === undefined ||
+            matchesWebhookOrderTenant(bridgeRow as unknown as Record<string, unknown>, scopedTenant)));
 
-      if (!isTerminalState && !unpaidDeliveryBlock && validTransition) {
-        try {
-          await db
-            .prepare(
-              currentStatus
-                ? "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?"
-                : "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?"
-            )
-            .bind(...(currentStatus ? [mappedStatus, localOrderId, currentStatus] : [mappedStatus, localOrderId]))
-            .run();
-        } catch {
-          await db
-            .prepare(
-              currentStatus
-                ? 'UPDATE orders SET status = ? WHERE id = ? AND status = ?'
-                : 'UPDATE orders SET status = ? WHERE id = ?'
-            )
-            .bind(...(currentStatus ? [mappedStatus, localOrderId, currentStatus] : [mappedStatus, localOrderId]))
-            .run();
+      if (!isTerminalState && !unpaidDeliveryBlock && validTransition && tenantAllowed) {
+        await db
+          .prepare(
+            "UPDATE ti_order_bridge SET status = ?, ti_order_id = COALESCE(?, ti_order_id), synced_at = datetime('now') WHERE id = ?"
+          )
+          .bind(mappedStatus, tiOrderId ?? null, bridgeId)
+          .run();
+        const baseBinds = currentStatus ? [mappedStatus, localOrderId, currentStatus] : [mappedStatus, localOrderId];
+        if (scopedTenant && scopedTenant !== '*') {
+          const tenantClause = scopedTenant === 'default'
+            ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+            : ' AND tenant_id = ?';
+          try {
+            await db
+              .prepare(
+                currentStatus
+                  ? `UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?${tenantClause}`
+                  : `UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?${tenantClause}`
+              )
+              .bind(...baseBinds, scopedTenant)
+              .run();
+          } catch {
+            try {
+              await db
+                .prepare(
+                  currentStatus
+                    ? `UPDATE orders SET status = ? WHERE id = ? AND status = ?${tenantClause}`
+                    : `UPDATE orders SET status = ? WHERE id = ?${tenantClause}`
+                )
+                .bind(...baseBinds, scopedTenant)
+                .run();
+            } catch {
+              if (matchesWebhookOrderTenant(currentOrder as unknown as Record<string, unknown>, scopedTenant)) {
+                try {
+                  await db
+                    .prepare(
+                      currentStatus
+                        ? "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?"
+                        : "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?"
+                    )
+                    .bind(...baseBinds)
+                    .run();
+                } catch {
+                  await db
+                    .prepare(
+                      currentStatus
+                        ? 'UPDATE orders SET status = ? WHERE id = ? AND status = ?'
+                        : 'UPDATE orders SET status = ? WHERE id = ?'
+                    )
+                    .bind(...baseBinds)
+                    .run();
+                }
+              }
+            }
+          }
+        } else {
+          try {
+            await db
+              .prepare(
+                currentStatus
+                  ? "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?"
+                  : "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?"
+              )
+              .bind(...baseBinds)
+              .run();
+          } catch {
+            await db
+              .prepare(
+                currentStatus
+                  ? 'UPDATE orders SET status = ? WHERE id = ? AND status = ?'
+                  : 'UPDATE orders SET status = ? WHERE id = ?'
+              )
+              .bind(...baseBinds)
+              .run();
+          }
         }
       } else {
         log.warn('local_order_status_transition_blocked', {
@@ -188,3 +286,5 @@ export async function processTIWebhook(
     updated: Boolean(bridgeRow)
   };
 }
+
+export const handleOrderUpdated = processTIWebhook;

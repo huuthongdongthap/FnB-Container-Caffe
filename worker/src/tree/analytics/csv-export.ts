@@ -28,8 +28,8 @@ export async function getOrdersInRange(
   const tenantClause = !hasTenant
     ? ''
     : tenantId === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-      : ' AND tenant_id = ?';
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND TRIM(tenant_id) = ?';
   const binds = hasTenant && tenantId ? [start, end, tenantId] : [start, end];
   const { results } = await db.prepare(`
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
@@ -97,7 +97,7 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
  * if it contains comma, newline, semicolon, or double-quote.
  */
 function escapeCsvField(value: string): string {
-  const sanitized = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value;
+  const sanitized = /^[\t\r\n ]*[=+\-@]/.test(value) ? `'${value}` : value;
   if (sanitized.includes(',') || sanitized.includes('\n') || sanitized.includes('"') || sanitized.includes(';')) {
     return `"${sanitized.replace(/"/g, '""')}"`;
   }

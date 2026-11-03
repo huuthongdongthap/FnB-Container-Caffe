@@ -76,17 +76,31 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
   let activeRewards: { cnt: number }[] = [];
   try {
     const res = await db.prepare(
-      'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
-    ).bind(cust.id).all<{ cnt: number }>();
+      "SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(cust.id, tenantId).all<{ cnt: number }>();
     activeRewards = res.results || [];
   } catch {
     try {
       const res = await db.prepare(
-        'SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status = \'pending\''
+        'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
       ).bind(cust.id).all<{ cnt: number }>();
       activeRewards = res.results || [];
     } catch {
-      activeRewards = [];
+      try {
+        const res = await db.prepare(
+          "SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(cust.id, tenantId).all<{ cnt: number }>();
+        activeRewards = res.results || [];
+      } catch {
+        try {
+          const res = await db.prepare(
+            'SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status = \'pending\''
+          ).bind(cust.id).all<{ cnt: number }>();
+          activeRewards = res.results || [];
+        } catch {
+          activeRewards = [];
+        }
+      }
     }
   }
 

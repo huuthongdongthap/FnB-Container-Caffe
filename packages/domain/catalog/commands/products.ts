@@ -12,6 +12,7 @@ import { createProductSchema, updateProductSchema, zodErrorResponse } from 'work
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { audit } from 'worker/src/middleware/audit-log';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
+import { resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { Product } from '../model/catalog-types';
 import {
@@ -67,7 +68,7 @@ function generateProductId(): string {
 // ── 1. Static / Literal Prefix Routes (MUST PRECEDENCE OVER /:id) ──
 productsRouter.get('/slug/:slug', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const slug = c.req.param('slug');
   const row = await findSlugMatchForTenant(
     db,
@@ -84,7 +85,7 @@ productsRouter.get('/slug/:slug', async (c) => {
 // ── 2. Base Collection Routes ──
 productsRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const category = c.req.query('category') || c.req.query('categoryId');
   const available = c.req.query('available');
   const status = c.req.query('status');
@@ -149,7 +150,7 @@ async function isCrossTenantCategory(db: Env['AURA_DB'], categoryId: string | un
 
 productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
   const db = c.env.AURA_DB;
-  const rawTenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
   const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createProductSchema.safeParse(body);
@@ -213,7 +214,7 @@ productsRouter.post('/', staffAuth, audit('product_create'), async (c) => {
 // ── 3. Parameterized Record Routes (/:id) ──
 productsRouter.get('/:id', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const row = (await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(c.req.param('id')).first()) as Product | null;
   if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
@@ -223,7 +224,7 @@ productsRouter.get('/:id', async (c) => {
 
 const handleUpdateProduct = async (c: any) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const body = await c.req.json();
   const id = c.req.param('id');
   const parsed = updateProductSchema.safeParse(body);
@@ -235,15 +236,15 @@ const handleUpdateProduct = async (c: any) => {
   if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
-  if (data.category_id && await isCrossTenantCategory(db, data.category_id, tenantId)) {
+  const existingRec = existing as unknown as Record<string, unknown>;
+  const targetTenant = existingRec.tenant_id && String(existingRec.tenant_id).trim()
+    ? String(existingRec.tenant_id).trim()
+    : (tenantId === '*' ? 'default' : tenantId);
+  if (data.category_id && await isCrossTenantCategory(db, data.category_id, targetTenant)) {
     return c.json({ success: false, error: 'Category not found' }, 404);
   }
   if (data.slug && data.slug !== existing.slug) {
     try {
-      const existingRec = existing as unknown as Record<string, unknown>;
-      const targetTenant = existingRec.tenant_id && String(existingRec.tenant_id).trim()
-        ? String(existingRec.tenant_id).trim()
-        : (tenantId === '*' ? 'default' : tenantId);
       const slugConflict = await findSlugMatchForTenant(
         db,
         'SELECT * FROM products WHERE slug = ? AND id != ?',
@@ -303,7 +304,7 @@ productsRouter.patch('/:id', staffAuth, audit('product_update'), handleUpdatePro
 
 productsRouter.delete('/:id', staffAuth, audit('product_delete'), async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const id = c.req.param('id');
   const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as Product | null;
   if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {

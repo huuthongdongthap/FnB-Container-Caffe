@@ -5,8 +5,12 @@
 
 import { createErpnextCrmClientWithKv, CrmUpdateData } from '../clients/erpnext-crm-client';
 import { ErpnextClient } from '../clients/erpnext-client';
-import { verifyJWT, getAuthToken } from '../lib/jwt';
+import { verifyJWT, getAuthToken, cookieWriteBlockReason } from '../lib/jwt';
+import { validateStaffSession, staffSessionErrorResponse, type StaffSession } from '../lib/staff-session';
 import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema, customerUpdateSchema, zodErrorResponseRaw } from '../lib/validators';
+import { createLogger } from '../middleware/logger';
+
+const log = createLogger({ route: 'erpnext' });
 
 interface Env {
 	AURA_DB?: D1Database;
@@ -34,6 +38,10 @@ async function verifyErpnextAdminRole(
 	env: Env,
 	resolvedTenantId?: string,
 ): Promise<{ ok: true; tenantId: string } | { ok: false; response: Response }> {
+	const blocked = cookieWriteBlockReason(request.method, request);
+	if (blocked) {
+		return { ok: false, response: jsonResp({ success: false, error: blocked }, 403) };
+	}
 	const token = getAuthToken(request);
 	if (!token || !env.JWT_SECRET) {
 		return { ok: false, response: jsonResp({ success: false, error: 'Unauthorized' }, 401) };
@@ -46,6 +54,15 @@ async function verifyErpnextAdminRole(
 	if (!payload || !ERPNEXT_CONFIG_ADMIN_ROLES.includes(payload.role)) {
 		return { ok: false, response: jsonResp({ success: false, error: 'Không đủ quyền truy cập' }, 403) };
 	}
+	if (env.AURA_DB && (payload as Partial<StaffSession>).authVersion !== undefined) {
+		try {
+			await validateStaffSession(env.AURA_DB, payload as Partial<StaffSession>);
+		} catch (err) {
+			const sessionResp = staffSessionErrorResponse(err);
+			if (sessionResp) return { ok: false, response: sessionResp };
+			return { ok: false, response: jsonResp({ success: false, error: 'Unauthorized' }, 401) };
+		}
+	}
 	const claimTenant = (payload as unknown as { tenant_id?: string; tenantId?: string }).tenant_id
 		|| (payload as unknown as { tenantId?: string }).tenantId
 		|| 'default';
@@ -57,7 +74,10 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 	const url = new URL(request.url);
 	const path = url.pathname.replace('/api/erpnext', '');
 	const method = request.method;
-	const activeTenant = resolvedTenantId && resolvedTenantId !== '*' ? resolvedTenantId : 'default';
+	const rawHeaderTenant = (request.headers.get('X-Tenant-ID') || request.headers.get('x-tenant-id') || '').trim();
+	const activeTenant = resolvedTenantId && resolvedTenantId !== '*'
+		? resolvedTenantId
+		: (rawHeaderTenant && rawHeaderTenant !== '*' ? rawHeaderTenant : 'default');
 
 	try {
 		if (method === 'GET' && path === '/configure') {
@@ -115,7 +135,7 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 			return jsonResp({ success: true, message: 'ERPNext credentials cleared' });
 		}
 
-		const client = await createErpnextCrmClientWithKv(env);
+		const client = await createErpnextCrmClientWithKv(env, activeTenant);
 		if (!client) return jsonResp({ success: false, error: 'ERPNext not configured' }, 503);
 
 		if (method === 'POST' && path === '/lead') {
@@ -157,6 +177,7 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 		return jsonResp({ success: false, error: 'Not found' }, 404);
 	} catch (e: unknown) {
 		const msg = e instanceof Error ? e.message : String(e);
-		return jsonResp({ success: false, error: msg }, 500);
+		log.error('erpnext_request_failed', { error: msg });
+		return jsonResp({ success: false, error: 'Internal integration error' }, 500);
 	}
 }

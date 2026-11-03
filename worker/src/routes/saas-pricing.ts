@@ -1,8 +1,25 @@
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 import { createLogger } from '../middleware/logger';
+import { matchesTenantRow } from '../lib/db';
+import { resolvePublicTenantId } from '../middleware/tenant';
 
 const log = createLogger({ route: 'saas-pricing' });
+
+function safeParseJsonArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item));
+  }
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+  } catch {
+    return [];
+  }
+}
 
 export type PricingTier = {
  id: string;
@@ -38,8 +55,8 @@ function mapRow(r: Record<string, unknown>): PricingTier {
    billingPeriod: String(r.billing_period ?? 'monthly'),
    sortOrder: Number(r.sort_order ?? 0),
    isRecommended: Boolean(r.is_recommended),
-   featuresVi: JSON.parse(String(r.features_vi ?? '[]')),
-   featuresEn: JSON.parse(String(r.features_en ?? '[]')),
+   featuresVi: safeParseJsonArray(r.features_vi),
+   featuresEn: safeParseJsonArray(r.features_en),
    ctaTextVi: String(r.cta_text_vi ?? 'Bắt đầu'),
    ctaTextEn: String(r.cta_text_en ?? 'Get Started'),
    ctaLink: String(r.cta_link ?? '/register'),
@@ -49,6 +66,7 @@ function mapRow(r: Record<string, unknown>): PricingTier {
 export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Response> {
  const db = c.env.AURA_DB as unknown as D1Database;
  const lang = (c.req.header('Accept-Language') || 'vi')?.startsWith('en') ? 'en' : 'vi';
+ const tenantId = resolvePublicTenantId(c);
 
  try {
    const { results } = await db
@@ -57,7 +75,13 @@ export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Respons
    )
    .all<PricingTier & Record<string, unknown>>();
 
-   const tiers = (results ?? []).map(mapRow);
+   const allRows = results ?? [];
+   const tenantRows = allRows.filter((row) => matchesTenantRow(row, tenantId));
+   const effectiveRows =
+     tenantRows.length > 0 || tenantId === 'default'
+       ? tenantRows
+       : allRows.filter((row) => matchesTenantRow(row, 'default'));
+   const tiers = effectiveRows.map(mapRow);
    return c.json({ ok: true, data: tiers, lang });
  } catch (err) {
    const e = err as { cause?: unknown; name?: string; message?: string };

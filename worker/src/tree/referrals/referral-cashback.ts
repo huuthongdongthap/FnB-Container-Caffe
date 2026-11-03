@@ -17,7 +17,25 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
     return { success: false, reason: 'order_below_min', min_required: MIN_ORDER_AMOUNT };
   }
 
-  const pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral>();
+  let pending: (Referral & { tenant_id?: string | null }) | null = null;
+  if (effectiveTenant) {
+    try {
+      pending = await db
+        .prepare("SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(customerId, 'pending', effectiveTenant)
+        .first<Referral & { tenant_id?: string | null }>();
+    } catch {
+      pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral & { tenant_id?: string | null }>();
+    }
+    if (pending && 'tenant_id' in pending && pending.tenant_id !== undefined) {
+      const pTenant = String(pending.tenant_id ?? '').trim() || 'default';
+      if (pTenant !== effectiveTenant) {
+        return { success: false, reason: 'no_pending_referral' };
+      }
+    }
+  } else {
+    pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral & { tenant_id?: string | null }>();
+  }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
   }
@@ -65,6 +83,7 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   }
   const batch: ReturnType<typeof db.prepare>[] = [];
 
+  const hadExistingWallet = Boolean(wallet);
   if (!wallet) {
     const walletId = genId('cbw_');
     batch.push(
@@ -76,32 +95,46 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   }
 
   const newBalance = (wallet.balance || 0) + REFERRER_CASHBACK_VND;
-  const txId = genId('cbt_');
+  // Deterministic transaction ID keyed by referral ID prevents duplicate payouts on retry.
+  const txId = `cbt_ref_${pending.id}_referrer`;
+  const stampTenant = effectiveTenant || 'default';
 
   batch.push(db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id));
   batch.push(db.prepare(
-    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
-     VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`
-  ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, now));
+    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, tenant_id, created_at)
+     VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?, ?)`
+  ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, stampTenant, now));
+  batch.push(
+    effectiveTenant
+      ? db.prepare(
+          "UPDATE referrals SET status = 'completed', cashback_awarded_vnd = ?, first_order_id = ?, first_order_amount = ?, reward_paid_at = ? WHERE id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(REFERRER_CASHBACK_VND, orderId, orderAmount, now, pending.id, effectiveTenant)
+      : db.prepare(
+          "UPDATE referrals SET status = 'completed', cashback_awarded_vnd = ?, first_order_id = ?, first_order_amount = ?, reward_paid_at = ? WHERE id = ? AND status = 'pending'"
+        ).bind(REFERRER_CASHBACK_VND, orderId, orderAmount, now, pending.id)
+  );
   batch.push(db.prepare(
-    'UPDATE referrals SET status = \'completed\', cashback_awarded_vnd = ?, first_order_id = ?, first_order_amount = ?, reward_paid_at = ? WHERE id = ?'
-  ).bind(REFERRER_CASHBACK_VND, orderId, orderAmount, now, pending.id));
-  batch.push(db.prepare(
-    `INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at)
-     VALUES (?, 'referral_cashback', ?, ?, ?, ?)`
-  ).bind(referrer.id, REFERRER_CASHBACK_VND, orderId, JSON.stringify({ referral_id: pending.id, referred_customer_id: customerId, order_amount: orderAmount }), now));
+    `INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, tenant_id, created_at)
+     VALUES (?, 'referral_cashback', ?, ?, ?, ?, ?)`
+  ).bind(referrer.id, REFERRER_CASHBACK_VND, orderId, JSON.stringify({ referral_id: pending.id, referred_customer_id: customerId, order_amount: orderAmount }), stampTenant, now));
 
   try {
     await db.batch(batch);
   } catch {
-    const fallbackBatch: ReturnType<typeof db.prepare>[] = [
-      db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id),
+    const fallbackBatch: ReturnType<typeof db.prepare>[] = [];
+    if (!hadExistingWallet) {
+      fallbackBatch.push(
+        db.prepare('INSERT OR IGNORE INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)').bind(wallet.id, referrer.id, now)
+      );
+    }
+    fallbackBatch.push(
+      db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ? OR customer_id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id, referrer.id),
       db.prepare(
         `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
          VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`
       ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, now),
-      db.prepare('UPDATE referrals SET status = \'completed\' WHERE id = ?').bind(pending.id)
-    ];
+      db.prepare("UPDATE referrals SET status = 'completed' WHERE id = ? AND status = 'pending'").bind(pending.id)
+    );
     await db.batch(fallbackBatch);
   }
 

@@ -1,12 +1,5 @@
+import { matchesTenantRow } from '../../lib/db';
 import type { MixpostEnv } from './types';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 export async function resolveTemplate(template: string, env: MixpostEnv, tenantId = 'default'): Promise<string> {
   let content = template;

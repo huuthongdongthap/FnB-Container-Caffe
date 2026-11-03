@@ -35,23 +35,52 @@ function determineVarianceStatus(variance: number): VarianceStatus {
 
 async function getShiftWindow(
   db: D1Database,
-  shiftId: string
-): Promise<{ clock_in: string; clock_out: string | null } | null> {
+  shiftId: string,
+  tenantId?: string
+): Promise<{ clock_in: string; clock_out: string | null; tenant_id?: string | null } | null> {
+  const normTenant = tenantId ? tenantId.trim() : undefined;
+  const matchesTenant = (row: { tenant_id?: string | null }) => {
+    if (!normTenant || normTenant === '*' || !('tenant_id' in row) || row.tenant_id === undefined) return true;
+    const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+    return rowTenant === normTenant;
+  };
+  if (normTenant) {
+    try {
+      const staffShift = await db
+        .prepare('SELECT clock_in, clock_out, tenant_id FROM staff_shifts WHERE id = ?')
+        .bind(shiftId)
+        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
+      if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
+    } catch {
+      // Fallback to legacy query without tenant_id
+    }
+  }
   try {
     const staffShift = await db
       .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
       .bind(shiftId)
-      .first<{ clock_in: string; clock_out: string | null }>();
-    if (staffShift) return staffShift;
+      .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
+    if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
   } catch {
     // Fallback to legacy shifts table when staff_shifts is absent in unit test mocks
+  }
+  if (normTenant) {
+    try {
+      const row = await db
+        .prepare('SELECT clock_in, clock_out, tenant_id FROM shifts WHERE id = ?')
+        .bind(shiftId)
+        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
+      if (row) return matchesTenant(row) ? row : null;
+    } catch {
+      // Fallback to legacy query without tenant_id
+    }
   }
   try {
     const row = await db
       .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
       .bind(shiftId)
-      .first<{ clock_in: string; clock_out: string | null }>();
-    if (row) return row;
+      .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
+    if (row) return matchesTenant(row) ? row : null;
   } catch {
     // Fallback to shifts with actual_start/start_time
   }
@@ -65,18 +94,53 @@ async function getShiftWindow(
   }
 }
 
+function resolveShiftTenant(
+  shift: { tenant_id?: string | null },
+  tenantId?: string
+): string | undefined {
+  const normTenant = tenantId ? tenantId.trim() : undefined;
+  if (normTenant && normTenant !== '*') return normTenant;
+  if ('tenant_id' in shift && shift.tenant_id !== undefined) {
+    return typeof shift.tenant_id === 'string' && shift.tenant_id.trim() ? shift.tenant_id.trim() : 'default';
+  }
+  return undefined;
+}
+
 /**
  * Fetch cash payments received during shift time window.
  */
 async function getCashPaymentsForShift(
   db: D1Database,
-  shiftId: string
+  shiftId: string,
+  tenantId?: string
 ): Promise<number> {
-  const shift = await getShiftWindow(db, shiftId);
+  const shift = await getShiftWindow(db, shiftId, tenantId);
 
   if (!shift) return 0;
 
   const endTime = shift.clock_out || new Date().toISOString();
+  const effectiveTenant = resolveShiftTenant(shift, tenantId);
+
+  if (effectiveTenant) {
+    try {
+      const scopedResult = await db
+        .prepare(
+          `SELECT COALESCE(SUM(amount), 0) as total FROM payments
+           WHERE method IN ('cash', 'cod')
+           AND created_at >= ? AND created_at <= ?
+           AND status = 'completed'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        )
+        .bind(shift.clock_in, endTime, effectiveTenant)
+        .first<{ total: number }>();
+
+      if (scopedResult && typeof scopedResult.total === 'number') {
+        return scopedResult.total;
+      }
+    } catch {
+      // Fallback if payments.tenant_id is absent in schema/mocks
+    }
+  }
 
   try {
     const result = await db
@@ -118,13 +182,35 @@ async function getCashPaymentsForShift(
  */
 async function getCashPayoutsForShift(
   db: D1Database,
-  shiftId: string
+  shiftId: string,
+  tenantId?: string
 ): Promise<number> {
-  const shift = await getShiftWindow(db, shiftId);
+  const shift = await getShiftWindow(db, shiftId, tenantId);
 
   if (!shift) return 0;
 
   const endTime = shift.clock_out || new Date().toISOString();
+  const effectiveTenant = resolveShiftTenant(shift, tenantId);
+
+  if (effectiveTenant) {
+    try {
+      const scopedResult = await db
+        .prepare(
+          `SELECT COALESCE(SUM(amount), 0) as total FROM cash_payouts
+           WHERE created_at >= ? AND created_at <= ?
+           AND status = 'completed'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        )
+        .bind(shift.clock_in, endTime, effectiveTenant)
+        .first<{ total: number }>();
+
+      if (scopedResult && typeof scopedResult.total === 'number') {
+        return scopedResult.total;
+      }
+    } catch {
+      // Fallback if cash_payouts.tenant_id is absent in schema/mocks
+    }
+  }
 
   try {
     const result = await db
@@ -150,13 +236,15 @@ async function getCashPayoutsForShift(
 export async function reconcileShiftCash(
   env: Env,
   input: ReconciliationInput,
-  staffId: string
+  staffId: string,
+  tenantId?: string
 ): Promise<ShiftReconciliation> {
   const db = env.AURA_DB;
+  const normTenant = tenantId ? tenantId.trim() : undefined;
 
   const actualCash = calculateTotalCash(input.denominations.denominations);
-  const cashPayments = await getCashPaymentsForShift(db, input.shift_id);
-  const cashPayouts = await getCashPayoutsForShift(db, input.shift_id);
+  const cashPayments = await getCashPaymentsForShift(db, input.shift_id, normTenant);
+  const cashPayouts = await getCashPayoutsForShift(db, input.shift_id, normTenant);
   const expectedCash = input.opening_float + cashPayments - cashPayouts;
   const variance = actualCash - expectedCash;
   const varianceStatus = determineVarianceStatus(variance);
@@ -176,6 +264,44 @@ export async function reconcileShiftCash(
     notes: input.notes ?? null,
     created_at: new Date().toISOString(),
   };
+
+  let effectiveReconTenant = normTenant && normTenant !== '*' ? normTenant : undefined;
+  if (!effectiveReconTenant && normTenant === '*') {
+    const shiftWindow = await getShiftWindow(db, input.shift_id, normTenant);
+    if (shiftWindow) {
+      effectiveReconTenant = resolveShiftTenant(shiftWindow, normTenant);
+    }
+  }
+
+  if (effectiveReconTenant && effectiveReconTenant !== '*') {
+    try {
+      await db.prepare(
+        `INSERT INTO shift_reconciliations (
+          id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
+          variance, variance_status, denominations, cash_payment_total,
+          cash_payout_total, notes, tenant_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        reconciliation.id,
+        reconciliation.shift_id,
+        reconciliation.staff_id,
+        reconciliation.opening_float,
+        reconciliation.expected_cash,
+        reconciliation.actual_cash,
+        reconciliation.variance,
+        reconciliation.variance_status,
+        JSON.stringify(reconciliation.denominations),
+        reconciliation.cash_payment_total,
+        reconciliation.cash_payout_total,
+        reconciliation.notes,
+        effectiveReconTenant,
+        reconciliation.created_at
+      ).run();
+      return reconciliation;
+    } catch {
+      // Fallback if shift_reconciliations.tenant_id column is absent
+    }
+  }
 
   await db.prepare(
     `INSERT INTO shift_reconciliations (
@@ -204,9 +330,11 @@ export async function reconcileShiftCash(
 
 export async function getReconciliationForShift(
   env: Env,
-  shiftId: string
+  shiftId: string,
+  tenantId?: string
 ): Promise<ShiftReconciliation | null> {
   const db = env.AURA_DB;
+  const normTenant = tenantId ? tenantId.trim() : undefined;
 
   const row = await db
     .prepare('SELECT * FROM shift_reconciliations WHERE shift_id = ?')
@@ -214,6 +342,10 @@ export async function getReconciliationForShift(
     .first<Record<string, unknown>>();
 
   if (!row) return null;
+  if (normTenant && normTenant !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+    if (rowTenant !== normTenant) return null;
+  }
 
   return {
     ...(row as unknown as ShiftReconciliation),

@@ -57,32 +57,52 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_earned, 0) AS total_earned,
                COALESCE(cw.total_spent, 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND (? = '*' OR o.tenant_id = ? OR (? = 'default' AND (o.tenant_id IS NULL OR o.tenant_id = '')))) AS visit_count
+               (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND COALESCE(o.status, '') NOT IN ('cancelled', 'failed', 'expired') AND (? = '*' OR CASE WHEN o.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') END = ?)) AS visit_count
         FROM customers c
-        LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-        WHERE c.phone = ? AND (? = '*' OR c.tenant_id = ? OR (? = 'default' AND (c.tenant_id IS NULL OR c.tenant_id = '')))
+        LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
+        WHERE c.phone = ? AND (? = '*' OR CASE WHEN c.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') END = ?)
       `)
-      .bind(tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId, tenantId)
+      .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
       .first<PosCustomerRow>();
   } catch (err) {
-    const missingTenant = /no such column:\s*(?:c\.|o\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
-    row = missingTenant
-      ? await db
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const missingWalletTenant = /no such column:\s*cw\.tenant_id/i.test(errMsg);
+    const missingCustomerOrOrderTenant = /no such column:\s*(?:c\.|o\.)?tenant_id/i.test(errMsg) && !missingWalletTenant;
+    if (missingCustomerOrOrderTenant) {
+      row = await db
+        .prepare(`
+          SELECT c.id, c.name, c.phone, c.email,
+                 c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+                 c.created_at,
+                 COALESCE(cw.balance, 0) AS cashback_balance,
+                 COALESCE(cw.total_earned, 0) AS total_earned,
+                 COALESCE(cw.total_spent, 0) AS total_spent,
+                 (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+          FROM customers c
+          LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+          WHERE c.phone = ?
+        `)
+        .bind(normalizedPhone)
+        .first<PosCustomerRow>();
+    } else if (missingWalletTenant) {
+      try {
+        row = await db
           .prepare(`
             SELECT c.id, c.name, c.phone, c.email,
-                   c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
-                   c.created_at,
+                   c.loyalty_tier, c.loyalty_points, c.lifetime_points,
+                   c.created_at, c.tenant_id,
                    COALESCE(cw.balance, 0) AS cashback_balance,
                    COALESCE(cw.total_earned, 0) AS total_earned,
                    COALESCE(cw.total_spent, 0) AS total_spent,
-                   (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND COALESCE(o.status, '') NOT IN ('cancelled', 'failed', 'expired') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
             FROM customers c
             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-            WHERE c.phone = ?
+            WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
           `)
-          .bind(normalizedPhone)
-          .first<PosCustomerRow>()
-      : await db
+          .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
+          .first<PosCustomerRow>();
+      } catch {
+        row = await db
           .prepare(`
             SELECT c.id, c.name, c.phone, c.email,
                    c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
@@ -90,15 +110,54 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                    COALESCE(cw.balance, 0) AS cashback_balance,
                    COALESCE(cw.total_earned, 0) AS total_earned,
                    COALESCE(cw.total_spent, 0) AS total_spent,
-                   (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone) AS visit_count
+                   (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
             FROM customers c
             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-            WHERE c.phone = ? AND (? = '*' OR c.tenant_id = ? OR (? = 'default' AND (c.tenant_id IS NULL OR c.tenant_id = '')))
+            WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
           `)
-          .bind(normalizedPhone, tenantId, tenantId, tenantId)
+          .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
           .first<PosCustomerRow>();
+      }
+    } else {
+      try {
+        row = await db
+          .prepare(`
+            SELECT c.id, c.name, c.phone, c.email,
+                   c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+                   c.created_at, c.tenant_id,
+                   COALESCE(cw.balance, 0) AS cashback_balance,
+                   COALESCE(cw.total_earned, 0) AS total_earned,
+                   COALESCE(cw.total_spent, 0) AS total_spent,
+                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND COALESCE(o.status, '') NOT IN ('cancelled', 'failed', 'expired') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
+            FROM customers c
+            LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
+            WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+          `)
+          .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
+          .first<PosCustomerRow>();
+      } catch {
+        row = await db
+          .prepare(`
+            SELECT c.id, c.name, c.phone, c.email,
+                   c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+                   c.created_at, c.tenant_id,
+                   COALESCE(cw.balance, 0) AS cashback_balance,
+                   COALESCE(cw.total_earned, 0) AS total_earned,
+                   COALESCE(cw.total_spent, 0) AS total_spent,
+                   (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
+            FROM customers c
+            LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+            WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+          `)
+          .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
+          .first<PosCustomerRow>();
+      }
+    }
   }
-  if (tenantId !== '*' && row && 'tenant_id' in row && row.tenant_id !== undefined && (row.tenant_id || 'default') !== tenantId) {
+  const resolvedRowTenant = row && 'tenant_id' in row && row.tenant_id !== undefined
+    ? (typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default')
+    : 'default';
+  if (tenantId !== '*' && row && 'tenant_id' in row && row.tenant_id !== undefined && resolvedRowTenant !== tenantId) {
     row = null;
   }
 

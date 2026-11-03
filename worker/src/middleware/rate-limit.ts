@@ -110,6 +110,34 @@ export const CLIENT_ERROR_RATE_LIMIT: RateLimitConfig = {
   errorMessage: 'Too many error reports. Please try again later.'
 };
 
+export const LOYALTY_REDEEM_RATE_LIMIT: RateLimitConfig = {
+  max: 3,
+  windowSec: 60,
+  keyPrefix: 'rate:loyalty-redeem',
+  errorMessage: 'Too many redemptions. Please try again in 1 minute.',
+};
+
+export const CASHBACK_SPEND_RATE_LIMIT: RateLimitConfig = {
+  max: 5,
+  windowSec: 60,
+  keyPrefix: 'rate:cashback-spend',
+  errorMessage: 'Too many cashback requests. Please try again in 1 minute.',
+};
+
+export const REFERRAL_CODE_RATE_LIMIT: RateLimitConfig = {
+  max: 5,
+  windowSec: 60,
+  keyPrefix: 'rate:referral-code',
+  errorMessage: 'Too many requests. Please try again in 1 minute.',
+};
+
+export const CHECKIN_RATE_LIMIT: RateLimitConfig = {
+  max: 3,
+  windowSec: 3600,
+  keyPrefix: 'rate:checkin',
+  errorMessage: 'Too many check-ins. Please try again later.',
+};
+
 const rateLimitLocks = new Map<string, Promise<unknown>>();
 
 async function withKeyLock<T>(lockKey: string, fn: () => Promise<T>): Promise<T> {

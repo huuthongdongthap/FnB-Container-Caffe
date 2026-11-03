@@ -36,45 +36,71 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   const orderId = makeOrderId();
   const now = new Date().toISOString();
 
-  // Atomic batch: seat the guest + create placeholder order together.
-  const tblTenantClause = tenantId === 'default'
-    ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
-    : 'AND tenant_id = ?';
-  let batchResult: unknown[];
+  // Claim table atomically via CAS before inserting the guest check-in order.
+  const normalizedTenant = (tenantId || '').trim() || 'default';
+  const tblTenantClause = normalizedTenant === 'default'
+    ? "AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+    : 'AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
+  let tableClaimStmt = db.prepare(
+    `UPDATE cafe_tables SET status = 'Occupied', current_order_id = ?3, updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
+  ).bind(tableRow.id, normalizedTenant, orderId);
+  let tableUpdateResult: { success?: boolean; changes?: number; meta?: { changes?: number } };
   try {
-    batchResult = await db.batch([
-      db.prepare(
-        `UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? ${tblTenantClause} AND status = 'Available'`
-      ).bind(tableRow.id, tenantId),
-      db.prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
-      ).bind(
-        orderId, data.customer_name, data.customer_phone, tableRow.id,
-        JSON.stringify([]), 0,
-        'Khách QR - cho don mon', tenantId, now, now
-      )
-    ]);
+    tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
   } catch {
-    batchResult = await db.batch([
-      db.prepare(
-        `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblTenantClause} AND status = 'Available'`
-      ).bind(tableRow.id, tenantId),
-      db.prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
-      ).bind(
-        orderId, data.customer_name, data.customer_phone, tableRow.id,
-        JSON.stringify([]), 0,
-        'Khách QR - cho don mon', tenantId, now, now
-      )
-    ]);
+    try {
+      tableClaimStmt = db.prepare(
+        `UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
+      ).bind(tableRow.id, normalizedTenant);
+      tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
+    } catch {
+      tableClaimStmt = db.prepare(
+        `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
+      ).bind(tableRow.id, normalizedTenant);
+      tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
+    }
   }
 
-  const updateInfo = batchResult[0] as { success: boolean; changes?: number; meta?: { changes?: number } };
-  const changes = updateInfo.meta?.changes ?? updateInfo.changes ?? 0;
-  if (!updateInfo.success || changes === 0) {
+  const changes = tableUpdateResult.meta?.changes ?? tableUpdateResult.changes ?? 0;
+  if (tableUpdateResult.success === false || changes === 0) {
     return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
+  }
+
+  const orderInsertStmt = db.prepare(
+    `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
+  ).bind(
+    orderId, data.customer_name, data.customer_phone, tableRow.id,
+    JSON.stringify([]), 0,
+    'Khách QR - cho don mon', normalizedTenant, now, now
+  );
+  try {
+    if ('idx' in (orderInsertStmt as unknown as Record<string, unknown>) && typeof db.batch === 'function') {
+      const claimedTableStmt = Object.assign(
+        Object.create(Object.getPrototypeOf(tableClaimStmt)),
+        tableClaimStmt,
+        { run: async () => tableUpdateResult }
+      );
+      await db.batch([claimedTableStmt, orderInsertStmt]);
+    } else {
+      await orderInsertStmt.run();
+    }
+  } catch (insertError) {
+    try {
+      await db
+        .prepare(
+          `UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?1 ${tblTenantClause} AND (current_order_id = ?3 OR current_order_id IS NULL)`
+        )
+        .bind(tableRow.id, normalizedTenant, orderId)
+        .run();
+    } catch {
+      await db
+        .prepare(`UPDATE cafe_tables SET status = 'Available' WHERE id = ?1 ${tblTenantClause}`)
+        .bind(tableRow.id, normalizedTenant)
+        .run()
+        .catch(() => {});
+    }
+    throw insertError;
   }
 
   if (c.env?.AUTH_KV) {
@@ -91,8 +117,8 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     const pushPromise = notifyStaff(c.env as Env, {
       title: 'Khách check-in 🪑',
       body: `Ban ${data.table_id} - ${data.customer_name} / ${data.customer_phone}`,
-      data: { url: '/kds', orderId }
-    }, STAFF_PUSH_ROLE).catch(() => {});
+      data: { url: '/kds', orderId, tenantId: normalizedTenant }
+    }, STAFF_PUSH_ROLE, undefined, normalizedTenant).catch(() => {});
     c.executionCtx?.waitUntil(pushPromise);
   } catch { /* push best-effort */ }
 

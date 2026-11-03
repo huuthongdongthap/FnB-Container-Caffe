@@ -8,10 +8,9 @@
  */
 
 import type { SopShiftType, SopSource, SopTemplate } from '../model/sop-types';
-import type { SopTemplateRow } from '../src/model/sop-row-mapper';
 import { SopAccessError, assertId, type SopScope } from './sop-access';
 import { sopDatabase } from './sop-violation-columns';
-import { findTemplate } from './sop-template-reads';
+import { findTemplate, findTemplateByCode } from './sop-template-reads';
 
 /** Only manager-level roles author the paper the floor executes. */
 function assertAuthor(scope: SopScope): void {
@@ -74,52 +73,75 @@ export async function createTemplate(scope: SopScope, input: CreateTemplateInput
   await sopDatabase(scope)
     .prepare(
       `INSERT INTO sop_templates (id, tenant_id, code, title, description, source, shift_type,
-         applicable_roles, version, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+         applicable_roles, version, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
     )
-    .bind(
-      id,
-      scope.tenantId,
-      code,
-      title,
-      typeof input.description === 'string' ? input.description : null,
-      input.source,
-      input.shiftType,
-      roles.join(','),
-    )
+    .bind(id, scope.tenantId, code, title, typeof input.description === 'string' ? input.description : null, input.source, input.shiftType, roles.join(','))
     .run();
 
   await insertItems(scope, id, items);
   return loadTemplate(scope, id);
 }
 
-async function insertItems(scope: SopScope, templateId: string, items: TemplateItemInput[]): Promise<void> {
-  for (const item of items) {
+async function insertItems(scope: SopScope, templateId: string, items: TemplateItemInput[], reusedIds?: string[]): Promise<string[]> {
+  const insertedIds: string[] = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    const itemId = reusedIds?.[idx] ?? `ti_${crypto.randomUUID()}`;
+    insertedIds.push(itemId);
     await sopDatabase(scope)
       .prepare(
         `INSERT INTO sop_template_items (id, tenant_id, template_id, label, description, order_index,
-           is_critical, requires_note, requires_value)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           is_critical, requires_note, requires_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(
-        `ti_${crypto.randomUUID()}`,
-        scope.tenantId,
-        templateId,
-        item.label,
-        item.description,
-        item.orderIndex,
-        item.isCritical ? 1 : 0,
-        item.requireNote ? 1 : 0,
-        item.requireValue ? 1 : 0,
-      )
+      .bind(itemId, scope.tenantId, templateId, item.label, item.description, item.orderIndex, item.isCritical ? 1 : 0, item.requireNote ? 1 : 0, item.requireValue ? 1 : 0)
       .run();
+  }
+  return insertedIds;
+}
+
+async function syncInProgressRunItems(scope: SopScope, templateId: string, nextItemIds: string[]): Promise<void> {
+  try {
+    const openRuns = await sopDatabase(scope)
+      .prepare(`SELECT id, started_at FROM sop_runs WHERE tenant_id = ? AND template_id = ? AND status = 'in_progress'`)
+      .bind(scope.tenantId, templateId)
+      .all<{ id: string; started_at: string }>();
+
+    const nextSet = new Set(nextItemIds);
+    for (const run of openRuns.results ?? []) {
+      const existingRunItems = await sopDatabase(scope)
+        .prepare('SELECT id, template_item_id FROM sop_run_items WHERE tenant_id = ? AND run_id = ?')
+        .bind(scope.tenantId, run.id)
+        .all<{ id: string; template_item_id: string }>();
+      const presentItemIds = new Set<string>();
+      for (const row of existingRunItems.results ?? []) {
+        if (!nextSet.has(row.template_item_id)) {
+          await sopDatabase(scope).prepare('DELETE FROM sop_run_items WHERE tenant_id = ? AND id = ?').bind(scope.tenantId, row.id).run();
+        } else {
+          presentItemIds.add(row.template_item_id);
+        }
+      }
+      for (const itemId of nextItemIds) {
+        if (!presentItemIds.has(itemId)) {
+          await sopDatabase(scope)
+            .prepare(
+              `INSERT OR IGNORE INTO sop_run_items
+                 (id, tenant_id, run_id, template_item_id, is_checked, checked_at, checked_by, note, value, created_at)
+               VALUES (?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, ?)`
+            )
+            .bind(`${run.id}:${itemId}`, scope.tenantId, run.id, itemId, run.started_at ?? new Date().toISOString())
+            .run();
+        }
+      }
+    }
+  } catch {
+    // Minimal mocks without sop_runs or sop_run_items fall through safely.
   }
 }
 
 /**
- * Replaces the item set and bumps the version. The old rows are deleted rather
- * than archived because the template is a definition, not evidence — the run
- * rows carry the version they were executed under, and that is what survives.
+ * Replaces the item set and bumps the version. Existing item IDs are reused at
+ * matching indices and active in-progress runs are synchronized so open
+ * checklists retain valid template item references.
  */
 export async function updateTemplate(
   scope: SopScope,
@@ -128,11 +150,8 @@ export async function updateTemplate(
 ): Promise<SopTemplate> {
   assertAuthor(scope);
   const id = assertId(templateId);
-  const current = await sopDatabase(scope)
-    .prepare('SELECT id, version FROM sop_templates WHERE tenant_id = ? AND id = ?')
-    .bind(scope.tenantId, id)
-    .first<Pick<SopTemplateRow, 'id' | 'version'>>();
-  if (!current) throw new SopAccessError('Template not found', 404);
+  const existing = await findTemplate(scope, id);
+  if (!existing) throw new SopAccessError('Template not found', 404);
 
   const items = input.items ? readItems(input.items) : null;
   const roles = input.applicableRoles ? input.applicableRoles.map(String) : null;
@@ -141,8 +160,20 @@ export async function updateTemplate(
   const assignments: string[] = ['version = version + 1'];
   const params: (string | number | null)[] = [];
   if (typeof input.code === 'string' && input.code.trim()) {
+    const nextCode = assertId(input.code, 'code');
+    if (nextCode !== existing.code) {
+      const conflict =
+        (await findTemplateByCode(scope, nextCode)) ??
+        (await sopDatabase(scope)
+          .prepare('SELECT id FROM sop_templates WHERE tenant_id = ? AND code = ?')
+          .bind(scope.tenantId, nextCode)
+          .first<{ id: string }>());
+      if (conflict && conflict.id !== id) {
+        throw new SopAccessError('SOP template code already exists for this tenant', 409);
+      }
+    }
     assignments.push('code = ?');
-    params.push(assertId(input.code, 'code'));
+    params.push(nextCode);
   }
   if (typeof input.title === 'string' && input.title.trim()) {
     assignments.push('title = ?');
@@ -171,11 +202,13 @@ export async function updateTemplate(
     .run();
 
   if (items) {
+    const reusedIds = items.map((_, idx) => existing.items[idx]?.id ?? `ti_${crypto.randomUUID()}`);
     await sopDatabase(scope)
       .prepare('DELETE FROM sop_template_items WHERE tenant_id = ? AND template_id = ?')
       .bind(scope.tenantId, id)
       .run();
-    await insertItems(scope, id, items);
+    const nextItemIds = await insertItems(scope, id, items, reusedIds);
+    await syncInProgressRunItems(scope, id, nextItemIds);
   }
 
   return loadTemplate(scope, id);

@@ -39,9 +39,19 @@ async function loadForAction(
   return violation;
 }
 
+function assertNotSelfDealing(scope: SopScope, violation: SopViolation): void {
+  if (role(scope) !== 'owner' && violation.staffId === scope.actorId) {
+    throw new SopAccessError(
+      'Managers cannot record, confirm, apply, or close violations on their own staff record',
+      403
+    );
+  }
+}
+
 /** Manager confirms the recorder's account. The recorder may not confirm their own record. */
 export async function confirmViolation(scope: SopScope, violationId: string): Promise<SopViolation> {
   const violation = await loadForAction(scope, violationId, 'confirm');
+  assertNotSelfDealing(scope, violation);
   if (violation.recordedBy === scope.actorId) {
     throw new SopAccessError('You may not confirm a violation you recorded', 403);
   }
@@ -67,17 +77,8 @@ export interface ApplyViolationInput {
 }
 
 /**
- * Applies the discipline step. Termination stays owner-only inside the policy.
- *
- * Role is checked before state on purpose. Both a wrong role and a wrong state
- * are refusals, but they ask different things of the caller: 403 says this actor
- * may never take this step (hide the control), 409 says the step is available in
- * principle but not for this record right now (refresh and look again). Collapsing
- * them into one 409 leaves the caller unable to tell an owner-only decision from a
- * stale view, which is how a manager ends up retrying a dismissal forever.
- *
- * The recorder's `description` is never written here — the applier's note goes to
- * `sanction_note`, so the account of the conduct survives to be weighed at appeal.
+ * Applies the discipline step. Termination and serious-violation overrides stay
+ * owner-only, and role is checked before state so 403 vs 409 stays unambiguous.
  */
 export async function applyViolation(
   scope: SopScope,
@@ -87,13 +88,17 @@ export async function applyViolation(
   assertViolationRole(scope);
   const violation = await findViolation(scope, violationId);
   if (!violation) throw new SopAccessError('Violation not found', 404);
+  assertNotSelfDealing(scope, violation);
 
   const step = input.disciplineStep ?? violation.disciplineStep;
   const target = step === violation.disciplineStep ? violation : { ...violation, disciplineStep: step };
 
   // Who may act on this step, decided before whether the record allows it.
-  if (step === 'termination' && role(scope) !== 'owner') {
+  if ((step === 'termination' || violation.disciplineStep === 'termination') && role(scope) !== 'owner') {
     throw new SopAccessError('Only the owner may dismiss a staff member', 403);
+  }
+  if (Boolean(violation.isSerious) && step !== 'termination' && role(scope) !== 'owner') {
+    throw new SopAccessError('Serious violations require termination unless overridden by the owner', 403);
   }
   if (violation.status !== 'confirmed') {
     throw new SopAccessError('This violation cannot take that action', 409);
@@ -178,6 +183,7 @@ async function persistAppeal(
 /** Terminal. A closed violation is never deleted — it is compliance evidence. */
 export async function closeViolation(scope: SopScope, violationId: string): Promise<SopViolation> {
   const violation = await loadForAction(scope, violationId, 'close');
+  assertNotSelfDealing(scope, violation);
   const result = closePolicy(violation, role(scope), new Date().toISOString());
   if (!result.ok) throw new SopAccessError(result.error, 409);
 

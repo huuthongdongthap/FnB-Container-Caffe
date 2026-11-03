@@ -17,7 +17,7 @@ import type { SopViolationRow } from '../src/model/sop-row-mapper';
 import { toViolation } from '../src/model/sop-row-mapper';
 import { isSeriousCategory, nextDisciplineStep } from '../src/policies/violation-policy';
 import { countConfirmedInMonth } from './sop-violation-reads';
-import { assertViolationRole, sopDatabase, sopViolationColumns } from './sop-violation-columns';
+import { assertViolationRole, role, sopDatabase, sopViolationColumns } from './sop-violation-columns';
 import { SopAccessError, type SopScope } from './sop-access';
 
 /** Fresh local id: a violation is created before any downstream reference to it. */
@@ -56,10 +56,51 @@ export async function recordViolation(
   assertViolationRole(scope);
   const staffId = String(input.staffId ?? '').trim();
   if (!staffId) throw new SopAccessError('A staff member is required', 400);
+  if (role(scope) !== 'owner' && staffId === scope.actorId) {
+    throw new SopAccessError(
+      'Managers cannot record, confirm, apply, or close violations on their own staff record',
+      403
+    );
+  }
   const note = String(input.note ?? '').trim();
   if (note.length === 0) throw new SopAccessError('A description is required', 400);
 
-  const occurredAt = input.occurredAt ?? new Date().toISOString();
+  const occurredAt =
+    input.occurredAt !== undefined && input.occurredAt !== null
+      ? String(input.occurredAt).trim()
+      : new Date().toISOString();
+  if (!/^\d{4}-\d{2}-\d{2}/.test(occurredAt) || Number.isNaN(Date.parse(occurredAt))) {
+    throw new SopAccessError('occurredAt must be a valid ISO-8601 date', 400);
+  }
+
+  try {
+    const targetUser = await sopDatabase(scope)
+      .prepare('SELECT id, role, tenant_id FROM users WHERE id = ?')
+      .bind(staffId)
+      .first<{ id: string; role?: string | null; tenant_id?: string | null }>();
+    if (targetUser) {
+      if (String(targetUser.role || '').trim().toLowerCase() === 'customer') {
+        throw new SopAccessError('Staff member not found', 404);
+      }
+      if (scope.tenantId !== '*' && 'tenant_id' in targetUser && targetUser.tenant_id !== undefined) {
+        const targetTenant = (targetUser.tenant_id && String(targetUser.tenant_id).trim()) || 'default';
+        if (targetTenant !== scope.tenantId) {
+          throw new SopAccessError('Staff member not found', 404);
+        }
+      }
+    } else if (scope.tenantId !== '*') {
+      const hasAnyUser = await sopDatabase(scope)
+        .prepare('SELECT 1 AS has_users FROM users LIMIT 1')
+        .first<{ has_users: number }>();
+      if (hasAnyUser) {
+        throw new SopAccessError('Staff member not found', 404);
+      }
+    }
+  } catch (err) {
+    if (err instanceof SopAccessError) throw err;
+    // Allow minimal unit test schemas without a users table
+  }
+
   const month = occurredAt.slice(0, 7);
   const isSerious = isSeriousCategory(input.category);
   const priorCount = await countConfirmedInMonth(scope, staffId, month);

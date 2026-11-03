@@ -11,6 +11,7 @@ import { Hono } from 'hono';
 import { createCategorySchema, updateCategorySchema } from 'worker/src/lib/validators';
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
+import { resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { Category } from '../model/catalog-types';
 import { syncCategorySlugToMenuProjection } from '../policies/menu-projection';
@@ -34,7 +35,7 @@ function generateCategoryId(): string {
 // ── 1. Static Literal Routes (MUST PRECEDENCE OVER /:id) ──
 categoriesRouter.get('/tree', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const { results } = await db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC').all<Category>();
   const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
   return c.json({ success: true, data: filtered, categories: filtered });
@@ -42,7 +43,7 @@ categoriesRouter.get('/tree', async (c) => {
 
 categoriesRouter.post('/reorder', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const body = (await c.req.json()) as {
     items?: Array<{ id: string; sort_order?: number; sortOrder?: number; displayOrder?: number }>;
     order?: Array<{ id: string; sort_order?: number; sortOrder?: number; displayOrder?: number }>;
@@ -64,7 +65,7 @@ categoriesRouter.post('/reorder', staffAuth, async (c) => {
 // ── 2. Base Collection Routes ──
 categoriesRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const { results } = await db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC').all<Category>();
   const filtered = (results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
   return c.json({ success: true, data: filtered });
@@ -72,7 +73,7 @@ categoriesRouter.get('/', async (c) => {
 
 categoriesRouter.post('/', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const rawTenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
   const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createCategorySchema.safeParse(body);
@@ -112,7 +113,7 @@ categoriesRouter.post('/', staffAuth, async (c) => {
 // ── 3. Parameterized Record Routes (/:id) ──
 categoriesRouter.get('/:id', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicTenantId(c);
   const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(c.req.param('id')).first<Category>();
   if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Category not found' }, 404);
@@ -122,7 +123,7 @@ categoriesRouter.get('/:id', async (c) => {
 
 const handleUpdateCategory = async (c: any) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const body = await c.req.json();
   const id = c.req.param('id');
   const parsed = updateCategorySchema.safeParse(body);
@@ -165,18 +166,22 @@ categoriesRouter.patch('/:id', staffAuth, handleUpdateCategory);
 
 categoriesRouter.delete('/:id', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<Category>();
   if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Category not found' }, 404);
   }
+  const existingRec = existing as unknown as Record<string, unknown>;
+  const targetTenant = existingRec.tenant_id && String(existingRec.tenant_id).trim()
+    ? String(existingRec.tenant_id).trim()
+    : (tenantId === '*' ? 'default' : tenantId);
   const prodCount = (await db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').bind(id).first()) as { count: number } | null;
   let hasTenantProducts = Boolean(prodCount && prodCount.count > 0);
-  if (hasTenantProducts && tenantId !== '*') {
+  if (hasTenantProducts && targetTenant !== '*') {
     const prodRowsRes = await db.prepare('SELECT * FROM products WHERE category_id = ?').bind(id).all<Record<string, unknown>>().catch(() => null);
     if (prodRowsRes && Array.isArray(prodRowsRes.results) && prodRowsRes.results.length > 0) {
-      hasTenantProducts = prodRowsRes.results.some((p) => matchesTenantRow(p, tenantId));
+      hasTenantProducts = prodRowsRes.results.some((p) => matchesTenantRow(p, targetTenant));
     }
   }
   if (hasTenantProducts) {

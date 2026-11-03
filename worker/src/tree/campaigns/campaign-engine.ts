@@ -2,6 +2,7 @@
  * Campaign Engine — core evaluate, route, dedup logic
  */
 import { createLogger } from '../../utils/logger';
+import { matchesTenantRow } from '../../middleware/tenant';
 import type { CampaignTrigger, CampaignResult } from './types';
 
 const log = createLogger({ route: 'campaign-engine' });
@@ -18,16 +19,44 @@ export async function deduplicate(
   db: import('@cloudflare/workers-types').D1Database,
   customerId: string,
   trigger: CampaignTrigger,
-  sinceDays: number
+  sinceDays: number,
+  tenantId?: string
 ): Promise<boolean> {
   const cutoff = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const scoped = Boolean(tenantId && tenantId !== '*');
+  if (scoped && tenantId) {
+    try {
+      const row = await db.prepare(
+        `SELECT id, sent_at, tenant_id FROM campaign_logs
+         WHERE customer_id = ? AND trigger = ? AND sent_at > ?
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         ORDER BY sent_at DESC LIMIT 1`
+      ).bind(customerId, trigger, cutoff, tenantId).first<Record<string, unknown>>();
+      if (!row) return false;
+      return !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+    } catch {
+      try {
+        const row = await db.prepare(
+          `SELECT id, created_at as sent_at, tenant_id FROM campaign_logs
+           WHERE customer_id = ? AND trigger_type = ? AND created_at > ?
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           ORDER BY created_at DESC LIMIT 1`
+        ).bind(customerId, trigger, cutoff, tenantId).first<Record<string, unknown>>();
+        if (!row) return false;
+        return !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+      } catch {
+        // Fall through to default queries if tenant_id column is absent
+      }
+    }
+  }
   try {
     const row = await db.prepare(
       `SELECT id, sent_at FROM campaign_logs
        WHERE customer_id = ? AND trigger = ? AND sent_at > ?
        ORDER BY sent_at DESC LIMIT 1`
-    ).bind(customerId, trigger, cutoff).first();
-    return row !== null;
+    ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+    if (!row) return false;
+    return !scoped || !tenantId || !('tenant_id' in row) || matchesTenantRow(row, tenantId);
   } catch (err) {
     const msg = String((err as Error)?.message || '');
     if (msg.includes('column')) {
@@ -36,8 +65,9 @@ export async function deduplicate(
           `SELECT id, created_at as sent_at FROM campaign_logs
            WHERE customer_id = ? AND trigger_type = ? AND created_at > ?
            ORDER BY created_at DESC LIMIT 1`
-        ).bind(customerId, trigger, cutoff).first();
-        return row !== null;
+        ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+        if (!row) return false;
+        return !scoped || !tenantId || !('tenant_id' in row) || matchesTenantRow(row, tenantId);
       } catch (fallbackErr) {
         log.warn('deduplicate check failed', { customerId, trigger, error: (fallbackErr as Error).message });
         return false;
@@ -53,12 +83,14 @@ export async function deduplicate(
  */
 export async function logSend(
   db: import('@cloudflare/workers-types').D1Database,
-  result: CampaignResult
+  result: CampaignResult,
+  tenantId?: string
 ): Promise<void> {
   const id = generateId();
   const now = new Date().toISOString();
   const status = result.sent ? 'sent' : 'failed';
   const errorMsg = result.error || null;
+  const effectiveTenant = tenantId || result.tenant_id || undefined;
   try {
     await db.prepare(
       `INSERT INTO campaign_logs (id, customer_id, trigger, channel, sent_at, status, error, trigger_type, error_message, created_at)
@@ -75,6 +107,10 @@ export async function logSend(
       errorMsg,
       now
     ).run();
+    if (effectiveTenant && effectiveTenant !== '*') {
+      await db.prepare('UPDATE campaign_logs SET tenant_id = ? WHERE id = ?')
+        .bind(effectiveTenant, id).run().catch(() => null);
+    }
   } catch (err) {
     const msg = String((err as Error)?.message || '');
     if (msg.includes('column')) {
@@ -91,6 +127,10 @@ export async function logSend(
           status,
           errorMsg
         ).run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await db.prepare('UPDATE campaign_logs SET tenant_id = ? WHERE id = ?')
+            .bind(effectiveTenant, id).run().catch(() => null);
+        }
         return;
       } catch {
         try {
@@ -106,6 +146,10 @@ export async function logSend(
             errorMsg,
             now
           ).run();
+          if (effectiveTenant && effectiveTenant !== '*') {
+            await db.prepare('UPDATE campaign_logs SET tenant_id = ? WHERE id = ?')
+              .bind(effectiveTenant, id).run().catch(() => null);
+          }
           return;
         } catch (fallbackErr) {
           log.error('logSend failed', { customerId: result.customer_id, error: (fallbackErr as Error).message });

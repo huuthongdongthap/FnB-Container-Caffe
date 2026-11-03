@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { createLogger } from '../../middleware/logger';
+import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 import { CUSTOMER_PUSH_ROLE } from './roles';
 
 const log = createLogger({ route: 'push' });
@@ -8,6 +9,7 @@ export interface PushEnv {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_EMAIL?: string;
+  PILOT_STORE?: string;
   AURA_DB: import('@cloudflare/workers-types').D1Database;
 }
 
@@ -18,6 +20,7 @@ interface Subscription {
   p256dh_key: string;
   customer_id: string | null;
   role: string;
+  tenant_id?: string | null;
 }
 
 export interface PushPayload {
@@ -42,7 +45,8 @@ export function initPush(env: PushEnv): void {
 export async function sendPushToCustomer(
   env: PushEnv,
   customerId: string | null,
-  payload: PushPayload
+  payload: PushPayload,
+  tenantId?: string
 ): Promise<{ sent: number; failed: number }> {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
     log.warn('VAPID keys not configured');
@@ -50,21 +54,57 @@ export async function sendPushToCustomer(
   }
 
   initPush(env);
+  const effectiveTenant = tenantId || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
 
   // Get subscriptions for this customer
   let subscriptions: Subscription[];
   if (customerId) {
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
-    ).bind(customerId).all<Subscription>();
-    subscriptions = results || [];
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        const { results } = await env.AURA_DB.prepare(
+          "SELECT id, endpoint, auth_key, p256dh_key, customer_id, role, tenant_id FROM push_subscriptions WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(customerId, effectiveTenant).all<Subscription>();
+        subscriptions = results || [];
+      } catch {
+        const { results } = await env.AURA_DB.prepare(
+          'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
+        ).bind(customerId).all<Subscription>();
+        subscriptions = results || [];
+      }
+    } else {
+      const { results } = await env.AURA_DB.prepare(
+        'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
+      ).bind(customerId).all<Subscription>();
+      subscriptions = results || [];
+    }
   } else {
     // Broadcast to all
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions'
-    ).all<Subscription>();
-    subscriptions = results || [];
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        const { results } = await env.AURA_DB.prepare(
+          "SELECT id, endpoint, auth_key, p256dh_key, customer_id, role, tenant_id FROM push_subscriptions WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(effectiveTenant).all<Subscription>();
+        subscriptions = results || [];
+      } catch {
+        const { results } = await env.AURA_DB.prepare(
+          'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions'
+        ).all<Subscription>();
+        subscriptions = results || [];
+      }
+    } else {
+      const { results } = await env.AURA_DB.prepare(
+        'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions'
+      ).all<Subscription>();
+      subscriptions = results || [];
+    }
   }
+  subscriptions = subscriptions.filter(
+    s =>
+      s.endpoint &&
+      !s.endpoint.startsWith('https://manual.auraspace.local/') &&
+      (!customerId ? !s.role || s.role === 'customer' : true) &&
+      (!('tenant_id' in s) || matchesTenantRow(s, effectiveTenant))
+  );
 
   let sent = 0;
   let failed = 0;
@@ -85,9 +125,17 @@ export async function sendPushToCustomer(
     } catch (err: unknown) {
       // 410 Gone = subscription expired, remove it
       if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode: number }).statusCode === 410) {
-        await env.AURA_DB.prepare(
-          'DELETE FROM push_subscriptions WHERE endpoint = ?'
-        ).bind(sub.endpoint).run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await env.AURA_DB.prepare(
+            "DELETE FROM push_subscriptions WHERE endpoint = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(sub.endpoint, effectiveTenant).run().catch(async () => {
+            await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+          });
+        } else {
+          await env.AURA_DB.prepare(
+            'DELETE FROM push_subscriptions WHERE endpoint = ?'
+          ).bind(sub.endpoint).run();
+        }
         log.info('Removed expired subscription', { endpoint: sub.endpoint.slice(0, 30) });
       } else {
         log.error('Push send failed', { endpoint: sub.endpoint.slice(0, 30), error: (err as Error).message });
@@ -110,7 +158,8 @@ export async function sendPushToStaff(
   env: PushEnv,
   payload: PushPayload,
   role: string = '',
-  excludeCustomerIds?: string[]
+  excludeCustomerIds?: string[],
+  tenantId?: string
 ): Promise<{ sent: number; failed: number }> {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
     log.warn('VAPID keys not configured');
@@ -118,6 +167,7 @@ export async function sendPushToStaff(
   }
 
   initPush(env);
+  const effectiveTenant = tenantId || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
 
   // Build query: all non-customer roles, or specific role
   let query = `SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != ?`;
@@ -128,8 +178,21 @@ export async function sendPushToStaff(
     params.push(role);
   }
 
-  const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
-  let subscriptions: Subscription[] = results || [];
+  let subscriptions: Subscription[] = [];
+  if (effectiveTenant && effectiveTenant !== '*') {
+    try {
+      const tenantQuery = `${query.replace('SELECT id, endpoint, auth_key, p256dh_key, customer_id, role', 'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role, tenant_id')} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+      const { results } = await env.AURA_DB.prepare(tenantQuery).bind(...params, effectiveTenant).all<Subscription>();
+      subscriptions = results || [];
+    } catch {
+      const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
+      subscriptions = results || [];
+    }
+  } else {
+    const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
+    subscriptions = results || [];
+  }
+  subscriptions = subscriptions.filter(s => !('tenant_id' in s) || matchesTenantRow(s, effectiveTenant));
 
   // Exclude manual placeholder entries that have not yet paired a browser WebPush endpoint
   subscriptions = subscriptions.filter(s => s.endpoint && !s.endpoint.startsWith('https://manual.auraspace.local/'));
@@ -157,7 +220,15 @@ export async function sendPushToStaff(
       sent++;
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode: number }).statusCode === 410) {
-        await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          await env.AURA_DB.prepare(
+            "DELETE FROM push_subscriptions WHERE endpoint = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(sub.endpoint, effectiveTenant).run().catch(async () => {
+            await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+          });
+        } else {
+          await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+        }
         log.info('Removed expired subscription', { endpoint: sub.endpoint.slice(0, 30) });
       } else {
         log.error('Staff push send failed', { endpoint: sub.endpoint.slice(0, 30), error: (err as Error).message });

@@ -6,13 +6,24 @@
 import { Hono } from 'hono';
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
+import { isHQSuperAdmin, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { HappyHourWindow } from '../model/catalog-types';
 import { happyHourDiscountFor } from '../policies/pricing';
 
 export const happyHourRouter = new Hono<{ Bindings: Env }>();
 happyHourRouter.use('*', optionalAuth());
-const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
+
+function resolvePublicHappyHourTenantId(c: any): string {
+  const raw = resolvePublicTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c.get?.('user') ?? c) ? 'default' : raw;
+}
+
+function resolveWriteHappyHourTenantId(c: any): string {
+  const raw = getTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c.get?.('user') ?? c) ? 'default' : raw;
+}
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);
@@ -31,7 +42,7 @@ function padHHMM(t: string): string {
 
 happyHourRouter.get('/happy-hour', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicHappyHourTenantId(c);
   const onlyActive = c.req.query('active') !== 'false';
   let query = 'SELECT * FROM happy_hour_windows WHERE 1=1';
   if (onlyActive) query += ' AND active = 1';
@@ -98,7 +109,7 @@ happyHourRouter.post('/happy-hour', staffAuth, async (c) => {
 
 happyHourRouter.patch('/happy-hour/:id', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteHappyHourTenantId(c);
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM happy_hour_windows WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!existing || !matchesTenantRow(existing, tenantId)) return c.json({ success: false, error: 'Happy hour window not found' }, 404);
@@ -137,20 +148,7 @@ happyHourRouter.patch('/happy-hour/:id', staffAuth, async (c) => {
     }
   }
   const now = new Date().toISOString();
-  await db.prepare(
-    `UPDATE happy_hour_windows
-     SET name = COALESCE(?, name),
-         day_of_week = COALESCE(?, day_of_week),
-         start_time = COALESCE(?, start_time),
-         end_time = COALESCE(?, end_time),
-         discount_rate = COALESCE(?, discount_rate),
-         apply_to = COALESCE(?, apply_to),
-         apply_ids = COALESCE(?, apply_ids),
-         priority = COALESCE(?, priority),
-         active = COALESCE(?, active),
-         updated_at = ?
-     WHERE id = ?`
-  ).bind(
+  const bindParams = [
     body.name ? String(body.name) : null,
     body.day_of_week != null ? Number(body.day_of_week) : null,
     nextStart,
@@ -160,25 +158,85 @@ happyHourRouter.patch('/happy-hour/:id', staffAuth, async (c) => {
     body.apply_ids != null ? (typeof body.apply_ids === 'string' ? body.apply_ids : JSON.stringify(body.apply_ids)) : null,
     body.priority != null ? Number(body.priority) : null,
     body.active != null ? (typeof body.active === 'boolean' ? (body.active ? 1 : 0) : Number(body.active)) : null,
-    now, id
-  ).run();
+    now,
+    id,
+  ];
+  if (tenantId !== '*') {
+    await db.prepare(
+      `UPDATE happy_hour_windows
+       SET name = COALESCE(?, name),
+           day_of_week = COALESCE(?, day_of_week),
+           start_time = COALESCE(?, start_time),
+           end_time = COALESCE(?, end_time),
+           discount_rate = COALESCE(?, discount_rate),
+           apply_to = COALESCE(?, apply_to),
+           apply_ids = COALESCE(?, apply_ids),
+           priority = COALESCE(?, priority),
+           active = COALESCE(?, active),
+           updated_at = ?
+       WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+    ).bind(...bindParams, tenantId).run().catch(async () => {
+      if (tenantId === 'default') {
+        await db.prepare(
+          `UPDATE happy_hour_windows
+           SET name = COALESCE(?, name),
+               day_of_week = COALESCE(?, day_of_week),
+               start_time = COALESCE(?, start_time),
+               end_time = COALESCE(?, end_time),
+               discount_rate = COALESCE(?, discount_rate),
+               apply_to = COALESCE(?, apply_to),
+               apply_ids = COALESCE(?, apply_ids),
+               priority = COALESCE(?, priority),
+               active = COALESCE(?, active),
+               updated_at = ?
+           WHERE id = ?`
+        ).bind(...bindParams).run();
+      }
+    });
+  } else {
+    await db.prepare(
+      `UPDATE happy_hour_windows
+       SET name = COALESCE(?, name),
+           day_of_week = COALESCE(?, day_of_week),
+           start_time = COALESCE(?, start_time),
+           end_time = COALESCE(?, end_time),
+           discount_rate = COALESCE(?, discount_rate),
+           apply_to = COALESCE(?, apply_to),
+           apply_ids = COALESCE(?, apply_ids),
+           priority = COALESCE(?, priority),
+           active = COALESCE(?, active),
+           updated_at = ?
+       WHERE id = ?`
+    ).bind(...bindParams).run();
+  }
   const win = await db.prepare('SELECT * FROM happy_hour_windows WHERE id = ?').bind(id).first<HappyHourWindow>();
   return c.json({ success: true, data: win });
 });
 
 happyHourRouter.delete('/happy-hour/:id', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
-  const existing = await db.prepare('SELECT * FROM happy_hour_windows WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
+  const tenantId = resolveWriteHappyHourTenantId(c);
+  const id = c.req.param('id');
+  const existing = await db.prepare('SELECT * FROM happy_hour_windows WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!existing || !matchesTenantRow(existing, tenantId)) return c.json({ success: false, error: 'Happy hour window not found' }, 404);
-  await db.prepare('DELETE FROM happy_hour_windows WHERE id = ?').bind(c.req.param('id')).run();
+  if (tenantId !== '*') {
+    await db.prepare(
+      "DELETE FROM happy_hour_windows WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(id, tenantId).run().catch(async () => {
+      if (tenantId === 'default') {
+        await db.prepare('DELETE FROM happy_hour_windows WHERE id = ?').bind(id).run();
+      }
+    });
+  } else {
+    await db.prepare('DELETE FROM happy_hour_windows WHERE id = ?').bind(id).run();
+  }
   return c.json({ success: true });
 });
 
 // ── Happy hour evaluation (public, no auth) ────────────────────────
 happyHourRouter.get('/happy-hour/now', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicHappyHourTenantId(c);
   const { results: rawWindows } = await db.prepare(
     'SELECT * FROM happy_hour_windows WHERE active = 1'
   ).all<HappyHourWindow>();
@@ -187,24 +245,30 @@ happyHourRouter.get('/happy-hour/now', async (c) => {
   let categoryId = c.req.query('category_id') || c.req.query('categoryId') || null;
   if (productId && !categoryId) {
     try {
-      const prod = await db.prepare('SELECT category_id FROM products WHERE id = ?')
+      const prod = await db.prepare('SELECT category_id, tenant_id FROM products WHERE id = ?')
         .bind(productId)
-        .first<{ category_id?: string; category?: string }>();
-      categoryId = prod?.category_id || prod?.category || null;
+        .first<{ category_id?: string; category?: string; tenant_id?: string | null }>()
+        .catch(() => db.prepare('SELECT category_id FROM products WHERE id = ?').bind(productId).first<{ category_id?: string; category?: string; tenant_id?: string | null }>());
+      if (prod && matchesTenantRow(prod as unknown as Record<string, unknown>, tenantId)) {
+        categoryId = prod.category_id || prod.category || null;
+      }
     } catch {
       // Optional category lookup when only product_id is passed
     }
     if (!categoryId) {
       try {
-        const menuRow = await db.prepare('SELECT id, name, price, category AS category_id FROM menu_items WHERE id = ?')
+        const menuRow = await db.prepare('SELECT id, name, price, category AS category_id, tenant_id FROM menu_items WHERE id = ?')
           .bind(productId)
-          .first<{ id?: string; category_id?: string; category?: string }>();
-        categoryId = menuRow?.category_id || menuRow?.category || null;
+          .first<{ id?: string; category_id?: string; category?: string; tenant_id?: string | null }>()
+          .catch(() => db.prepare('SELECT id, name, price, category AS category_id FROM menu_items WHERE id = ?').bind(productId).first<{ id?: string; category_id?: string; category?: string; tenant_id?: string | null }>());
+        if (menuRow && matchesTenantRow(menuRow as unknown as Record<string, unknown>, tenantId)) {
+          categoryId = menuRow.category_id || menuRow.category || null;
+        }
         if (!categoryId) {
           const { results: menuItems } = await db.prepare(
             'SELECT id, name, price, category AS category_id FROM menu_items WHERE available = 1'
-          ).all<{ id: string; category_id?: string; category?: string }>();
-          const matched = (menuItems || []).find((m) => m.id === productId);
+          ).all<{ id: string; category_id?: string; category?: string; tenant_id?: string | null }>();
+          const matched = (menuItems || []).find((m) => m.id === productId && matchesTenantRow(m as unknown as Record<string, unknown>, tenantId));
           categoryId = matched?.category_id || matched?.category || null;
         }
       } catch {

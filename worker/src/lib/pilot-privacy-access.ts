@@ -9,7 +9,8 @@ export function privacyStore(c: Context<{ Bindings: Env }>, roles?: string[]): s
   const tenantId = resolvePilotStore(c.env);
   const user = c.get('user');
   if (!user) return errorResponse('Unauthorized', 401);
-  if ((roles && !roles.includes(user.role)) || !user.tenantId || user.tenantId !== tenantId)
+  const userTenant = typeof user.tenantId === 'string' ? user.tenantId.trim() : '';
+  if ((roles && !roles.includes(user.role)) || !userTenant || userTenant !== tenantId)
     return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
   return tenantId;
 }

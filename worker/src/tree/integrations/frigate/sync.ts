@@ -10,6 +10,7 @@
 
 import { createLogger } from '../../../middleware/logger';
 import { createFrigateClient } from '../../../clients/frigate-client';
+import { matchesTenantRow } from '../../../lib/db';
 
 const log = createLogger({ route: 'frigate-sync' });
 
@@ -38,11 +39,9 @@ export function matchesFrigateTenant(
   tenantId?: string
 ): boolean {
   if (!row) return false;
-  if (!tenantId || tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
-  }
-  return tenantId === 'default';
+  const clean = tenantId ? tenantId.trim() : '';
+  if (!clean || clean === '*') return true;
+  return matchesTenantRow(row, clean);
 }
 
 /**
@@ -71,8 +70,9 @@ export async function syncFrigateEvents(
       const { events } = await client.getRecentEvents(camera, limit);
 
       let persisted = 0;
+      const rawTenant = opts?.tenantId ? opts.tenantId.trim() : '';
+      const effectiveTenant = rawTenant && rawTenant !== '*' ? rawTenant : 'default';
       for (const evt of events) {
-        const effectiveTenant = opts?.tenantId && opts.tenantId !== '*' ? opts.tenantId : 'default';
         try {
           await db
             .prepare(
@@ -92,7 +92,7 @@ export async function syncFrigateEvents(
             )
             .run();
         } catch {
-          await db
+          const fallbackRes = await db
             .prepare(
               `INSERT OR IGNORE INTO frigate_events
                (id, camera, label, start_time, end_time, score, payload, received_at)
@@ -108,14 +108,19 @@ export async function syncFrigateEvents(
               evt.data ? JSON.stringify(evt.data) : null
             )
             .run();
-        }
 
-        if (opts?.tenantId && opts.tenantId !== 'default' && opts.tenantId !== '*') {
-          await db
-            .prepare("UPDATE frigate_events SET tenant_id = ? WHERE id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '')")
-            .bind(opts.tenantId, evt.id)
-            .run()
-            .catch(() => {});
+          const insertedChanges = Number(
+            (fallbackRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes ??
+              (fallbackRes as unknown as { changes?: number })?.changes ??
+              0
+          );
+          if (insertedChanges > 0 && effectiveTenant !== 'default') {
+            await db
+              .prepare("UPDATE frigate_events SET tenant_id = ? WHERE id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '')")
+              .bind(effectiveTenant, evt.id)
+              .run()
+              .catch(() => {});
+          }
         }
 
         persisted++;
@@ -171,12 +176,22 @@ export async function getFrigateEvents(
   binds.push(limit);
 
   let rows: { results?: FrigateEventRow[] };
+  const cleanTenant = opts?.tenantId ? opts.tenantId.trim() : '';
   try {
-    const tenantSql = sql.replace(
+    let tenantSql = sql.replace(
       'SELECT id, camera, label, start_time, end_time, score, payload, received_at FROM frigate_events',
       'SELECT id, camera, label, start_time, end_time, score, payload, received_at, tenant_id FROM frigate_events'
     );
-    rows = await db.prepare(tenantSql).bind(...binds).all<FrigateEventRow>();
+    const tenantBinds = [...binds];
+    if (cleanTenant && cleanTenant !== '*') {
+      tenantSql = tenantSql.replace(
+        ' ORDER BY start_time DESC LIMIT ?',
+        " AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY start_time DESC LIMIT ?"
+      );
+      const limitBind = tenantBinds.pop();
+      tenantBinds.push(cleanTenant, cleanTenant, limitBind);
+    }
+    rows = await db.prepare(tenantSql).bind(...tenantBinds).all<FrigateEventRow>();
   } catch {
     rows = await db.prepare(sql).bind(...binds).all<FrigateEventRow>();
   }

@@ -17,8 +17,8 @@ export async function filterAuditRowsByTenant<T extends Record<string, any>>(
   const filtered: T[] = [];
 
   for (const row of rows) {
-    if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id) !== '') {
-      if (String(row.tenant_id) === tenantId) {
+    if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
+      if (String(row.tenant_id).trim() === tenantId) {
         filtered.push(row);
       }
       continue;
@@ -29,8 +29,8 @@ export async function filterAuditRowsByTenant<T extends Record<string, any>>(
     if (rawDetails.includes('tenant_id')) {
       try {
         const parsed = JSON.parse(rawDetails);
-        if (parsed && typeof parsed.tenant_id === 'string' && parsed.tenant_id) {
-          matchedFromMeta = parsed.tenant_id === tenantId;
+        if (parsed && typeof parsed.tenant_id === 'string' && parsed.tenant_id.trim()) {
+          matchedFromMeta = parsed.tenant_id.trim() === tenantId;
         }
       } catch {
         // Ignore non-JSON details
@@ -51,7 +51,8 @@ export async function filterAuditRowsByTenant<T extends Record<string, any>>(
           .first()
           .catch(() => null)) as Record<string, unknown> | null;
         if (userRow && 'tenant_id' in userRow && userRow.tenant_id !== undefined) {
-          actorTenant = userRow.tenant_id ? String(userRow.tenant_id) : 'default';
+          const trimmedActorTenant = typeof userRow.tenant_id === 'string' ? userRow.tenant_id.trim() : '';
+          actorTenant = trimmedActorTenant || 'default';
         } else {
           actorTenant = null;
         }
@@ -71,9 +72,15 @@ export async function filterAuditRowsByTenant<T extends Record<string, any>>(
   return filtered;
 }
 
+const AUDIT_LOG_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
 export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs — query audit logs with filters and pagination
   router.get('/', async (c) => {
+    const user = c.get('user' as never) as { role?: string } | undefined;
+    if (user?.role && !AUDIT_LOG_ALLOWED_ROLES.includes(String(user.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     try {
       // Create AuditLogger per-request (query only needs AURA_DB)
       let execCtx: any;
@@ -85,7 +92,7 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
       const dateFrom = c.req.query('date_from');
       const dateTo = c.req.query('date_to');
       const pageRaw = c.req.query('page');
-      const pageSizeRaw = c.req.query('page_size');
+      const pageSizeRaw = c.req.query('page_size') ?? c.req.query('pageSize');
 
       // Validate page / pageSize
       const page = pageRaw ? parseInt(pageRaw, 10) : 1;
@@ -116,14 +123,19 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         }, 400);
       }
 
+      const tenantId = getTenantId(c as any);
+      const isScoped = tenantId !== '*';
+      const batchSize = isScoped ? Math.max(page * pageSize * 5, 500) : pageSize;
+      const queryPage = isScoped ? 1 : page;
+
       let result = await auditLogger.query({
         actorId: actorId || undefined,
         action: action || undefined,
         resourceType: resourceType || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-        page,
-        pageSize
+        page: queryPage,
+        pageSize: batchSize
       });
 
       // Fallback for case-insensitive / prefix / CRUD verb action filters (e.g. CREATE -> %.post)
@@ -162,13 +174,13 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
           params.push(action.trim(), ...patterns);
 
           const whereClause = `WHERE ${conditions.join(' AND ')}`;
-          const offset = (page - 1) * pageSize;
+          const offset = (queryPage - 1) * batchSize;
           const countRow = await c.env.AURA_DB.prepare(
             `SELECT COUNT(*) as total FROM audit_logs ${whereClause}`
           ).bind(...params).first<{ total: number }>();
           const { results } = await c.env.AURA_DB.prepare(
             `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-          ).bind(...params, pageSize, offset).all<typeof result.rows[number]>();
+          ).bind(...params, batchSize, offset).all<typeof result.rows[number]>();
           if (results && results.length > 0) {
             result = {
               rows: results,
@@ -180,15 +192,15 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         }
       }
 
-      const tenantId = getTenantId(c as any);
-      if (tenantId !== '*' && result.rows.length > 0) {
-        const filteredRows = await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
-        if (filteredRows.length !== result.rows.length) {
-          result = {
-            rows: filteredRows as any,
-            total: Math.max(0, result.total - (result.rows.length - filteredRows.length)),
-          };
-        }
+      if (isScoped && result.rows.length > 0) {
+        const filteredAll = await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
+        const startIdx = (page - 1) * pageSize;
+        result = {
+          rows: filteredAll.slice(startIdx, startIdx + pageSize) as any,
+          total: result.rows.length < batchSize
+            ? filteredAll.length
+            : Math.max(filteredAll.length, result.total - (result.rows.length - filteredAll.length)),
+        };
       }
 
       const response: PaginatedResponse<typeof result.rows[number]> = {

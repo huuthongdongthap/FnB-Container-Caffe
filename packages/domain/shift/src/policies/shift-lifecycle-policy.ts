@@ -42,18 +42,38 @@ export async function openCanonicalShift(
     return { ok: false, error: 'invalid_opening_cash' };
   }
 
-  const operatingUnit = input.operatingUnitId || 'main_store';
+  const operatingUnit = (input.operatingUnitId || '').trim() || 'main_store';
+  const rawTenant = (input.tenantId || '').trim();
+  const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
   let existing: { id: string } | null = null;
   try {
     existing = await db.prepare(
       `SELECT id FROM staff_shifts
-       WHERE staff_id = ? AND status = 'open' AND clock_out IS NULL LIMIT 1`
-    ).bind(input.staffId).first<{ id: string }>();
+       WHERE staff_id = ? AND status = 'open' AND clock_out IS NULL
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+       LIMIT 1`
+    ).bind(input.staffId, effectiveTenant).first<{ id: string }>();
   } catch {
-    existing = await db.prepare(
-      `SELECT id FROM shifts
-       WHERE staff_id = ? AND (clock_out IS NULL AND actual_end IS NULL) LIMIT 1`
-    ).bind(input.staffId).first<{ id: string }>();
+    try {
+      existing = await db.prepare(
+        `SELECT id FROM staff_shifts
+         WHERE staff_id = ? AND status = 'open' AND clock_out IS NULL LIMIT 1`
+      ).bind(input.staffId).first<{ id: string }>();
+    } catch {
+      try {
+        existing = await db.prepare(
+          `SELECT id FROM shifts
+           WHERE staff_id = ? AND (clock_out IS NULL AND actual_end IS NULL)
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           LIMIT 1`
+        ).bind(input.staffId, effectiveTenant).first<{ id: string }>();
+      } catch {
+        existing = await db.prepare(
+          `SELECT id FROM shifts
+           WHERE staff_id = ? AND (clock_out IS NULL AND actual_end IS NULL) LIMIT 1`
+        ).bind(input.staffId).first<{ id: string }>();
+      }
+    }
   }
 
   if (existing) {
@@ -69,6 +89,7 @@ export async function openCanonicalShift(
     staff_name: input.staffName,
     role: input.role,
     operating_unit_id: operatingUnit,
+    tenant_id: effectiveTenant,
     clock_in: now,
     clock_out: null,
     status: 'open',
@@ -85,46 +106,91 @@ export async function openCanonicalShift(
     updated_at: now,
   };
 
+  const today = now.slice(0, 10);
   try {
     await db.prepare(
       `INSERT INTO staff_shifts (
         id, staff_id, staff_name, role, operating_unit_id, clock_in,
         clock_out, status, opening_cash, total_sales, cash_sales,
-        online_sales, order_count, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?)`
+        online_sales, order_count, notes, created_at, updated_at, tenant_id
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?, ?)`
     ).bind(
       shift.id, shift.staff_id, shift.staff_name, shift.role,
       shift.operating_unit_id, shift.clock_in, shift.opening_cash,
-      shift.notes, now, now
+      shift.notes, now, now, effectiveTenant
     ).run();
   } catch {
-    const today = now.slice(0, 10);
     try {
-      const info = await db.prepare(
+      await db.prepare(
         `INSERT INTO staff_shifts (
-          staff_id, staff_name, role, date, operating_unit_id, clock_in,
+          id, staff_id, staff_name, role, operating_unit_id, clock_in,
           clock_out, status, opening_cash, total_sales, cash_sales,
           online_sales, order_count, notes, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?)`
       ).bind(
-        shift.staff_id, shift.staff_name, shift.role, today,
+        shift.id, shift.staff_id, shift.staff_name, shift.role,
         shift.operating_unit_id, shift.clock_in, shift.opening_cash,
         shift.notes, now, now
       ).run();
-      if (info?.meta?.last_row_id) {
-        shift.id = String(info.meta.last_row_id);
-      }
     } catch {
       try {
-        await db.prepare(
-          `INSERT INTO shifts (id, staff_id, staff_name, clock_in, date, notes)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(shift.id, shift.staff_id, shift.staff_name, shift.clock_in, today, shift.notes || '').run();
+        const info = await db.prepare(
+          `INSERT INTO staff_shifts (
+            staff_id, staff_name, role, date, operating_unit_id, tenant_id, clock_in,
+            clock_out, status, opening_cash, total_sales, cash_sales,
+            online_sales, order_count, notes, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?)`
+        ).bind(
+          shift.staff_id, shift.staff_name, shift.role, today,
+          shift.operating_unit_id, effectiveTenant, shift.clock_in, shift.opening_cash,
+          shift.notes, now, now
+        ).run();
+        if (info?.meta?.last_row_id) {
+          shift.id = String(info.meta.last_row_id);
+        }
       } catch {
-        await db.prepare(
-          `INSERT INTO shifts (id, staff_id, staff_name, date, start_time, end_time, actual_start, status, notes)
-           VALUES (?, ?, ?, ?, ?, '23:59', ?, 'active', ?)`
-        ).bind(shift.id, shift.staff_id, shift.staff_name, today, now.slice(11, 16), now, shift.notes || '').run();
+        try {
+          const info = await db.prepare(
+            `INSERT INTO staff_shifts (
+              staff_id, staff_name, role, date, operating_unit_id, clock_in,
+              clock_out, status, opening_cash, total_sales, cash_sales,
+              online_sales, order_count, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', ?, 0, 0, 0, 0, ?, ?, ?)`
+          ).bind(
+            shift.staff_id, shift.staff_name, shift.role, today,
+            shift.operating_unit_id, shift.clock_in, shift.opening_cash,
+            shift.notes, now, now
+          ).run();
+          if (info?.meta?.last_row_id) {
+            shift.id = String(info.meta.last_row_id);
+          }
+        } catch {
+          try {
+            await db.prepare(
+              `INSERT INTO shifts (id, staff_id, staff_name, tenant_id, clock_in, date, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).bind(shift.id, shift.staff_id, shift.staff_name, effectiveTenant, shift.clock_in, today, shift.notes || '').run();
+          } catch {
+            try {
+              await db.prepare(
+                `INSERT INTO shifts (id, staff_id, staff_name, clock_in, date, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)`
+              ).bind(shift.id, shift.staff_id, shift.staff_name, shift.clock_in, today, shift.notes || '').run();
+            } catch {
+              try {
+                await db.prepare(
+                  `INSERT INTO shifts (id, staff_id, staff_name, tenant_id, date, start_time, end_time, actual_start, status, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, '23:59', ?, 'active', ?)`
+                ).bind(shift.id, shift.staff_id, shift.staff_name, effectiveTenant, today, now.slice(11, 16), now, shift.notes || '').run();
+              } catch {
+                await db.prepare(
+                  `INSERT INTO shifts (id, staff_id, staff_name, date, start_time, end_time, actual_start, status, notes)
+                   VALUES (?, ?, ?, ?, ?, '23:59', ?, 'active', ?)`
+                ).bind(shift.id, shift.staff_id, shift.staff_name, today, now.slice(11, 16), now, shift.notes || '').run();
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -139,22 +205,44 @@ export async function recordShiftSale(
   if (typeof input.amount !== 'number' || !Number.isFinite(input.amount) || input.amount <= 0) {
     return { ok: false, error: 'invalid_sale_amount' };
   }
+  const rawTenant = (input.tenantId || '').trim();
+  const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
   let shift: ShiftRecord | null = null;
   try {
     shift = await db.prepare(
-      'SELECT id, status, operating_unit_id, cash_sales, online_sales, total_sales, order_count FROM staff_shifts WHERE id = ?'
+      'SELECT id, staff_id, tenant_id, status, operating_unit_id, cash_sales, online_sales, total_sales, order_count FROM staff_shifts WHERE id = ?'
     ).bind(input.shiftId).first<ShiftRecord>();
   } catch {
-    shift = await db.prepare(
-      'SELECT * FROM shifts WHERE id = ?'
-    ).bind(input.shiftId).first<ShiftRecord>();
+    try {
+      shift = await db.prepare(
+        'SELECT id, staff_id, status, operating_unit_id, cash_sales, online_sales, total_sales, order_count FROM staff_shifts WHERE id = ?'
+      ).bind(input.shiftId).first<ShiftRecord>();
+    } catch {
+      shift = await db.prepare(
+        'SELECT * FROM shifts WHERE id = ?'
+      ).bind(input.shiftId).first<ShiftRecord>();
+    }
   }
 
   if (!shift) return { ok: false, error: 'shift_not_found' };
+  if (
+    rawTenant &&
+    rawTenant !== '*' &&
+    'tenant_id' in shift &&
+    shift.tenant_id !== undefined &&
+    (String(shift.tenant_id || '').trim() || 'default') !== rawTenant
+  ) {
+    return { ok: false, error: 'shift_not_found' };
+  }
   if (shift.status === 'closed' || shift.status === 'audited') {
     return { ok: false, error: 'closed_shift_immutable' };
   }
-  if (input.operatingUnitId && shift.operating_unit_id && input.operatingUnitId !== shift.operating_unit_id) {
+  if (input.staffId && shift.staff_id && input.staffId !== shift.staff_id) {
+    return { ok: false, error: 'shift_staff_mismatch' };
+  }
+  const inputUnit = input.operatingUnitId ? input.operatingUnitId.trim() : '';
+  const shiftUnit = shift.operating_unit_id ? String(shift.operating_unit_id).trim() : '';
+  if (inputUnit && inputUnit !== '*' && shiftUnit && inputUnit !== shiftUnit) {
     return { ok: false, error: 'cross_operating_unit_mismatch' };
   }
 
@@ -164,15 +252,39 @@ export async function recordShiftSale(
   const now = new Date().toISOString();
 
   try {
-    await db.prepare(
-      `UPDATE staff_shifts
-       SET cash_sales = cash_sales + ?,
-           online_sales = online_sales + ?,
-           total_sales = total_sales + ?,
-           order_count = order_count + 1,
-           updated_at = ?
-       WHERE id = ?`
-    ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId).run();
+    if (rawTenant !== '*') {
+      try {
+        await db.prepare(
+          `UPDATE staff_shifts
+           SET cash_sales = cash_sales + ?,
+               online_sales = online_sales + ?,
+               total_sales = total_sales + ?,
+               order_count = order_count + 1,
+               updated_at = ?
+           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId, effectiveTenant).run();
+      } catch {
+        await db.prepare(
+          `UPDATE staff_shifts
+           SET cash_sales = cash_sales + ?,
+               online_sales = online_sales + ?,
+               total_sales = total_sales + ?,
+               order_count = order_count + 1,
+               updated_at = ?
+           WHERE id = ?`
+        ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId).run();
+      }
+    } else {
+      await db.prepare(
+        `UPDATE staff_shifts
+         SET cash_sales = cash_sales + ?,
+             online_sales = online_sales + ?,
+             total_sales = total_sales + ?,
+             order_count = order_count + 1,
+             updated_at = ?
+         WHERE id = ?`
+      ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId).run();
+    }
   } catch {
     // Fallback when shifts table does not store inline sales counters
   }
@@ -187,6 +299,8 @@ export async function closeCanonicalShift(
   if (typeof input.actualCash !== 'number' || !Number.isFinite(input.actualCash) || input.actualCash < 0) {
     return { ok: false, error: 'invalid_actual_cash' };
   }
+  const rawTenant = (input.tenantId || '').trim();
+  const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
   let shift: ShiftRecord | null = null;
   try {
     shift = await db.prepare(
@@ -199,11 +313,25 @@ export async function closeCanonicalShift(
   }
 
   if (!shift) return { ok: false, error: 'shift_not_found' };
+  if (
+    rawTenant &&
+    rawTenant !== '*' &&
+    'tenant_id' in shift &&
+    shift.tenant_id !== undefined &&
+    (String(shift.tenant_id || '').trim() || 'default') !== rawTenant
+  ) {
+    return { ok: false, error: 'shift_not_found' };
+  }
   if (shift.status === 'closed' || shift.status === 'audited') {
     return { ok: false, error: 'shift_already_closed' };
   }
   if (!canStaffOperateShift(input.closedByRole)) {
     return { ok: false, error: 'unauthorized_role' };
+  }
+  const inputUnit = input.operatingUnitId ? input.operatingUnitId.trim() : '';
+  const shiftUnit = shift.operating_unit_id ? String(shift.operating_unit_id).trim() : '';
+  if (inputUnit && inputUnit !== '*' && shiftUnit && inputUnit !== shiftUnit) {
+    return { ok: false, error: 'cross_operating_unit_mismatch' };
   }
   const closerRole = String(input.closedByRole);
   if (
@@ -222,26 +350,78 @@ export async function closeCanonicalShift(
   const now = new Date().toISOString();
 
   try {
-    await db.prepare(
-      `UPDATE staff_shifts
-       SET status = 'closed',
-           clock_out = ?,
-           expected_cash = ?,
-           actual_cash = ?,
-           cash_variance = ?,
-           notes = COALESCE(?, notes),
-           updated_at = ?
-       WHERE id = ?`
-    ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId).run();
+    if (rawTenant !== '*') {
+      try {
+        await db.prepare(
+          `UPDATE staff_shifts
+           SET status = 'closed',
+               clock_out = ?,
+               expected_cash = ?,
+               actual_cash = ?,
+               cash_variance = ?,
+               notes = COALESCE(?, notes),
+               updated_at = ?
+           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId, effectiveTenant).run();
+      } catch {
+        await db.prepare(
+          `UPDATE staff_shifts
+           SET status = 'closed',
+               clock_out = ?,
+               expected_cash = ?,
+               actual_cash = ?,
+               cash_variance = ?,
+               notes = COALESCE(?, notes),
+               updated_at = ?
+           WHERE id = ?`
+        ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId).run();
+      }
+    } else {
+      await db.prepare(
+        `UPDATE staff_shifts
+         SET status = 'closed',
+             clock_out = ?,
+             expected_cash = ?,
+             actual_cash = ?,
+             cash_variance = ?,
+             notes = COALESCE(?, notes),
+             updated_at = ?
+         WHERE id = ?`
+      ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId).run();
+    }
   } catch {
     try {
-      await db.prepare(
-        `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ?`
-      ).bind(now, input.notes || null, input.shiftId).run();
+      if (rawTenant !== '*') {
+        try {
+          await db.prepare(
+            `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(now, input.notes || null, input.shiftId, effectiveTenant).run();
+        } catch {
+          await db.prepare(
+            `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ?`
+          ).bind(now, input.notes || null, input.shiftId).run();
+        }
+      } else {
+        await db.prepare(
+          `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ?`
+        ).bind(now, input.notes || null, input.shiftId).run();
+      }
     } catch {
-      await db.prepare(
-        `UPDATE shifts SET actual_end = ?, status = 'completed', notes = COALESCE(?, notes) WHERE id = ?`
-      ).bind(now, input.notes || null, input.shiftId).run();
+      if (rawTenant !== '*') {
+        try {
+          await db.prepare(
+            `UPDATE shifts SET actual_end = ?, status = 'completed', notes = COALESCE(?, notes) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(now, input.notes || null, input.shiftId, effectiveTenant).run();
+        } catch {
+          await db.prepare(
+            `UPDATE shifts SET actual_end = ?, status = 'completed', notes = COALESCE(?, notes) WHERE id = ?`
+          ).bind(now, input.notes || null, input.shiftId).run();
+        }
+      } else {
+        await db.prepare(
+          `UPDATE shifts SET actual_end = ?, status = 'completed', notes = COALESCE(?, notes) WHERE id = ?`
+        ).bind(now, input.notes || null, input.shiftId).run();
+      }
     }
   }
 

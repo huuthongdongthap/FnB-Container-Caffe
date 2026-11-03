@@ -35,7 +35,7 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
     let customer: CustomerRecord | null = null;
     try {
       customer = await db.prepare(
-        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?`
+        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?`
       ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
       try {
@@ -95,33 +95,99 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Không có trường nào để cập nhật' }, 400);
     }
 
+    if (typeof data.phone === 'string' && data.phone.trim() !== '') {
+      const trimmedPhone = data.phone.trim();
+      let existingPhone: { id?: string; phone?: string | null; tenant_id?: string | null } | null = null;
+      try {
+        existingPhone = await db
+          .prepare(
+            `SELECT id, phone, tenant_id FROM customers WHERE phone = ? AND id != ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1`
+          )
+          .bind(trimmedPhone, customerId, tenantId, tenantId)
+          .first<{ id?: string; phone?: string | null; tenant_id?: string | null }>();
+      } catch (err) {
+        if (/no such column:\s*tenant_id/i.test(String(err))) {
+          existingPhone = await db
+            .prepare(`SELECT id, phone FROM customers WHERE phone = ? AND id != ? LIMIT 1`)
+            .bind(trimmedPhone, customerId)
+            .first<{ id?: string; phone?: string | null }>()
+            .catch(() => null);
+        }
+      }
+      if (
+        existingPhone &&
+        existingPhone.id &&
+        existingPhone.id !== customerId &&
+        (existingPhone.phone === undefined || String(existingPhone.phone).trim() === trimmedPhone)
+      ) {
+        const existingTenant =
+          existingPhone.tenant_id && String(existingPhone.tenant_id).trim() !== ''
+            ? String(existingPhone.tenant_id).trim()
+            : 'default';
+        if (
+          tenantId === '*' ||
+          !('tenant_id' in existingPhone) ||
+          existingPhone.tenant_id === undefined ||
+          existingTenant === tenantId
+        ) {
+          return c.json({ success: false, error: 'Phone number already in use by another customer' }, 409);
+        }
+      }
+    }
+
     const baseUpdates = [...updates];
     updates.push('updated_at = CURRENT_TIMESTAMP');
     try {
       await db.prepare(
-        `UPDATE customers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?`
+        `UPDATE customers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
       ).bind(...params, customerId, tenantId).run();
-    } catch {
+    } catch (err) {
+      const msg = String(err);
+      if (/UNIQUE constraint failed/i.test(msg)) {
+        return c.json({ success: false, error: 'Phone number already in use by another customer' }, 409);
+      }
       const existing = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(customerId).first<{ id?: string; tenant_id?: string | null }>().catch(() => null);
       const existingTenant = existing?.tenant_id && existing.tenant_id.trim() !== '' ? existing.tenant_id.trim() : 'default';
       if (tenantId !== '*' && ((!existing && tenantId !== 'default') || existingTenant !== tenantId)) {
         return c.json({ success: false, error: 'Customer not found' }, 404);
       }
-      try {
-        await db.prepare(
-          `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
-        ).bind(...params, customerId).run();
-      } catch {
-        await db.prepare(
-          `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
-        ).bind(...params, customerId).run();
+      if (!/no such column:\s*tenant_id/i.test(msg)) {
+        try {
+          await db.prepare(
+            `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...params, customerId, tenantId).run();
+        } catch (innerErr) {
+          const innerMsg = String(innerErr);
+          if (/UNIQUE constraint failed/i.test(innerMsg)) {
+            return c.json({ success: false, error: 'Phone number already in use by another customer' }, 409);
+          }
+          if (!/no such column:\s*tenant_id/i.test(innerMsg)) {
+            throw innerErr;
+          }
+          await db.prepare(
+            `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
+          ).bind(...params, customerId).run();
+        }
+      } else {
+        try {
+          await db.prepare(
+            `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
+          ).bind(...params, customerId).run();
+        } catch (fallbackErr) {
+          if (/UNIQUE constraint failed/i.test(String(fallbackErr))) {
+            return c.json({ success: false, error: 'Phone number already in use by another customer' }, 409);
+          }
+          await db.prepare(
+            `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
+          ).bind(...params, customerId).run();
+        }
       }
     }
 
     let customer: CustomerRecord | null = null;
     try {
       customer = await db.prepare(
-        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?`
+        `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?`
       ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
       try {

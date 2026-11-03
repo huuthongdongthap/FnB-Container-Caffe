@@ -2,13 +2,34 @@ import { managerScope, shiftTarget, ShiftContractError, type ShiftScope } from '
 import { getShift } from './shift-repository';
 
 export interface ScheduleInput { staffId?: string; locationId?: string; date?: string; startTime?: string; endTime?: string; breakMinutes?: number; status?: string; notes?: string }
+
+function normalizeHHMM(value?: string | null): string | null {
+  if (typeof value !== 'string') return null;
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  if (!match) return null;
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
+function assertValidTimeRange(startTime?: string | null, endTime?: string | null) {
+  const start = normalizeHHMM(startTime);
+  const end = normalizeHHMM(endTime);
+  if (!start || !end || start >= end) {
+    throw new ShiftContractError('startTime must be before endTime', 400);
+  }
+}
+
 export function scheduleInput(scope: ShiftScope, body: ScheduleInput) {
-  if (body.locationId && body.locationId !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
+  const locId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
+  if (locId && locId !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
   if (body.breakMinutes) throw new ShiftContractError('Break tracking is unavailable for pilot schedules', 400);
   if (body.status && !['scheduled', 'cancelled'].includes(body.status)) throw new ShiftContractError('Use attendance check-in/out to record work', 400);
+  if (body.startTime !== undefined && body.endTime !== undefined) {
+    assertValidTimeRange(body.startTime, body.endTime);
+  }
 }
 export async function createSchedule(scope: ShiftScope, body: ScheduleInput) {
   managerScope(scope); scheduleInput(scope, body);
+  assertValidTimeRange(body.startTime, body.endTime);
   const staff = await shiftTarget(scope, body.staffId);
   const result = await scope.env.AURA_DB.prepare(`INSERT INTO staff_shifts
     (tenant_id, staff_id, staff_name, role, date, shift, start_time, end_time, attendance_state, notes)
@@ -20,10 +41,26 @@ export async function updateSchedule(scope: ShiftScope, id: string, body: Schedu
   managerScope(scope); scheduleInput(scope, body);
   const current = await getShift(scope, id);
   if (current.clock_in !== null || current.clock_out !== null) throw new ShiftContractError('Recorded attendance cannot be edited as a schedule', 409);
+  if (current.attendance_state === 'cancelled') {
+    const isIdempotentCancel =
+      body.status === 'cancelled' &&
+      body.staffId === undefined &&
+      body.date === undefined &&
+      body.startTime === undefined &&
+      body.endTime === undefined &&
+      body.notes === undefined;
+    if (isIdempotentCancel) return current;
+    throw new ShiftContractError('Cancelled shift cannot be modified', 409);
+  }
+  const effectiveStart = body.startTime ?? current.start_time;
+  const effectiveEnd = body.endTime ?? current.end_time;
+  if (body.startTime !== undefined || body.endTime !== undefined) {
+    assertValidTimeRange(effectiveStart, effectiveEnd);
+  }
   const staff = await shiftTarget(scope, body.staffId || current.staff_id);
   const result = await scope.env.AURA_DB.prepare(`UPDATE staff_shifts SET staff_id = ?, staff_name = ?, role = ?, date = ?,
     start_time = ?, end_time = ?, attendance_state = ?, notes = ?
-    WHERE id = ? AND tenant_id = ? AND staff_id = ? AND clock_in IS NULL AND clock_out IS NULL`)
+    WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in IS NULL AND clock_out IS NULL AND attendance_state != 'cancelled'`)
     .bind(staff.id, staff.name, staff.role, body.date ?? current.date, body.startTime ?? current.start_time,
       body.endTime ?? current.end_time, body.status ?? current.attendance_state, body.notes ?? current.notes,
       current.id, scope.tenantId, current.staff_id).run();

@@ -1,6 +1,6 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../middleware/tenant';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
@@ -8,15 +8,6 @@ const log = createLogger({ route: 'tables-mobile' });
 
 const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
 const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 const D1_TO_MOBILE_STATUS: Record<string, 'free' | 'occupied' | 'reserved'> = {
   available: 'free',
@@ -76,14 +67,12 @@ export async function getTablesMobile(
     const tenantId = getTenantId(context);
     let rows: Array<Record<string, unknown>> = [];
     let cafeTablesSucceeded = false;
-    let cafeTablesTotalRows = 0;
     try {
       const cafeRes = await context.env.AURA_DB
         .prepare('SELECT * FROM cafe_tables ORDER BY table_number ASC')
         .all();
       const rawCafeRows = (cafeRes.results as Array<Record<string, unknown>>) || [];
       cafeTablesSucceeded = true;
-      cafeTablesTotalRows = rawCafeRows.length;
       rows = rawCafeRows.filter((r) => matchesTenantRow(r, tenantId));
     } catch (err) {
       if (!String((err as Error)?.message || '').includes('no such table')) {
@@ -91,7 +80,7 @@ export async function getTablesMobile(
       }
     }
 
-    if (!cafeTablesSucceeded || cafeTablesTotalRows === 0) {
+    if (!cafeTablesSucceeded || rows.length === 0) {
       try {
         const legacyRes = await context.env.AURA_DB
           .prepare('SELECT * FROM tables ORDER BY table_number ASC')
@@ -166,32 +155,157 @@ export async function updateTableStatus(
     }
 
     const now = new Date().toISOString();
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    const hasTenantCol = 'tenant_id' in existing;
+    const normalizedStatus = MOBILE_TO_D1_STATUS[requestedStatus];
     if (!useLegacyTable) {
       try {
-        await context.env.AURA_DB
-          .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
-          .bind(MOBILE_TO_D1_STATUS[requestedStatus], tableId)
-          .run();
+        if (tenantId !== '*' && hasTenantCol) {
+          try {
+            if (requestedStatus === 'free') {
+              try {
+                await context.env.AURA_DB
+                  .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                  .bind(normalizedStatus, tableId, effectiveTenant)
+                  .run();
+              } catch (clearErr) {
+                if (String((clearErr as Error)?.message || '').includes('no such table')) {
+                  throw clearErr;
+                }
+                await context.env.AURA_DB
+                  .prepare("UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                  .bind(normalizedStatus, tableId, effectiveTenant)
+                  .run();
+              }
+            } else {
+              await context.env.AURA_DB
+                .prepare("UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                .bind(normalizedStatus, tableId, effectiveTenant)
+                .run();
+            }
+          } catch (colErr) {
+            if (String((colErr as Error)?.message || '').includes('no such table')) {
+              throw colErr;
+            }
+            if (requestedStatus === 'free') {
+              try {
+                await context.env.AURA_DB
+                  .prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ?')
+                  .bind(normalizedStatus, tableId)
+                  .run();
+              } catch {
+                await context.env.AURA_DB
+                  .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+                  .bind(normalizedStatus, tableId)
+                  .run();
+              }
+            } else {
+              await context.env.AURA_DB
+                .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+                .bind(normalizedStatus, tableId)
+                .run();
+            }
+          }
+        } else {
+          if (requestedStatus === 'free') {
+            try {
+              await context.env.AURA_DB
+                .prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ?')
+                .bind(normalizedStatus, tableId)
+                .run();
+            } catch (clearErr) {
+              if (String((clearErr as Error)?.message || '').includes('no such table')) {
+                throw clearErr;
+              }
+              await context.env.AURA_DB
+                .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+                .bind(normalizedStatus, tableId)
+                .run();
+            }
+          } else {
+            await context.env.AURA_DB
+              .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+              .bind(normalizedStatus, tableId)
+              .run();
+          }
+        }
       } catch (err) {
         if (String((err as Error)?.message || '').includes('no such table')) {
-          await context.env.AURA_DB
-            .prepare('UPDATE tables SET status = ? WHERE id = ?')
-            .bind(requestedStatus, tableId)
-            .run();
+          if (tenantId !== '*' && hasTenantCol) {
+            try {
+              await context.env.AURA_DB
+                .prepare("UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                .bind(requestedStatus, tableId, effectiveTenant)
+                .run();
+            } catch {
+              await context.env.AURA_DB
+                .prepare('UPDATE tables SET status = ? WHERE id = ?')
+                .bind(requestedStatus, tableId)
+                .run();
+            }
+          } else {
+            await context.env.AURA_DB
+              .prepare('UPDATE tables SET status = ? WHERE id = ?')
+              .bind(requestedStatus, tableId)
+              .run();
+          }
         } else {
           throw err;
         }
       }
     } else {
-      await context.env.AURA_DB
-        .prepare('UPDATE tables SET status = ? WHERE id = ?')
-        .bind(requestedStatus, tableId)
-        .run();
+      if (tenantId !== '*' && hasTenantCol) {
+        try {
+          await context.env.AURA_DB
+            .prepare("UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(requestedStatus, tableId, effectiveTenant)
+            .run();
+        } catch {
+          await context.env.AURA_DB
+            .prepare('UPDATE tables SET status = ? WHERE id = ?')
+            .bind(requestedStatus, tableId)
+            .run();
+        }
+      } else {
+        await context.env.AURA_DB
+          .prepare('UPDATE tables SET status = ? WHERE id = ?')
+          .bind(requestedStatus, tableId)
+          .run();
+      }
+    }
+
+    if (requestedStatus === 'free') {
+      try {
+        if (tenantId !== '*') {
+          await context.env.AURA_DB
+            .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(now, now, tableId, effectiveTenant)
+            .run()
+            .catch(() =>
+              context.env.AURA_DB
+                .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')")
+                .bind(now, now, tableId)
+                .run()
+            );
+        } else {
+          await context.env.AURA_DB
+            .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'ordering', 'paying', 'paid')")
+            .bind(now, now, tableId)
+            .run();
+        }
+      } catch {
+        // table_sessions table or columns may be absent in minimal schemas
+      }
     }
 
     return jsonResponse({
       success: true,
-      table: normalizeMobileTableRow({ ...existing, status: requestedStatus, updated_at: now }),
+      table: normalizeMobileTableRow({
+        ...existing,
+        status: requestedStatus,
+        ...(requestedStatus === 'free' && 'current_order_id' in existing ? { current_order_id: null } : {}),
+        updated_at: now,
+      }),
     });
   } catch (err) {
     const errMsg = (err as Error).message;

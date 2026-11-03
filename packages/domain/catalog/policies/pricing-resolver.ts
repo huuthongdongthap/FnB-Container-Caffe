@@ -70,25 +70,27 @@ export async function resolveServerProductPrice(
 
   let dbItem: DbCatalogRow | null = null;
   if (db && productId) {
+    const attachTenantId = async (table: 'products' | 'menu_items', id: string, row: DbCatalogRow): Promise<DbCatalogRow> => {
+      if (input.tenantId && input.tenantId !== '*' && row.tenant_id === undefined) {
+        const tenantRow = await db
+          .prepare(`SELECT tenant_id FROM ${table} WHERE id = ?`)
+          .bind(id)
+          .first<{ tenant_id?: string | null }>()
+          .catch(() => null);
+        if (tenantRow && 'tenant_id' in tenantRow && tenantRow.tenant_id !== undefined) {
+          row.tenant_id = tenantRow.tenant_id;
+        }
+      }
+      return row;
+    };
+
     const findById = async (id: string): Promise<DbCatalogRow | null> => {
       try {
         const row = await db
           .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) {
-          if (input.tenantId && input.tenantId !== '*' && row.tenant_id === undefined) {
-            const tenantRow = await db
-              .prepare('SELECT tenant_id FROM products WHERE id = ?')
-              .bind(id)
-              .first<{ tenant_id?: string | null }>()
-              .catch(() => null);
-            if (tenantRow && 'tenant_id' in tenantRow && tenantRow.tenant_id !== undefined) {
-              row.tenant_id = tenantRow.tenant_id;
-            }
-          }
-          return row;
-        }
+        if (row) return attachTenantId('products', id, row);
       } catch {
         // fallback to legacy column list
       }
@@ -97,7 +99,7 @@ export async function resolveServerProductPrice(
           .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return row;
+        if (row) return attachTenantId('products', id, row);
       } catch {
         // fallback to menu_items
       }
@@ -106,7 +108,7 @@ export async function resolveServerProductPrice(
           .prepare('SELECT id, name, price, available, category FROM menu_items WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return row;
+        if (row) return attachTenantId('menu_items', id, row);
       } catch {
         // fallback to legacy column list
       }
@@ -115,7 +117,7 @@ export async function resolveServerProductPrice(
           .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return row;
+        if (row) return attachTenantId('menu_items', id, row);
       } catch {
         // ignore
       }
@@ -173,7 +175,10 @@ export async function resolveServerProductPrice(
 
   // Validate modifier choices strictly against DB modifier_choices table and product mappings
   const candidateProductIds = [productId, dbItem?.id].filter(Boolean) as string[];
-  const modResult = await validateProductModifiers(db, productId, modifiers, candidateProductIds);
+  const effectiveModTenant = input.tenantId && input.tenantId.trim() && input.tenantId.trim() !== '*'
+    ? input.tenantId.trim()
+    : (dbItem?.tenant_id && String(dbItem.tenant_id).trim() ? String(dbItem.tenant_id).trim() : input.tenantId);
+  const modResult = await validateProductModifiers(db, productId, modifiers, candidateProductIds, effectiveModTenant);
   if (!modResult.valid) {
     return {
       id: dbItem?.id || productId,

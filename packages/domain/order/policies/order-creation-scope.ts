@@ -10,6 +10,7 @@ export class OrderCreationError extends Error {
 }
 
 const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper']);
+const TENANT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
 /** Public checkout belongs to this deployment's flagship store. No public store mapping exists yet. */
 export async function resolveOrderCreationScope(
@@ -32,7 +33,30 @@ export async function resolveOrderCreationScope(
       throw error;
     }
   }
-  const tenantId = actor?.role && STAFF_ROLES.has(actor.role) ? (actor.tenantId || 'default') : 'default';
+  let tenantId = 'default';
+  if (actor?.role && STAFF_ROLES.has(actor.role)) {
+    tenantId = actor.tenantId?.trim() || 'default';
+  } else if (actor) {
+    const actorTenant = actor.tenantId?.trim();
+    if (actorTenant && actorTenant !== 'default' && actorTenant !== '*' && TENANT_ID_PATTERN.test(actorTenant)) {
+      tenantId = actorTenant;
+    } else {
+      const headerTenant = (request.headers.get('X-Tenant-ID') || request.headers.get('x-tenant-id') || '').trim();
+      let queryTenant = '';
+      try {
+        const u = new URL(request.url, 'http://localhost');
+        queryTenant = (u.searchParams.get('tenant_id') || u.searchParams.get('tenantId') || '').trim();
+      } catch {
+        // Ignore invalid URL
+      }
+      const candidateTenant = headerTenant || queryTenant;
+      if (candidateTenant && candidateTenant !== '*' && TENANT_ID_PATTERN.test(candidateTenant)) {
+        tenantId = candidateTenant;
+      } else if (actorTenant && actorTenant !== '*' && TENANT_ID_PATTERN.test(actorTenant)) {
+        tenantId = actorTenant;
+      }
+    }
+  }
   if (!tenantId.trim() || tenantId === '*' || tenantId.length > 200) throw new OrderCreationError('Invalid store binding', 403);
   return { actor: actor || null, tenantId };
 }
@@ -41,27 +65,28 @@ export async function resolveOrderCreationScope(
 export async function resolveOrderCreationTable(db: D1Like, tableId: string | undefined, tenantId: string) {
   if (!tableId?.trim()) return null;
   const code = tableId.trim();
-  const tenantClause = tenantId === 'default'
+  const normTenant = (tenantId || '').trim() || 'default';
+  const tenantClause = normTenant === 'default'
     ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
     : 'AND tenant_id = ?';
   const byNumber = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-    .bind(code, tenantId).first<{ id: string }>();
+    .bind(code, normTenant).first<{ id: string }>();
   let table = byNumber || (code !== code.toUpperCase()
     ? await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-      .bind(code.toUpperCase(), tenantId).first<{ id: string }>() : null)
+      .bind(code.toUpperCase(), normTenant).first<{ id: string }>() : null)
     || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
-      .bind(code, tenantId).first<{ id: string }>();
+      .bind(code, normTenant).first<{ id: string }>();
   if (!table) {
     const slugOrPaddedMatch = code.match(/^[tT]?0*([1-9]\d*)(?:-[a-z0-9-]+)?$/i);
     if (slugOrPaddedMatch) {
       const normalizedNumber = slugOrPaddedMatch[1];
       const paddedId = `t${normalizedNumber.padStart(2, '0')}`;
       table = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-        .bind(normalizedNumber, tenantId).first<{ id: string }>()
+        .bind(normalizedNumber, normTenant).first<{ id: string }>()
         || await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-          .bind(Number(normalizedNumber), tenantId).first<{ id: string }>()
+          .bind(Number(normalizedNumber), normTenant).first<{ id: string }>()
         || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
-          .bind(paddedId, tenantId).first<{ id: string }>();
+          .bind(paddedId, normTenant).first<{ id: string }>();
     }
   }
   if (!table) throw new OrderCreationError('A valid table_id in this store is required', 400);

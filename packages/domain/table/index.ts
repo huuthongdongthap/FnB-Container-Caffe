@@ -22,6 +22,7 @@ export type {
   AvailabilityQuery,
 } from './src/model/table-reservation-types';
 export {
+  matchesOperatingUnit,
   validateOrderTable,
   checkTableAvailability,
 } from './src/policies/table-availability-policy';

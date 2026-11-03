@@ -1,18 +1,47 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import { mixpostCreatePostSchema, zodErrorResponse } from '../../lib/validators';
 import { createLogger } from '../../utils/logger.js';
 import { getMixpostClient, type PostRecord } from './types';
 
 const log = createLogger({ route: 'mixpost:posts' });
 
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
+function isSafeMixpostMediaUrl(rawUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
   }
-  return tenantId === 'default';
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (
+    !hostname ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    hostname === '169.254.169.254' ||
+    hostname === 'metadata.google.internal' ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal')
+  ) {
+    return false;
+  }
+  if (/^127\./.test(hostname) || /^10\./.test(hostname) || /^192\.168\./.test(hostname) || /^169\.254\./.test(hostname)) {
+    return false;
+  }
+  const octets = hostname.split('.');
+  if (octets.length === 4 && octets.every((o) => /^\d+$/.test(o))) {
+    const [a, b] = octets.map(Number);
+    if (a === 172 && b >= 16 && b <= 31) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
@@ -41,6 +70,11 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
       const mediaUrls = data.media_urls ?? data.mediaUrls ?? [];
       if (mediaUrls.length > 0) {
         for (const url of mediaUrls) {
+          if (!isSafeMixpostMediaUrl(url)) {
+            return c.json({ success: false, error: 'Invalid or restricted media URL' }, 400);
+          }
+        }
+        for (const url of mediaUrls) {
           try {
             const media = await client.uploadMediaFromUrl(url);
             if (media.id) {
@@ -61,7 +95,7 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
       });
 
       if (env.AURA_DB) {
-        const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+        const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
         const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
         const now = new Date().toISOString();
         try {
@@ -107,28 +141,46 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
   // GET /posts — list recent posts
   router.get('/posts', async (c) => {
     const env = c.env as unknown as MixpostEnv;
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
     const client = getMixpostClient(env);
     const rawLimit = parseInt(c.req.query('limit') || '20', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
     if (env.AURA_DB) {
       try {
-        const { results } = await env.AURA_DB.prepare(
-          'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT ?'
-        ).bind(Math.max(limit, 200)).all<PostRecord>();
-        const filtered = (results || [])
-          .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
-          .slice(0, limit);
+        let filtered: PostRecord[] = [];
+        if (tenantId !== '*') {
+          try {
+            const { results: scopedResults } = await env.AURA_DB.prepare(
+              "SELECT * FROM mixpost_posts WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT ?"
+            ).bind(tenantId, limit).all<PostRecord>();
+            filtered = (scopedResults || [])
+              .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+              .slice(0, limit);
+          } catch {
+            filtered = [];
+          }
+        }
+        if (filtered.length === 0) {
+          const { results } = await env.AURA_DB.prepare(
+            'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT ?'
+          ).bind(Math.max(limit, 200)).all<PostRecord>();
+          filtered = (results || [])
+            .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+            .slice(0, limit);
+        }
         if (filtered.length > 0 || !client) {
           return c.json({ success: true, data: filtered });
         }
+        if (tenantId !== 'default' && tenantId !== '*') {
+          return c.json({ success: true, data: [], source: 'd1' });
+        }
       } catch {
-        if (!client) {
+        if (!client || (tenantId !== 'default' && tenantId !== '*')) {
           return c.json({ success: true, data: [] });
         }
       }
     }
-    if (!client) {
+    if (!client || (tenantId !== 'default' && tenantId !== '*')) {
       return c.json({ success: true, data: [] });
     }
 

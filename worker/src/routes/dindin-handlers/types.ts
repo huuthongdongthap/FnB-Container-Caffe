@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../../types/env';
-import { queryFirst, execute } from '../../lib/db';
+import { queryFirst, execute, matchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
 
 export type DindinContext = Context<{ Bindings: Env }>;
@@ -39,12 +39,24 @@ export function errorResponse(c: DindinContext, e: DinDinError): Response {
 }
 
 // ── Helpers ──
-export function cartKVKey(sessionId: string): string {
-  return `dindin:cart:${sessionId}`;
+function normalizeDinDinTenant(tenantId?: string): string {
+  const trimmed = typeof tenantId === 'string' ? tenantId.trim() : '';
+  return trimmed && trimmed !== '*' ? trimmed : 'default';
 }
 
-export function idempotencyKVKey(key: string): string {
-  return `dindin:idempotency:${key}`;
+export function cartKVKey(sessionId: string, tenantId?: string): string {
+  const effective = normalizeDinDinTenant(tenantId);
+  return effective === 'default' ? `dindin:cart:${sessionId}` : `dindin:${effective}:cart:${sessionId}`;
+}
+
+export function idempotencyKVKey(key: string, tenantId?: string): string {
+  const effective = normalizeDinDinTenant(tenantId);
+  return effective === 'default' ? `dindin:idempotency:${key}` : `dindin:${effective}:idempotency:${key}`;
+}
+
+export function configKVKey(tenantId?: string): string {
+  const effective = normalizeDinDinTenant(tenantId);
+  return effective === 'default' ? 'dindin:config' : `dindin:${effective}:config`;
 }
 
 export type Cart = {
@@ -56,28 +68,63 @@ export function emptyCart(): Cart {
   return { items: [], total: 0 };
 }
 
-export async function readCartRD(env: Env, sessionId: string): Promise<Cart | null> {
-  const fromKv = await kvGet<Cart>(env.AUTH_KV, cartKVKey(sessionId));
+export async function readCartRD(env: Env, sessionId: string, tenantId?: string): Promise<Cart | null> {
+  const effective = normalizeDinDinTenant(tenantId);
+  const fromKv = await kvGet<Cart>(env.AUTH_KV, cartKVKey(sessionId, effective));
   if (fromKv && Array.isArray(fromKv.items)) {
     return fromKv;
   }
 
-  let row: { raw: string } | null = null;
-  try {
-    row = await queryFirst<{ raw: string }>(
-      env.AURA_DB,
-      'SELECT COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
-      sessionId
-    );
-  } catch {
+  let row: { raw: string; tenant_id?: string | null } | null = null;
+  if (effective !== 'default') {
+    const scopedSessionId = `${effective}::${sessionId}`;
     try {
-      row = await queryFirst<{ raw: string }>(
+      row = await queryFirst<{ raw: string; tenant_id?: string | null }>(
         env.AURA_DB,
-        'SELECT raw FROM dindin_cart WHERE session_id = ?',
-        sessionId
+        "SELECT COALESCE(raw, cart) as raw, tenant_id FROM dindin_cart WHERE session_id IN (?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+        scopedSessionId,
+        sessionId,
+        effective
       );
     } catch {
-      row = null;
+      try {
+        row = await queryFirst<{ raw: string }>(
+          env.AURA_DB,
+          'SELECT COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
+          scopedSessionId
+        );
+      } catch {
+        row = null;
+      }
+    }
+  } else {
+    try {
+      const candidate = await queryFirst<{ raw: string; tenant_id?: string | null }>(
+        env.AURA_DB,
+        'SELECT *, COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
+        sessionId
+      );
+      if (candidate && matchesTenantRow(candidate as unknown as Record<string, unknown>, 'default')) {
+        row = candidate;
+      }
+    } catch {
+      try {
+        row = await queryFirst<{ raw: string }>(
+          env.AURA_DB,
+          'SELECT COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
+          sessionId
+        );
+      } catch {
+        try {
+          row = await queryFirst<{ raw: string }>(
+            env.AURA_DB,
+            'SELECT raw FROM dindin_cart WHERE session_id = ?',
+            sessionId
+          );
+        } catch {
+          row = null;
+        }
+      }
     }
   }
   if (!row) {
@@ -90,34 +137,154 @@ export async function readCartRD(env: Env, sessionId: string): Promise<Cart | nu
   }
 }
 
-export async function writeCart(env: Env, sessionId: string, cart: Cart): Promise<void> {
+export async function writeCart(env: Env, sessionId: string, cart: Cart, tenantId?: string): Promise<void> {
+  const effective = normalizeDinDinTenant(tenantId);
   const blob = JSON.stringify(cart);
+  if (effective !== 'default') {
+    const scopedSessionId = `${effective}::${sessionId}`;
+    await Promise.all([
+      kvSet(env.AUTH_KV, cartKVKey(sessionId, effective), blob),
+      execute(
+        env.AURA_DB,
+        'INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
+        scopedSessionId,
+        blob,
+        blob,
+        effective
+      ).catch(() =>
+        execute(
+          env.AURA_DB,
+          'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
+          scopedSessionId,
+          blob,
+          blob
+        ).catch(() => {})
+      ),
+    ]);
+    return;
+  }
+
   await Promise.all([
     kvSet(env.AUTH_KV, cartKVKey(sessionId), blob),
     execute(
       env.AURA_DB,
-      'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
+      'INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
       sessionId,
       blob,
-      blob
+      blob,
+      effective
     ).catch(() =>
       execute(
         env.AURA_DB,
-        'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
+        'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
         sessionId,
+        blob,
         blob
-      ).catch(() => {})
+      ).catch(() =>
+        execute(
+          env.AURA_DB,
+          'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
+          sessionId,
+          blob
+        ).catch(() => {})
+      )
     ),
   ]);
 }
 
-export async function writeConfig(env: Env, configBlob: string): Promise<void> {
+export async function readConfigRaw(env: Env, tenantId?: string): Promise<{ config: string } | null> {
+  const effective = normalizeDinDinTenant(tenantId);
+  if (effective !== 'default') {
+    try {
+      const row = await queryFirst<{ config: string; tenant_id?: string | null }>(
+        env.AURA_DB,
+        "SELECT config, tenant_id FROM dindin_config WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY updated_at DESC LIMIT 1",
+        effective
+      );
+      if (row?.config && matchesTenantRow(row as unknown as Record<string, unknown>, effective)) {
+        return { config: row.config };
+      }
+    } catch {
+      // fall through to tenant KV
+    }
+    const kvConfig = await kvGet<Record<string, unknown> | string>(env.AUTH_KV, configKVKey(effective));
+    if (kvConfig) {
+      return { config: typeof kvConfig === 'string' ? kvConfig : JSON.stringify(kvConfig) };
+    }
+    return null;
+  }
+
+  try {
+    const row = await queryFirst<{ config: string; tenant_id?: string | null }>(
+      env.AURA_DB,
+      "SELECT config, tenant_id FROM dindin_config WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' LIMIT 1"
+    );
+    if (row?.config) {
+      return { config: row.config };
+    }
+    const anyRow = await queryFirst<{ config: string; tenant_id?: string | null }>(
+      env.AURA_DB,
+      'SELECT config, tenant_id FROM dindin_config LIMIT 1'
+    );
+    if (anyRow?.config && matchesTenantRow(anyRow as unknown as Record<string, unknown>, 'default')) {
+      return { config: anyRow.config };
+    }
+    return null;
+  } catch {
+    const row = await queryFirst<{ config: string }>(env.AURA_DB, 'SELECT config FROM dindin_config LIMIT 1');
+    return row?.config ? { config: row.config } : null;
+  }
+}
+
+export async function writeConfig(env: Env, configBlob: string, tenantId?: string): Promise<void> {
+  const effective = normalizeDinDinTenant(tenantId);
+  if (effective !== 'default') {
+    await Promise.all([
+      kvSet(env.AUTH_KV, configKVKey(effective), configBlob),
+      (async () => {
+        try {
+          const existing = await queryFirst<{ id: number | string }>(
+            env.AURA_DB,
+            'SELECT id FROM dindin_config WHERE tenant_id = ? LIMIT 1',
+            effective
+          );
+          if (existing?.id !== undefined) {
+            await execute(
+              env.AURA_DB,
+              'UPDATE dindin_config SET config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?',
+              configBlob,
+              existing.id,
+              effective
+            );
+          } else {
+            await execute(
+              env.AURA_DB,
+              'INSERT INTO dindin_config (config, tenant_id, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+              configBlob,
+              effective
+            );
+          }
+        } catch {
+          // KV holds the tenant-scoped config if dindin_config table lacks tenant_id
+        }
+      })(),
+    ]);
+    return;
+  }
+
   await Promise.all([
     kvSet(env.AUTH_KV, 'dindin:config', configBlob),
     execute(
       env.AURA_DB,
-      'INSERT INTO dindin_config (id, config, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at',
-      configBlob
-    ).catch(() => {}),
+      'INSERT INTO dindin_config (id, config, tenant_id, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
+      configBlob,
+      effective
+    ).catch(() =>
+      execute(
+        env.AURA_DB,
+        'INSERT INTO dindin_config (id, config, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at',
+        configBlob
+      ).catch(() => {})
+    ),
   ]);
 }

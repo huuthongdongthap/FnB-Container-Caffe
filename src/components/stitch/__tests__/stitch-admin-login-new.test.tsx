@@ -61,4 +61,9 @@ describe('StitchAdminLoginNew', () => {
     await user.click(guestBtn);
     expect(onGuestLogin).toHaveBeenCalled();
   });
+
+  it('omits guest login button when onGuestLogin is undefined', () => {
+    renderWithProviders(<StitchAdminLoginNew />);
+    expect(screen.queryByRole('button', { name: /adminLogin\.guestAriaLabel/i })).toBeNull();
+  });
 });

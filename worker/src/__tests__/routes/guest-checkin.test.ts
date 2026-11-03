@@ -4,6 +4,11 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { ordersRouter } from '../../routes/orders-hono';
+import { matchesHaTenant } from '../../tree/homeassistant/devices';
+import { matchesFrigateTenant } from '../../tree/integrations/frigate/sync';
+import { matchesMauticTenant, getSyncStatus } from '../../tree/mautic/sync-state';
+import { matchesCatalogTenant } from '../../routes/openapi-categories-handlers/helpers';
+import { matchesLoyaltyTenant } from '../../routes/openapi-loyalty-handlers/loyalty-db-helpers';
 
 function buildApp(
   tables: Array<{ id: string; table_number: string; status: string }> = [
@@ -132,5 +137,44 @@ describe('POST /api/orders/guest-checkin', () => {
     expect(body.data.customer_name).toBe('Tran Thi B');
     expect(body.data.customer_phone).toBe('0988777666');
     expect(body.data.status).toBe('pending');
+  });
+
+  it('normalizes whitespace-padded tenant_id in guest-checkin UPDATE cafe_tables and tree/catalog/loyalty matchers', async() => {
+    let capturedBatchStmts: any[] = [];
+    const { app, env } = buildApp([{ id: 'tbl-001', table_number: 'T01', status: 'Available' }]);
+    const origBatch = env.AURA_DB.batch;
+    env.AURA_DB.batch = async (stmtsList: any[]) => {
+      capturedBatchStmts = stmtsList;
+      return origBatch(stmtsList);
+    };
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/orders/guest-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_name: 'Le Van C', customer_phone: '0909111222', table_id: 'T01' })
+      }),
+      env
+    );
+    expect(res.status).toBe(201);
+    expect(capturedBatchStmts.length).toBe(2);
+    expect(String(capturedBatchStmts[0]._sql)).toContain("TRIM(tenant_id) = ''");
+    expect(capturedBatchStmts[0]._binds[1]).toBe('default');
+
+    expect(matchesHaTenant({ tenant_id: '  store_02  ' }, ' store_02 ')).toBe(true);
+    expect(matchesHaTenant({ tenant_id: '   ' }, ' default ')).toBe(true);
+    expect(matchesHaTenant({ tenant_id: 'store_02' }, 'store_03')).toBe(false);
+
+    expect(matchesFrigateTenant({ tenant_id: '  store_02  ' }, ' store_02 ')).toBe(true);
+    expect(matchesFrigateTenant({ tenant_id: '   ' }, ' default ')).toBe(true);
+    expect(matchesFrigateTenant({ tenant_id: 'store_02' }, 'store_03')).toBe(false);
+
+    expect(matchesMauticTenant({ tenant_id: '  store_02  ' }, ' store_02 ')).toBe(true);
+    expect(matchesMauticTenant({ tenant_id: '   ' }, '   ')).toBe(true);
+    expect(getSyncStatus('  store_02  ')).toBe(getSyncStatus('store_02'));
+
+    expect(matchesCatalogTenant({ tenant_id: '  store_02  ' }, ' store_02 ')).toBe(true);
+    expect(matchesLoyaltyTenant({ tenant_id: '  store_02  ' }, ' store_02 ')).toBe(true);
+    expect(matchesLoyaltyTenant({ tenant_id: '   ' }, ' default ')).toBe(true);
   });
 });

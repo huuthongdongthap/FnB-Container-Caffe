@@ -12,7 +12,7 @@ import { getTenantId, matchesTenantRow } from '../../lib/db';
 
 export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const authHeader = c.req.header('Authorization');
   const statusFilter = c.req.query('status');
   const zoneFilter = c.req.query('zone');
@@ -71,7 +71,7 @@ export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
 
 export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
 
   try {
     const activeResult = await db.prepare(
@@ -82,11 +82,23 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
       'SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?) GROUP BY zone ORDER BY revenue DESC'
     ).bind(tenantId, tenantId).all<{ zone: string; count: number; revenue: number }>();
 
-    const byPlan = await db.prepare(
-      `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
-       FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
-       WHERE s.status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?) GROUP BY p.id ORDER BY revenue DESC`
-    ).bind(tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
+    let byPlan: { results?: Array<{ name: string; slug: string; count: number; revenue: number }> };
+    try {
+      byPlan = await db.prepare(
+        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
+         FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
+         WHERE s.status = 'active'
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?)
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?)
+         GROUP BY p.id ORDER BY revenue DESC`
+      ).bind(tenantId, tenantId, tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
+    } catch {
+      byPlan = await db.prepare(
+        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
+         FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
+         WHERE s.status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?) GROUP BY p.id ORDER BY revenue DESC`
+      ).bind(tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
+    }
 
     const monthStart = new Date();
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -171,7 +183,7 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
 
 export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const days = parseInt(c.req.query('days') || '30', 10);
 
   if (tenantId !== 'default' && tenantId !== '*') {
@@ -204,7 +216,7 @@ export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
 
 export async function getSubscription(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.features as plan_features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
   ).bind(c.req.param('id')).first<SubscriptionRecord>();
@@ -260,7 +272,7 @@ export async function getSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function createSubscription(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const rawTenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
   const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createSubscriptionSchema.safeParse(body);
@@ -273,6 +285,16 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
   ).bind(body.plan_id).first<PlanRecord>();
   if (!plan) {
     return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
+  }
+  const planRow = plan as unknown as Record<string, unknown>;
+  if (
+    'tenant_id' in planRow &&
+    planRow.tenant_id !== undefined &&
+    planRow.tenant_id !== null &&
+    String(planRow.tenant_id).trim() !== '' &&
+    !matchesTenantRow(planRow, rawTenantId)
+  ) {
+    return c.json({ success: false, error: 'Plan not found' }, 404);
   }
 
   let callerRole: string | undefined;
@@ -299,11 +321,13 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
 
   const isSelfServiceCaller = callerRole === 'customer' || callerRole === 'vendor';
   const explicitCustomerId = body.customer_id as string | undefined;
+  const cycleMonths = (body.billing_cycle as string) === 'quarterly' ? 3 : (body.billing_cycle as string) === 'yearly' ? 12 : 1;
+  const cyclePlanAmount = Number(plan.monthly_price_vnd) * cycleMonths;
   if (isSelfServiceCaller) {
     if (explicitCustomerId && callerUserId && explicitCustomerId !== callerUserId) {
       return c.json({ success: false, error: 'Forbidden: cannot create subscription for another customer' }, 403);
     }
-    if (body.amount_vnd !== undefined && Number(body.amount_vnd) < Number(plan.monthly_price_vnd)) {
+    if (body.amount_vnd !== undefined && Number(body.amount_vnd) < cyclePlanAmount) {
       return c.json({ success: false, error: 'Invalid subscription amount for selected plan' }, 400);
     }
     if (body.deposit_paid === true || (body.deposit_vnd !== undefined && Number(body.deposit_vnd) < Number(plan.deposit_vnd ?? 0))) {
@@ -323,8 +347,8 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
 
   const id = generateId('sub_');
   const periodStart = today();
-  const periodEnd = addMonths(periodStart, (body.billing_cycle as string) === 'quarterly' ? 3 : (body.billing_cycle as string) === 'yearly' ? 12 : 1);
-  const amount = isSelfServiceCaller ? plan.monthly_price_vnd : ((body.amount_vnd as number) || plan.monthly_price_vnd);
+  const periodEnd = addMonths(periodStart, cycleMonths);
+  const amount = isSelfServiceCaller ? cyclePlanAmount : ((body.amount_vnd as number) || cyclePlanAmount);
   const depositPaidFlag = isSelfServiceCaller ? 0 : (body.deposit_paid ? 1 : 0);
   const depositAmount = isSelfServiceCaller ? plan.deposit_vnd : (body.deposit_vnd || plan.deposit_vnd);
 
@@ -401,15 +425,37 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   const body = parsed.data;
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, getTenantId(c))) {
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, rawTenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
+
+  const bodyAny = body as unknown as Record<string, unknown>;
+  const requestedPlanId = bodyAny.plan_id ?? rawBody.plan_id;
+  if (requestedPlanId !== undefined) {
+    const plan = await db.prepare(
+      'SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1'
+    ).bind(requestedPlanId).first<PlanRecord>();
+    if (!plan) {
+      return c.json({ success: false, error: 'Plan not found' }, 404);
+    }
+    const planRow = plan as unknown as Record<string, unknown>;
+    if (
+      'tenant_id' in planRow &&
+      planRow.tenant_id !== undefined &&
+      planRow.tenant_id !== null &&
+      String(planRow.tenant_id).trim() !== '' &&
+      !matchesTenantRow(planRow, rawTenantId)
+    ) {
+      return c.json({ success: false, error: 'Plan not found' }, 404);
+    }
+    bodyAny.plan_id = requestedPlanId;
   }
 
   const updates: string[] = [];
   const params: unknown[] = [];
 
   const updatable = ['plan_id', 'customer_name', 'customer_phone', 'customer_email', 'container_number', 'zone', 'deposit_vnd', 'deposit_paid', 'notes'];
-  const bodyAny = body as unknown as Record<string, unknown>;
   for (const key of updatable) {
     if (bodyAny[key] !== undefined) {
       updates.push(`${key} = ?`); params.push(bodyAny[key]);
@@ -424,7 +470,13 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   params.push(nowStr());
   params.push(id);
 
-  await db.prepare(`UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+  try {
+    await db.prepare(
+      `UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+    ).bind(...params, rawTenantId, rawTenantId).run();
+  } catch {
+    await db.prepare(`UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+  }
 
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
@@ -465,7 +517,8 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const data = parsed.success ? parsed.data : {};
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, getTenantId(c))) {
+  const tenantId = getTenantId(c).trim() || 'default';
+  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
   if (adminErr && (!sub.customer_id || sub.customer_id !== callerUserId)) {
@@ -475,11 +528,18 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Already cancelled' }, 400);
   }
 
-  await db.prepare(
-    'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?'
-  ).bind(nowStr(), data.reason || '', nowStr(), id).run();
+  const cancelledAt = nowStr();
+  try {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(cancelledAt, data.reason || '', cancelledAt, id, tenantId, tenantId).run();
+  } catch {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?'
+    ).bind(cancelledAt, data.reason || '', cancelledAt, id).run();
+  }
 
-  await updateMRRSnapshot(db);
+  await updateMRRSnapshot(db, tenantId);
 
   return c.json({ success: true, message: 'Subscription cancelled' });
 }
@@ -492,23 +552,31 @@ export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
+  const tenantId = getTenantId(c).trim() || 'default';
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, getTenantId(c))) {
+  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
 
+  const pausedAt = nowStr();
   try {
     await db.prepare(
-      'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ?'
-    ).bind(nowStr(), nowStr(), id).run();
+      'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(pausedAt, pausedAt, id, tenantId, tenantId).run();
   } catch {
-    await db.prepare(
-      'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
-    ).bind(nowStr(), id).run();
+    try {
+      await db.prepare(
+        'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ?'
+      ).bind(pausedAt, pausedAt, id).run();
+    } catch {
+      await db.prepare(
+        'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
+      ).bind(pausedAt, id).run();
+    }
   }
 
-  await updateMRRSnapshot(db);
+  await updateMRRSnapshot(db, tenantId);
   return c.json({ success: true, message: 'Subscription paused' });
 }
 
@@ -520,8 +588,9 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
     return adminErr;
   }
 
+  const tenantId = getTenantId(c).trim() || 'default';
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, getTenantId(c))) {
+  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
   if (sub.status !== 'paused') {
@@ -535,11 +604,18 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
   newEnd.setDate(newEnd.getDate() + pauseDays);
   const newPeriodEnd = newEnd.toISOString().slice(0, 10);
 
-  await db.prepare(
-    'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
-  ).bind(newPeriodEnd, newPeriodEnd, nowStr(), id).run();
+  const resumedAt = nowStr();
+  try {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id, tenantId, tenantId).run();
+  } catch {
+    await db.prepare(
+      'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
+    ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id).run();
+  }
 
-  await updateMRRSnapshot(db);
+  await updateMRRSnapshot(db, tenantId);
   return c.json({ success: true, message: 'Subscription resumed', new_period_end: newPeriodEnd });
 }
 
@@ -551,17 +627,30 @@ export async function deleteSubscription(c: Context<{ Bindings: Env }>) {
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
+  const tenantId = getTenantId(c).trim() || 'default';
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, getTenantId(c))) {
+  if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
   if (sub.status === 'active') {
     return c.json({ success: false, error: 'Cannot delete active subscription — use cancel endpoint' }, 400);
   }
 
-  await db.prepare('DELETE FROM subscription_invoices WHERE subscription_id = ?').bind(id).run();
-  await db.prepare('DELETE FROM subscriptions WHERE id = ?').bind(id).run();
+  try {
+    await db.prepare(
+      'DELETE FROM subscription_invoices WHERE subscription_id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(id, tenantId, tenantId).run();
+  } catch {
+    await db.prepare('DELETE FROM subscription_invoices WHERE subscription_id = ?').bind(id).run();
+  }
+  try {
+    await db.prepare(
+      'DELETE FROM subscriptions WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(id, tenantId, tenantId).run();
+  } catch {
+    await db.prepare('DELETE FROM subscriptions WHERE id = ?').bind(id).run();
+  }
 
   return c.json({ success: true, message: 'Subscription deleted' });
 }
@@ -573,7 +662,7 @@ export async function deletePlan(c: Context<{ Bindings: Env }>) {
   }
 
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = getTenantId(c).trim() || 'default';
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -581,7 +670,13 @@ export async function deletePlan(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
   }
 
-  await db.prepare('DELETE FROM subscription_plans WHERE id = ?').bind(id).run();
+  try {
+    await db.prepare(
+      'DELETE FROM subscription_plans WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(id, tenantId, tenantId).run();
+  } catch {
+    await db.prepare('DELETE FROM subscription_plans WHERE id = ?').bind(id).run();
+  }
   return c.json({ success: true, message: 'Plan deleted' });
 }
 

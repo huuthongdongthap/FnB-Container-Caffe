@@ -1,17 +1,10 @@
+import { matchesTenantRow } from '../../lib/db';
 import { createMixpostClient } from '../../lib/mixpost-client';
 import { createLogger } from '../../utils/logger.js';
 import { resolveTemplate } from './template-resolver';
 import type { MixpostEnv, MixpostPostInput, AutoPostTemplate } from './types';
 
 const log = createLogger({ route: 'mixpost' });
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === tenantId;
-  }
-  return tenantId === 'default';
-}
 
 function getMixpostClient(env: MixpostEnv) {
   if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) {

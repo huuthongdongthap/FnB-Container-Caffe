@@ -1,9 +1,27 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth, authenticateRequest } from '../middleware/auth';
+import { getTenantId as getCanonicalTenantId, resolvePilotStore, matchesTenantRow } from '../middleware/tenant';
 import { sendPushToStaff } from '../tree/push/notifier';
 import { DEFAULT_STAFF_PUSH_ROLE } from '../tree/push/roles';
 import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErrorResponse } from '../lib/validators';
+
+function getTenantId(c: {
+  env: Env;
+  req: { query?: (k: string) => string | undefined; header: (k: string) => string | undefined };
+  get: (k: string) => unknown;
+}): string {
+  if (typeof c?.get === 'function' && (c.get('user') || c.get('tenantId'))) {
+    return getCanonicalTenantId(c as Parameters<typeof getCanonicalTenantId>[0]);
+  }
+  const hdr = c.req.header('X-Tenant-ID');
+  if (hdr && hdr.trim() && hdr.trim() !== '*') return hdr.trim();
+  try {
+    return resolvePilotStore(c.env);
+  } catch {
+    return 'default';
+  }
+}
 
 const STAFF_PUSH_AUTH_ROLES = new Set([
   'owner',
@@ -21,48 +39,70 @@ const STAFF_PUSH_AUTH_ROLES = new Set([
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/push/list-subscriptions — list staff push subscriptions for admin UI
-pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
+pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
   const db = c.env.AURA_DB;
-  let results: Array<{
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+  type SubscriptionListRow = {
     id: string;
     customer_id: string | null;
     endpoint: string;
     user_agent: string | null;
     role: string | null;
+    tenant_id?: string | null;
     created_at: string;
-  }> = [];
+  };
+  let results: SubscriptionListRow[] = [];
   try {
-    const res = await db.prepare(
-      `SELECT id, customer_id, endpoint, user_agent, role, created_at
-       FROM push_subscriptions
-       WHERE role != 'customer'
-       ORDER BY created_at DESC`
-    ).all<{
-      id: string;
-      customer_id: string | null;
-      endpoint: string;
-      user_agent: string | null;
-      role: string | null;
-      created_at: string;
-    }>();
+    const stmt = tenantId && tenantId !== '*'
+      ? db.prepare(
+        `SELECT id, customer_id, endpoint, user_agent, role, tenant_id, created_at
+         FROM push_subscriptions
+         WHERE role != 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         ORDER BY created_at DESC
+         LIMIT 500`
+      ).bind(tenantId)
+      : db.prepare(
+        `SELECT id, customer_id, endpoint, user_agent, role, tenant_id, created_at
+         FROM push_subscriptions
+         WHERE role != 'customer'
+         ORDER BY created_at DESC
+         LIMIT 500`
+      );
+    const res = await stmt.all<SubscriptionListRow>();
     results = res.results || [];
   } catch {
-    const res = await db.prepare(
-      `SELECT id, customer_id, endpoint, user_agent, 'staff' as role, created_at
-       FROM push_subscriptions
-       ORDER BY created_at DESC`
-    ).all<{
-      id: string;
-      customer_id: string | null;
-      endpoint: string;
-      user_agent: string | null;
-      role: string | null;
-      created_at: string;
-    }>().catch(() => ({ results: [] }));
-    results = res.results || [];
+    try {
+      const res = await db.prepare(
+        `SELECT id, customer_id, endpoint, user_agent, role, tenant_id, created_at
+         FROM push_subscriptions
+         WHERE role != 'customer'
+         ORDER BY created_at DESC
+         LIMIT 500`
+      ).all<SubscriptionListRow>();
+      results = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT id, customer_id, endpoint, user_agent, role, created_at
+           FROM push_subscriptions
+           WHERE role != 'customer'
+           ORDER BY created_at DESC
+           LIMIT 500`
+        ).all<SubscriptionListRow>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(
+          `SELECT id, customer_id, endpoint, user_agent, 'staff' as role, created_at
+           FROM push_subscriptions
+           ORDER BY created_at DESC
+           LIMIT 500`
+        ).all<SubscriptionListRow>().catch(() => ({ results: [] }));
+        results = res.results || [];
+      }
+    }
   }
 
-  const subscriptions = (results || []).map((row) => {
+  const subscriptions = (results || []).filter((row) => matchesTenantRow(row, tenantId)).map((row) => {
     const isManual = row.endpoint?.startsWith('https://manual.auraspace.local/');
     const normalizedRole: 'owner' | 'staff' | 'all' =
       row.role === 'owner' || row.role === 'staff' || row.role === 'all'
@@ -85,12 +125,22 @@ pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervis
 // POST /api/push/subscribe — save subscription (supports both browser WebPush and manual staff registration)
 pushRouter.post('/subscribe', async(c) => {
   const db = c.env.AURA_DB;
+  let tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const raw = await c.req.json() as Record<string, unknown>;
   const isManualStaffEntry = !raw.endpoint && typeof raw.name === 'string' && raw.name.trim().length > 0;
   const requestedRole = typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : (isManualStaffEntry ? DEFAULT_STAFF_PUSH_ROLE : 'customer');
 
   // Rate limit customer subscriptions: 5 per minute per IP
   if (requestedRole === 'customer' && !isManualStaffEntry) {
+    const preParsed = pushSubscribeSchema.safeParse({
+      ...raw,
+      auth_key: raw.auth_key ?? (raw.keys as Record<string, unknown> | undefined)?.auth,
+      p256dh_key: raw.p256dh_key ?? (raw.keys as Record<string, unknown> | undefined)?.p256dh,
+      role: requestedRole,
+    });
+    if (!preParsed.success) {
+      return c.json({ success: false, error: 'Invalid subscription payload' }, 400);
+    }
     const kv = c.env.AUTH_KV as { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> } | undefined;
     if (kv) {
       const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() || 'unknown';
@@ -100,6 +150,52 @@ pushRouter.post('/subscribe', async(c) => {
         return c.json({ success: false, error: 'Too many subscription attempts, please try again later' }, 429);
       }
       await kv.put(rlKey, String(cur + 1), { expirationTtl: 60 });
+    }
+  }
+
+  // Verify customer identity: authenticated caller must match customer_id, unauthenticated requires existing customer
+  let callerUser: { id?: string; customerId?: string; role?: string } | undefined =
+    c.get('user' as never) as { id?: string; customerId?: string; role?: string } | undefined;
+  if (!callerUser && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    try {
+      const session = await authenticateRequest(c.req.raw, c.env);
+      if (session && 'payload' in session && session.payload) {
+        callerUser = session.payload as { id?: string; customerId?: string; role?: string };
+      } else if (session && 'role' in session) {
+        callerUser = session as { id?: string; customerId?: string; role?: string };
+      }
+    } catch {
+      // Optional auth failure ignored
+    }
+  }
+  if (requestedRole === 'customer' && !isManualStaffEntry) {
+    const auth = callerUser;
+    const submittedCustomerId = typeof raw.customer_id === 'string' ? raw.customer_id.trim() : '';
+    if (auth && auth.id) {
+      const authCustomerId = auth.customerId || auth.id;
+      if (submittedCustomerId && submittedCustomerId !== authCustomerId) {
+        return c.json({ success: false, error: 'Forbidden: customer_id mismatch' }, 403);
+      }
+    } else if (!submittedCustomerId) {
+      return c.json({ success: false, error: 'customer_id is required' }, 400);
+    } else {
+      // Unauthenticated: verify customer exists in DB and belongs to this tenant
+      let exists: { id: string; tenant_id?: string | null } | null = null;
+      let queryRan = false;
+      try {
+        exists = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1').bind(submittedCustomerId).first<{ id: string; tenant_id?: string | null }>();
+        queryRan = true;
+      } catch {
+        try {
+          exists = await db.prepare('SELECT id FROM customers WHERE id = ? LIMIT 1').bind(submittedCustomerId).first<{ id: string }>();
+          queryRan = true;
+        } catch {
+          // Table may not exist; allow through for backward compat
+        }
+      }
+      if (queryRan && (!exists || !matchesTenantRow(exists, tenantId))) {
+        return c.json({ success: false, error: 'Invalid customer_id' }, 400);
+      }
     }
   }
 
@@ -119,6 +215,19 @@ pushRouter.post('/subscribe', async(c) => {
     if (!STAFF_PUSH_AUTH_ROLES.has(String(resolvedRole))) {
       return c.json({ success: false, error: 'Forbidden: staff role required for staff push subscriptions' }, 403);
     }
+    if (!callerUser) {
+      callerUser = ('payload' in authSession && authSession.payload
+        ? authSession.payload
+        : authSession) as { id?: string; customerId?: string; role?: string };
+    }
+    const payloadObj = ('payload' in authSession && authSession.payload
+      ? authSession.payload
+      : authSession) as { tenant_id?: unknown; tenantId?: unknown } | undefined;
+    const rawStaffTenant = payloadObj?.tenant_id ?? payloadObj?.tenantId;
+    const staffTenant = typeof rawStaffTenant === 'string' ? rawStaffTenant.trim() : '';
+    if (staffTenant && staffTenant !== '*') {
+      tenantId = staffTenant;
+    }
   }
 
   let endpoint: string;
@@ -130,7 +239,11 @@ pushRouter.post('/subscribe', async(c) => {
 
   if (isManualStaffEntry) {
     const cleanName = String(raw.name).trim();
-    endpoint = `https://manual.auraspace.local/staff/${encodeURIComponent(cleanName.toLowerCase())}`;
+    const encodedName = encodeURIComponent(cleanName.toLowerCase());
+    endpoint =
+      tenantId && tenantId !== 'default' && tenantId !== '*'
+        ? `https://manual.auraspace.local/staff/${encodeURIComponent(tenantId)}/${encodedName}`
+        : `https://manual.auraspace.local/staff/${encodedName}`;
     auth_key = 'manual_pending';
     p256dh_key = 'manual_pending';
     customer_id = cleanName;
@@ -171,6 +284,33 @@ pushRouter.post('/subscribe', async(c) => {
   const id = `SUB-${Date.now().toString(36).toUpperCase()}${subSuffix}`;
   const now = new Date().toISOString();
 
+  let existingSub: { customer_id?: string | null; auth_key?: string | null; tenant_id?: string | null } | null = null;
+  try {
+    existingSub = await db
+      .prepare('SELECT customer_id, auth_key, tenant_id FROM push_subscriptions WHERE endpoint = ?')
+      .bind(endpoint)
+      .first<{ customer_id?: string | null; auth_key?: string | null; tenant_id?: string | null }>();
+  } catch {
+    existingSub = await db
+      .prepare('SELECT customer_id, auth_key FROM push_subscriptions WHERE endpoint = ?')
+      .bind(endpoint)
+      .first<{ customer_id?: string | null; auth_key?: string | null }>()
+      .catch(() => null);
+  }
+  if (existingSub) {
+    if ('tenant_id' in existingSub && existingSub.tenant_id !== undefined && !matchesTenantRow(existingSub, tenantId)) {
+      return c.json({ success: false, error: 'Subscription endpoint already registered to another user' }, 403);
+    }
+    const callerAuthId = callerUser?.customerId || callerUser?.id || '';
+    const isCallerStaff = Boolean(callerUser?.role && STAFF_PUSH_AUTH_ROLES.has(String(callerUser.role)));
+    const isCallerExistingOwner = Boolean(callerAuthId && existingSub.customer_id && callerAuthId === existingSub.customer_id) || isCallerStaff;
+    const hasDifferentAuthKey = Boolean(existingSub.auth_key && existingSub.auth_key !== 'manual_pending' && existingSub.auth_key !== auth_key);
+    const hasDifferentCustomer = Boolean(existingSub.customer_id && existingSub.customer_id !== (customer_id || ''));
+    if (!isCallerExistingOwner && (hasDifferentAuthKey || hasDifferentCustomer)) {
+      return c.json({ success: false, error: 'Subscription endpoint already registered to another user' }, 403);
+    }
+  }
+
   try {
     await db.prepare(
       `INSERT INTO push_subscriptions (id, customer_id, endpoint, auth_key, p256dh_key, user_agent, role, created_at, updated_at)
@@ -194,13 +334,18 @@ pushRouter.post('/subscribe', async(c) => {
        user_agent = excluded.user_agent`
     ).bind(id, customer_id || null, endpoint, auth_key, p256dh_key, user_agent || null, now).run();
   }
+  if (tenantId && tenantId !== '*') {
+    await db.prepare('UPDATE push_subscriptions SET tenant_id = ? WHERE endpoint = ?')
+      .bind(tenantId, endpoint).run().catch(() => null);
+  }
 
   return c.json({ success: true, message: 'Subscribed' }, 201);
 });
 
 // DELETE /api/push/subscribe — remove staff subscription by name or endpoint
-pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier']), async(c) => {
+pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const name = typeof raw.name === 'string' ? raw.name.trim() : '';
   const endpoint = typeof raw.endpoint === 'string' ? raw.endpoint.trim() : '';
@@ -210,12 +355,34 @@ pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'supervisor', '
   }
 
   if (endpoint) {
-    await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+    if (tenantId && tenantId !== '*') {
+      await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(endpoint, tenantId).run().catch(async () => {
+          await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+        });
+    } else {
+      await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+    }
   } else {
-    const manualEndpoint = `https://manual.auraspace.local/staff/${encodeURIComponent(name.toLowerCase())}`;
-    await db.prepare(
-      'DELETE FROM push_subscriptions WHERE user_agent = ? OR customer_id = ? OR endpoint = ?'
-    ).bind(name, name, manualEndpoint).run();
+    const encodedName = encodeURIComponent(name.toLowerCase());
+    const legacyManualEndpoint = `https://manual.auraspace.local/staff/${encodedName}`;
+    const tenantManualEndpoint =
+      tenantId && tenantId !== 'default' && tenantId !== '*'
+        ? `https://manual.auraspace.local/staff/${encodeURIComponent(tenantId)}/${encodedName}`
+        : legacyManualEndpoint;
+    if (tenantId && tenantId !== '*') {
+      await db.prepare(
+        "DELETE FROM push_subscriptions WHERE (user_agent = ? OR customer_id = ? OR endpoint = ? OR endpoint = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(name, name, tenantManualEndpoint, legacyManualEndpoint, tenantId).run().catch(async () => {
+        await db.prepare(
+          'DELETE FROM push_subscriptions WHERE user_agent = ? OR customer_id = ? OR endpoint = ? OR endpoint = ?'
+        ).bind(name, name, tenantManualEndpoint, legacyManualEndpoint).run();
+      });
+    } else {
+      await db.prepare(
+        'DELETE FROM push_subscriptions WHERE user_agent = ? OR customer_id = ? OR endpoint = ? OR endpoint = ?'
+      ).bind(name, name, tenantManualEndpoint, legacyManualEndpoint).run();
+    }
   }
 
   return c.json({ success: true, message: 'Unsubscribed' });
@@ -224,6 +391,7 @@ pushRouter.delete('/subscribe', requireAuth(['owner', 'manager', 'supervisor', '
 // POST /api/push/unsubscribe — remove subscription (requires matching auth_key for ownership proof)
 pushRouter.post('/unsubscribe', async(c) => {
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const raw = await c.req.json();
   const parsed = pushUnsubscribeSchema.safeParse(raw);
   if (!parsed.success) {
@@ -231,23 +399,90 @@ pushRouter.post('/unsubscribe', async(c) => {
   }
 
   const endpoint = parsed.data.endpoint;
-  // Verify the caller owns this subscription via auth_key match
-  const authKey = typeof (raw as Record<string, unknown>).auth_key === 'string'
-    ? String((raw as Record<string, unknown>).auth_key).trim()
-    : '';
-  if (authKey) {
-    // If auth_key provided, verify it matches the stored subscription
+  const rawObj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const rawKeys = (rawObj.keys && typeof rawObj.keys === 'object' ? rawObj.keys : {}) as Record<string, unknown>;
+  const authKey = typeof rawObj.auth_key === 'string'
+    ? String(rawObj.auth_key).trim()
+    : typeof rawKeys.auth === 'string'
+      ? String(rawKeys.auth).trim()
+      : '';
+
+  let callerUser = c.get('user' as never) as { id?: string; customerId?: string; role?: string } | undefined;
+  if (!callerUser && (c.req.header('Authorization') || c.req.header('authorization'))) {
     try {
-      const existing = await db.prepare('SELECT auth_key FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).first<{ auth_key: string }>();
-      if (existing && existing.auth_key !== authKey && existing.auth_key !== 'manual_pending') {
-        return c.json({ success: false, error: 'Invalid auth_key' }, 403);
+      const session = await authenticateRequest(c.req.raw, c.env);
+      if (session && 'payload' in session && session.payload) {
+        callerUser = session.payload as { id?: string; customerId?: string; role?: string };
+      } else if (session && 'role' in session) {
+        callerUser = session as { id?: string; customerId?: string; role?: string };
       }
     } catch {
-      // table schema variation — proceed with delete
+      // Optional auth failure ignored
     }
   }
 
-  await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+  let existing: { customer_id?: string | null; auth_key?: string | null; tenant_id?: string | null } | null = null;
+  try {
+    existing = await db
+      .prepare(
+        "SELECT customer_id, auth_key, tenant_id FROM push_subscriptions WHERE endpoint = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      )
+      .bind(endpoint, tenantId, tenantId)
+      .first<{ customer_id?: string | null; auth_key?: string | null; tenant_id?: string | null }>();
+  } catch {
+    try {
+      existing = await db
+        .prepare('SELECT customer_id, auth_key FROM push_subscriptions WHERE endpoint = ?')
+        .bind(endpoint)
+        .first<{ customer_id?: string | null; auth_key?: string | null }>();
+    } catch {
+      existing = await db
+        .prepare('SELECT auth_key FROM push_subscriptions WHERE endpoint = ?')
+        .bind(endpoint)
+        .first<{ auth_key?: string | null }>()
+        .catch(() => null);
+    }
+  }
+
+  const callerAuthId = callerUser?.customerId || callerUser?.id || '';
+  const isCallerAdmin = Boolean(
+    callerUser?.role && ['owner', 'manager', 'supervisor', 'admin'].includes(String(callerUser.role))
+  );
+  const isCallerStaffOrAdmin = Boolean(
+    callerUser?.role && ['owner', 'manager', 'supervisor', 'admin', 'staff'].includes(String(callerUser.role))
+  );
+  const isAuthorizedByUser = Boolean(
+    existing &&
+    (('tenant_id' in existing && existing.tenant_id !== undefined) ? matchesTenantRow(existing, tenantId) : true) &&
+    (isCallerAdmin || (callerAuthId && existing.customer_id && callerAuthId === existing.customer_id))
+  );
+
+  if (existing && 'tenant_id' in existing && existing.tenant_id !== undefined && !matchesTenantRow(existing, tenantId)) {
+    return c.json({ success: false, error: 'Invalid auth_key' }, 403);
+  }
+
+  if (existing && existing.auth_key === 'manual_pending') {
+    if (!isCallerStaffOrAdmin) {
+      return c.json({ success: false, error: 'Forbidden: staff role required' }, 403);
+    }
+  } else if (existing && existing.auth_key) {
+    if (!isAuthorizedByUser && (!authKey || existing.auth_key !== authKey)) {
+      return c.json({ success: false, error: 'Invalid auth_key' }, 403);
+    }
+  } else if (!authKey && !callerUser) {
+    return c.json({ success: false, error: 'Invalid auth_key' }, 403);
+  }
+
+  try {
+    await db
+      .prepare(
+        "DELETE FROM push_subscriptions WHERE endpoint = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      )
+      .bind(endpoint, tenantId, tenantId)
+      .run();
+  } catch {
+    await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint).run();
+  }
   return c.json({ success: true, message: 'Unsubscribed' });
 });
 
@@ -261,14 +496,26 @@ pushRouter.get('/public-key', async(c) => {
 
 // POST /api/push/send-staff — send push to staff by role (kitchen/cashier/all or admin testSend)
 pushRouter.post('/send-staff', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
-  const raw = await c.req.json() as Record<string, unknown>;
+  const raw = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  if (raw.title !== undefined && (typeof raw.title !== 'string' || raw.title.trim().length === 0 || raw.title.length > 200)) {
+    return c.json({ success: false, error: 'Invalid payload' }, 400);
+  }
+  if (raw.body !== undefined && (typeof raw.body !== 'string' || raw.body.trim().length === 0 || raw.body.length > 1000)) {
+    return c.json({ success: false, error: 'Invalid payload' }, 400);
+  }
+  if (raw.targetRole !== undefined && typeof raw.targetRole !== 'string') {
+    return c.json({ success: false, error: 'Invalid payload' }, 400);
+  }
   const targetRole = typeof raw.targetRole === 'string' ? raw.targetRole : undefined;
   const staffName = typeof raw.name === 'string' ? raw.name : undefined;
+  if (raw.title === undefined && raw.body === undefined && !staffName && !targetRole) {
+    return c.json({ success: false, error: 'Invalid payload' }, 400);
+  }
   const normalizedPayload = {
     ...raw,
-    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title : 'AURA SPACE — Thông báo thử nghiệm',
+    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'AURA SPACE — Thông báo thử nghiệm',
     body: typeof raw.body === 'string' && raw.body.trim()
-      ? raw.body
+      ? raw.body.trim()
       : (staffName ? `Thông báo thử cho ${staffName}` : 'Kiểm tra kết nối thông báo đẩy'),
     role: typeof raw.role === 'string'
       ? raw.role
@@ -280,13 +527,16 @@ pushRouter.post('/send-staff', requireAuth(['owner', 'manager', 'supervisor', 'a
   }
   const { title, body: msgBody, role = 'staff-all', data, actions } = parsed.data;
 
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const result = await sendPushToStaff(c.env as Env, {
     title,
     body: msgBody,
     data,
     actions
   },
-  role === 'all' ? '' : role);
+  role === 'all' ? '' : role,
+  [],
+  tenantId);
 
   return c.json({ success: true, ...result });
 });

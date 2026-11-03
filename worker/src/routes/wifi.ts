@@ -16,7 +16,7 @@ import {
   authorizeWifiOverride
 } from '../tree/wifi/session';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, resolvePublicTenantId } from '../middleware/tenant';
 import { createLogger } from '../middleware/logger';
 
 const log = createLogger({ route: 'wifi-routes' });
@@ -25,31 +25,22 @@ const MAX_WIFI_DURATION_SECONDS = 86400;
 const MIN_WIFI_DURATION_SECONDS = 60;
 
 const WifiLoginSchema = z.object({
-  mac: z.string().min(1),
-  phone: z.string().min(9),
-  name: z.string().optional(),
-  ip_address: z.string().optional(),
+  mac: z.string().min(1).max(64),
+  phone: z.string().min(9).max(20),
+  name: z.string().max(120).optional(),
+  ip_address: z.string().max(64).optional(),
   duration_seconds: z.number().int().min(MIN_WIFI_DURATION_SECONDS).max(MAX_WIFI_DURATION_SECONDS).optional()
 });
 
 const WifiAuthorizeSchema = z.object({
-  mac: z.string().min(1),
+  mac: z.string().min(1).max(64),
   action: z.enum(['grant', 'revoke']),
   duration_seconds: z.number().int().min(MIN_WIFI_DURATION_SECONDS).max(MAX_WIFI_DURATION_SECONDS).optional(),
-  notes: z.string().optional()
+  notes: z.string().max(500).optional()
 });
 
-function resolvePortalTenantId(c: {
-  get?: (_k: string) => unknown;
-  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
-}): string {
-  const user = typeof c.get === 'function' ? c.get('user') : undefined;
-  if (user) {
-    return getTenantId(c as Parameters<typeof getTenantId>[0]);
-  }
-  const raw = (c.req.query('tenant_id') || c.req.header('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') return 'default';
-  return raw;
+function resolvePortalTenantId(c: Parameters<typeof resolvePublicTenantId>[0]): string {
+  return resolvePublicTenantId(c);
 }
 
 export function createWifiRoutes() {
@@ -77,6 +68,17 @@ export function createWifiRoutes() {
   // Public captive portal guest submission
   app.post('/login', optionalAuth(), async(c) => {
     try {
+      const kv = c.env?.AUTH_KV as { get?: (k: string) => Promise<string | null>; put?: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> } | undefined;
+      if (kv && typeof kv.get === 'function' && typeof kv.put === 'function') {
+        const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() || 'unknown';
+        const rlKey = `rl:wifi-login:${ip}`;
+        const cur = parseInt((await kv.get(rlKey).catch(() => null)) || '0', 10);
+        if (cur >= 10) {
+          return c.json({ success: false, error: 'Too many WiFi login attempts, please try again later' }, 429);
+        }
+        await kv.put(rlKey, String(cur + 1), { expirationTtl: 60 }).catch(() => {});
+      }
+
       const body = await c.req.json<Record<string, unknown>>();
       const parsed = WifiLoginSchema.safeParse(body);
       if (!parsed.success) {
@@ -98,7 +100,7 @@ export function createWifiRoutes() {
   });
 
   // POST /api/wifi/authorize
-  // Staff/Supervisor/Manager/Admin/Owner manual MAC grant/revoke override
+  // Supervisor/Manager/Admin/Owner manual MAC grant/revoke override (staff limited to revoke only)
   app.post('/authorize', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']), async(c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>();
@@ -108,7 +110,12 @@ export function createWifiRoutes() {
         return c.json({ error: `${first.path.join('.')}: ${first.message}` }, 400);
       }
 
-      const tenantId = getTenantId(c);
+      const user = c.get('user' as never) as { role?: string } | undefined;
+      if (parsed.data.action === 'grant' && user?.role === 'staff') {
+        return c.json({ error: 'Forbidden: Role staff is not allowed to grant WiFi overrides' }, 403);
+      }
+
+      const tenantId = getTenantId(c).trim() || 'default';
       const result = await authorizeWifiOverride(c.env as Record<string, unknown>, parsed.data, tenantId);
       return c.json(result);
     } catch (err) {

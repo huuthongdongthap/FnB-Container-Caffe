@@ -11,6 +11,7 @@
  */
 import type { D1Database } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
+import { matchesTenantRow } from 'worker/src/middleware/tenant';
 import { toAvailabilityFlag } from '../policies/availability';
 import { resolveItemPrice, type Channel, type ChannelDeltaConfig } from '../policies/pricing';
 import type { HappyHourWindow } from '../model/catalog-types';
@@ -53,6 +54,7 @@ export interface CustomerMenuOptions {
   channel?: Channel | string;
   now?: Date;
   channelDeltas?: ChannelDeltaConfig;
+  tenantId?: string;
 }
 
 interface RawMenuRow {
@@ -64,6 +66,7 @@ interface RawMenuRow {
   image_url: string | null;
   tags: string | string[] | null;
   available: number | boolean;
+  tenant_id?: string | null;
 }
 
 function parseTags(tags: string | string[] | null | undefined): string[] {
@@ -137,9 +140,10 @@ export async function getCustomerMenu(
   opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenu> {
   const includeUnavailable = opts.includeUnavailable ?? false;
+  const effectiveTenant = (opts.tenantId && opts.tenantId.trim()) || 'default';
 
   try {
-    let query = `SELECT id, name, description, price, category, image_url, tags, available
+    let query = `SELECT *, id, name, description, price, category, image_url, tags, available
       FROM menu_items WHERE 1 = 1`;
     const params: unknown[] = [];
 
@@ -156,14 +160,16 @@ export async function getCustomerMenu(
     let primaryErr: unknown = null;
     try {
       const res = await db.prepare(query).bind(...params).all<RawMenuRow>();
-      results = res.results ?? [];
+      results = (res.results ?? []).filter((item) =>
+        matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant)
+      );
     } catch (err) {
       primaryErr = err;
     }
 
     if (results.length === 0) {
       try {
-        let prodQuery = `SELECT id, name, name_en, description, description_en, price, category_id AS category, image_url, is_available AS available, is_featured AS featured, tags, sort_order FROM products WHERE 1 = 1`;
+        let prodQuery = `SELECT *, id, name, name_en, description, description_en, price, category_id AS category, image_url, is_available AS available, is_featured AS featured, tags, sort_order FROM products WHERE 1 = 1`;
         const prodParams: unknown[] = [];
         if (!includeUnavailable) {
           prodQuery += ' AND is_available = 1';
@@ -174,7 +180,9 @@ export async function getCustomerMenu(
         }
         prodQuery += ' ORDER BY category_id ASC, name ASC';
         const prodRes = await db.prepare(prodQuery).bind(...prodParams).all<RawMenuRow>();
-        results = prodRes.results ?? [];
+        results = (prodRes.results ?? []).filter((item) =>
+          matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant)
+        );
         primaryErr = null;
       } catch {
         if (primaryErr) throw primaryErr;
@@ -186,13 +194,17 @@ export async function getCustomerMenu(
     if (hasPricingOverrides) {
       try {
         const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
-        happyHourWindows = (hhRes.results || hhRes || []) as HappyHourWindow[];
+        happyHourWindows = ((hhRes.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
+          matchesTenantRow(w as unknown as Record<string, unknown>, effectiveTenant)
+        );
       } catch {
         happyHourWindows = [];
       }
     }
 
-    const items: CustomerMenuItem[] = (results ?? []).map((item: RawMenuRow) => {
+    const items: CustomerMenuItem[] = (results ?? [])
+      .filter((item) => matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant))
+      .map((item: RawMenuRow) => {
       const basePrice = typeof item.price === 'string' ? parseInt(item.price, 10) : item.price;
       const priceCents = hasPricingOverrides
         ? resolveItemPrice({
@@ -243,17 +255,21 @@ export async function getCustomerMenu(
 export async function getCustomerMenuItem(
   db: D1Database,
   id: string,
-  opts: CustomerMenuOptions = {},
+  opts: CustomerMenuOptions | string = {},
 ): Promise<CustomerMenuItem | null> {
+  const resolvedOpts: CustomerMenuOptions = typeof opts === 'string' ? { tenantId: opts } : opts;
+  const effectiveTenant = (resolvedOpts.tenantId && resolvedOpts.tenantId.trim()) || 'default';
   try {
     let results: RawMenuRow[] | undefined;
     let primaryErr: unknown = null;
     try {
       const res = await db
-        .prepare('SELECT id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?')
+        .prepare('SELECT *, id, name, description, price, category, image_url, tags, available FROM menu_items WHERE id = ?')
         .bind(id)
         .all<RawMenuRow>();
-      results = res.results;
+      results = (res.results ?? []).filter((r) =>
+        matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+      );
     } catch (err) {
       primaryErr = err;
     }
@@ -261,28 +277,35 @@ export async function getCustomerMenuItem(
     if (!results || results.length === 0 || !results[0]) {
       try {
         const prodRes = await db
-          .prepare('SELECT id, name, description, price, category_id AS category, image_url, tags, is_available AS available FROM products WHERE id = ?')
+          .prepare('SELECT *, id, name, description, price, category_id AS category, image_url, tags, is_available AS available FROM products WHERE id = ?')
           .bind(id)
           .all<RawMenuRow>();
-        results = prodRes.results;
+        results = (prodRes.results ?? []).filter((r) =>
+          matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+        );
         primaryErr = null;
       } catch {
         if (primaryErr) throw primaryErr;
       }
     }
 
-    if (!results || results.length === 0 || !results[0]) {
+    const matchedResults = (results ?? []).filter((r) =>
+      matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+    );
+    if (matchedResults.length === 0 || !matchedResults[0]) {
       return null;
     }
-    const raw = results[0];
+    const raw = matchedResults[0];
     const basePrice = typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price;
 
-    const hasPricingOverrides = Boolean(opts.channel || opts.now || opts.channelDeltas);
+    const hasPricingOverrides = Boolean(resolvedOpts.channel || resolvedOpts.now || resolvedOpts.channelDeltas);
     let happyHourWindows: HappyHourWindow[] = [];
     if (hasPricingOverrides) {
       try {
         const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
-        happyHourWindows = (hhRes.results || hhRes || []) as HappyHourWindow[];
+        happyHourWindows = ((hhRes.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
+          matchesTenantRow(w as unknown as Record<string, unknown>, effectiveTenant)
+        );
       } catch {
         happyHourWindows = [];
       }
@@ -291,11 +314,11 @@ export async function getCustomerMenuItem(
     const priceCents = hasPricingOverrides
       ? resolveItemPrice({
           basePriceCents: basePrice,
-          channel: opts.channel || 'dine_in',
+          channel: resolvedOpts.channel || 'dine_in',
           modifierChoices: [],
           happyHourWindows,
-          now: opts.now || new Date(),
-          channelDeltas: opts.channelDeltas,
+          now: resolvedOpts.now || new Date(),
+          channelDeltas: resolvedOpts.channelDeltas,
           productId: raw.id,
           categoryId: raw.category,
         })

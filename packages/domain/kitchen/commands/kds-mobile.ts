@@ -9,7 +9,7 @@ const log = createLogger({ route: 'kds-mobile' });
 
 // Allowed roles per action
 const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter', 'cashier'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter'];
 const VALID_STATUSES: string[] = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled'];
 
 function parseKdsItems(raw: unknown): unknown[] {
@@ -36,12 +36,12 @@ export async function getKdsMobile(
       return errorResponse('Không có quyền', 403);
     }
 
-    const tenantId = getTenantId(context);
+    const tenantId = getTenantId(context).trim() || 'default';
     const tenantClause = tenantId === '*'
       ? ''
       : tenantId === 'default'
         ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
-        : ' AND o.tenant_id = ?';
+        : ' AND (o.tenant_id = ? OR TRIM(o.tenant_id) = ?1)';
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
     let orders: { results: unknown[] };
     try {
@@ -63,6 +63,7 @@ export async function getKdsMobile(
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON t.id = o.table_id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
            WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
            ORDER BY o.created_at ASC`
         )
@@ -132,7 +133,7 @@ export async function updateKdsStatus(
       body.status,
       role,
       {
-        tenantId: getTenantId(context),
+        tenantId: getTenantId(context).trim() || 'default',
         kv: context.env.AUTH_KV,
         waitUntil: waitUntilFn,
       }

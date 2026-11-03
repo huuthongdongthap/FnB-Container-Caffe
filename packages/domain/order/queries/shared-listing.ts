@@ -40,11 +40,12 @@ export function buildOrderFilterClause(opts: Pick<OrderListOptions, 'filters' | 
   let clause = '';
 
   const alias = opts.tableAlias ?? 'o';
-  if (opts.tenantId && opts.tenantId !== '*') {
-    clause += opts.tenantId === 'default'
+  const normTenant = opts.tenantId ? opts.tenantId.trim() : '';
+  if (normTenant && normTenant !== '*') {
+    clause += normTenant === 'default'
       ? ` AND (${alias}.tenant_id = ? OR ${alias}.tenant_id IS NULL OR ${alias}.tenant_id = '')`
       : ` AND ${alias}.tenant_id = ?`;
-    params.push(opts.tenantId);
+    params.push(normTenant);
   }
 
   // Filter columns are caller-side constants (never user input), so values go
@@ -61,8 +62,8 @@ export function buildOrderTail(
 ): string {
   const sortBy = opts.sort ?? 'created_at';
   const direction = opts.order === 'DESC' ? 'DESC' : 'ASC';
-  const limit = Math.max(1, Math.floor(opts.limit ?? 50));
-  const offset = Math.max(0, Math.floor(opts.offset ?? 0));
+  const limit = Number.isFinite(opts.limit) ? Math.min(200, Math.max(1, Math.floor(opts.limit!))) : 50;
+  const offset = Number.isFinite(opts.offset) ? Math.max(0, Math.floor(opts.offset!)) : 0;
   const prefix = opts.prefix ?? '';
   return ` ORDER BY ${safeSortColumn(sortBy, prefix)} ${direction} LIMIT ${limit} OFFSET ${offset}`;
 }

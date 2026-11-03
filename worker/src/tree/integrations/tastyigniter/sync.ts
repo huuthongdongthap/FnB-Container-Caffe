@@ -9,6 +9,7 @@
 
 import { createLogger } from '../../../middleware/logger';
 import { createTastyIgniterClient } from '../../../clients/tastyigniter-client';
+import { matchesTenantRow } from '../../../lib/db';
 
 const log = createLogger({ route: 'ti-sync' });
 
@@ -44,12 +45,14 @@ interface _TIBridgeRow {
  */
 export async function syncTIToLocalMenu(
   env: TISyncEnv,
-  ctx?: ExecutionContext
+  ctx?: ExecutionContext,
+  tenantId?: string,
 ): Promise<{ ok: boolean; mock?: boolean; synced?: number; reason?: string }> {
   const client = createTastyIgniterClient(env);
   if (!client) {
     return { ok: true, mock: false, synced: 0, reason: 'disabled' };
   }
+  const effectiveTenant = (tenantId ?? '').trim();
 
   const promise = (async() => {
     try {
@@ -69,14 +72,36 @@ export async function syncTIToLocalMenu(
         const name = anyItem.name as string | undefined;
         const active = anyItem.is_active !== false ? 1 : 0;
 
-        await db
-          .prepare(
-            `INSERT OR REPLACE INTO ti_menu_cache
-             (id, name, sku, price, active, cached_at)
-             VALUES (?, ?, ?, ?, ?, datetime('now'))`
-          )
-          .bind(id, name ?? '', sku ?? null, price, active)
-          .run();
+        if (effectiveTenant && effectiveTenant !== '*') {
+          try {
+            await db
+              .prepare(
+                `INSERT OR REPLACE INTO ti_menu_cache
+                 (id, name, sku, price, active, cached_at, tenant_id)
+                 VALUES (?, ?, ?, ?, ?, datetime('now'), ?)`
+              )
+              .bind(id, name ?? '', sku ?? null, price, active, effectiveTenant)
+              .run();
+          } catch {
+            await db
+              .prepare(
+                `INSERT OR REPLACE INTO ti_menu_cache
+                 (id, name, sku, price, active, cached_at)
+                 VALUES (?, ?, ?, ?, ?, datetime('now'))`
+              )
+              .bind(id, name ?? '', sku ?? null, price, active)
+              .run();
+          }
+        } else {
+          await db
+            .prepare(
+              `INSERT OR REPLACE INTO ti_menu_cache
+               (id, name, sku, price, active, cached_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))`
+            )
+            .bind(id, name ?? '', sku ?? null, price, active)
+            .run();
+        }
 
         synced++;
       }
@@ -152,14 +177,40 @@ export async function bridgeOrderToTI(
 
       if (db) {
         if (tiOrderId) {
-          await db
+          const updateRes = await db
             .prepare(
               `UPDATE ti_order_bridge
                SET ti_order_id = ?, status = 'synced', error = NULL, synced_at = datetime('now')
-               WHERE local_order_id = ? AND status != 'synced'`
+               WHERE local_order_id = ?`
             )
             .bind(tiOrderId, localOrderId)
-            .run();
+            .run()
+            .catch(() => null);
+          if (((updateRes as { meta?: { changes?: number } } | null)?.meta?.changes ?? 0) === 0) {
+            try {
+              await db
+                .prepare(
+                  `INSERT INTO ti_order_bridge
+                   (id, local_order_id, ti_order_id, status, synced_at, created_at)
+                   VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+                )
+                .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced')
+                .run();
+            } catch {
+              try {
+                await db
+                  .prepare(
+                    `INSERT INTO ti_order_bridge
+                     (id, local_order_id, ti_order_id, status, error, created_at)
+                     VALUES (?, ?, ?, ?, NULL, datetime('now'))`
+                  )
+                  .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced')
+                  .run();
+              } catch {
+                // Non-blocking persistence fallback
+              }
+            }
+          }
         } else {
           await db
             .prepare(
@@ -199,31 +250,95 @@ export async function bridgeOrderToTI(
 /**
  * Fetch local menu cache, falling back to live TI pull if too stale (> 6h).
  */
-export async function getTiMenuCache(env: TISyncEnv): Promise<{ items: MenuCacheRow[] }> {
+export async function getTiMenuCache(env: TISyncEnv, tenantId?: string): Promise<{ items: MenuCacheRow[] }> {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
+  const effectiveTenant = (tenantId ?? '').trim();
 
   if (db) {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    const row = await db
-      .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
-      .bind(sixHoursAgo)
-      .first<{ cnt: number }>();
+    let row: { cnt: number } | null = null;
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        row = await db
+          .prepare("SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(sixHoursAgo, effectiveTenant)
+          .first<{ cnt: number }>();
+      } catch {
+        row = await db
+          .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
+          .bind(sixHoursAgo)
+          .first<{ cnt: number }>();
+      }
+    } else {
+      row = await db
+        .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
+        .bind(sixHoursAgo)
+        .first<{ cnt: number }>();
+    }
 
     if (row && row.cnt > 0) {
+      if (effectiveTenant && effectiveTenant !== '*') {
+        try {
+          const rows = await db
+            .prepare("SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(effectiveTenant)
+            .all<MenuCacheRow & { tenant_id?: string | null }>();
+          const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+          return {
+            items: raw.filter(
+              (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+            ),
+          };
+        } catch {
+          // Fall through to unscoped query if tenant_id column is absent
+        }
+      }
       const rows = await db
         .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
         .all<MenuCacheRow>();
-      return { items: (rows as { results: MenuCacheRow[] }).results ?? [] };
+      const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+      return {
+        items:
+          effectiveTenant && effectiveTenant !== '*'
+            ? raw.filter(
+                (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+              )
+            : raw,
+      };
     }
   }
 
   // cache stale or missing — pull live (best-effort, non-blocking)
-  const result = await syncTIToLocalMenu(env);
+  const result = await syncTIToLocalMenu(env, undefined, tenantId);
   if (db && result.synced && result.synced > 0) {
+    if (effectiveTenant && effectiveTenant !== '*') {
+      try {
+        const rows = await db
+          .prepare("SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(effectiveTenant)
+          .all<MenuCacheRow & { tenant_id?: string | null }>();
+        const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+        return {
+          items: raw.filter(
+            (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+          ),
+        };
+      } catch {
+        // Fall through to unscoped query if tenant_id column is absent
+      }
+    }
     const rows = await db
       .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
       .all<MenuCacheRow>();
-    return { items: (rows as { results: MenuCacheRow[] }).results ?? [] };
+    const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+    return {
+      items:
+        effectiveTenant && effectiveTenant !== '*'
+          ? raw.filter(
+              (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+            )
+          : raw,
+    };
   }
 
   return { items: [] };

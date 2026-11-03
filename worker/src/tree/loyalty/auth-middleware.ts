@@ -50,7 +50,8 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
     throw err;
   }
   const hasExplicitPilotTenant = c.env.PILOT_TENANT_ID !== undefined;
-  if (hasExplicitPilotTenant && payload.tenantId && payload.tenantId !== tenantId) {
+  const payloadTenant = payload.tenantId ? String(payload.tenantId).trim() : '';
+  if (hasExplicitPilotTenant && payloadTenant && payloadTenant !== tenantId) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
   const emailBind = payload.email ? String(payload.email) : null;
@@ -106,7 +107,7 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
   if (!customer && emailBind) {
     const expectedTenant = hasExplicitPilotTenant
       ? tenantId
-      : ((payload.tenantId && String(payload.tenantId).trim()) || c.req.header('X-Tenant-ID')?.trim() || 'default');
+      : (payloadTenant || (c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id'))?.trim() || 'default');
     try {
       customer = await c.env.AURA_DB.prepare(
         "SELECT *, COALESCE(lifetime_points, loyalty_points, 0) AS lifetime_points FROM customers WHERE email = ? ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END"
@@ -131,10 +132,10 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
   if (hasExplicitPilotTenant && normalizedCustomerTenant !== tenantId) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
-  if (payload.tenantId && payload.tenantId.trim() && normalizedCustomerTenant !== payload.tenantId.trim()) {
+  if (payloadTenant && normalizedCustomerTenant !== payloadTenant) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
-  const hdrTenant = c.req.header('X-Tenant-ID')?.trim();
+  const hdrTenant = (c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id'))?.trim();
   if (!hasExplicitPilotTenant && hdrTenant && normalizedCustomerTenant !== hdrTenant) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }

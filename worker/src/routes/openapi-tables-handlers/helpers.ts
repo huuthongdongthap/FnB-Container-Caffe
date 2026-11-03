@@ -32,21 +32,22 @@ export async function isAllowedLocationForTenant(
   if (locationId === undefined || locationId === null || String(locationId).trim() === '') {
     return true;
   }
-  if (!tenantId || tenantId === '*') return true;
+  const cleanTenant = (tenantId || '').trim() || 'default';
+  if (!cleanTenant || cleanTenant === '*') return true;
   const locId = String(locationId).trim();
-  if (locId === tenantId) return true;
+  if (locId === cleanTenant) return true;
   try {
     const locRow = await db
       .prepare('SELECT tenant_id FROM locations WHERE id = ? LIMIT 1')
       .bind(locId)
       .first();
     if (locRow && locRow.tenant_id !== undefined && locRow.tenant_id !== null && String(locRow.tenant_id).trim() !== '') {
-      return String(locRow.tenant_id).trim() === tenantId;
+      return String(locRow.tenant_id).trim() === cleanTenant;
     }
   } catch {
     // Optional locations table
   }
-  if (tenantId !== 'default') {
+  if (cleanTenant !== 'default') {
     return false;
   }
   if (/^tenant[-_]/i.test(locId) && locId !== 'default') {
@@ -62,26 +63,42 @@ export async function writeTableAuditLog(
   entityType: string,
   entityId: string,
   metadata: string,
-  now: string
+  now: string,
+  tenantId: string = 'default'
 ): Promise<void> {
+  const effectiveTenant = !tenantId || tenantId === '*' ? 'default' : tenantId.trim() || 'default';
   try {
     await db.prepare(
-      `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
+      `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, effectiveTenant, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+          `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, effectiveTenant, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
+        } catch {
+          try {
+            await db.prepare(
+              `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+          } catch {
+            // Ignore audit log error
+          }
+        }
       }
     }
   }

@@ -105,9 +105,11 @@ export async function getFulfillment(
     return { ok: false, code: 'not_found', error: `order not found: ${orderId}` };
   }
 
-  if (tenantId && tenantId !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
+  const normTenant = tenantId !== undefined ? (String(tenantId).trim() || 'default') : undefined;
+  let resolvedOrderTenant: string | undefined;
+  if ('tenant_id' in row && row.tenant_id !== undefined) {
     let rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || '';
-    if (!rowTenant && row.customer_id) {
+    if (!rowTenant && row.customer_id && normTenant && normTenant !== '*') {
       const custRow = await db
         .prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1')
         .bind(row.customer_id)
@@ -117,8 +119,8 @@ export async function getFulfillment(
         rowTenant = String(custRow.tenant_id).trim();
       }
     }
-    const resolvedTenant = rowTenant || 'default';
-    if (resolvedTenant !== tenantId) {
+    resolvedOrderTenant = rowTenant || 'default';
+    if (normTenant && normTenant !== '*' && resolvedOrderTenant !== normTenant) {
       return { ok: false, code: 'forbidden', error: 'order belongs to another store' };
     }
   }
@@ -130,14 +132,17 @@ export async function getFulfillment(
 
   const channel = (row.channel === 'delivery' ? 'delivery' : 'pickup') as FulfillmentChannel;
   const isSettled = FULFILLMENT_SETTLED_STATUSES.has(row.status);
+  const effectiveQueueTenant = normTenant && normTenant !== '*'
+    ? normTenant
+    : resolvedOrderTenant;
 
   let queueDepth = 0;
   if (!isSettled) {
     try {
-      const q = await (tenantId && tenantId !== '*'
+      const q = await (effectiveQueueTenant && effectiveQueueTenant !== '*'
         ? db
             .prepare("SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)")
-            .bind('pending', row.created_at, tenantId)
+            .bind('pending', row.created_at, effectiveQueueTenant)
             .first<{ c: number }>()
             .catch(() =>
               db
@@ -162,7 +167,7 @@ export async function getFulfillment(
     : new Date(Date.now() + etaMinutes * 60_000).toISOString();
 
   // Pickup point is only relevant for active pickup orders.
-  const pickupPoint = !isSettled && channel === 'pickup' ? await resolvePickupPoint(kv) : null;
+  const pickupPoint = !isSettled && channel === 'pickup' ? await resolvePickupPoint(kv, effectiveQueueTenant) : null;
 
   return {
     ok: true,
@@ -178,10 +183,14 @@ export async function getFulfillment(
   };
 }
 
-async function resolvePickupPoint(kv?: KVNamespace): Promise<PickupPoint> {
+async function resolvePickupPoint(kv?: KVNamespace, tenantId?: string): Promise<PickupPoint> {
   if (!kv) return DEFAULT_PICKUP_POINT;
   try {
-    const raw = await kv.get('fulfillment:pickup_point');
+    const normTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    let raw = normTenant !== 'default' ? await kv.get(`fulfillment:pickup_point:${normTenant}`) : null;
+    if (!raw) {
+      raw = await kv.get('fulfillment:pickup_point');
+    }
     if (!raw) return DEFAULT_PICKUP_POINT;
     const parsed = JSON.parse(raw) as Partial<PickupPoint>;
     return {
@@ -199,8 +208,8 @@ async function resolvePickupPoint(kv?: KVNamespace): Promise<PickupPoint> {
  * Public pickup-point list — used by the ordering surface so the customer
  * can confirm where to collect before placing the order.
  */
-export async function listPickupPoints(kv?: KVNamespace): Promise<PickupPoint[]> {
-  const main = await resolvePickupPoint(kv);
+export async function listPickupPoints(kv?: KVNamespace, tenantId?: string): Promise<PickupPoint[]> {
+  const main = await resolvePickupPoint(kv, tenantId);
   // Single location for now — multi-point is additive via KV array later.
   return [main];
 }

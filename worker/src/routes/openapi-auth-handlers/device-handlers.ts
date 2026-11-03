@@ -104,8 +104,44 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const passwordHash = await hashPassword(body.newPassword);
     if (user.role !== 'customer') await changeStaffPassword(db, await requireStaffAccount(db, user.id), passwordHash);
-    else await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+    else {
+      try {
+        await db.prepare('UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+      } catch {
+        await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+      }
+    }
     await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run().catch(() => {});
+    if (c.env.AUTH_KV) {
+      let nextVersion = Number(user.authVersion || 1) + 1;
+      if (user.email) {
+        const rawUser = await c.env.AUTH_KV.get(`user:${user.email}`).catch(() => null);
+        if (rawUser) {
+          try {
+            const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+            const currentVer = Number(parsed.auth_version || 1);
+            nextVersion = Math.max(nextVersion, currentVer + 1);
+            parsed.auth_version = nextVersion;
+            parsed.password_hash = passwordHash;
+            parsed.password = passwordHash;
+            parsed.updated_at = now;
+            await c.env.AUTH_KV.put(`user:${user.email}`, JSON.stringify(parsed)).catch(() => {});
+          } catch {
+            // Ignore malformed KV entry
+          }
+        }
+      }
+      if (user.id) {
+        const rawCustVer = await c.env.AUTH_KV.get(`cust_auth_ver:${user.id}`).catch(() => null);
+        if (rawCustVer) {
+          const currentCustVer = Number(rawCustVer);
+          if (Number.isFinite(currentCustVer) && currentCustVer >= nextVersion) {
+            nextVersion = currentCustVer + 1;
+          }
+        }
+        await c.env.AUTH_KV.put(`cust_auth_ver:${user.id}`, String(nextVersion)).catch(() => {});
+      }
+    }
     const token = getAuthToken(c.req.raw);
     if (token && c.env.AUTH_KV) {
       await c.env.AUTH_KV.put('revoked:' + token, '1', { expirationTtl: 604800 }).catch(() => {});

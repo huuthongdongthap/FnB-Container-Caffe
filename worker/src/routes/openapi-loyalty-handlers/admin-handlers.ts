@@ -2,7 +2,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import {
   getLoyaltyAccountWithFallback,
   recordLoyaltyTransactionDualWrite,
@@ -12,19 +12,28 @@ import {
 
 const LOYALTY_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
+async function loadCustomerTenantMap(db: any): Promise<Map<string, Record<string, unknown>>> {
+  const map = new Map<string, Record<string, unknown>>();
+  try {
+    const res = (await db.prepare('SELECT * FROM customers LIMIT 1000').all()) as {
+      results?: Array<Record<string, unknown>>;
+    } | null;
+    for (const c of res?.results || []) {
+      if (c && c.id !== undefined && c.id !== null) {
+        map.set(String(c.id), c);
+      }
+    }
+  } catch {
+    // Ignore when batch customer lookup is unavailable in minimal mocks
   }
-  return tenantId === 'default';
+  return map;
 }
 
 async function accountBelongsToTenant(
   db: any,
   row: Record<string, unknown>,
-  tenantId: string
+  tenantId: string,
+  customerMap?: Map<string, Record<string, unknown>>
 ): Promise<boolean> {
   if (tenantId === '*') return true;
   const rawAccountTenant = 'tenant_id' in row && row.tenant_id !== undefined
@@ -33,14 +42,20 @@ async function accountBelongsToTenant(
   if (rawAccountTenant && rawAccountTenant !== 'default' && !matchesTenantRow(row, tenantId)) {
     return false;
   }
-  const custId = String(row.customer_id ?? row.id ?? '').replace(/^la_/, '');
+  const custId = String(row.customer_id ?? row.user_id ?? row.id ?? '').replace(/^la_/, '');
   if (custId) {
+    const cachedCust = customerMap?.get(custId);
+    if (cachedCust && 'tenant_id' in cachedCust && cachedCust.tenant_id !== undefined) {
+      return matchesTenantRow(cachedCust, tenantId);
+    }
+
     const custRow = (await db
       .prepare('SELECT * FROM customers WHERE id = ?')
       .bind(custId)
       .first()
       .catch(() => null)) as Record<string, unknown> | null;
     if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
+      customerMap?.set(custId, custRow);
       return matchesTenantRow(custRow, tenantId);
     }
 
@@ -115,14 +130,25 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
-    const newBalance = currentPoints + body.points;
-    if (newBalance < 0) {
+    const expectedBalance = currentPoints + body.points;
+    if (expectedBalance < 0) {
       return c.json({ success: false, error: 'Insufficient points for adjustment' }, 400);
     }
 
     const transactionId = crypto.randomUUID();
     const accountId = String(account.id);
     const customerId = String(account.customer_id ?? body.customerId);
+
+    const resolvedBalance = await syncLoyaltyAccountAndCustomerBalance(db, {
+      accountId,
+      customerId,
+      newBalance: expectedBalance,
+      pointsDelta: body.points,
+      lifetimeDelta: Math.max(0, body.points),
+      tenantId,
+      now,
+    });
+    const newBalance = typeof resolvedBalance === 'number' && Number.isFinite(resolvedBalance) ? resolvedBalance : expectedBalance;
 
     await recordLoyaltyTransactionDualWrite(db, {
       txId: transactionId,
@@ -135,14 +161,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       reason: body.reason,
       idempotencyKey: body.idempotencyKey ?? null,
       createdBy: user.id,
-      now,
-    });
-
-    await syncLoyaltyAccountAndCustomerBalance(db, {
-      accountId,
-      customerId,
-      newBalance,
-      lifetimeDelta: Math.max(0, body.points),
+      tenantId,
       now,
     });
 
@@ -203,23 +222,45 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let accountResults: any[] = [];
     try {
-      await db.prepare(
-        `INSERT OR IGNORE INTO loyalty_accounts (
-          id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
-        )
-        SELECT
-          'la_' || id,
-          id,
-          COALESCE(loyalty_points, 0),
-          COALESCE(lifetime_points, loyalty_points, 0),
-          COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
-          COALESCE(visit_count, 0),
-          COALESCE(total_spent, 0),
-          COALESCE(updated_at, created_at, datetime('now')),
-          COALESCE(created_at, datetime('now')),
-          COALESCE(updated_at, datetime('now'))
-        FROM customers`
-      ).run();
+      try {
+        await db.prepare(
+          `INSERT OR IGNORE INTO loyalty_accounts (
+            id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, tenant_id, created_at, updated_at
+          )
+          SELECT
+            'la_' || id,
+            id,
+            COALESCE(loyalty_points, 0),
+            COALESCE(lifetime_points, loyalty_points, 0),
+            COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+            COALESCE(visit_count, 0),
+            COALESCE(total_spent, 0),
+            COALESCE(updated_at, created_at, datetime('now')),
+            COALESCE(NULLIF(TRIM(tenant_id), ''), 'default'),
+            COALESCE(created_at, datetime('now')),
+            COALESCE(updated_at, datetime('now'))
+          FROM customers
+          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+        ).bind(tenantId, tenantId).run();
+      } catch {
+        await db.prepare(
+          `INSERT OR IGNORE INTO loyalty_accounts (
+            id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
+          )
+          SELECT
+            'la_' || id,
+            id,
+            COALESCE(loyalty_points, 0),
+            COALESCE(lifetime_points, loyalty_points, 0),
+            COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+            COALESCE(visit_count, 0),
+            COALESCE(total_spent, 0),
+            COALESCE(updated_at, created_at, datetime('now')),
+            COALESCE(created_at, datetime('now')),
+            COALESCE(updated_at, datetime('now'))
+          FROM customers`
+        ).run();
+      }
       if (tenantId === '*') {
         const accounts = (await db.prepare(
           `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -227,7 +268,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         accountResults = accounts.results || [];
       } else {
         const accounts = (await db.prepare(
-          `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC`
+          `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT 1000`
         ).bind(...params).all()) as { results: any[] };
         accountResults = accounts.results || [];
       }
@@ -250,16 +291,17 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         accountResults = accounts.results || [];
       } else {
         const accounts = (await db.prepare(
-          `SELECT *, id as customer_id, loyalty_points as current_points, loyalty_points as lifetime_points, loyalty_tier as tier, visit_count as order_count FROM customers ${canonicalWhere} ORDER BY created_at DESC`
+          `SELECT *, id as customer_id, loyalty_points as current_points, loyalty_points as lifetime_points, loyalty_tier as tier, visit_count as order_count FROM customers ${canonicalWhere} ORDER BY created_at DESC LIMIT 1000`
         ).bind(...canonicalParams).all().catch(() => ({ results: [] }))) as { results: any[] };
         accountResults = accounts.results || [];
       }
     }
 
     if (tenantId !== '*') {
+      const customerMap = await loadCustomerTenantMap(db);
       const filtered: any[] = [];
       for (const a of accountResults) {
-        if (await accountBelongsToTenant(db, a as Record<string, unknown>, tenantId)) {
+        if (await accountBelongsToTenant(db, a as Record<string, unknown>, tenantId, customerMap)) {
           filtered.push(a);
         }
       }
@@ -302,30 +344,52 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       let allAccounts: any[] = [];
       let scopedQuerySucceeded = false;
       try {
-        await db.prepare(
-          `INSERT OR IGNORE INTO loyalty_accounts (
-            id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
-          )
-          SELECT
-            'la_' || id,
-            id,
-            COALESCE(loyalty_points, 0),
-            COALESCE(lifetime_points, loyalty_points, 0),
-            COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
-            COALESCE(visit_count, 0),
-            COALESCE(total_spent, 0),
-            COALESCE(updated_at, created_at, datetime('now')),
-            COALESCE(created_at, datetime('now')),
-            COALESCE(updated_at, datetime('now'))
-          FROM customers`
-        ).run().catch(() => {});
-        const res = (await db.prepare('SELECT * FROM loyalty_accounts').all()) as { results?: any[] };
+        try {
+          await db.prepare(
+            `INSERT OR IGNORE INTO loyalty_accounts (
+              id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, tenant_id, created_at, updated_at
+            )
+            SELECT
+              'la_' || id,
+              id,
+              COALESCE(loyalty_points, 0),
+              COALESCE(lifetime_points, loyalty_points, 0),
+              COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+              COALESCE(visit_count, 0),
+              COALESCE(total_spent, 0),
+              COALESCE(updated_at, created_at, datetime('now')),
+              COALESCE(NULLIF(TRIM(tenant_id), ''), 'default'),
+              COALESCE(created_at, datetime('now')),
+              COALESCE(updated_at, datetime('now'))
+            FROM customers
+            WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+          ).bind(tenantId, tenantId).run();
+        } catch {
+          await db.prepare(
+            `INSERT OR IGNORE INTO loyalty_accounts (
+              id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
+            )
+            SELECT
+              'la_' || id,
+              id,
+              COALESCE(loyalty_points, 0),
+              COALESCE(lifetime_points, loyalty_points, 0),
+              COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+              COALESCE(visit_count, 0),
+              COALESCE(total_spent, 0),
+              COALESCE(updated_at, created_at, datetime('now')),
+              COALESCE(created_at, datetime('now')),
+              COALESCE(updated_at, datetime('now'))
+            FROM customers`
+          ).run().catch(() => {});
+        }
+        const res = (await db.prepare('SELECT * FROM loyalty_accounts LIMIT 1000').all()) as { results?: any[] };
         allAccounts = res?.results || [];
         scopedQuerySucceeded = true;
       } catch {
         const res = (await db
           .prepare(
-            'SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers'
+            'SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers LIMIT 1000'
           )
           .all()
           .catch(() => null)) as { results?: any[] } | null;
@@ -336,14 +400,16 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
 
       if (scopedQuerySucceeded || tenantId !== 'default') {
+        const customerMap = await loadCustomerTenantMap(db);
         const scopedAccounts: any[] = [];
         const scopedAccountIds = new Set<string>();
         const scopedCustomerIds = new Set<string>();
         for (const a of allAccounts) {
-          if (await accountBelongsToTenant(db, a as Record<string, unknown>, tenantId)) {
+          if (await accountBelongsToTenant(db, a as Record<string, unknown>, tenantId, customerMap)) {
             scopedAccounts.push(a);
             if (a.id !== undefined && a.id !== null) scopedAccountIds.add(String(a.id));
             if (a.customer_id !== undefined && a.customer_id !== null) scopedCustomerIds.add(String(a.customer_id));
+            if (a.user_id !== undefined && a.user_id !== null) scopedCustomerIds.add(String(a.user_id));
           }
         }
 
@@ -370,7 +436,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         }
 
         const allTxsRes = (await db
-          .prepare('SELECT * FROM loyalty_transactions')
+          .prepare('SELECT * FROM loyalty_transactions ORDER BY created_at DESC LIMIT 1000')
           .all()
           .catch(() => ({ results: [] }))) as { results?: any[] };
         let totalIssued = 0;
@@ -378,12 +444,14 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         let totalExpired = 0;
         for (const tx of allTxsRes?.results || []) {
           const accId = tx.account_id !== undefined && tx.account_id !== null ? String(tx.account_id) : '';
-          const custId = tx.customer_id !== undefined && tx.customer_id !== null ? String(tx.customer_id) : '';
+          const custId = tx.customer_id !== undefined && tx.customer_id !== null
+            ? String(tx.customer_id)
+            : (tx.user_id !== undefined && tx.user_id !== null ? String(tx.user_id) : '');
           let belongs = false;
           if ((accId && scopedAccountIds.has(accId)) || (custId && scopedCustomerIds.has(custId))) {
             belongs = true;
           } else if (custId || accId) {
-            belongs = await accountBelongsToTenant(db, { customer_id: custId || accId }, tenantId);
+            belongs = await accountBelongsToTenant(db, { customer_id: custId || accId }, tenantId, customerMap);
           }
           if (!belongs) continue;
           const pts = Number(tx.points || 0);

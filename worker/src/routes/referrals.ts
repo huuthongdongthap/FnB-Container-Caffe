@@ -5,9 +5,11 @@
  */
 
 import { Hono } from 'hono';
+import { matchesTenantRow } from '../lib/db';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { referralApplySchema } from '../lib/validators';
 import { authCustomer } from '../tree/loyalty/auth-middleware';
+import { rateLimitMiddleware, REFERRAL_CODE_RATE_LIMIT } from '../middleware/rate-limit';
 import type { Env } from '../types/env';
 import type { Customer, ReferralCode } from '../types/models';
 
@@ -19,8 +21,12 @@ function getTenantId(c: {
   get: (k: string) => unknown;
 }): string {
   const cust = c.get('customer') as { tenant_id?: string | null } | undefined;
-  if (cust?.tenant_id && String(cust.tenant_id).trim()) return String(cust.tenant_id).trim();
   const user = c.get('user') as { tenantId?: string } | undefined;
+  if (cust) {
+    if (cust.tenant_id && String(cust.tenant_id).trim()) return String(cust.tenant_id).trim();
+    if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
+    return 'default';
+  }
   if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
   const hdr = c.req?.header?.('X-Tenant-ID');
   if (hdr && hdr.trim()) return hdr.trim();
@@ -29,17 +35,6 @@ function getTenantId(c: {
   } catch {
     return 'default';
   }
-}
-
-function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (!row || typeof row !== 'object') return false;
-  if (tenantId === '*') return true;
-  const r = row as Record<string, unknown>;
-  if (r.tenant_id === undefined) {
-    return tenantId === 'default';
-  }
-  const rowTenant = typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default';
-  return rowTenant === tenantId;
 }
 
 function maskPhone(phone: unknown): string | null {
@@ -69,11 +64,18 @@ function genReferralCode(length = 6): string {
 
 referralRouter.use('/*', authCustomer);
 
-referralRouter.get('/code', async(c) => {
+referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
 
   let rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>();
+  if (rc && 'tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
+    const scopedRc = tenantId && tenantId !== '*'
+      ? await db.prepare("SELECT * FROM referral_codes WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?").bind(cust.id, tenantId).first<ReferralCode>().catch(() => null)
+      : null;
+    rc = scopedRc && matchesTenantRow(scopedRc as unknown as Record<string, unknown>, tenantId) ? scopedRc : null;
+  }
 
   if (!rc) {
     let code: string, attempts = 0;
@@ -87,11 +89,13 @@ referralRouter.get('/code', async(c) => {
     } while (attempts < 5);
 
     let codeId = genId('refc_');
+    let finalCodeId = codeId;
     const now = new Date().toISOString();
     let inserted = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await db.prepare('INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)').bind(attempt === 0 ? codeId : codeId + attempt, cust.id, code, now).run();
+        finalCodeId = attempt === 0 ? codeId : codeId + attempt;
+        await db.prepare('INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)').bind(finalCodeId, cust.id, code, now).run();
         inserted = true;
         break;
       } catch (e) {
@@ -105,7 +109,10 @@ referralRouter.get('/code', async(c) => {
     if (!inserted) {
       return c.json({ success: false, error: 'Không thể tạo mã giới thiệu. Vui lòng thử lại sau.' }, 500);
     }
-    rc = { id: codeId, customer_id: cust.id, code, times_used: 0, total_points_earned: 0, created_at: now };
+    if (tenantId && tenantId !== '*') {
+      await db.prepare('UPDATE referral_codes SET tenant_id = ? WHERE id = ?').bind(tenantId, finalCodeId).run().catch(() => {});
+    }
+    rc = { id: finalCodeId, customer_id: cust.id, code, times_used: 0, total_points_earned: 0, created_at: now };
   }
 
   return c.json({
@@ -138,8 +145,15 @@ referralRouter.post('/apply', async(c) => {
   if (rc.customer_id === cust.id) {
     return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
   }
+  const maxUses = (rc as unknown as { max_uses?: number | null }).max_uses;
+  if (typeof maxUses === 'number' && maxUses > 0 && Number(rc.times_used ?? 0) >= maxUses) {
+    return c.json({ success: false, error: 'Mã giới thiệu đã hết lượt sử dụng' }, 409);
+  }
 
   const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
+  if ('tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
+    return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
+  }
   let referrer: { id: string; tenant_id?: string | null } | null = null;
   try {
     referrer = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(rc.customer_id).first<{ id: string; tenant_id?: string | null }>();
@@ -150,7 +164,15 @@ referralRouter.post('/apply', async(c) => {
     return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
   }
 
-  const existing = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string }>();
+  let existing: { id: string; tenant_id?: string | null } | null = null;
+  try {
+    existing = await db.prepare('SELECT id, tenant_id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string; tenant_id?: string | null }>();
+  } catch {
+    existing = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string }>();
+  }
+  if (existing && 'tenant_id' in existing && existing.tenant_id !== undefined && !matchesTenantRow(existing, tenantId)) {
+    existing = null;
+  }
   if (existing) {
     return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
   }
@@ -183,8 +205,23 @@ referralRouter.post('/apply', async(c) => {
        VALUES (?, ?, ?, ?, 0, 'pending', ?)`
     ).bind(refId, referrer.id, cust.id, normalized, now).run();
   }
+  if (tenantId && tenantId !== '*') {
+    await db.prepare('UPDATE referrals SET tenant_id = ? WHERE id = ?').bind(tenantId, refId).run().catch(() => {});
+  }
 
-  await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();
+  try {
+    const usageRes = await db
+      .prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ? AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(times_used, 0) < max_uses)')
+      .bind(rc.id)
+      .run();
+    const changes = Number((usageRes as unknown as { meta?: { changes?: number } })?.meta?.changes ?? 1);
+    if (changes === 0) {
+      await db.prepare('DELETE FROM referrals WHERE id = ?').bind(refId).run().catch(() => {});
+      return c.json({ success: false, error: 'Mã giới thiệu đã hết lượt sử dụng' }, 409);
+    }
+  } catch {
+    await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();
+  }
 
   return c.json({
     success: true,
@@ -199,28 +236,76 @@ referralRouter.post('/apply', async(c) => {
 referralRouter.get('/stats', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
+  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
 
-  const rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>();
+  let rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>();
+  if (rc && 'tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
+    const scopedRc = tenantId && tenantId !== '*'
+      ? await db.prepare("SELECT * FROM referral_codes WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?").bind(cust.id, tenantId).first<ReferralCode>().catch(() => null)
+      : null;
+    rc = scopedRc && matchesTenantRow(scopedRc as unknown as Record<string, unknown>, tenantId) ? scopedRc : null;
+  }
 
-  const { results: refCount } = await db.prepare('SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id = ?').bind(cust.id).all<{ cnt: number }>();
+  let refCount: { cnt: number }[] = [];
+  if (tenantId && tenantId !== '*') {
+    try {
+      const res = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(cust.id, tenantId).all<{ cnt: number }>();
+      refCount = res.results || [];
+    } catch {
+      const res = await db.prepare('SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id = ?').bind(cust.id).all<{ cnt: number }>();
+      refCount = res.results || [];
+    }
+  } else {
+    const res = await db.prepare('SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id = ?').bind(cust.id).all<{ cnt: number }>();
+    refCount = res.results || [];
+  }
 
-  const { results: recentRefs } = await db.prepare(
+  const { results: rawRecentRefs } = await db.prepare(
     `SELECT r.*, c.name as referred_name, c.phone as referred_phone
      FROM referrals r LEFT JOIN customers c ON r.referred_customer_id = c.id
      WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 20`
   ).bind(cust.id).all();
+  const recentRefs = ((rawRecentRefs || []) as Record<string, unknown>[]).filter((row) => {
+    if ('tenant_id' in row && row.tenant_id !== undefined) {
+      return matchesTenantRow(row, tenantId);
+    }
+    return true;
+  });
 
   let cashbackEarned: { total: number }[] = [];
-  try {
-    const res = await db.prepare(
-      'SELECT COALESCE(SUM(cashback_awarded_vnd), 0) as total FROM referrals WHERE referrer_id = ? AND status = ?'
-    ).bind(cust.id, 'completed').all<{ total: number }>();
-    cashbackEarned = res.results || [];
-  } catch {
-    const res = await db.prepare(
-      'SELECT COUNT(*) * 10000 as total FROM referrals WHERE referrer_id = ? AND status = ?'
-    ).bind(cust.id, 'completed').all<{ total: number }>().catch(() => ({ results: [{ total: 0 }] }));
-    cashbackEarned = res.results || [];
+  if (tenantId && tenantId !== '*') {
+    try {
+      const res = await db.prepare(
+        "SELECT COALESCE(SUM(cashback_awarded_vnd), 0) as total FROM referrals WHERE referrer_id = ? AND status = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(cust.id, 'completed', tenantId).all<{ total: number }>();
+      cashbackEarned = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          'SELECT COALESCE(SUM(cashback_awarded_vnd), 0) as total FROM referrals WHERE referrer_id = ? AND status = ?'
+        ).bind(cust.id, 'completed').all<{ total: number }>();
+        cashbackEarned = res.results || [];
+      } catch {
+        const res = await db.prepare(
+          'SELECT COUNT(*) * 10000 as total FROM referrals WHERE referrer_id = ? AND status = ?'
+        ).bind(cust.id, 'completed').all<{ total: number }>().catch(() => ({ results: [{ total: 0 }] }));
+        cashbackEarned = res.results || [];
+      }
+    }
+  } else {
+    try {
+      const res = await db.prepare(
+        'SELECT COALESCE(SUM(cashback_awarded_vnd), 0) as total FROM referrals WHERE referrer_id = ? AND status = ?'
+      ).bind(cust.id, 'completed').all<{ total: number }>();
+      cashbackEarned = res.results || [];
+    } catch {
+      const res = await db.prepare(
+        'SELECT COUNT(*) * 10000 as total FROM referrals WHERE referrer_id = ? AND status = ?'
+      ).bind(cust.id, 'completed').all<{ total: number }>().catch(() => ({ results: [{ total: 0 }] }));
+      cashbackEarned = res.results || [];
+    }
   }
 
   return c.json({
@@ -231,9 +316,13 @@ referralRouter.get('/stats', async(c) => {
       total_cashback_earned_vnd: cashbackEarned[0]?.total || 0,
       total_points_earned_legacy: rc?.total_points_earned || 0,
       code_usage: rc?.times_used || 0,
-      recent_referrals: ((recentRefs || []) as Record<string, unknown>[]).map((row) => ({
-        ...row,
-        referred_phone: maskPhone(row.referred_phone)
+      recent_referrals: recentRefs.map((row: Record<string, unknown>) => ({
+        referred_name: row.referred_name,
+        referred_phone: maskPhone(String(row.referred_phone || '')),
+        status: row.status,
+        created_at: row.created_at,
+        cashback_awarded_vnd: row.cashback_awarded_vnd,
+        points_awarded: row.points_awarded,
       }))
     }
   });

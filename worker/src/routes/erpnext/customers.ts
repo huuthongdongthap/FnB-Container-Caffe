@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
-import { createErpnextClient } from '../../clients/erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv } from '../../clients/erpnext-client';
 import type { Env } from '../../types/env';
 
 const CustomerSyncSchema = z.object({
@@ -42,12 +42,12 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
         if (tenantId !== '*') {
           const res = await db
             .prepare(
-              "SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, tenant_id, created_at, updated_at FROM customers WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
+              "SELECT id, name, phone, email, tax_id, erpnext_id, sync_status, tenant_id, created_at, updated_at FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
             )
             .bind(tenantId, limit, offset)
             .all<Record<string, unknown>>();
           results = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
-          const countRes = await db.prepare("SELECT COUNT(*) as total FROM customers WHERE COALESCE(NULLIF(tenant_id, ''), 'default') = ?").bind(tenantId).first<{ total: number }>();
+          const countRes = await db.prepare("SELECT COUNT(*) as total FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?").bind(tenantId).first<{ total: number }>();
           total = Number(countRes?.total ?? results.length);
         } else {
           const res = await db
@@ -101,7 +101,10 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
         });
       }
 
-      const client = createErpnextClient(c.env);
+      const client =
+        (c.env.AUTH_KV && typeof createErpnextClientWithKv === 'function'
+          ? await createErpnextClientWithKv(c.env, tenantId)
+          : null) ?? createErpnextClient(c.env);
       if (!client) {
         return c.json({ success: false, error: 'ERPNext not configured' }, 503);
       }
@@ -112,7 +115,7 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
       if (db && data.name) {
         const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
         const updatePromise = db
-          .prepare("UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+          .prepare("UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
           .bind((result.data as Record<string, string>)?.name || null, 'synced', data.name, effectiveTenant)
           .run()
           .catch(() =>

@@ -12,14 +12,16 @@ export { resolveTenantId as getTenantId };
  * Checks whether a database row belongs to the active tenant context.
  * Rows without a `tenant_id` column (legacy/minimal test schemas) match `'default'` or `'*'`.
  */
-export function matchesTenantRow(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
-  if (!row) return false;
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
+export function matchesTenantRow(row: unknown, tenantId: string): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const normalizedTenant = (tenantId && String(tenantId).trim()) || 'default';
+  if (normalizedTenant === '*') return true;
+  const r = row as Record<string, unknown>;
+  if ('tenant_id' in r && r.tenant_id !== undefined) {
+    const rowTenant = (r.tenant_id && String(r.tenant_id).trim()) || 'default';
+    return rowTenant === normalizedTenant;
   }
-  return tenantId === 'default';
+  return normalizedTenant === 'default';
 }
 
 export interface QueryResult<T = unknown> {

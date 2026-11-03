@@ -17,6 +17,7 @@ import { writeCanonicalAuditLog, type AuditActor } from '@aura/domain-audit';
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import type { D1Database } from '@cloudflare/workers-types';
+import { getTenantId } from '../../middleware/tenant';
 
 /** What a checklist action did, named so the register reads as a sentence. */
 export type SopRunAction = 'sop_run.started' | 'sop_run.item_checked' | 'sop_run.completed' | 'sop_run.abandoned';
@@ -34,18 +35,28 @@ export type SopViolationAction =
 
 export type SopAuditAction = SopRunAction | SopTemplateAction | SopViolationAction;
 
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 /**
  * The session cast into the shape the shared audit writer expects. Both SOP
  * surfaces build the actor the same way, so this lives here rather than being
  * written twice.
  */
 export function auditActor(c: Context<{ Bindings: Env }>): AuditActor {
-  const user = c.get('user') as { id: string; name?: string; role?: string; tenantId?: string } | undefined;
+  const user = c.get('user') as { id: string; name?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const resolvedTenant =
+    nonEmptyString(user?.tenantId) ??
+    nonEmptyString(user?.tenant_id) ??
+    nonEmptyString((c.env as unknown as Record<string, unknown> | undefined)?.SOP_TENANT_ID) ??
+    nonEmptyString(getTenantId(c)) ??
+    'default';
   return {
     id: String(user?.id ?? ''),
     name: user?.name ?? user?.id ?? '',
     role: String(user?.role ?? 'staff'),
-    tenantId: user?.tenantId,
+    tenantId: resolvedTenant,
     operatingUnitId: undefined,
   };
 }
@@ -64,7 +75,11 @@ interface AuditInput {
  * must not be able to fail the request that preceded it.
  */
 export async function auditSopAction(input: AuditInput): Promise<void> {
-  const resourceType = input.action.startsWith('sop_violation') ? 'sop_violation' : 'sop_run';
+  const resourceType = input.action.startsWith('sop_template')
+    ? 'sop_template'
+    : input.action.startsWith('sop_violation')
+      ? 'sop_violation'
+      : 'sop_run';
   try {
     await writeCanonicalAuditLog(input.db, {
       actor: input.actor,

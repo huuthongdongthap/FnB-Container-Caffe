@@ -26,6 +26,7 @@ export interface IdentifyCustomerInput {
   zalo?: string | null;
   verifiedAt?: string;          // ISO — defaults to now
   source: 'checkout' | 'signup' | 'setting' | 'staff';
+  tenantId?: string;
 }
 
 export interface IdentifiedIdentity {
@@ -41,19 +42,31 @@ export async function appendCustomerIdentifiedEvent(
   db: D1Database,
   customerId: string,
   identity: IdentifiedIdentity,
-  source: string
+  source: string,
+  tenantId?: string
 ): Promise<void> {
+  const effectiveTenant = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
+  const eventId = genCustomerId('cev_');
+  const now = nowIso();
+  const payload = JSON.stringify({
+    identifier_type: identity.identifier_type,
+    identifier_value: identity.identifier_value,
+    source,
+    ...(effectiveTenant !== 'default' && effectiveTenant !== '*' ? { tenant_id: effectiveTenant } : {}),
+  });
+  if (effectiveTenant !== '*') {
+    try {
+      await db.prepare(
+        'INSERT INTO customer_events (id, customer_id, event_type, payload, tenant_id, recorded_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(eventId, customerId, 'CustomerIdentified', payload, effectiveTenant, now).run();
+      return;
+    } catch {
+      // fallback to legacy schema without tenant_id
+    }
+  }
   await db.prepare(
     'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
-  ).bind(
-    genCustomerId('cev_'), customerId, 'CustomerIdentified',
-    JSON.stringify({
-      identifier_type: identity.identifier_type,
-      identifier_value: identity.identifier_value,
-      source
-    }),
-    nowIso()
-  ).run();
+  ).bind(eventId, customerId, 'CustomerIdentified', payload, now).run();
 }
 
 /**
@@ -67,18 +80,60 @@ export async function identifyCustomer(
   if (!classified) return null;
 
   const { db, customerId } = input;
+  const effectiveTenant = input.tenantId && input.tenantId.trim()
+    ? input.tenantId.trim()
+    : 'default';
   try {
-    const existing = await db.prepare(
-      'SELECT id, is_primary FROM customer_identities WHERE customer_id = ? AND identifier_type = ? AND identifier_value = ? LIMIT 1'
-    ).bind(customerId, classified.type, classified.value)
-      .first<{ id: string; is_primary: number }>();
+    let existing: { id: string; is_primary: number } | null = null;
+    if (effectiveTenant !== '*') {
+      try {
+        existing = await db.prepare(
+          "SELECT id, is_primary FROM customer_identities WHERE customer_id = ? AND identifier_type = ? AND identifier_value = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(customerId, classified.type, classified.value, effectiveTenant)
+          .first<{ id: string; is_primary: number }>();
+      } catch {
+        // Fallback below
+      }
+      if (!existing && !input.tenantId) {
+        const fallback = await db.prepare(
+          'SELECT id, is_primary FROM customer_identities WHERE customer_id = ? AND identifier_type = ? AND identifier_value = ? LIMIT 1'
+        ).bind(customerId, classified.type, classified.value)
+          .first<{ id: string; is_primary: number; tenant_id?: string | null }>();
+        if (
+          fallback &&
+          (!('tenant_id' in fallback) ||
+            fallback.tenant_id == null ||
+            String(fallback.tenant_id).trim() === '' ||
+            String(fallback.tenant_id).trim() === effectiveTenant)
+        ) {
+          existing = fallback;
+        }
+      }
+    } else {
+      existing = await db.prepare(
+        'SELECT id, is_primary FROM customer_identities WHERE customer_id = ? AND identifier_type = ? AND identifier_value = ? LIMIT 1'
+      ).bind(customerId, classified.type, classified.value)
+        .first<{ id: string; is_primary: number }>();
+    }
 
     if (existing) {
       // Refresh verification timestamp only — never demote a primary.
       if (input.verifiedAt) {
-        await db.prepare(
-          'UPDATE customer_identities SET verified_at = ? WHERE id = ?'
-        ).bind(input.verifiedAt, existing.id).run();
+        if (effectiveTenant !== '*') {
+          try {
+            await db.prepare(
+              "UPDATE customer_identities SET verified_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(input.verifiedAt, existing.id, effectiveTenant).run();
+          } catch {
+            await db.prepare(
+              'UPDATE customer_identities SET verified_at = ? WHERE id = ?'
+            ).bind(input.verifiedAt, existing.id).run();
+          }
+        } else {
+          await db.prepare(
+            'UPDATE customer_identities SET verified_at = ? WHERE id = ?'
+          ).bind(input.verifiedAt, existing.id).run();
+        }
       }
       return {
         id: existing.id,
@@ -90,18 +145,62 @@ export async function identifyCustomer(
     }
 
     // First identifier for this customer becomes primary.
-    const anyRow = await db.prepare(
-      'SELECT id FROM customer_identities WHERE customer_id = ? LIMIT 1'
-    ).bind(customerId).first<{ id: string }>();
+    let anyRow: { id: string } | null = null;
+    if (effectiveTenant !== '*') {
+      try {
+        anyRow = await db.prepare(
+          "SELECT id FROM customer_identities WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(customerId, effectiveTenant).first<{ id: string }>();
+      } catch {
+        // Fallback below
+      }
+      if (!anyRow && !input.tenantId) {
+        const fallback = await db.prepare(
+          'SELECT id FROM customer_identities WHERE customer_id = ? LIMIT 1'
+        ).bind(customerId).first<{ id: string; tenant_id?: string | null }>();
+        if (
+          fallback &&
+          (!('tenant_id' in fallback) ||
+            fallback.tenant_id == null ||
+            String(fallback.tenant_id).trim() === '' ||
+            String(fallback.tenant_id).trim() === effectiveTenant)
+        ) {
+          anyRow = fallback;
+        }
+      }
+    } else {
+      anyRow = await db.prepare(
+        'SELECT id FROM customer_identities WHERE customer_id = ? LIMIT 1'
+      ).bind(customerId).first<{ id: string }>();
+    }
     const isPrimary = anyRow ? 0 : 1;
 
     const id = genCustomerId('cid_');
-    await db.prepare(
-      'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(
-      id, customerId, classified.type, classified.value, isPrimary,
-      input.verifiedAt ?? null, nowIso()
-    ).run();
+    const createdNow = nowIso();
+    if (effectiveTenant !== '*') {
+      try {
+        await db.prepare(
+          'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(
+          id, customerId, classified.type, classified.value, isPrimary,
+          input.verifiedAt ?? null, effectiveTenant, createdNow
+        ).run();
+      } catch {
+        await db.prepare(
+          'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        ).bind(
+          id, customerId, classified.type, classified.value, isPrimary,
+          input.verifiedAt ?? null, createdNow
+        ).run();
+      }
+    } else {
+      await db.prepare(
+        'INSERT INTO customer_identities (id, customer_id, identifier_type, identifier_value, is_primary, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        id, customerId, classified.type, classified.value, isPrimary,
+        input.verifiedAt ?? null, createdNow
+      ).run();
+    }
 
     const identity: IdentifiedIdentity = {
       id,
@@ -110,7 +209,7 @@ export async function identifyCustomer(
       is_primary: isPrimary,
       created: true
     };
-    await appendCustomerIdentifiedEvent(db, customerId, identity, input.source);
+    await appendCustomerIdentifiedEvent(db, customerId, identity, input.source, effectiveTenant);
     return identity;
   } catch (err) {
     // Capture must never break the caller's flow (live-checkout law).

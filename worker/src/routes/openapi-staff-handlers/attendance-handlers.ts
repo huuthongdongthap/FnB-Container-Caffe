@@ -9,7 +9,7 @@ import { attendanceDto } from '../../../../packages/domain/shift/model/shift-typ
 export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(StaffRoutes.attendance.checkIn as any, async (c: any) => {
     const scope = await shiftScope(c.env, c.get('user')), body = c.req.valid('json');
-    if (body.locationId && body.locationId !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
+    if (body.locationId && String(body.locationId).trim() !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
     const scheduled = body.shiftId ? await getShift(scope, body.shiftId) : undefined;
     const row = await clockIn(scope, body.staffId || scheduled?.staff_id, body.notes, body.shiftId);
     return c.json({ success: true, data: attendanceDto(row) }, 201);
@@ -17,12 +17,15 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
   app.openapi(StaffRoutes.attendance.checkOut as any, async (c: any) => {
     const scope = await shiftScope(c.env, c.get('user')), body = c.req.valid('json');
     const existing = body.attendanceId ? await getShift(scope, body.attendanceId) : undefined;
+    if (existing && body.staffId && String(body.staffId).trim() !== existing.staff_id) {
+      throw new ShiftContractError('Attendance record does not match staff member', 409);
+    }
     const row = await clockOut(scope, body.staffId || existing?.staff_id, body.attendanceId, body.notes);
     return c.json({ success: true, data: attendanceDto(row) });
   });
   app.openapi(StaffRoutes.attendance.list as any, async (c: any) => {
     const scope = await shiftScope(c.env, c.get('user')), query = c.req.valid('query');
-    if (query.locationId && query.locationId !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
+    if (query.locationId && String(query.locationId).trim() !== scope.tenantId) throw new ShiftContractError('Location does not match store', 403);
     const { rows, meta } = await listShifts(scope, { ...query, from: query.dateFrom, to: query.dateTo, attendanceOnly: true });
     return c.json({ success: true, data: { attendance: rows.map(attendanceDto), meta } });
   });

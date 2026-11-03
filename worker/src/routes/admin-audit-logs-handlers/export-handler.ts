@@ -9,9 +9,15 @@ import { filterAuditRowsByTenant } from './query-handler';
 
 const log = createLogger({ route: 'admin-audit-logs:export' });
 
+const AUDIT_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
 export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs/export — export audit logs as CSV with filters
   router.get('/export', async (c) => {
+    const user = c.get('user' as never) as { role?: string } | undefined;
+    if (user?.role && !AUDIT_EXPORT_ALLOWED_ROLES.includes(String(user.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     try {
       let execCtx: any;
       try { execCtx = c.executionCtx; } catch { execCtx = undefined; }

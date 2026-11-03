@@ -62,6 +62,19 @@ export interface BuildOptions {
 
 const MS_PER_DAY = 86_400_000;
 
+export const CUSTOM_SEGMENTS_KV_KEY = 'crm:segments';
+export const BAND_POLICY_KV_KEY = 'crm:band_policy';
+
+export function getSegmentsKvKey(tenantId?: string): string {
+  const clean = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
+  return clean === 'default' || clean === '*' ? CUSTOM_SEGMENTS_KV_KEY : `${CUSTOM_SEGMENTS_KV_KEY}:${clean}`;
+}
+
+export function getBandPolicyKvKey(tenantId?: string): string {
+  const clean = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
+  return clean === 'default' || clean === '*' ? BAND_POLICY_KV_KEY : `${BAND_POLICY_KV_KEY}:${clean}`;
+}
+
 export const DEFAULT_SEGMENTS: SegmentDefinition[] = [
   {
     key: 'new_first_week',
@@ -103,10 +116,12 @@ export const DEFAULT_SEGMENTS: SegmentDefinition[] = [
  */
 export async function loadSegmentDefinitions(
   kv?: KVNamespace,
+  tenantId?: string,
 ): Promise<SegmentDefinition[]> {
   if (!kv) return DEFAULT_SEGMENTS;
   try {
-    const raw = await kv.get('crm:segments');
+    const tenantKey = getSegmentsKvKey(tenantId);
+    const raw = (await kv.get(tenantKey)) ?? (tenantKey !== CUSTOM_SEGMENTS_KV_KEY ? await kv.get(CUSTOM_SEGMENTS_KV_KEY) : null);
     if (!raw) return DEFAULT_SEGMENTS;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_SEGMENTS;
@@ -139,7 +154,7 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
   try {
     const hasTenantFilter = Boolean(tenantId && tenantId !== '*');
     const whereClause = hasTenantFilter
-      ? "WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?"
+      ? "WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?1"
       : '';
     try {
       const stmt = db.prepare(
@@ -153,7 +168,8 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
           AND o.status != 'cancelled'
           AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')
          ${whereClause}
-         GROUP BY c.id`,
+         GROUP BY c.id
+         LIMIT 1000`,
       );
       const bound = hasTenantFilter && typeof stmt.bind === 'function' ? stmt.bind(tenantId!) : stmt;
       const { results } = await bound.all<{
@@ -184,7 +200,8 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
                ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone))
               AND o.status != 'cancelled'
              WHERE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
-             GROUP BY c.id`,
+             GROUP BY c.id
+             LIMIT 1000`,
           );
           const bound = typeof stmt.bind === 'function' ? stmt.bind(tenantId!) : stmt;
           const { results } = await bound.all<{
@@ -212,7 +229,8 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
                   COUNT(o.id) as order_count
            FROM customers c
            LEFT JOIN orders o ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled'
-           GROUP BY c.id`,
+           GROUP BY c.id
+           LIMIT 1000`,
         )
         .all<{
           id: string;
@@ -266,6 +284,32 @@ function classify(
   );
 }
 
+function matchesSegmentKey(
+  key: SegmentKey,
+  row: { lifetime_points: number },
+  band: string,
+  daysSinceFirst: number,
+  highValueThresholdVnd?: number,
+): boolean {
+  switch (key) {
+    case 'new_first_week':
+      return daysSinceFirst <= 7;
+    case 'regular':
+      return band === 'regular' || band === 'resurrected';
+    case 'regular_high_value':
+      return (
+        (band === 'regular' || band === 'resurrected') &&
+        row.lifetime_points * 10000 >= (highValueThresholdVnd ?? 1_000_000)
+      );
+    case 'lapsing_30d':
+      return band === 'lapsing';
+    case 'dormant_60d':
+      return band === 'dormant';
+    default:
+      return false;
+  }
+}
+
 /**
  * Build a segment: count + paginated member list. `key` must match a
  * loaded definition.
@@ -277,7 +321,7 @@ export async function buildSegment(
   options: BuildOptions = {},
   now: Date = new Date(),
 ): Promise<SegmentResult> {
-  const definitions = await loadSegmentDefinitions(kv);
+  const definitions = await loadSegmentDefinitions(kv, options.tenantId);
   const def = definitions.find((d) => d.key === key);
   if (!def) {
     return {
@@ -303,30 +347,7 @@ export async function buildSegment(
       ? (now.getTime() - new Date(row.first_order_at).getTime()) / MS_PER_DAY
       : daysSinceLast;
 
-    let inSegment = false;
-    switch (key) {
-      case 'new_first_week':
-        inSegment = daysSinceFirst <= 7;
-        break;
-      case 'regular':
-        inSegment = band === 'regular' || band === 'resurrected';
-        break;
-      case 'regular_high_value':
-        inSegment =
-          (band === 'regular' || band === 'resurrected') &&
-          (row.lifetime_points * 10000) >= (def.highValueThresholdVnd ?? 1_000_000);
-        break;
-      case 'lapsing_30d':
-        inSegment = band === 'lapsing';
-        break;
-      case 'dormant_60d':
-        inSegment = band === 'dormant';
-        break;
-      default:
-        inSegment = false;
-    }
-
-    if (inSegment) {
+    if (matchesSegmentKey(key, row, band, daysSinceFirst, def.highValueThresholdVnd)) {
       matched.push({
         id: row.id,
         name: row.name,
@@ -355,8 +376,8 @@ export async function buildSegment(
 }
 
 /**
- * List all segment definitions with their counts (no member list).
- * Useful for the segment dashboard overview.
+ * List all segment definitions with their counts and bounded customer samples
+ * evaluated in a single customer scan pass.
  */
 export async function listSegments(
   db: D1Database,
@@ -364,11 +385,47 @@ export async function listSegments(
   now: Date = new Date(),
   options: BuildOptions = {},
 ): Promise<Array<SegmentResult>> {
-  const definitions = await loadSegmentDefinitions(kv);
-  const results: SegmentResult[] = [];
-  for (const def of definitions) {
-    const full = await buildSegment(db, def.key, kv, { ...options, limit: 0 }, now);
-    results.push(full);
+  const definitions = await loadSegmentDefinitions(kv, options.tenantId);
+  const policy = await resolveBandPolicy(kv);
+  const all = await scanCustomers(db, options.tenantId);
+  const sampleLimit = options.limit ?? 25;
+
+  const results: SegmentResult[] = definitions.map((def) => ({
+    key: def.key,
+    labelVi: def.labelVi,
+    labelEn: def.labelEn,
+    description: def.description,
+    count: 0,
+    customers: [],
+  }));
+
+  for (const row of all) {
+    const band = classify(row, policy, now);
+    const daysSinceLast = row.last_order_at
+      ? (now.getTime() - new Date(row.last_order_at).getTime()) / MS_PER_DAY
+      : Infinity;
+    const daysSinceFirst = row.first_order_at
+      ? (now.getTime() - new Date(row.first_order_at).getTime()) / MS_PER_DAY
+      : daysSinceLast;
+
+    for (let i = 0; i < definitions.length; i++) {
+      const def = definitions[i];
+      if (matchesSegmentKey(def.key, row, band, daysSinceFirst, def.highValueThresholdVnd)) {
+        results[i].count += 1;
+        if (sampleLimit === 0 || results[i].customers.length < sampleLimit) {
+          results[i].customers.push({
+            id: row.id,
+            name: row.name,
+            phone: row.phone,
+            tier: row.tier,
+            lifetimePoints: row.lifetime_points,
+            lastOrderAt: row.last_order_at,
+            band,
+          });
+        }
+      }
+    }
   }
+
   return results;
 }

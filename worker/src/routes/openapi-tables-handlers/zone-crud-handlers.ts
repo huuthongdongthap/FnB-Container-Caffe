@@ -3,16 +3,7 @@ import type { Env } from '../../types/env';
 import { TableZoneRoutes } from '../../schemas/tables';
 import { formatZone, isAllowedLocationForTenant, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
-
-function matchesTenantRow(row: Record<string, unknown>, tenantId: string): boolean {
-  if (tenantId === '*') return true;
-  if ('tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-    return rowTenant === tenantId;
-  }
-  return tenantId === 'default';
-}
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 
 function matchesZoneTenant(row: Record<string, unknown>, tenantId: string): boolean {
   if (tenantId === '*') return true;
@@ -113,21 +104,47 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let total = 0;
     let zoneRows: any[] = [];
     try {
-      const countResult = (await db.prepare(
-        `SELECT COUNT(*) as total FROM table_zones ${whereClause}`
-      ).bind(...params).first()) as { total: number } | null;
-      total = countResult?.total || 0;
+      let querySucceeded = false;
+      if (tenantId !== '*') {
+        try {
+          const tenantWhere = `${whereClause} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+          const tenantParams = [...params, tenantId];
+          const countResult = (await db.prepare(
+            `SELECT COUNT(*) as total FROM table_zones ${tenantWhere}`
+          ).bind(...tenantParams).first()) as { total: number } | null;
+          total = countResult?.total || 0;
 
-      const rows = (await db.prepare(
-        `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
-      ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
-      const rawZoneRows = rows.results || [];
-      if (tenantId === '*') {
-        zoneRows = rawZoneRows;
-      } else {
-        const filteredZoneRows = rawZoneRows.filter((r) => matchesZoneTenant(r, tenantId));
-        total = filteredZoneRows.length;
-        zoneRows = filteredZoneRows.slice(offset, offset + limit);
+          const rows = (await db.prepare(
+            `SELECT * FROM table_zones ${tenantWhere} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+          ).bind(...tenantParams, limit, offset).all()) as { results: any[] };
+          const rawZoneRows = rows.results || [];
+          const filteredZoneRows = rawZoneRows.filter((r) => matchesZoneTenant(r, tenantId));
+          if (filteredZoneRows.length !== rawZoneRows.length) {
+            total = filteredZoneRows.length;
+          }
+          zoneRows = filteredZoneRows;
+          querySucceeded = true;
+        } catch {
+          querySucceeded = false;
+        }
+      }
+      if (!querySucceeded) {
+        const countResult = (await db.prepare(
+          `SELECT COUNT(*) as total FROM table_zones ${whereClause}`
+        ).bind(...params).first()) as { total: number } | null;
+        total = countResult?.total || 0;
+
+        const rows = (await db.prepare(
+          `SELECT * FROM table_zones ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`
+        ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+        const rawZoneRows = rows.results || [];
+        if (tenantId === '*') {
+          zoneRows = rawZoneRows;
+        } else {
+          const filteredZoneRows = rawZoneRows.filter((r) => matchesZoneTenant(r, tenantId));
+          total = filteredZoneRows.length;
+          zoneRows = filteredZoneRows.slice(offset, offset + limit);
+        }
       }
 
       if (total === 0) {
@@ -249,6 +266,9 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const writeTenant = rawTenantId === '*' ? 'default' : rawTenantId;
     const body = c.req.valid('json');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
@@ -260,10 +280,15 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const locationId = rawTenantId !== '*' && rawTenantId !== 'default' ? (body.locationId || rawTenantId) : (body.locationId || writeTenant);
     const sortOrder = body.sortOrder ?? body.displayOrder ?? 0;
 
-    // Check slug uniqueness
+    // Check slug uniqueness within tenant and location
     let existing: unknown = null;
     try {
-      existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = ?').bind(body.slug, locationId).first();
+      const candidates = await db.prepare('SELECT * FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = ?').bind(body.slug, locationId).all<Record<string, unknown>>();
+      if (candidates && Array.isArray(candidates.results)) {
+        existing = candidates.results.find((r) => matchesZoneTenant(r, writeTenant)) ?? null;
+      } else {
+        existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = ?').bind(body.slug, locationId).first();
+      }
     } catch {
       existing = null;
     }
@@ -272,28 +297,54 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     let insertFailed = false;
-    try {
-      await db.prepare(
-        `INSERT INTO table_zones (id, slug, name, description, sort_order, is_active, location_id, metadata, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.slug,
-        body.name,
-        body.description || null,
-        sortOrder,
-        body.isActive !== false ? 1 : 0,
-        locationId,
-        JSON.stringify(body.metadata || {}),
-        now,
-        now
-      ).run();
-    } catch {
-      insertFailed = true;
+    let insertedWithTenant = false;
+    if (writeTenant) {
+      try {
+        await db.prepare(
+          `INSERT INTO table_zones (id, slug, name, description, sort_order, is_active, location_id, metadata, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.slug,
+          body.name,
+          body.description || null,
+          sortOrder,
+          body.isActive !== false ? 1 : 0,
+          locationId,
+          JSON.stringify(body.metadata || {}),
+          writeTenant,
+          now,
+          now
+        ).run();
+        insertedWithTenant = true;
+      } catch {
+        insertedWithTenant = false;
+      }
+    }
+    if (!insertedWithTenant) {
+      try {
+        await db.prepare(
+          `INSERT INTO table_zones (id, slug, name, description, sort_order, is_active, location_id, metadata, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.slug,
+          body.name,
+          body.description || null,
+          sortOrder,
+          body.isActive !== false ? 1 : 0,
+          locationId,
+          JSON.stringify(body.metadata || {}),
+          now,
+          now
+        ).run();
+      } catch {
+        insertFailed = true;
+      }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now);
+    await writeTableAuditLog(db, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now, writeTenant);
 
     let created: any = null;
     if (!insertFailed) {
@@ -335,6 +386,9 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     let existing: any = null;
@@ -368,7 +422,18 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (body.slug !== undefined) {
       if (!usingFallback) {
-        const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.slug, body.locationId || existing.location_id || 'default', id).first();
+        let slugExists: unknown = null;
+        try {
+          const targetLoc = body.locationId || existing.location_id || 'default';
+          const candidates = await db.prepare('SELECT * FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.slug, targetLoc, id).all<Record<string, unknown>>();
+          if (candidates && Array.isArray(candidates.results)) {
+            slugExists = candidates.results.find((r) => matchesZoneTenant(r, tenantId === '*' ? 'default' : tenantId)) ?? null;
+          } else {
+            slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND COALESCE(location_id, \'default\') = COALESCE(?, \'default\') AND id != ?').bind(body.slug, targetLoc, id).first();
+          }
+        } catch {
+          slugExists = null;
+        }
         if (slugExists) {
           return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
         }
@@ -389,11 +454,38 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(id);
 
     if (!usingFallback && updates.length > 1) {
-      await db.prepare(`UPDATE table_zones SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            `UPDATE table_zones SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...params, tenantId).run();
+        } catch {
+          await db.prepare(`UPDATE table_zones SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+        }
+      } else {
+        await db.prepare(`UPDATE table_zones SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      }
+    } else if (usingFallback && body.name !== undefined) {
+      const oldZoneName = String(existing.name || id);
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            "UPDATE cafe_tables SET zone = ? WHERE (zone = ? OR LOWER(zone) = LOWER(?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(body.name, oldZoneName, id, tenantId).run();
+        } catch {
+          await db.prepare(
+            'UPDATE cafe_tables SET zone = ? WHERE zone = ?'
+          ).bind(body.name, oldZoneName).run().catch(() => {});
+        }
+      } else {
+        await db.prepare(
+          'UPDATE cafe_tables SET zone = ? WHERE zone = ?'
+        ).bind(body.name, oldZoneName).run().catch(() => {});
+      }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now);
+    await writeTableAuditLog(db, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now, tenantId);
 
     let updated: any = null;
     if (!usingFallback) {
@@ -427,6 +519,9 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const now = new Date().toISOString();
 
     let existing: any = null;
@@ -476,11 +571,21 @@ export function registerZoneCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     if (!usingFallback) {
-      await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
+      if (tenantId !== '*') {
+        try {
+          await db.prepare(
+            "DELETE FROM table_zones WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(id, tenantId).run();
+        } catch {
+          await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
+        }
+      } else {
+        await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
+      }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_zone_delete', 'table_zone', id, JSON.stringify({ name: existing.name }), now);
+    await writeTableAuditLog(db, user.id, 'table_zone_delete', 'table_zone', id, JSON.stringify({ name: existing.name }), now, tenantId);
 
     return c.json({ success: true, data: { success: true } });
   });

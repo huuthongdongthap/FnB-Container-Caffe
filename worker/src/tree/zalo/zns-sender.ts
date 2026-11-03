@@ -12,7 +12,10 @@ function normalizePhone(phone: string): string {
  * Send a single ZNS message.
  * Returns { ok, channel } — never throws.
  */
-export async function sendZNS(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Database }, params: { phone: string; template_key: string; data: ZnsData }): Promise<ZnsResult> {
+export async function sendZNS(
+  env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Database },
+  params: { phone: string; template_key: string; data: ZnsData; tenantId?: string }
+): Promise<ZnsResult> {
   if (!env.ZALO_ACCESS_TOKEN) {
     return { ok: false, channel: 'zalo', reason: 'no_token' };
   }
@@ -50,16 +53,31 @@ export async function sendZNS(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Dat
 
   // Audit log — fire-and-forget, never block main flow
   if (env.AURA_DB) {
+    const effectiveTenant = params.tenantId && params.tenantId.trim() && params.tenantId.trim() !== '*' ? params.tenantId.trim() : '';
+    const writeTenant = !effectiveTenant || effectiveTenant === '*' ? 'default' : effectiveTenant;
     try {
-      await env.AURA_DB.prepare(
-        `INSERT INTO notification_audit_log
-         (channel, phone, template_key, data, status, response, created_at)
-         VALUES ('zalo_zns', ?, ?, ?, ?, ?, datetime('now'))`
-      ).bind(
-        params.phone, params.template_key,
-        JSON.stringify(params.data), status,
-        JSON.stringify(zaloResponse)
-      ).run();
+      try {
+        await env.AURA_DB.prepare(
+          `INSERT INTO notification_audit_log
+           (channel, phone, template_key, data, status, response, tenant_id, created_at)
+           VALUES ('zalo_zns', ?, ?, ?, ?, ?, ?, datetime('now'))`
+        ).bind(
+          params.phone, params.template_key,
+          JSON.stringify(params.data), status,
+          JSON.stringify(zaloResponse),
+          writeTenant
+        ).run();
+      } catch {
+        await env.AURA_DB.prepare(
+          `INSERT INTO notification_audit_log
+           (channel, phone, template_key, data, status, response, created_at)
+           VALUES ('zalo_zns', ?, ?, ?, ?, ?, datetime('now'))`
+        ).bind(
+          params.phone, params.template_key,
+          JSON.stringify(params.data), status,
+          JSON.stringify(zaloResponse)
+        ).run();
+      }
     } catch {
       /* audit failure never blocks */
     }

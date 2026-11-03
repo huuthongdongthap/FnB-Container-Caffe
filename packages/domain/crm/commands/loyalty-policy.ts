@@ -38,14 +38,19 @@ const DEFAULT_TIER: LoyaltyTierPolicy = {
  * Load the live loyalty policy: tiers sorted by min_points ASC,
  * plus any active campaign multiplier / cap overrides.
  *
- * KV override key: `loyalty:policy` (JSON partial<LoyaltyPolicy>).
+ * KV override key: `loyalty:policy:${tenantId}` or `loyalty:policy` (JSON partial<LoyaltyPolicy>).
  * Parsed with try/catch — bad JSON falls back to DB policy.
  */
 export async function loadPolicy(
   db: D1Database,
   kv?: KVNamespace,
   now: Date = new Date(),
+  tenantId?: string,
 ): Promise<LoyaltyPolicy> {
+  const effectiveTenant =
+    typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+      ? tenantId.trim()
+      : undefined;
   let tiers: LoyaltyTierPolicy[] = [];
   let campaignMultiplier = 1.0;
   let maxCapPerTx = DEFAULT_MAX_CASHBACK_PER_TX;
@@ -79,20 +84,57 @@ export async function loadPolicy(
 
   try {
     const iso = now.toISOString().replace('T', ' ').slice(0, 19);
-    const campaign = await db
-      .prepare(
-        `SELECT code, cashback_multiplier, max_cap_per_customer_vnd, end_date
-         FROM bonus_campaigns
-         WHERE active = 1 AND start_date <= ? AND end_date >= ?
-         ORDER BY id DESC LIMIT 1`,
-      )
-      .bind(iso, iso)
-      .first<{
-        code: string;
-        cashback_multiplier: number;
-        max_cap_per_customer_vnd: number;
-        end_date: string;
-      }>();
+    type CampaignRow = {
+      code: string;
+      cashback_multiplier: number;
+      max_cap_per_customer_vnd: number;
+      end_date: string;
+      tenant_id?: string | null;
+    };
+    let campaign: CampaignRow | null = null;
+    if (effectiveTenant) {
+      try {
+        campaign = await db
+          .prepare(
+            `SELECT code, cashback_multiplier, max_cap_per_customer_vnd, end_date, tenant_id
+             FROM bonus_campaigns
+             WHERE active = 1 AND start_date <= ? AND end_date >= ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             ORDER BY id DESC LIMIT 1`,
+          )
+          .bind(iso, iso, effectiveTenant)
+          .first<CampaignRow>();
+      } catch {
+        const unscoped = await db
+          .prepare(
+            `SELECT code, cashback_multiplier, max_cap_per_customer_vnd, end_date
+             FROM bonus_campaigns
+             WHERE active = 1 AND start_date <= ? AND end_date >= ?
+             ORDER BY id DESC LIMIT 1`,
+          )
+          .bind(iso, iso)
+          .first<CampaignRow>();
+        if (unscoped) {
+          const rowTenant =
+            'tenant_id' in unscoped && unscoped.tenant_id !== undefined
+              ? (String(unscoped.tenant_id ?? '').trim() || 'default')
+              : 'default';
+          if (rowTenant === effectiveTenant) {
+            campaign = unscoped;
+          }
+        }
+      }
+    } else {
+      campaign = await db
+        .prepare(
+          `SELECT code, cashback_multiplier, max_cap_per_customer_vnd, end_date
+           FROM bonus_campaigns
+           WHERE active = 1 AND start_date <= ? AND end_date >= ?
+           ORDER BY id DESC LIMIT 1`,
+        )
+        .bind(iso, iso)
+        .first<CampaignRow>();
+    }
 
     if (campaign) {
       campaignMultiplier = campaign.cashback_multiplier ?? 1.0;
@@ -119,7 +161,7 @@ export async function loadPolicy(
   };
 
   if (kv) {
-    policy = await applyKvOverride(policy, kv);
+    policy = await applyKvOverride(policy, kv, effectiveTenant);
   }
 
   return policy;
@@ -128,9 +170,20 @@ export async function loadPolicy(
 async function applyKvOverride(
   policy: LoyaltyPolicy,
   kv: KVNamespace,
+  tenantId?: string,
 ): Promise<LoyaltyPolicy> {
   try {
-    const raw = await kv.get('loyalty:policy');
+    let raw: string | null = null;
+    if (tenantId && tenantId !== 'default') {
+      raw = await kv.get(`loyalty:policy:${tenantId}`);
+    } else {
+      if (tenantId === 'default') {
+        raw = await kv.get('loyalty:policy:default');
+      }
+      if (!raw) {
+        raw = await kv.get('loyalty:policy');
+      }
+    }
     if (!raw) return policy;
     const override = JSON.parse(raw) as Partial<LoyaltyPolicy>;
     return {

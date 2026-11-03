@@ -478,7 +478,8 @@ describe('placeOrder & referral post-payment ledger invariants', () => {
     const reward = await rewardReferralOnFirstOrder(db, 'cus_new', 'ord_paid_1', 45000);
     expect(reward.success).toBe(true);
     expect(reward.reward_vnd).toBe(10000);
-    expect(batchCalls.length).toBeGreaterThanOrEqual(4);
+    // CAS referral status update runs outside batch; batch = wallet credit + customer points + audit = 3+
+    expect(batchCalls.length).toBeGreaterThanOrEqual(3);
 
     const revBatchCalls: BatchCall[] = [];
     const revDb = createMockDB(
@@ -510,6 +511,7 @@ describe('placeOrder & referral post-payment ledger invariants', () => {
 
     const rev = await reverseReferralCashback(revDb, 'ref_1');
     expect(rev.success).toBe(true);
-    expect(revBatchCalls.length).toBe(6);
+    // CAS referral status runs outside batch; batch1 = wallet debit + tx + audit (3), batch2 = referee wallet debit + tx (2) = 5
+    expect(revBatchCalls.length).toBe(5);
   });
 });

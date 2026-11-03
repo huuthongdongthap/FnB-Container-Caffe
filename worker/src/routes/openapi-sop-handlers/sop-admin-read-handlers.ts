@@ -16,6 +16,7 @@ import {
   isOverdue,
   listRunsForStaffDay,
   listAllTemplates,
+  listTemplates,
   listViolations,
   sopScope,
   type SopRun,
@@ -41,6 +42,7 @@ function toRunSummary(run: SopRun, template: { code: string; title: string } | n
     templateId: run.templateId,
     templateCode: template?.code ?? '',
     templateTitle: template?.title ?? '',
+    shiftType: run.shiftType,
     status: run.status,
     scheduledDate: run.scheduledDate,
     startedAt: run.startedAt,
@@ -90,12 +92,28 @@ function toMonitorItem(
  * than once per run — a day of twenty runs across two templates is two reads.
  */
 async function templateIdentities(scope: SopScope, runs: SopRun[]) {
-  const ids = [...new Set(runs.map((run) => run.templateId))];
-  const entries = await Promise.all(ids.map(async (id) => {
-    const template = await findTemplate(scope, id);
-    return [id, { code: template?.code ?? '', title: template?.title ?? '' }] as const;
-  }));
-  return new Map(entries);
+  const map = new Map<string, { code: string; title: string }>();
+  if (runs.length === 0) return map;
+  try {
+    const active = await listTemplates(scope);
+    for (const tpl of active ?? []) {
+      map.set(tpl.id, { code: tpl.code ?? '', title: tpl.title ?? '' });
+    }
+  } catch {
+    // Fallback to per-id lookup below if listTemplates is unavailable in a stub.
+  }
+  const missingIds = [...new Set(runs.map((run) => run.templateId))].filter((id) => !map.has(id));
+  await Promise.all(
+    missingIds.map(async (id) => {
+      try {
+        const template = await findTemplate(scope, id);
+        if (template) map.set(id, { code: template.code ?? '', title: template.title ?? '' });
+      } catch {
+        // Leave missing entry unset so caller defaults to empty strings.
+      }
+    })
+  );
+  return map;
 }
 
 export function registerSopAdminReadHandlers(app: OpenAPIHono<{ Bindings: Env }>, routes: typeof SopAdminRoutes) {
@@ -124,12 +142,17 @@ export function registerSopAdminReadHandlers(app: OpenAPIHono<{ Bindings: Env }>
     const scope = sopScope(c.env, c.get('user'));
     const query = c.req.valid('query');
     const date = query.date ?? businessDate();
-    const rows = await listRunsForStaffDay(scope, query.staffId ?? '', date);
-    const runs = rows.filter((run) => !query.status || run.status === query.status);
+    const rows = await listRunsForStaffDay(scope, query.staffId ?? '', date, query.templateId);
+    const runs = rows.filter(
+      (run) =>
+        (!query.status || run.status === query.status) &&
+        (!query.templateId || run.templateId === query.templateId)
+    );
+    const templates = await templateIdentities(scope, runs);
     return c.json({
       success: true,
       data: {
-        runs: runs.map((run) => toRunSummary(run, null)),
+        runs: runs.map((run) => toRunSummary(run, templates.get(run.templateId) ?? null)),
         meta: { page: 1, limit: runs.length, total: runs.length },
       },
     });

@@ -25,6 +25,7 @@ export async function updateOrder(
       return errorResponse('Payment status can only be changed by a verified PayOS webhook or authorized COD collection', 400);
     }
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    tenantId = (tenantId || '').trim() || 'default';
 
     const tenantClause = tenantId === '*'
       ? ''
@@ -34,9 +35,21 @@ export async function updateOrder(
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
 
     // Fetch full row — needed for DO broadcast payload below
-    const { results } = await db.prepare(
-      `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?${tenantClause}`
-    ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
+    let results: Record<string, unknown>[];
+    try {
+      const q = await db.prepare(
+        `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+      ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
+      results = q.results ?? [];
+    } catch (selectErr) {
+      if (!/no such column:\s*tenant_id/i.test(String(selectErr))) {
+        throw selectErr;
+      }
+      const q = await db.prepare(
+        `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?`
+      ).bind(id).all<Record<string, unknown>>();
+      results = q.results ?? [];
+    }
 
     if (!results || results.length === 0) {
       return errorResponse('Order not found', 404);
@@ -98,27 +111,33 @@ export async function updateOrder(
     }
 
     if (body.status === 'cancelled') {
-  // Restore inventory (idempotent — no-op if no reserves exist)
-  try {
-    const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-    await restoreInventoryForOrder(env as any, id);
-  } catch (invErr) {
-    log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
-  }
-
-      // Reverse loyalty accrual if order had already earned points/cashback
       const rawOrderTenantForCancel = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
       const orderTenantForCancel =
         typeof rawOrderTenantForCancel === 'string' && rawOrderTenantForCancel.trim()
           ? rawOrderTenantForCancel.trim()
-          : undefined;
+          : (tenantId && tenantId !== '*' ? tenantId : undefined);
+
+      // Restore inventory (idempotent — no-op if no reserves exist)
+      try {
+        const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+        await restoreInventoryForOrder(env as any, id, orderTenantForCancel);
+      } catch (invErr) {
+        log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
+      }
+
+      // Reverse loyalty accrual if order had already earned points/cashback
       try {
         const earnRow = await db.prepare(
           "SELECT customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
         ).bind(id).first<{ customer_id: string; amount: number }>();
         if (earnRow?.customer_id) {
           const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
-          const policy = await loadPolicy(db).catch(() => null);
+          const policy = await loadPolicy(
+            db,
+            env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
+            new Date(),
+            orderTenantForCancel
+          ).catch(() => null);
           if (policy) {
             await reverseAccrual(db, policy, {
               orderId: id,
@@ -133,25 +152,180 @@ export async function updateOrder(
         log.warn('Loyalty accrual reversal error (non-blocking):', { message: (revAccErr as Error).message, orderId: id });
       }
 
+      const effectiveCancelTenant = orderTenantForCancel || 'default';
+
+      // Refund spent cashback on cancellation if not already refunded
+      try {
+        const existingRefund = await db.prepare(
+          "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(id, effectiveCancelTenant).first<{ id?: string }>().catch(() =>
+          db.prepare(
+            "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' LIMIT 1"
+          ).bind(id).first<{ id?: string }>().catch(() => null)
+        );
+        if (!existingRefund?.id) {
+          const spendRow = await db.prepare(
+            "SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type IN ('spend', 'redeem') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+          ).bind(id, effectiveCancelTenant).first<{ id?: string; customer_id?: string; amount?: number }>().catch(() =>
+            db.prepare(
+              "SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1"
+            ).bind(id).first<{ id?: string; customer_id?: string; amount?: number }>().catch(() => null)
+          );
+          let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
+          let refundAmount = Number(spendRow?.amount ?? 0);
+          if (!refundCustomerId || !(refundAmount > 0)) {
+            const ordSpend = await db.prepare(
+              "SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(id, effectiveCancelTenant).first<{ customer_id?: string | null; cashback_used?: number | null }>().catch(() =>
+              db.prepare(
+                'SELECT customer_id, cashback_used FROM orders WHERE id = ?'
+              ).bind(id).first<{ customer_id?: string | null; cashback_used?: number | null }>().catch(() => null)
+            );
+            if (!refundCustomerId && ordSpend?.customer_id) {
+              refundCustomerId = String(ordSpend.customer_id).trim();
+            }
+            if (!(refundAmount > 0) && Number(ordSpend?.cashback_used ?? 0) > 0) {
+              refundAmount = Number(ordSpend?.cashback_used ?? 0);
+            }
+          }
+          if (refundCustomerId && refundAmount > 0) {
+            const wRow = await db.prepare(
+              "SELECT id FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+            ).bind(refundCustomerId, effectiveCancelTenant).first<{ id?: string }>().catch(() =>
+              db.prepare(
+                'SELECT id FROM cashback_wallets WHERE customer_id = ? LIMIT 1'
+              ).bind(refundCustomerId).first<{ id?: string }>().catch(() => null)
+            );
+            const walletId = wRow?.id || `wal_${refundCustomerId}`;
+            const refundTxId = `cb_ref_${id}`;
+            let insertedRefund = true;
+            try {
+              const insRes = await db.prepare(
+                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
+                 SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
+              ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, effectiveCancelTenant, id).run();
+              const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+                ?? (insRes as unknown as { changes?: number })?.changes;
+              if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
+            } catch {
+              try {
+                const insRes = await db.prepare(
+                  `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
+                   SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
+                   WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
+                ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, id).run();
+                const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+                  ?? (insRes as unknown as { changes?: number })?.changes;
+                if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
+              } catch {
+                try {
+                  await db.prepare(
+                    "INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, created_at) VALUES (?, ?, ?, 'refund', ?, datetime('now'))"
+                  ).bind(refundTxId, refundCustomerId, id, refundAmount).run();
+                } catch {
+                  // Optional cashback_transactions schema differences
+                }
+              }
+            }
+            if (insertedRefund) {
+              await db.prepare(
+                "UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(refundAmount, refundCustomerId, effectiveCancelTenant).run().catch(() =>
+                db.prepare(
+                  "UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ?"
+                ).bind(refundAmount, refundCustomerId).run().catch(() => {})
+              );
+              await db.prepare(
+                "UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(id, effectiveCancelTenant).run().catch(() =>
+                db.prepare(
+                  'UPDATE orders SET cashback_used = 0 WHERE id = ?'
+                ).bind(id).run().catch(() => {})
+              );
+            }
+          }
+        }
+      } catch (refSpendErr) {
+        log.warn('Cashback spend refund error (non-blocking):', { message: (refSpendErr as Error).message, orderId: id });
+      }
+
       // Release promotion redemption usage count if redeemed on this order
+      const decrementedPromoIds = new Set<string>();
       try {
         const redRow = await db.prepare(
           'SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
         ).bind(id).first<{ promotion_id?: string; code?: string }>();
         if (redRow && (redRow.promotion_id || redRow.code)) {
+          if (redRow.promotion_id) decrementedPromoIds.add(String(redRow.promotion_id).trim());
+          const promoTenantForCancel = effectiveCancelTenant;
           try {
             await db.prepare(
-              "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE (id = ? OR code = ?) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-            ).bind(redRow.promotion_id ?? '', redRow.code ?? '', tenantId, tenantId).run();
+              `UPDATE promotions
+               SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
+                   used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
+                   usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
+               WHERE (id = ? OR UPPER(code) = UPPER(?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(redRow.promotion_id ?? '', redRow.code ?? '', promoTenantForCancel).run();
           } catch {
-            await db.prepare(
-              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
-            ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+            try {
+              await db.prepare(
+                "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE (id = ? OR code = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(redRow.promotion_id ?? '', redRow.code ?? '', promoTenantForCancel).run();
+            } catch {
+              if (promoTenantForCancel === 'default') {
+                await db.prepare(
+                  'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? OR code = ?'
+                ).bind(redRow.promotion_id ?? '', redRow.code ?? '').run().catch(() => {});
+              }
+            }
           }
           await db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(id).run().catch(() => {});
         }
       } catch {
         // Optional promotion_redemptions table in partial schemas
+      }
+
+      try {
+        const usageRes = await db.prepare(
+          'SELECT id, promotion_id FROM promotion_usages WHERE order_id = ?'
+        ).bind(id).all<{ id?: string; promotion_id?: string }>().catch(async () => {
+          const single = await db.prepare(
+            'SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? LIMIT 1'
+          ).bind(id).first<{ id?: string; promotion_id?: string }>().catch(() => null);
+          return { results: single ? [single] : [] };
+        });
+        const usageRows = usageRes?.results ?? [];
+        for (const usageRow of usageRows) {
+          const promoId = usageRow.promotion_id ? String(usageRow.promotion_id).trim() : '';
+          if (promoId && !decrementedPromoIds.has(promoId)) {
+            decrementedPromoIds.add(promoId);
+            await db.prepare(
+              `UPDATE promotions
+               SET current_uses = MAX(0, COALESCE(current_uses, 0) - 1),
+                   used_count = MAX(0, COALESCE(used_count, 0) - 1),
+                   usage_count = MAX(0, COALESCE(usage_count, 0) - 1)
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(promoId, effectiveCancelTenant).run().catch(async () => {
+              try {
+                await db.prepare(
+                  "UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+                ).bind(promoId, effectiveCancelTenant).run();
+              } catch {
+                if (effectiveCancelTenant === 'default') {
+                  await db.prepare(
+                    'UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ?'
+                  ).bind(promoId).run().catch(() => {});
+                }
+              }
+            });
+          }
+        }
+        if (usageRows.length > 0) {
+          await db.prepare('DELETE FROM promotion_usages WHERE order_id = ?').bind(id).run().catch(() => {});
+        }
+      } catch {
+        // Optional promotion_usages table in partial schemas
       }
 
       let refRow: { id: string } | null = null;
@@ -201,19 +375,25 @@ if (['served', 'completed'].includes(body.status as string)) {
         );
 
         if (order) {
-          const normalizedPhone = String(order.customer_phone || '').replace(/\D/g, '');
+          const { sanitizeCustomerIdentity } = await import('../policies/loyalty-trigger');
+          const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
+            order.customer_phone,
+            order.customer_email,
+          );
           const orderTenant = typeof order.tenant_id === 'string' && order.tenant_id.trim()
             ? order.tenant_id.trim()
             : (tenantId && tenantId !== '*' ? tenantId : 'default');
           let visitCustomer: { id: string } | null = null;
-          try {
-            visitCustomer = await db.prepare(
-              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
-            ).bind(order.customer_email, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
-          } catch {
-            visitCustomer = await db.prepare(
-              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-            ).bind(order.customer_email, normalizedPhone).first<{ id: string }>();
+          if (normalizedPhone || sanitizedEmail) {
+            try {
+              visitCustomer = await db.prepare(
+                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
+              ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
+            } catch {
+              visitCustomer = await db.prepare(
+                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+              ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>();
+            }
           }
 
           if (visitCustomer) {
@@ -226,7 +406,8 @@ if (['served', 'completed'].includes(body.status as string)) {
               : 'in_store';
             const visitResult = await recordVisit({
               db, customerId: visitCustomer.id, orderId: id,
-              spent: order.total, channel: visitChannel
+              spent: order.total, channel: visitChannel,
+              tenantId: orderTenant
             });
             if (visitResult.created) {
               log.info('Visit recorded', { customer_id: visitCustomer.id, order_id: id, channel: visitChannel });
@@ -249,29 +430,36 @@ if (['served', 'completed'].includes(body.status as string)) {
         if (order && order.total >= 20000 && (!order.payment_status || order.payment_status === 'paid')) {
           let customerId = order.customer_id || null;
           if (!customerId) {
+            const { sanitizeCustomerIdentity } = await import('../policies/loyalty-trigger');
+            const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
+              order.customer_phone,
+              order.customer_email,
+            );
             const orderTenant = typeof order.tenant_id === 'string' && order.tenant_id.trim()
               ? order.tenant_id.trim()
               : (tenantId && tenantId !== '*' ? tenantId : 'default');
             let customer: { id: string } | null = null;
-            try {
-              customer = await db.prepare(
-                "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
-              ).bind(order.customer_email, order.customer_phone, orderTenant, orderTenant).first<{ id: string }>();
-            } catch {
-              customer = await db.prepare(
-                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-              ).bind(order.customer_email, order.customer_phone).first<{ id: string }>();
+            if (normalizedPhone || sanitizedEmail) {
+              try {
+                customer = await db.prepare(
+                  "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1"
+                ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
+              } catch {
+                customer = await db.prepare(
+                  'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+                ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>();
+              }
             }
             customerId = customer?.id || null;
           }
 
           if (customerId) {
             const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-            const refPolicy = await resolveReferralPolicy(env.AUTH_KV as any).catch(() => DEFAULT_REFERRAL_POLICY);
             const orderTenantForRef =
               typeof order.tenant_id === 'string' && order.tenant_id.trim()
                 ? order.tenant_id.trim()
-                : undefined;
+                : (tenantId && tenantId !== '*' ? tenantId : undefined);
+            const refPolicy = await resolveReferralPolicy(env.AUTH_KV as any, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
             const result = await rewardReferralOnFirstOrder(
               db, customerId, id, order.total, refPolicy, orderTenantForRef
             );
@@ -286,10 +474,16 @@ if (['served', 'completed'].includes(body.status as string)) {
 
       // ERPNext e-invoice trigger (fire-and-forget, non-blocking)
       if (env.AUTH_KV) {
-        (async() => {
+        const rawErpTenant = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
+        const erpOrderTenant =
+          typeof rawErpTenant === 'string' && rawErpTenant.trim()
+            ? rawErpTenant.trim()
+            : (tenantId && tenantId !== '*' ? tenantId : 'default');
+        const erpTask = (async () => {
           try {
             const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-            const erpnextUrl = await kv.get('erpnext:api_url');
+            const erpPrefix = erpOrderTenant === 'default' ? 'erpnext' : `erpnext:${erpOrderTenant}`;
+            const erpnextUrl = (await kv.get(`${erpPrefix}:api_url`)) ?? (erpOrderTenant === 'default' ? null : await kv.get('erpnext:api_url'));
             if (!erpnextUrl) {
               log.info('ERPNext not configured via KV, skipping e-invoice');
               return;
@@ -307,7 +501,10 @@ if (['served', 'completed'].includes(body.status as string)) {
             const { createErpnextClientWithKv } = await import('worker/src/clients/erpnext-client');
             const { ErpnextAccountingClient } = await import('worker/src/clients/erpnext-accounting-client');
 
-            const erpnextClient = await createErpnextClientWithKv(env as unknown as ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace });
+            const erpnextClient = await createErpnextClientWithKv(
+              env as unknown as ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
+              erpOrderTenant
+            );
             if (!erpnextClient) {
               log.error('Failed to create ERPNext client despite KV config', { order_id: id });
               return;
@@ -322,13 +519,19 @@ if (['served', 'completed'].includes(body.status as string)) {
               customer_email: orderRow.customer_email as string | undefined,
               customer_name: orderRow.customer_name as string | undefined,
               customer_address: orderRow.customer_address as string | undefined
-            }, env as unknown as WorkerEnv);
+            }, env as unknown as WorkerEnv, erpOrderTenant);
 
             log.info('ERPNext e-invoice created', { order_id: id });
           } catch (erpErr) {
             log.error('ERPNext e-invoice error (non-blocking):', { message: (erpErr as Error).message, order_id: id });
           }
         })();
+        const execCtx = env.executionCtx as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+        try {
+          execCtx?.waitUntil?.(erpTask);
+        } catch {
+          // waitUntil unavailable in unit test context
+        }
       }
     }
 

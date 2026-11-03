@@ -89,7 +89,7 @@ export const LoyaltyRoutes = {
       summary: 'Claim birthday bonus points',
       tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { 'application/json': { schema: z.object({ idempotencyKey: z.string().min(1) }) } } } },
+      request: { body: { content: { 'application/json': { schema: z.object({ idempotencyKey: z.string().min(1).optional() }) } } } },
       responses: {
         200: { description: 'Bonus claimed', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ points: z.number().int().positive(), newBalance: z.number().int().nonnegative() })) } } },
         400: { description: 'Already claimed or not birthday month', content: { 'application/json': { schema: ErrorResponseSchema } } },

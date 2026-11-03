@@ -42,6 +42,8 @@ export interface Customer360Options {
   eventLimit?: number;
   /** Max orders to scan for preferences (default 100). */
   orderLimit?: number;
+  /** Tenant scope for multi-tenant isolation. */
+  tenantId?: string;
 }
 
 const EMPTY_EVENTS: AggregateResult = { customerId: '', events: [], total: 0 };
@@ -60,13 +62,17 @@ export async function getCustomer360(
   const eventLimit = Number.isFinite(rawEventLimit) ? Math.min(Math.max(1, Math.floor(rawEventLimit)), 200) : 5;
   const rawOrderLimit = Number(options.orderLimit ?? 100);
   const orderLimit = Number.isFinite(rawOrderLimit) ? Math.min(Math.max(1, Math.floor(rawOrderLimit)), 200) : 100;
+  const effectiveTenant =
+    options.tenantId && options.tenantId !== '*'
+      ? options.tenantId.trim() || 'default'
+      : null;
 
   const [account, events, bandPolicy] = await Promise.all([
-    getCustomerAccount(db, customerId).catch((err) => {
+    getCustomerAccount(db, customerId, { tenantId: options.tenantId }).catch((err) => {
       log.error('360_account_failed', { customerId, error: String(err) });
       return null;
     }),
-    aggregateEvents(db, customerId, { limit: eventLimit }).catch((err) => {
+    aggregateEvents(db, customerId, { limit: eventLimit, tenantId: options.tenantId }).catch((err) => {
       log.error('360_events_failed', { customerId, error: String(err) });
       return { ...EMPTY_EVENTS, customerId };
     }),
@@ -75,33 +81,38 @@ export async function getCustomer360(
 
   const tierInfo = resolveTierInfo(account, db, kv);
 
-  const orders = await db
-    .prepare(
-      `SELECT o.total, o.items, o.order_type as channel, o.payment_method, o.created_at
-       FROM orders o
-       LEFT JOIN customers c ON c.id = ?
-       WHERE (
-         o.customer_id = ?
-         OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
-       )
-       AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default') OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
-       ORDER BY o.created_at DESC LIMIT ?`,
-    )
-    .bind(customerId, customerId, orderLimit)
-    .all<{
-      total: number | null;
-      items: string | null;
-      channel: string | null;
-      payment_method: string | null;
-      created_at: string | null;
-    }>()
-    .catch(() =>
-      db
+  const orders = await (effectiveTenant
+    ? db
         .prepare(
-          `SELECT total, items, order_type as channel, payment_method, created_at
-           FROM orders
-           WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
-           ORDER BY created_at DESC LIMIT ?`,
+          `SELECT o.total, o.items, o.order_type as channel, o.payment_method, o.created_at
+           FROM orders o
+           LEFT JOIN customers c ON c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+           WHERE (
+             o.customer_id = ?
+             OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
+           )
+           AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+           ORDER BY o.created_at DESC LIMIT ?`,
+        )
+        .bind(customerId, effectiveTenant, customerId, effectiveTenant, orderLimit)
+        .all<{
+          total: number | null;
+          items: string | null;
+          channel: string | null;
+          payment_method: string | null;
+          created_at: string | null;
+        }>()
+    : db
+        .prepare(
+          `SELECT o.total, o.items, o.order_type as channel, o.payment_method, o.created_at
+           FROM orders o
+           LEFT JOIN customers c ON c.id = ?
+           WHERE (
+             o.customer_id = ?
+             OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)
+           )
+           AND (c.id IS NULL OR COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default') OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+           ORDER BY o.created_at DESC LIMIT ?`,
         )
         .bind(customerId, customerId, orderLimit)
         .all<{
@@ -110,7 +121,82 @@ export async function getCustomer360(
           channel: string | null;
           payment_method: string | null;
           created_at: string | null;
-        }>(),
+        }>()
+  )
+    .catch(() =>
+      (effectiveTenant
+        ? db
+            .prepare(
+              `SELECT total, items, order_type as channel, payment_method, created_at
+               FROM orders
+               WHERE (customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?))
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               ORDER BY created_at DESC LIMIT ?`,
+            )
+            .bind(customerId, customerId, effectiveTenant, effectiveTenant, orderLimit)
+            .all<{
+              total: number | null;
+              items: string | null;
+              channel: string | null;
+              payment_method: string | null;
+              created_at: string | null;
+            }>()
+            .catch((err) =>
+              !/no such column:\s*tenant_id/i.test(String(err))
+                ? db
+                    .prepare(
+                      `SELECT total, items, channel, payment_method, created_at
+                       FROM orders
+                       WHERE (customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?))
+                         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                       ORDER BY created_at DESC LIMIT ?`,
+                    )
+                    .bind(customerId, customerId, effectiveTenant, effectiveTenant, orderLimit)
+                    .all<{
+                      total: number | null;
+                      items: string | null;
+                      channel: string | null;
+                      payment_method: string | null;
+                      created_at: string | null;
+                    }>()
+                    .catch(() =>
+                      db
+                        .prepare(
+                          `SELECT COALESCE(total, total_amount, 0) AS total, items, payment_method, created_at
+                           FROM orders
+                           WHERE (customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?))
+                             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                           ORDER BY created_at DESC LIMIT ?`,
+                        )
+                        .bind(customerId, customerId, effectiveTenant, effectiveTenant, orderLimit)
+                        .all<{
+                          total: number | null;
+                          items: string | null;
+                          channel?: string | null;
+                          payment_method: string | null;
+                          created_at: string | null;
+                        }>(),
+                    )
+                : Promise.reject(err),
+            )
+        : Promise.reject(new Error('skip_scoped_fallback'))
+      ).catch(() =>
+        db
+          .prepare(
+            `SELECT total, items, order_type as channel, payment_method, created_at
+             FROM orders
+             WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
+             ORDER BY created_at DESC LIMIT ?`,
+          )
+          .bind(customerId, customerId, orderLimit)
+          .all<{
+            total: number | null;
+            items: string | null;
+            channel: string | null;
+            payment_method: string | null;
+            created_at: string | null;
+          }>(),
+      ),
     )
     .catch(() =>
       db
@@ -151,7 +237,17 @@ export async function getCustomer360(
       return { results: [] as Array<Record<string, unknown>> };
     });
 
-  const orderRows = (orders?.results ?? []).map((r) => ({
+  const filteredOrderRows = (orders?.results ?? []).filter((r) => {
+    if (!effectiveTenant) return true;
+    const rec = r as Record<string, unknown>;
+    if ('tenant_id' in rec && rec.tenant_id !== undefined) {
+      const rowTenant = (rec.tenant_id && String(rec.tenant_id).trim()) || 'default';
+      return rowTenant === effectiveTenant;
+    }
+    return true;
+  });
+
+  const orderRows = filteredOrderRows.map((r) => ({
     total: Number((r as Record<string, unknown>).total ?? (r as Record<string, unknown>).total_amount ?? 0),
     items: (r.items as string | null) ?? undefined,
     channel: (r.channel as string | undefined) ?? undefined,

@@ -53,6 +53,7 @@ export async function validateProductModifiers(
   productId: string,
   modifiers: unknown[],
   candidateProductIds?: string[],
+  tenantId?: string,
 ): Promise<ModifierValidationResult> {
   if (!Array.isArray(modifiers) || modifiers.length === 0) {
     return { valid: true, validatedModifiers: [], modifierDelta: 0 };
@@ -92,7 +93,7 @@ export async function validateProductModifiers(
       continue;
     }
 
-    const choiceRow = await fetchModifierChoice(db, modId, modName);
+    const choiceRow = await fetchModifierChoice(db, modId, modName, tenantId);
     if (!choiceRow) {
       const prodIds = candidateProductIds && candidateProductIds.length > 0 ? candidateProductIds : [productId];
       const normalizedChoice = (modName || modId || '').trim();
@@ -135,7 +136,7 @@ export async function validateProductModifiers(
       };
     }
 
-    const groupRow = await fetchModifierGroup(db, choiceRow.group_id);
+    const groupRow = await fetchModifierGroup(db, choiceRow.group_id, tenantId);
     if (!groupRow) {
       return {
         valid: false,
@@ -168,7 +169,7 @@ export async function validateProductModifiers(
     }
 
     const prodIds = candidateProductIds && candidateProductIds.length > 0 ? candidateProductIds : [productId];
-    const linked = await isGroupLinkedToProduct(db, prodIds, choiceRow.group_id);
+    const linked = await isGroupLinkedToProduct(db, prodIds, choiceRow.group_id, tenantId);
     if (!linked) {
       return {
         valid: false,

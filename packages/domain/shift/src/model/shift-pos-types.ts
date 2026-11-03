@@ -11,6 +11,7 @@ export interface ShiftRecord {
   staff_name: string;
   role: StaffRole;
   operating_unit_id: string;
+  tenant_id?: string | null;
   clock_in: string;
   clock_out: string | null;
   status: ShiftStatus;
@@ -32,6 +33,7 @@ export interface OpenShiftInput {
   staffName: string;
   role: StaffRole;
   operatingUnitId?: string;
+  tenantId?: string;
   openingCash: number;
   notes?: string;
 }
@@ -43,6 +45,7 @@ export interface PosSaleInput {
   paymentMethod: 'cash' | 'card' | 'payos' | 'sepay' | 'transfer' | string;
   staffId?: string;
   operatingUnitId?: string;
+  tenantId?: string;
 }
 
 export interface CloseShiftInput {
@@ -51,6 +54,8 @@ export interface CloseShiftInput {
   closedByRole: StaffRole;
   actualCash: number;
   notes?: string;
+  operatingUnitId?: string;
+  tenantId?: string;
 }
 
 export interface ShiftSummary {

@@ -609,5 +609,160 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(csv).toContain("' =CMD|calc");
     expect(csv).toContain("'\t+84900000000");
   });
+
+  it('Phase AA1-AA4 — enforces TRIM(tenant_id) across analytics tree, reports handlers, audit log tenant filtering, franchise locations, and admin QR', async () => {
+    const { getZoneStats } = await import('../../tree/analytics/zone-analytics');
+    const { buildTenantClause, buildCustomerJoinTenantClause } = await import('../../routes/reports-handlers/analytics-handlers');
+    const { filterAuditRowsByTenant } = await import('../../routes/admin-audit-logs-handlers/query-handler');
+    const { franchiseRouter } = await import('../../routes/franchise-locations');
+    const { adminQRRouter } = await import('../../routes/admin-qr');
+
+    // AA1: analytics tree queries emit TRIM(tenant_id) / TRIM(o.tenant_id)
+    const sqlLog: string[] = [];
+    const trackingDb = {
+      prepare: (sql: string) => {
+        sqlLog.push(sql);
+        return {
+          bind: () => ({
+            first: async () => ({ total_orders: 1, total_revenue: 35000, avg_order_value: 35000, total_customers: 1, new_30d: 1, repeat_rate: 0 }),
+            all: async () => ({ results: [], success: true }),
+          }),
+          first: async () => ({ total_customers: 1, new_30d: 1, repeat_rate: 0, avg_order_value: 35000 }),
+          all: async () => ({ results: [], success: true }),
+        };
+      },
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+
+    await getSummary(trackingDb, 7, 'default');
+    await getSummary(trackingDb, 7, 'tenant_sadec_02');
+    await getTopProducts(trackingDb, 5, 'tenant_sadec_02');
+    await getPeakHours(trackingDb, 7, 'tenant_sadec_02');
+    await getCustomerMetrics(trackingDb, 'tenant_sadec_02');
+    await getZoneStats(trackingDb, 7, 'tenant_sadec_02');
+
+    expect(sqlLog.some((s) => s.includes("TRIM(tenant_id) = ''"))).toBe(true);
+    expect(sqlLog.some((s) => s.includes('TRIM(tenant_id) = ?'))).toBe(true);
+    expect(sqlLog.some((s) => s.includes('TRIM(o.tenant_id) = ?'))).toBe(true);
+
+    // AA2: reports-handlers buildTenantClause & buildCustomerJoinTenantClause normalize TRIM
+    expect(buildTenantClause('default').where).toContain("TRIM(tenant_id) = ''");
+    expect(buildCustomerJoinTenantClause('default').and).toContain("TRIM(c.tenant_id) = ''");
+    expect(buildCustomerJoinTenantClause('tenant_sadec_02').and).toContain('c.tenant_id = ?');
+
+    // AA3: filterAuditRowsByTenant trims whitespace-padded row.tenant_id, details.tenant_id, and users.tenant_id
+    const auditDb = {
+      prepare: () => ({
+        bind: (id: string) => ({
+          first: async () => (id === 'actor_sadec' ? { id: 'actor_sadec', tenant_id: '  tenant_sadec_02  ' } : { id: 'actor_blank', tenant_id: '   ' }),
+        }),
+      }),
+    };
+    const rawAuditRows = [
+      { id: 'log_1', tenant_id: '  tenant_sadec_02  ', action: 'order.create' },
+      { id: 'log_2', tenant_id: '   ', details: JSON.stringify({ tenant_id: '  tenant_sadec_02  ' }), action: 'menu.update' },
+      { id: 'log_3', tenant_id: null, actor_id: 'actor_sadec', action: 'shift.open' },
+      { id: 'log_4', tenant_id: '   ', actor_id: 'actor_blank', action: 'legacy.action' },
+    ];
+    const sadecLogs = await filterAuditRowsByTenant(auditDb, rawAuditRows, 'tenant_sadec_02');
+    expect(sadecLogs.map((r) => r.id)).toEqual(['log_1', 'log_2', 'log_3']);
+    const defaultLogs = await filterAuditRowsByTenant(auditDb, rawAuditRows, 'default');
+    expect(defaultLogs.map((r) => r.id)).toEqual(['log_4']);
+
+    // AA4: franchise-locations & admin-qr enforce canonical whitespace-trimmed tenant filtering
+    const crypto = require('crypto');
+    const makeBearer = (id: string, role: string, tenantId: string) => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+      const payload = Buffer.from(JSON.stringify({
+        id,
+        sub: id,
+        role,
+        tenantId,
+        email: `${id}@test.aura`,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        authVersion: 1,
+        authTime: Math.floor(Date.now() / 1000),
+        sessionType: 'staff-web',
+      })).toString('base64url');
+      const sig = crypto.createHmac('sha256', 'test-jwt-secret-at-least-16-chars').update(`${header}.${payload}`).digest('base64url');
+      return `Bearer ${header}.${payload}.${sig}`;
+    };
+
+    const franchiseSqls: string[] = [];
+    const franchiseBinds: unknown[][] = [];
+    const franchiseDb = {
+      prepare: (sql: string) => {
+        franchiseSqls.push(sql);
+        return {
+          bind: (...args: unknown[]) => {
+            franchiseBinds.push(args);
+            return {
+              first: async () => {
+                if (/FROM users WHERE id = \?/i.test(sql)) {
+                  return { id: 'm_sadec', name: 'Manager Sa Dec', role: 'manager', tenant_id: 'tenant_sadec_02', is_active: 1, auth_version: 1 };
+                }
+                if (/FROM franchise_locations WHERE id = \?/i.test(sql)) {
+                  return { id: 'loc_sadec', code: 'SD02', name: 'Sa Dec 02', tenant_id: '  tenant_sadec_02  ', royalty_percentage: 5 };
+                }
+                return { order_count: 4, gross_sales: 200000 };
+              },
+              all: async () => ({
+                results: [
+                  { id: 'loc_sadec', code: 'SD02', name: 'Sa Dec 02', tenant_id: '  tenant_sadec_02  ' },
+                  { id: 'loc_other', code: 'OTH1', name: 'Other', tenant_id: 'tenant_other' },
+                ],
+              }),
+            };
+          },
+        };
+      },
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+
+    const sadecToken = makeBearer('m_sadec', 'manager', 'tenant_sadec_02');
+    const franchiseEnv = createMockEnv({ AURA_DB: franchiseDb });
+
+    const locListRes = await franchiseRouter.fetch(
+      new Request('https://test.aura/locations', { headers: { Authorization: sadecToken } }),
+      franchiseEnv
+    );
+    expect(locListRes.status).toBe(200);
+    const locListJson = await locListRes.json() as { data: Array<{ id: string }> };
+    expect(locListJson.data.map((l) => l.id)).toEqual(['loc_sadec']);
+    expect(franchiseSqls.some((s) => s.includes('AND tenant_id = ?'))).toBe(true);
+
+    const metricsRes = await franchiseRouter.fetch(
+      new Request('https://test.aura/locations/loc_sadec/metrics', { headers: { Authorization: sadecToken } }),
+      franchiseEnv
+    );
+    expect(metricsRes.status).toBe(200);
+    expect(franchiseBinds.some((b) => b[0] === 'tenant_sadec_02')).toBe(true);
+
+    const qrDb = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => (/FROM users WHERE id = \?/i.test(sql)
+            ? { id: 'm_sadec', name: 'Manager Sa Dec', role: 'manager', tenant_id: 'tenant_sadec_02', is_active: 1, auth_version: 1 }
+            : null),
+          run: async () => ({ success: true }),
+        }),
+        all: async () => ({
+          results: /FROM cafe_tables/i.test(sql)
+            ? [
+                { id: 1, table_number: 1, zone: 'Indoor', status: 'available', tenant_id: '  tenant_sadec_02  ' },
+                { id: 2, table_number: 2, zone: 'Outdoor', status: 'available', tenant_id: 'tenant_other' },
+              ]
+            : [{ table_id: 1, slug: 'tbl-1' }, { table_id: 2, slug: 'tbl-2' }],
+        }),
+      }),
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+
+    const qrRes = await adminQRRouter.fetch(
+      new Request('https://test.aura/tables', { headers: { Authorization: sadecToken } }),
+      createMockEnv({ AURA_DB: qrDb, QR_SIGNING_SECRET: 'qr-secret-key-at-least-16-chars' })
+    );
+    expect(qrRes.status).toBe(200);
+    const qrJson = await qrRes.json() as { data: Array<{ id: number }> };
+    expect(qrJson.data.map((t) => t.id)).toEqual([1]);
+  });
 });
 

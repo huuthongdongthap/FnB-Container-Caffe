@@ -13,8 +13,8 @@ export async function listStaff(request: Request, rawEnv: Record<string, unknown
     let rows;
     try {
       rows = await env.AURA_DB.prepare(`SELECT id, name, phone, role, is_active, created_at FROM users
-        WHERE role != 'customer' AND COALESCE(NULLIF(tenant_id, ''), 'default') = ? ORDER BY created_at DESC`)
-        .bind(session.account.tenant_id || 'default').all<Record<string, unknown>>();
+        WHERE role != 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC`)
+        .bind((session.account.tenant_id || '').trim() || 'default').all<Record<string, unknown>>();
     } catch { throw new SessionUnavailableError(); }
     const metadata = new Map<string, Record<string, unknown>>();
     // Only this tenant's canonical accounts are eligible for enrichment. Bound

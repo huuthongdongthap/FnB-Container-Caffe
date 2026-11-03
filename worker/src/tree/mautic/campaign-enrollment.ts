@@ -4,6 +4,7 @@
  */
 
 import { getMauticClient } from './client-factory';
+import { isAlreadyEnrolled, trackEnrollment } from './enrollment-tracker';
 import { getSyncStatus, matchesMauticTenant } from './sync-state';
 import type { MauticBridgeEnv, MauticClientDuck } from './types';
 
@@ -28,7 +29,7 @@ export async function enrollCampaigns(
   try {
     const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
     const isWildcard = normalizedTenant === '*';
-    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?";
+    const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const tenantParams = isWildcard ? [] : [normalizedTenant];
 
     let masterCustomers: Array<{ id: string; email: string; phone: string }> = [];
@@ -72,7 +73,21 @@ export async function enrollCampaigns(
 
     for (const customer of masterCustomers || []) {
       try {
+        let alreadyEnrolled = false;
+        try {
+          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'vip-master', 30, normalizedTenant);
+        } catch {
+          alreadyEnrolled = false;
+        }
+        if (alreadyEnrolled) {
+          continue;
+        }
         await client.addToCampaign(customer.email || customer.phone, 'vip-master');
+        try {
+          await trackEnrollment(db, customer.id, 'vip-master', 'vip-master', 0, 'enrolled', normalizedTenant);
+        } catch {
+          // Best-effort enrollment tracking
+        }
         enrolled++;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -103,7 +118,21 @@ export async function enrollCampaigns(
 
     for (const customer of newCustomers || []) {
       try {
+        let alreadyEnrolled = false;
+        try {
+          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'welcome-series', 30, normalizedTenant);
+        } catch {
+          alreadyEnrolled = false;
+        }
+        if (alreadyEnrolled) {
+          continue;
+        }
         await client.addToCampaign(customer.email || customer.phone, 'welcome-series');
+        try {
+          await trackEnrollment(db, customer.id, 'welcome-series', 'welcome-series', 0, 'enrolled', normalizedTenant);
+        } catch {
+          // Best-effort enrollment tracking
+        }
         enrolled++;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);

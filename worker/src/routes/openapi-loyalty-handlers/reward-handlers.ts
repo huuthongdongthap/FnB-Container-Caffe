@@ -8,7 +8,6 @@ import {
   getLoyaltyAccountWithFallback,
   matchesLoyaltyTenant,
   recordLoyaltyTransactionDualWrite,
-  syncLoyaltyAccountAndCustomerBalance,
   writeLoyaltyAuditLog,
 } from './loyalty-db-helpers';
 
@@ -43,6 +42,7 @@ async function findRewardByIdWithFallback(db: any, id: string): Promise<{ reward
   try {
     const legacy = await db.prepare(
       `SELECT
+        *,
         id,
         COALESCE(name, title) as name,
         description,
@@ -254,6 +254,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           now,
           now
         ).run();
+        if (tenantId !== 'default') {
+          await db.prepare('UPDATE loyalty_rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
+        }
       } catch {
         await db.prepare(
           `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, created_at)
@@ -269,6 +272,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           isActiveInt,
           now
         ).run();
+        await db.prepare('UPDATE loyalty_rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
       }
     }
 
@@ -298,6 +302,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         now,
         now
       ).run();
+      try { await db.prepare('UPDATE rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run(); } catch { /* tenant_id column may not exist */ }
     } catch {
       // Ignore when rewards table is absent
     }
@@ -389,18 +394,33 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
+    const tenantClause = tenantId !== '*' ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : '';
+    const tenantBind = tenantId !== '*' ? [tenantId] : [];
+
     try {
-      await db.prepare(`UPDATE loyalty_rewards SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      await db.prepare(`UPDATE loyalty_rewards SET ${updates.join(', ')} WHERE id = ?${tenantClause}`).bind(...params, ...tenantBind).run();
     } catch {
-      if (canonicalUpdates.length > 0) {
-        await db.prepare(`UPDATE loyalty_rewards SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+      try {
+        await db.prepare(`UPDATE loyalty_rewards SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      } catch {
+        if (canonicalUpdates.length > 0) {
+          try {
+            await db.prepare(`UPDATE loyalty_rewards SET ${canonicalUpdates.join(', ')} WHERE id = ?${tenantClause}`).bind(...canonicalParams, id, ...tenantBind).run();
+          } catch {
+            await db.prepare(`UPDATE loyalty_rewards SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
+          }
+        }
       }
     }
 
     if (rewardsTableUpdates.length > 0) {
       rewardsTableUpdates.push('updated_at = ?');
       rewardsTableParams.push(now, id);
-      await db.prepare(`UPDATE rewards SET ${rewardsTableUpdates.join(', ')} WHERE id = ?`).bind(...rewardsTableParams).run().catch(() => {});
+      try {
+        await db.prepare(`UPDATE rewards SET ${rewardsTableUpdates.join(', ')} WHERE id = ?${tenantClause}`).bind(...rewardsTableParams, ...tenantBind).run();
+      } catch {
+        await db.prepare(`UPDATE rewards SET ${rewardsTableUpdates.join(', ')} WHERE id = ?`).bind(...rewardsTableParams).run().catch(() => {});
+      }
     }
 
     await writeLoyaltyAuditLog(db, user.id, 'loyalty_reward_update', 'loyalty_reward', id, JSON.stringify(body), now);
@@ -422,7 +442,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const now = new Date().toISOString();
     const tenantId = getTenantId(c);
 
-    const { reward } = await findRewardByIdWithFallback(db, id);
+    const { reward, fromRewardsTable } = await findRewardByIdWithFallback(db, id);
     if (!reward || !(await checkRewardTenant(db, reward, tenantId))) {
       return c.json({ success: false, error: 'Reward not found' }, 404);
     }
@@ -449,7 +469,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         // Optional orders table in unit tests
       }
     }
-    const { account } = await getLoyaltyAccountWithFallback(db, customerLookupId, now, tenantId);
+    const { account, usingCustomersFallback } = await getLoyaltyAccountWithFallback(db, customerLookupId, now, tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'No loyalty account found' }, 404);
@@ -463,6 +483,10 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Always verify customer has sufficient points to redeem the reward
     if (currentPoints < pointsCost) {
       return c.json({ success: false, error: 'Insufficient points' }, 400);
+    }
+
+    if (fromRewardsTable && reward.stock !== undefined && reward.stock !== null && Number(reward.stock) === 0) {
+      return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
     }
 
     if (maxRedemptions && currentRedemptions >= maxRedemptions) {
@@ -490,64 +514,171 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     let quotaReserved = false;
-    try {
-      const qRes = await db.prepare(
-        `UPDATE loyalty_rewards
-         SET current_redemptions = COALESCE(current_redemptions, 0) + 1
-         WHERE id = ? AND COALESCE(is_active, 1) = 1
-           AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions)`
-      ).bind(id).run();
-      if ((qRes?.meta?.changes ?? 1) === 0) {
-        return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+    if (fromRewardsTable) {
+      if (reward.stock !== undefined && reward.stock !== null && Number(reward.stock) > 0) {
+        const rStockRes = await db.prepare(
+          `UPDATE rewards
+           SET stock = stock - 1
+           WHERE id = ? AND COALESCE(is_active, 1) = 1 AND stock >= 1`
+        ).bind(id).run().catch(() => null);
+        if (rStockRes && (rStockRes?.meta?.changes ?? 1) === 0) {
+          return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+        }
+        quotaReserved = Boolean(rStockRes);
       }
-      quotaReserved = true;
-    } catch {
-      const qRes = await db.prepare(
-        `UPDATE loyalty_rewards
-         SET redeemed_count = COALESCE(redeemed_count, 0) + 1
-         WHERE id = ? AND COALESCE(is_active, 1) = 1
-           AND (stock IS NULL OR stock <= 0 OR COALESCE(redeemed_count, 0) < stock)`
-      ).bind(id).run().catch(() => null);
-      if (qRes && (qRes?.meta?.changes ?? 1) === 0) {
-        return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+    } else {
+      try {
+        const qRes = await db.prepare(
+          `UPDATE loyalty_rewards
+           SET current_redemptions = COALESCE(current_redemptions, 0) + 1
+           WHERE id = ? AND COALESCE(is_active, 1) = 1
+             AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions)`
+        ).bind(id).run();
+        if ((qRes?.meta?.changes ?? 1) === 0) {
+          return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+        }
+        quotaReserved = true;
+      } catch {
+        const qRes = await db.prepare(
+          `UPDATE loyalty_rewards
+           SET redeemed_count = COALESCE(redeemed_count, 0) + 1
+           WHERE id = ? AND COALESCE(is_active, 1) = 1
+             AND (stock IS NULL OR stock <= 0 OR COALESCE(redeemed_count, 0) < stock)`
+        ).bind(id).run().catch(() => null);
+        if (qRes && (qRes?.meta?.changes ?? 1) === 0) {
+          return c.json({ success: false, error: 'Reward max redemptions reached' }, 409);
+        }
+        quotaReserved = Boolean(qRes);
       }
-      quotaReserved = Boolean(qRes);
+      await db.prepare(
+        'UPDATE rewards SET stock = stock - 1 WHERE id = ? AND stock IS NOT NULL AND stock >= 1'
+      ).bind(id).run().catch(() => {});
     }
+
+    const rollbackQuotaReservation = async () => {
+      if (!quotaReserved) return;
+      if (fromRewardsTable) {
+        await db.prepare('UPDATE rewards SET stock = COALESCE(stock, 0) + 1 WHERE id = ?').bind(id).run().catch(() => {});
+      } else {
+        await db.prepare('UPDATE loyalty_rewards SET current_redemptions = MAX(0, COALESCE(current_redemptions, 1) - 1) WHERE id = ?').bind(id).run().catch(async () => {
+          await db.prepare('UPDATE loyalty_rewards SET redeemed_count = MAX(0, COALESCE(redeemed_count, 1) - 1) WHERE id = ?').bind(id).run().catch(() => {});
+        });
+      }
+    };
 
     const transactionId = crypto.randomUUID();
     const pointsChange = -pointsCost;
-    const newBalance = currentPoints + pointsChange;
+    let authoritativeBalance = currentPoints + pointsChange;
     const accountId = String(account.id);
     const customerId = String(account.customer_id ?? customerLookupId);
     const rewardName = String(reward.name ?? reward.title ?? id);
+    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
 
-    try {
-      const deductRes = await db.prepare(
-        `UPDATE loyalty_accounts
-         SET current_points = current_points - ?, last_activity_at = ?, updated_at = ?
-         WHERE (id = ? OR customer_id = ?) AND COALESCE(current_points, 0) >= ?`
-      ).bind(pointsCost, now, now, accountId, customerId, pointsCost).run();
-      if ((deductRes?.meta?.changes ?? 1) === 0) {
-        if (quotaReserved) {
-          await db.prepare('UPDATE loyalty_rewards SET current_redemptions = MAX(0, COALESCE(current_redemptions, 1) - 1) WHERE id = ?').bind(id).run().catch(() => {});
-        }
-        return c.json({ success: false, error: 'Insufficient points' }, 409);
-      }
-    } catch {
+    const deductFromCustomersOnly = async () => {
       try {
-        const custDeduct = await db.prepare(
-          `UPDATE customers
-           SET loyalty_points = loyalty_points - ?, updated_at = ?
-           WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?`
-        ).bind(pointsCost, now, customerId, pointsCost).run();
-        if ((custDeduct?.meta?.changes ?? 1) === 0) {
-          if (quotaReserved) {
-            await db.prepare('UPDATE loyalty_rewards SET current_redemptions = MAX(0, COALESCE(current_redemptions, 1) - 1) WHERE id = ?').bind(id).run().catch(() => {});
+        let custDeduct: any;
+        if (effectiveTenant) {
+          try {
+            custDeduct = await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = loyalty_points - ?, updated_at = ?
+               WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(pointsCost, now, customerId, pointsCost, effectiveTenant).run();
+          } catch {
+            custDeduct = await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = loyalty_points - ?, updated_at = ?
+               WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?`
+            ).bind(pointsCost, now, customerId, pointsCost).run();
           }
-          return c.json({ success: false, error: 'Insufficient points' }, 409);
+        } else {
+          custDeduct = await db.prepare(
+            `UPDATE customers
+             SET loyalty_points = loyalty_points - ?, updated_at = ?
+             WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?`
+          ).bind(pointsCost, now, customerId, pointsCost).run();
+        }
+        if ((custDeduct?.meta?.changes ?? 1) === 0) {
+          await rollbackQuotaReservation();
+          return false;
+        }
+        const postCust = await db.prepare(
+          'SELECT loyalty_points FROM customers WHERE id = ? LIMIT 1'
+        ).bind(customerId).first<{ loyalty_points?: number }>().catch(() => null);
+        if (typeof postCust?.loyalty_points === 'number') {
+          authoritativeBalance = Number(postCust.loyalty_points);
         }
       } catch {
         // Fallback for minimal test schemas
+      }
+      return true;
+    };
+
+    if (usingCustomersFallback) {
+      const ok = await deductFromCustomersOnly();
+      if (!ok) {
+        return c.json({ success: false, error: 'Insufficient points' }, 409);
+      }
+    } else {
+      try {
+        let deductRes: any;
+        if (effectiveTenant) {
+          try {
+            deductRes = await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = current_points - ?, last_activity_at = ?, updated_at = ?
+               WHERE (id = ? OR customer_id = ?) AND COALESCE(current_points, 0) >= ?
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(pointsCost, now, now, accountId, customerId, pointsCost, effectiveTenant).run();
+          } catch {
+            deductRes = await db.prepare(
+              `UPDATE loyalty_accounts
+               SET current_points = current_points - ?, last_activity_at = ?, updated_at = ?
+               WHERE (id = ? OR customer_id = ?) AND COALESCE(current_points, 0) >= ?`
+            ).bind(pointsCost, now, now, accountId, customerId, pointsCost).run();
+          }
+        } else {
+          deductRes = await db.prepare(
+            `UPDATE loyalty_accounts
+             SET current_points = current_points - ?, last_activity_at = ?, updated_at = ?
+             WHERE (id = ? OR customer_id = ?) AND COALESCE(current_points, 0) >= ?`
+          ).bind(pointsCost, now, now, accountId, customerId, pointsCost).run();
+        }
+        if ((deductRes?.meta?.changes ?? 1) === 0) {
+          await rollbackQuotaReservation();
+          return c.json({ success: false, error: 'Insufficient points' }, 409);
+        }
+        if (effectiveTenant) {
+          await db.prepare(
+            `UPDATE customers
+             SET loyalty_points = MAX(0, COALESCE(loyalty_points, 0) - ?), updated_at = ?
+             WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(pointsCost, now, customerId, effectiveTenant).run().catch(async () => {
+            await db.prepare(
+              `UPDATE customers
+               SET loyalty_points = MAX(0, COALESCE(loyalty_points, 0) - ?), updated_at = ?
+               WHERE id = ?`
+            ).bind(pointsCost, now, customerId).run().catch(() => {});
+          });
+        } else {
+          await db.prepare(
+            `UPDATE customers
+             SET loyalty_points = MAX(0, COALESCE(loyalty_points, 0) - ?), updated_at = ?
+             WHERE id = ?`
+          ).bind(pointsCost, now, customerId).run().catch(() => {});
+        }
+        const postAcct = await db.prepare(
+          'SELECT current_points FROM loyalty_accounts WHERE id = ? OR customer_id = ? LIMIT 1'
+        ).bind(accountId, customerId).first<{ current_points?: number }>().catch(() => null);
+        if (typeof postAcct?.current_points === 'number') {
+          authoritativeBalance = Number(postAcct.current_points);
+        }
+      } catch {
+        const ok = await deductFromCustomersOnly();
+        if (!ok) {
+          return c.json({ success: false, error: 'Insufficient points' }, 409);
+        }
       }
     }
 
@@ -557,23 +688,17 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       customerId,
       type: 'redeem',
       points: pointsChange,
-      balanceAfter: newBalance,
+      balanceAfter: authoritativeBalance,
       orderId: body.orderId || null,
       rewardId: id,
       description: `Redeemed: ${rewardName}`,
       reason: `Redeemed: ${rewardName}`,
       idempotencyKey: body.idempotencyKey ?? null,
+      tenantId,
       now,
     });
 
-    await syncLoyaltyAccountAndCustomerBalance(db, {
-      accountId,
-      customerId,
-      newBalance,
-      now,
-    });
-
-    if (!quotaReserved) {
+    if (!quotaReserved && !fromRewardsTable) {
       try {
         await db.prepare(
           'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1 WHERE id = ?'
@@ -596,6 +721,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           id, customer_id, reward_id, code, points_spent, order_id, status, expires_at, redeemed_at, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`
       ).bind(`lrd_${transactionId}`, customerId, id, voucherCode, pointsCost, body.orderId || null, expiresAt, now, now).run();
+      if (tenantId !== 'default' && tenantId !== '*') {
+        await db.prepare('UPDATE loyalty_redemptions SET tenant_id = ? WHERE id = ?').bind(tenantId, `lrd_${transactionId}`).run().catch(() => {});
+      }
     } catch {
       // Ignore when loyalty_redemptions is absent in older migration snapshots
     }
@@ -607,6 +735,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
          WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)
            AND EXISTS (SELECT 1 FROM rewards WHERE id = ?)`
       ).bind(`uwr_${transactionId}`, customerId, id, voucherCode, expiresAt, now, customerId, id).run();
+      if (tenantId !== 'default' && tenantId !== '*') {
+        await db.prepare('UPDATE user_rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, `uwr_${transactionId}`).run().catch(() => {});
+      }
     } catch {
       // Ignore when user_rewards is absent
     }
@@ -629,8 +760,8 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           ...mapRewardRow(reward),
           currentRedemptions: currentRedemptions + 1,
         },
-        newBalance,
-        expiresAt: null,
+        newBalance: authoritativeBalance,
+        expiresAt,
       },
     });
   });

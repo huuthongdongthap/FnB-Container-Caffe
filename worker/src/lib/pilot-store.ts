@@ -6,9 +6,10 @@ export class PilotStoreError extends Error {
 }
 
 export function resolvePilotStore(env: { [key: string]: unknown }): string {
-  const value = env.PILOT_TENANT_ID;
+  const rawValue = env.PILOT_TENANT_ID;
+  const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
   const production = env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
-  if (value === undefined && !production) return 'default';
+  if ((value === undefined || value === '') && !production) return 'default';
   if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(value)
     || value === 'hq') throw new PilotStoreError();
   return value;

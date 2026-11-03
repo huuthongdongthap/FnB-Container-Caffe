@@ -4,6 +4,7 @@
  */
 
 import type { SyncStatus } from './types';
+import { matchesTenantRow } from '../../lib/db';
 
 export const syncStatus: SyncStatus = {
   last_sync: null,
@@ -16,7 +17,8 @@ export const syncStatus: SyncStatus = {
 const tenantSyncStatusMap = new Map<string, SyncStatus>([['default', syncStatus]]);
 
 export function getSyncStatus(tenantId?: string): SyncStatus {
-  const key = tenantId && tenantId !== '*' ? tenantId : 'default';
+  const clean = tenantId ? tenantId.trim() : '';
+  const key = clean && clean !== '*' ? clean : 'default';
   if (key === 'default') {
     return syncStatus;
   }
@@ -39,10 +41,7 @@ export function matchesMauticTenant(
   tenantId?: string
 ): boolean {
   if (!row) return false;
-  if (tenantId === '*') return true;
-  const effective = tenantId && tenantId !== '*' ? tenantId : 'default';
-  if ('tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '') {
-    return String(row.tenant_id).trim() === effective;
-  }
-  return effective === 'default';
+  const clean = tenantId ? tenantId.trim() : '';
+  if (clean === '*') return true;
+  return matchesTenantRow(row, clean || 'default');
 }

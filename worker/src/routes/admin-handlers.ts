@@ -4,6 +4,7 @@
  */
 
 import { verifyJWT } from '../lib/jwt';
+import { matchesTenantRow } from '../lib/db';
 import { resolvePilotStore } from '../lib/pilot-store';
 
 function resolveEnvTenant(env: Record<string, unknown>, explicitTenantId?: string): string {
@@ -29,7 +30,7 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   const tier = url.searchParams.get('tier') || '';
   const offset = (page - 1) * limit;
 
-  const clauses: string[] = ["(? = '*' OR COALESCE(NULLIF(c.tenant_id, ''), 'default') = ?)"];
+  const clauses: string[] = ["(? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)"];
   const params: unknown[] = [tenantId, tenantId];
 
   if (search) {
@@ -44,7 +45,7 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
-  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) AS visit_count, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
   const canonicalCountQuery = `SELECT COUNT(*) as total FROM customers c${where}`;
 
   let results: unknown[] = [];
@@ -56,8 +57,8 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
     const totalRow = await db.prepare(canonicalCountQuery).bind(...params).first<{ total: number }>();
     total = totalRow?.total ?? 0;
   } catch (err) {
-    const missingTenantCol = /no such column:\s*(?:c\.|o\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
-    const legacyClauses: string[] = missingTenantCol ? [] : ["(? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)"];
+    const missingTenantCol = /no such column:\s*(?:c\.|o\.|cw\.)?tenant_id/i.test(err instanceof Error ? err.message : String(err));
+    const legacyClauses: string[] = missingTenantCol ? [] : ["(? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"];
     const legacyParams: unknown[] = missingTenantCol ? [] : [tenantId, tenantId];
     if (search) {
       legacyClauses.push('(name LIKE ? OR phone LIKE ? OR email LIKE ?)');
@@ -77,7 +78,9 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
     total = totalRow?.total ?? 0;
   }
 
-  const customers = (results || []).map((row) => {
+  const customers = (results || [])
+    .filter((row) => matchesTenantRow(row as Record<string, unknown>, tenantId))
+    .map((row) => {
     const r = row as Record<string, unknown>;
     const normalizedTier = String(r.tier ?? r.loyalty_tier ?? 'bronze');
     return {
@@ -111,9 +114,40 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
   const id = `c_${Date.now()}`;
   const now = new Date().toISOString();
   const sanitizedPhone = phone.replace(/\D/g, '') || id;
-  const email = body.email && String(body.email).trim()
-    ? String(body.email).trim()
-    : `${sanitizedPhone}@loyalty.aura`;
+  const rawEmail = body.email && String(body.email).trim() ? String(body.email).trim() : '';
+  const email = rawEmail
+    ? rawEmail
+    : tenantId && tenantId !== 'default' && tenantId !== '*'
+      ? `${sanitizedPhone}+${tenantId}@loyalty.aura`
+      : `${sanitizedPhone}@loyalty.aura`;
+
+  try {
+    const dupStmt = db.prepare('SELECT id, phone, tenant_id FROM customers WHERE phone = ?').bind(phone);
+    const existingRes = await dupStmt.all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
+    const candidates: Record<string, unknown>[] = [...(existingRes?.results || [])];
+    if (candidates.length === 0 && typeof dupStmt.first === 'function') {
+      const firstRow = await dupStmt.first<Record<string, unknown>>().catch(() => null);
+      if (firstRow) candidates.push(firstRow);
+    }
+    const duplicateInTenant = candidates.some(
+      (row) =>
+        row &&
+        Boolean(row.id) &&
+        (!('phone' in row) ||
+          row.phone === undefined ||
+          String(row.phone).trim() === phone ||
+          String(row.phone).replace(/\D/g, '') === sanitizedPhone) &&
+        matchesTenantRow(row, tenantId)
+    );
+    if (duplicateInTenant) {
+      return Response.json(
+        { success: false, error: 'Customer phone already exists in this store' },
+        { status: 409 }
+      );
+    }
+  } catch {
+    // Ignore optional pre-check errors on partial test mocks
+  }
 
   try {
     await db
@@ -146,6 +180,13 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
           .bind(id, name, phone, email, tier, now)
           .run();
       }
+    }
+    if (tenantId && tenantId !== '*') {
+      await db
+        .prepare('UPDATE customers SET tenant_id = ? WHERE id = ?')
+        .bind(tenantId, id)
+        .run()
+        .catch(() => {});
     }
   }
 
@@ -205,7 +246,7 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
       canonicalParams.push(tierValue);
     }
     canonicalParams.push(id, tenantId, tenantId);
-    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...canonicalParams).run();
+    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
   } catch (err) {
     const missingTenantCol = /no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err));
     try {
@@ -220,7 +261,7 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
       } else {
         canonicalParams.push(id, tenantId, tenantId);
-        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...canonicalParams).run();
+        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
       }
     } catch (innerErr) {
       const innerMissingTenant = missingTenantCol || /no such column:\s*tenant_id/i.test(innerErr instanceof Error ? innerErr.message : String(innerErr));
@@ -235,7 +276,7 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
       } else {
         legacyParams.push(id, tenantId, tenantId);
-        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)`).bind(...legacyParams).run();
+        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...legacyParams).run();
       }
     }
   }
@@ -246,7 +287,7 @@ export async function deleteAdminCustomer(env: Record<string, unknown>, id: stri
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const tenantId = resolveEnvTenant(env, effectiveTenantId);
   try {
-    await db.prepare("DELETE FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?)").bind(id, tenantId, tenantId).run();
+    await db.prepare("DELETE FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)").bind(id, tenantId, tenantId).run();
   } catch (err) {
     if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
       throw err;

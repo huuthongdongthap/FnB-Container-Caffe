@@ -33,12 +33,25 @@ export async function setItemChecked(
   if (!run) throw new SopAccessError('Run not found', 404);
   assertActorOrManager(scope, run.staffId);
 
-  const item = run.items.find((row) => row.templateItemId === itemId);
+  let itemIdx = run.items.findIndex((row) => row.templateItemId === itemId);
+  if (itemIdx === -1) {
+    const ruleIdx = (run.templateItems ?? []).findIndex((rule) => rule.id === itemId);
+    if (ruleIdx !== -1 && ruleIdx < run.items.length) {
+      itemIdx = ruleIdx;
+    }
+  }
+  const item = itemIdx !== -1 ? run.items[itemIdx] : undefined;
   if (!item) throw new SopAccessError('Item not found', 404);
+
+  const rawRule =
+    run.templateItems?.find((rule) => rule.id === item.templateItemId || rule.id === itemId) ??
+    run.templateItems?.[itemIdx] ??
+    templateItemOf(run, item.templateItemId);
+  const alignedRule = { ...rawRule, id: item.templateItemId };
 
   const updated = checkItem({
     run,
-    item: templateItemOf(run, itemId),
+    item: alignedRule,
     isChecked: payload.isChecked,
     note: payload.note ?? null,
     value: payload.value === null || payload.value === undefined ? null : String(payload.value),
@@ -48,7 +61,7 @@ export async function setItemChecked(
   if (!updated.ok) throw new SopAccessError(mapPolicyError(updated.error), 409);
 
   const next = updated.data;
-  const written = next.items.find((row) => row.templateItemId === itemId)!;
+  const written = next.items.find((row) => row.templateItemId === item.templateItemId)!;
 
   const result = await sopDatabase(scope)
     .prepare(
@@ -64,7 +77,7 @@ export async function setItemChecked(
       written.value === null ? null : Number(written.value),
       scope.tenantId,
       id,
-      itemId
+      item.templateItemId
     )
     .run();
   if (!result.meta.changes) throw new SopAccessError('Run changed; reload', 409);
@@ -78,9 +91,20 @@ export async function completeRunForStaff(scope: SopScope, runId: string): Promi
   if (!run) throw new SopAccessError('Run not found', 404);
   assertActorOrManager(scope, run.staffId);
 
+  const templateItems = templateItemsOf(run);
+  const ruleIds = new Set(templateItems.map((rule) => rule.id));
+  const alignedRun: SopRun = {
+    ...run,
+    items: run.items.map((row, idx) =>
+      ruleIds.has(row.templateItemId) || !templateItems[idx]
+        ? row
+        : { ...row, templateItemId: templateItems[idx].id }
+    ),
+  };
+
   const closed = completeRun({
-    run,
-    templateItems: templateItemsOf(run),
+    run: alignedRun,
+    templateItems,
     completedBy: scope.actorId,
     now: nowIso(),
   } satisfies CompleteRunInput);
@@ -95,7 +119,7 @@ export async function completeRunForStaff(scope: SopScope, runId: string): Promi
     .run();
   if (!result.meta.changes) throw new SopAccessError('Run is already closed', 409);
 
-  return closed.data;
+  return { ...closed.data, items: run.items };
 }
 
 export async function abandonRunForStaff(

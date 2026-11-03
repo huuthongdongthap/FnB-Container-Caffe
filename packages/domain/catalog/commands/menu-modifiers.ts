@@ -6,6 +6,7 @@
 import { Hono } from 'hono';
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
+import { isHQSuperAdmin, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { ModifierGroup, ModifierChoice } from '../model/catalog-types';
 import { syncModifierChoiceToMenuProjection } from '../policies/menu-projection';
@@ -13,7 +14,17 @@ import { happyHourRouter } from './happy-hour';
 
 export const menuModifiersRouter = new Hono<{ Bindings: Env }>();
 menuModifiersRouter.use('*', optionalAuth());
-const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
+
+function resolvePublicCatalogTenantId(c: any): string {
+  const raw = resolvePublicTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c.get?.('user') ?? c) ? 'default' : raw;
+}
+
+function resolveWriteCatalogTenantId(c: any): string {
+  const raw = getTenantId(c).trim() || 'default';
+  return raw === '*' && !isHQSuperAdmin(c.get?.('user') ?? c) ? 'default' : raw;
+}
 
 function makeId(prefix: string): string {
   const bytes = new Uint8Array(6);
@@ -26,7 +37,7 @@ function makeId(prefix: string): string {
 
 menuModifiersRouter.get('/groups', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicCatalogTenantId(c);
   const { results } = await db.prepare(
     'SELECT * FROM modifier_groups ORDER BY sort_order, name'
   ).all<ModifierGroup>();
@@ -63,6 +74,9 @@ menuModifiersRouter.post('/groups', staffAuth, async (c) => {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(id, name, type, required, Number(body.sort_order) || 0, now, now).run();
     }
+    if (tenantId !== 'default') {
+      await db.prepare('UPDATE modifier_groups SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
+    }
   }
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(id).first<ModifierGroup>();
   return c.json({ success: true, data: group }, 201);
@@ -70,7 +84,7 @@ menuModifiersRouter.post('/groups', staffAuth, async (c) => {
 
 menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!existing || !matchesTenantRow(existing, tenantId)) {
@@ -81,7 +95,17 @@ menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
   // loses modifiers it still advertises.
   await db.prepare('DELETE FROM product_modifier_groups WHERE group_id = ?').bind(id).run();
   await db.prepare('DELETE FROM menu_modifiers WHERE group_id = ?').bind(id).run();
-  await db.prepare('DELETE FROM modifier_groups WHERE id = ?').bind(id).run();
+  if (tenantId !== '*') {
+    await db.prepare(
+      "DELETE FROM modifier_groups WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(id, tenantId).run().catch(async () => {
+      if (tenantId === 'default') {
+        await db.prepare('DELETE FROM modifier_groups WHERE id = ?').bind(id).run();
+      }
+    });
+  } else {
+    await db.prepare('DELETE FROM modifier_groups WHERE id = ?').bind(id).run();
+  }
   return c.json({ success: true });
 });
 
@@ -89,7 +113,7 @@ menuModifiersRouter.delete('/groups/:id', staffAuth, async (c) => {
 
 menuModifiersRouter.get('/groups/:groupId/choices', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicCatalogTenantId(c);
   const groupId = c.req.param('groupId');
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
   if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
@@ -103,7 +127,7 @@ menuModifiersRouter.get('/groups/:groupId/choices', async (c) => {
 
 menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const groupId = c.req.param('groupId');
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>();
   if (!group || !matchesTenantRow(group, tenantId)) return c.json({ success: false, error: 'Modifier group not found' }, 404);
@@ -148,7 +172,7 @@ menuModifiersRouter.post('/groups/:groupId/choices', staffAuth, async (c) => {
 
 menuModifiersRouter.patch('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const { groupId, choiceId } = c.req.param();
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
   if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
@@ -197,7 +221,7 @@ menuModifiersRouter.patch('/groups/:groupId/choices/:choiceId', staffAuth, async
 
 menuModifiersRouter.delete('/groups/:groupId/choices/:choiceId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const { groupId, choiceId } = c.req.param();
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>().catch(() => null);
   if ((group && !matchesTenantRow(group, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !group)) {
@@ -219,7 +243,7 @@ menuModifiersRouter.delete('/groups/:groupId/choices/:choiceId', staffAuth, asyn
 
 menuModifiersRouter.get('/products/:productId/groups', async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolvePublicCatalogTenantId(c);
   const productId = c.req.param('productId');
   const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>().catch(() => null);
   if ((product && !matchesTenantRow(product, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !product)) {
@@ -238,7 +262,7 @@ menuModifiersRouter.get('/products/:productId/groups', async (c) => {
 
 menuModifiersRouter.post('/products/:productId/groups', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const productId = c.req.param('productId');
   const body = (await c.req.json()) as Record<string, unknown>;
   const groupId = String(body.group_id || '').trim();
@@ -247,8 +271,13 @@ menuModifiersRouter.post('/products/:productId/groups', staffAuth, async (c) => 
   if ((product && !matchesTenantRow(product, tenantId)) || (tenantId !== '*' && tenantId !== 'default' && !product)) {
     return c.json({ success: false, error: 'Product not found' }, 404);
   }
+  const productTenant = product && typeof product.tenant_id === 'string' && product.tenant_id.trim()
+    ? product.tenant_id.trim()
+    : (product && 'tenant_id' in product ? 'default' : tenantId);
   const group = await db.prepare('SELECT * FROM modifier_groups WHERE id = ?').bind(groupId).first<Record<string, unknown>>();
-  if (!group || !matchesTenantRow(group, tenantId)) return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  if (!group || !matchesTenantRow(group, tenantId) || (productTenant !== '*' && !matchesTenantRow(group, productTenant))) {
+    return c.json({ success: false, error: 'Modifier group not found' }, 404);
+  }
   await db.prepare(
     'INSERT OR IGNORE INTO product_modifier_groups (product_id, group_id, sort_order) VALUES (?, ?, ?)'
   ).bind(productId, groupId, Number(body.sort_order) || 0).run();
@@ -257,7 +286,7 @@ menuModifiersRouter.post('/products/:productId/groups', staffAuth, async (c) => 
 
 menuModifiersRouter.delete('/products/:productId/groups/:groupId', staffAuth, async (c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveWriteCatalogTenantId(c);
   const productId = c.req.param('productId');
   const groupId = c.req.param('groupId');
   const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>().catch(() => null);

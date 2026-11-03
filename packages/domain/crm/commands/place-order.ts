@@ -44,7 +44,8 @@ export interface PlaceOrderSuccess {
 
 export interface PlaceOrderError {
   ok: false;
-  code: 'empty_items' | 'invalid_item' | 'invalid_quantity' | 'invalid_channel' | 'd1_error';
+  status?: number;
+  code: 'empty_items' | 'invalid_item' | 'invalid_items' | 'invalid_quantity' | 'invalid_channel' | 'd1_error';
   error: string;
 }
 
@@ -66,6 +67,62 @@ function generateOrderId(): string {
   return 'ord_' + Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function fetchMenuPriceCents(
+  db: D1Database,
+  menuItemId: string,
+  targetTenant: string,
+): Promise<{ ok: true; id: string; name: string; unitPriceCents: number } | PlaceOrderError> {
+  let row: { id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null } | null;
+  try {
+    row = await db
+      .prepare('SELECT id, name, price, available, tenant_id FROM menu_items WHERE id = ?')
+      .bind(menuItemId)
+      .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
+      .catch(() =>
+        db
+          .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+          .bind(menuItemId)
+          .first<{ id: string; name: string; price: number; available: number | boolean }>()
+          .catch(() => null)
+      );
+    if (!row) {
+      row = await db
+        .prepare('SELECT id, name, price, is_available as available, tenant_id FROM products WHERE id = ?')
+        .bind(menuItemId)
+        .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
+        .catch(() =>
+          db
+            .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+            .bind(menuItemId)
+            .first<{ id: string; name: string; price: number; available: number | boolean }>()
+            .catch(() => null)
+        );
+    }
+  } catch (e) {
+    return { ok: false, code: 'd1_error', error: `failed to read menu item: ${(e as Error).message}` };
+  }
+
+  if (!row) {
+    return { ok: false, code: 'invalid_item', error: `menu item not found: ${menuItemId}` };
+  }
+  if (targetTenant !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
+    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+    if (rowTenant !== targetTenant) {
+      return { ok: false, code: 'invalid_item', error: `menu item not found: ${menuItemId}` };
+    }
+  }
+  if (row.available === 0 || row.available === false) {
+    return { ok: false, code: 'invalid_item', error: `menu item unavailable: ${menuItemId}` };
+  }
+
+  return {
+    ok: true,
+    id: row.id,
+    name: row.name,
+    unitPriceCents: Number(row.price) || 0,
+  };
+}
+
 /**
  * Place an online order. Each item's price is read from menu_items
  * so the customer can never inject a price. Internal fields (cost,
@@ -82,7 +139,11 @@ export async function placeOrder(
   if (!input.items || input.items.length === 0) {
     return { ok: false, code: 'empty_items', error: 'order must contain at least one item' };
   }
+  if (input.items.length > 50) {
+    return { ok: false, status: 400, code: 'invalid_items', error: 'Invalid item count or quantity' };
+  }
 
+  const targetTenant = (input.tenantId && input.tenantId.trim()) ? input.tenantId.trim() : 'default';
   const items: OrderItemResult[] = [];
   let totalCents = 0;
 
@@ -91,60 +152,25 @@ export async function placeOrder(
       return { ok: false, code: 'invalid_item', error: 'each item must have a menuItemId' };
     }
     const qty = Number(line.quantity);
-    if (!Number.isInteger(qty) || qty < 1) {
-      return { ok: false, code: 'invalid_quantity', error: `invalid quantity for item ${line.menuItemId}` };
+    if (!Number.isInteger(qty) || qty > 100) {
+      return { ok: false, status: 400, code: 'invalid_items', error: 'Invalid item count or quantity' };
+    }
+    if (qty < 1) {
+      return { ok: false, status: 400, code: 'invalid_quantity', error: `invalid quantity for item ${line.menuItemId}` };
     }
 
-    let row: { id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null } | null;
-    try {
-      row = await db
-        .prepare('SELECT id, name, price, available, tenant_id FROM menu_items WHERE id = ?')
-        .bind(line.menuItemId)
-        .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
-        .catch(() =>
-          db
-            .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
-            .bind(line.menuItemId)
-            .first<{ id: string; name: string; price: number; available: number | boolean }>()
-            .catch(() => null)
-        );
-      if (!row) {
-        row = await db
-          .prepare('SELECT id, name, price, is_available as available, tenant_id FROM products WHERE id = ?')
-          .bind(line.menuItemId)
-          .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
-          .catch(() =>
-            db
-              .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
-              .bind(line.menuItemId)
-              .first<{ id: string; name: string; price: number; available: number | boolean }>()
-              .catch(() => null)
-          );
-      }
-    } catch (e) {
-      return { ok: false, code: 'd1_error', error: `failed to read menu item: ${(e as Error).message}` };
+    const fetched = await fetchMenuPriceCents(db, line.menuItemId, targetTenant);
+    if (!fetched.ok) {
+      return fetched;
     }
 
-    if (!row) {
-      return { ok: false, code: 'invalid_item', error: `menu item not found: ${line.menuItemId}` };
-    }
-    if (input.tenantId && input.tenantId !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
-      const itemTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
-      if (itemTenant !== input.tenantId) {
-        return { ok: false, code: 'invalid_item', error: `menu item not found: ${line.menuItemId}` };
-      }
-    }
-    if (row.available === 0 || row.available === false) {
-      return { ok: false, code: 'invalid_item', error: `menu item unavailable: ${line.menuItemId}` };
-    }
-
-    const unitPriceCents = Number(row.price) || 0;
+    const unitPriceCents = fetched.unitPriceCents;
     const subtotalCents = unitPriceCents * qty;
     totalCents += subtotalCents;
 
     items.push({
-      menuItemId: row.id,
-      name: row.name,
+      menuItemId: fetched.id,
+      name: fetched.name,
       quantity: qty,
       unitPriceCents,
       subtotalCents,
@@ -163,9 +189,8 @@ export async function placeOrder(
     note: i.note,
   })));
 
-  const targetTenant = input.tenantId && input.tenantId !== '*' ? input.tenantId : 'default';
   try {
-    if (targetTenant !== 'default') {
+    if (targetTenant !== '*') {
       await db.prepare(`
         INSERT INTO orders (
           id, items, total, status, customer_name, customer_phone,
@@ -205,15 +230,13 @@ export async function placeOrder(
     }
   } catch {
     try {
-      const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
       await db.prepare(`
         INSERT INTO orders (
-          id, order_number, items, total, status, customer_name, customer_phone,
-          order_type, notes, customer_id, tenant_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         orderId,
-        orderNumber,
         itemsJson,
         totalCents,
         'pending',
@@ -222,8 +245,6 @@ export async function placeOrder(
         input.channel,
         input.notes ?? null,
         input.customerId,
-        targetTenant,
-        now,
         now,
       ).run();
     } catch {
@@ -232,8 +253,8 @@ export async function placeOrder(
         await db.prepare(`
           INSERT INTO orders (
             id, order_number, items, total, status, customer_name, customer_phone,
-            order_type, notes, customer_id, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            order_type, notes, customer_id, tenant_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           orderId,
           orderNumber,
@@ -245,11 +266,35 @@ export async function placeOrder(
           input.channel,
           input.notes ?? null,
           input.customerId,
+          targetTenant,
           now,
           now,
         ).run();
-      } catch (e) {
-        return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+      } catch {
+        try {
+          const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
+          await db.prepare(`
+            INSERT INTO orders (
+              id, order_number, items, total, status, customer_name, customer_phone,
+              order_type, notes, customer_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            orderId,
+            orderNumber,
+            itemsJson,
+            totalCents,
+            'pending',
+            input.customerName ?? null,
+            input.customerPhone,
+            input.channel,
+            input.notes ?? null,
+            input.customerId,
+            now,
+            now,
+          ).run();
+        } catch (e) {
+          return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+        }
       }
     }
   }

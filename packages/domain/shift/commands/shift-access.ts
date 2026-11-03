@@ -9,12 +9,24 @@ export class ShiftContractError extends Error {
 export interface ShiftScope { env: Env; tenantId: string; actor: StaffAccount; canManage: boolean }
 export async function shiftScope(env: Env, user: AuthUser | undefined): Promise<ShiftScope> {
   if (!user) throw new ShiftContractError('Staff authentication required', 403);
-  const tenantId = resolvePilotStore(env);
+  const hasExplicitPilot = env.PILOT_TENANT_ID !== undefined || env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
+  const pilotTenant = hasExplicitPilot ? resolvePilotStore(env) : undefined;
   const actor = await requireStaffAccount(env.AURA_DB, user.id);
-  if (!actor.tenant_id || actor.tenant_id === '*' || actor.tenant_id !== tenantId) {
+  const actorTenant = typeof actor.tenant_id === 'string' ? actor.tenant_id.trim() : '';
+  if (
+    !actorTenant ||
+    actorTenant === '*' ||
+    actorTenant === 'hq' ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(actorTenant) ||
+    (pilotTenant !== undefined && actorTenant !== pilotTenant)
+  ) {
     throw new ShiftContractError('Attendance is unavailable for this store', 403);
   }
-  return { env, tenantId, actor, canManage: ['owner', 'manager'].includes(actor.role) };
+  const tenantId = pilotTenant ?? actorTenant;
+  const allowedRoles = hasExplicitPilot
+    ? ['owner', 'manager', 'supervisor']
+    : ['owner', 'manager', 'supervisor', 'admin'];
+  return { env, tenantId, actor, canManage: allowedRoles.includes(actor.role) };
 }
 export function managerScope(scope: ShiftScope) {
   if (!scope.canManage) throw new ShiftContractError('Owner or manager required', 403);
@@ -25,7 +37,8 @@ export async function shiftTarget(scope: ShiftScope, requested?: string): Promis
     throw new ShiftContractError('Only your own attendance is allowed', 403);
   }
   const account = await requireStaffAccount(scope.env.AURA_DB, id);
-  if (account.tenant_id !== scope.tenantId) throw new ShiftContractError('Staff not found', 404);
+  const accountTenant = (typeof account.tenant_id === 'string' ? account.tenant_id.trim() : '') || 'default';
+  if (accountTenant !== scope.tenantId) throw new ShiftContractError('Staff not found', 404);
   return account;
 }
 export function shiftStaffFilter(scope: ShiftScope, requested?: string): string | undefined {
